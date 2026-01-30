@@ -15,9 +15,18 @@ import {
   Settings,
   LogOut,
   Sparkles,
+  User,
+  Building2,
+  Crown,
+  Receipt,
+  UserPlus,
 } from "lucide-react"
 import Link from "next/link"
-import { usePathname } from "next/navigation"
+import { usePathname, useRouter } from "next/navigation"
+import { signOut } from "firebase/auth"
+import { auth } from "@/lib/firebase"
+import { useAuth } from "@/hooks/use-auth"
+import { toast } from "sonner"
 
 import {
   Sidebar,
@@ -119,14 +128,57 @@ const secondaryNav = [
   },
 ]
 
+const settingsNav = [
+  {
+    title: "Configuración",
+    url: "/settings",
+    icon: Settings,
+    submenu: [
+      { title: "Mi Perfil", url: "/settings/profile", icon: User },
+      { title: "Mi Negocio", url: "/settings/organization", icon: Building2 },
+      { title: "Programa de Lealtad", url: "/settings/loyalty", icon: Crown },
+      { title: "Suscripción", url: "/settings/billing", icon: Receipt },
+      { title: "Usuarios", url: "/settings/users", icon: UserPlus },
+    ],
+  },
+]
+
 export function AppSidebar() {
   const pathname = usePathname()
+  const router = useRouter()
+  const { user } = useAuth()
 
   const isActive = (url: string) => {
     if (url === "/dashboard") {
       return pathname === url || pathname === "/"
     }
     return pathname.startsWith(url)
+  }
+
+  const handleLogout = async () => {
+    try {
+      await signOut(auth)
+      toast.success("Sesión cerrada exitosamente")
+      router.push("/")
+    } catch (error) {
+      console.error("Error al cerrar sesión:", error)
+      toast.error("Error al cerrar sesión")
+    }
+  }
+
+  const getUserInitials = () => {
+    if (user?.displayName) {
+      return user.displayName
+        .split(" ")
+        .map((n) => n[0])
+        .join("")
+        .toUpperCase()
+        .slice(0, 2)
+    }
+    if (user?.email) {
+      return user.email.slice(0, 2).toUpperCase()
+    }
+    return "NX"
   }
 
   return (
@@ -136,10 +188,14 @@ export function AppSidebar() {
           <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary">
             <Sparkles className="h-5 w-5 text-primary-foreground" />
           </div>
-          <span className="text-lg font-semibold text-sidebar-foreground">JellyFinds</span>
+          <span className="text-lg font-semibold text-sidebar-foreground">
+            Nexly
+          </span>
         </Link>
       </SidebarHeader>
+
       <SidebarContent>
+        {/* Menú Principal */}
         <SidebarGroup>
           <SidebarGroupLabel>Menú Principal</SidebarGroupLabel>
           <SidebarGroupContent>
@@ -147,7 +203,10 @@ export function AppSidebar() {
               {mainNav.map((item) => (
                 <SidebarMenuItem key={item.title}>
                   {item.submenu ? (
-                    <Collapsible defaultOpen={isActive(item.url)} className="group/collapsible">
+                    <Collapsible
+                      defaultOpen={isActive(item.url)}
+                      className="group/collapsible"
+                    >
                       <CollapsibleTrigger asChild>
                         <SidebarMenuButton isActive={isActive(item.url)}>
                           <item.icon className="h-4 w-4" />
@@ -159,8 +218,13 @@ export function AppSidebar() {
                         <SidebarMenuSub>
                           {item.submenu.map((subitem) => (
                             <SidebarMenuSubItem key={subitem.title}>
-                              <SidebarMenuSubButton asChild isActive={pathname === subitem.url}>
-                                <Link href={subitem.url}>{subitem.title}</Link>
+                              <SidebarMenuSubButton
+                                asChild
+                                isActive={pathname === subitem.url}
+                              >
+                                <Link href={subitem.url}>
+                                  {subitem.title}
+                                </Link>
                               </SidebarMenuSubButton>
                             </SidebarMenuSubItem>
                           ))}
@@ -181,6 +245,7 @@ export function AppSidebar() {
           </SidebarGroupContent>
         </SidebarGroup>
 
+        {/* Reportes */}
         <SidebarGroup>
           <SidebarGroupLabel>Análisis</SidebarGroupLabel>
           <SidebarGroupContent>
@@ -188,7 +253,10 @@ export function AppSidebar() {
               {secondaryNav.map((item) => (
                 <SidebarMenuItem key={item.title}>
                   {item.submenu ? (
-                    <Collapsible defaultOpen={isActive(item.url)} className="group/collapsible">
+                    <Collapsible
+                      defaultOpen={isActive(item.url)}
+                      className="group/collapsible"
+                    >
                       <CollapsibleTrigger asChild>
                         <SidebarMenuButton isActive={isActive(item.url)}>
                           <item.icon className="h-4 w-4" />
@@ -200,8 +268,13 @@ export function AppSidebar() {
                         <SidebarMenuSub>
                           {item.submenu.map((subitem) => (
                             <SidebarMenuSubItem key={subitem.title}>
-                              <SidebarMenuSubButton asChild isActive={pathname === subitem.url}>
-                                <Link href={subitem.url}>{subitem.title}</Link>
+                              <SidebarMenuSubButton
+                                asChild
+                                isActive={pathname === subitem.url}
+                              >
+                                <Link href={subitem.url}>
+                                  {subitem.title}
+                                </Link>
                               </SidebarMenuSubButton>
                             </SidebarMenuSubItem>
                           ))}
@@ -221,36 +294,99 @@ export function AppSidebar() {
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
+
+        {/* Configuración */}
+        <SidebarGroup>
+          <SidebarGroupLabel>Sistema</SidebarGroupLabel>
+          <SidebarGroupContent>
+            <SidebarMenu>
+              {settingsNav.map((item) => (
+                <SidebarMenuItem key={item.title}>
+                  <Collapsible
+                    defaultOpen={isActive(item.url)}
+                    className="group/collapsible"
+                  >
+                    <CollapsibleTrigger asChild>
+                      <SidebarMenuButton isActive={isActive(item.url)}>
+                        <item.icon className="h-4 w-4" />
+                        <span>{item.title}</span>
+                        <ChevronDown className="ml-auto h-4 w-4 transition-transform group-data-[state=open]/collapsible:rotate-180" />
+                      </SidebarMenuButton>
+                    </CollapsibleTrigger>
+                    <CollapsibleContent>
+                      <SidebarMenuSub>
+                        {item.submenu?.map((subitem) => (
+                          <SidebarMenuSubItem key={subitem.title}>
+                            <SidebarMenuSubButton
+                              asChild
+                              isActive={pathname === subitem.url}
+                            >
+                              <Link href={subitem.url}>
+                                {subitem.title}
+                              </Link>
+                            </SidebarMenuSubButton>
+                          </SidebarMenuSubItem>
+                        ))}
+                      </SidebarMenuSub>
+                    </CollapsibleContent>
+                  </Collapsible>
+                </SidebarMenuItem>
+              ))}
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
       </SidebarContent>
+
       <SidebarFooter className="border-t border-sidebar-border p-4">
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <button className="flex w-full items-center gap-3 rounded-lg p-2 hover:bg-sidebar-accent transition-colors">
               <Avatar className="h-8 w-8">
-                <AvatarFallback className="bg-primary text-primary-foreground text-sm">JF</AvatarFallback>
+                <AvatarFallback className="bg-primary text-primary-foreground text-sm">
+                  {getUserInitials()}
+                </AvatarFallback>
               </Avatar>
               <div className="flex flex-1 flex-col items-start text-sm">
-                <span className="font-medium text-sidebar-foreground">Demo Usuario</span>
-                <span className="text-xs text-muted-foreground">Administrador</span>
+                <span className="font-medium text-sidebar-foreground truncate max-w-35">
+                  {user?.displayName || user?.email?.split("@")[0] || "Usuario"}
+                </span>
+                <span className="text-xs text-muted-foreground truncate max-w-35">
+                  {user?.email}
+                </span>
               </div>
               <ChevronDown className="h-4 w-4 text-muted-foreground" />
             </button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-56">
             <DropdownMenuItem asChild>
-              <Link href="/profile" className="flex items-center">
-                <Settings className="mr-2 h-4 w-4" />
-                Configuración
+              <Link href="/settings/profile" className="flex items-center cursor-pointer">
+                <User className="mr-2 h-4 w-4" />
+                Mi Perfil
               </Link>
             </DropdownMenuItem>
             <DropdownMenuItem asChild>
-              <Link href="/organization/settings" className="flex items-center">
-                <FileText className="mr-2 h-4 w-4" />
-                Organización
+              <Link
+                href="/settings/organization"
+                className="flex items-center cursor-pointer"
+              >
+                <Building2 className="mr-2 h-4 w-4" />
+                Mi Negocio
+              </Link>
+            </DropdownMenuItem>
+            <DropdownMenuItem asChild>
+              <Link
+                href="/settings/billing"
+                className="flex items-center cursor-pointer"
+              >
+                <Receipt className="mr-2 h-4 w-4" />
+                Suscripción
               </Link>
             </DropdownMenuItem>
             <DropdownMenuSeparator />
-            <DropdownMenuItem className="text-destructive">
+            <DropdownMenuItem
+              onClick={handleLogout}
+              className="text-destructive cursor-pointer"
+            >
               <LogOut className="mr-2 h-4 w-4" />
               Cerrar Sesión
             </DropdownMenuItem>

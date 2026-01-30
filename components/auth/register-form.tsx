@@ -43,7 +43,6 @@ export function RegisterForm() {
   const onSubmit = async (data: RegisterFormData) => {
     setIsLoading(true);
     try {
-      // 1. Crear usuario en Firebase Auth
       const userCredential = await createUserWithEmailAndPassword(
         auth,
         data.email,
@@ -51,11 +50,8 @@ export function RegisterForm() {
       );
 
       const firebaseUser = userCredential.user;
-
-      // 2. Obtener token de Firebase
       const token = await firebaseUser.getIdToken();
 
-      // 3. Crear usuario en la base de datos
       const response = await fetch("/api/auth/register", {
         method: "POST",
         headers: {
@@ -77,12 +73,10 @@ export function RegisterForm() {
 
       toast.success("¡Cuenta creada exitosamente!");
       
-      // Redirect al dashboard
       router.push("/dashboard");
     } catch (error: any) {
       console.error("Error en registro:", error);
       
-      // Mensajes de error amigables
       let errorMessage = "Error al crear la cuenta";
       
       if (error.code === "auth/email-already-in-use") {
@@ -103,7 +97,6 @@ export function RegisterForm() {
 
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
-      {/* Nombre */}
       <div className="space-y-2">
         <Label htmlFor="name">Nombre completo</Label>
         <Input
@@ -117,7 +110,6 @@ export function RegisterForm() {
         )}
       </div>
 
-      {/* Email */}
       <div className="space-y-2">
         <Label htmlFor="email">Email</Label>
         <Input
@@ -132,7 +124,6 @@ export function RegisterForm() {
         )}
       </div>
 
-      {/* Nombre de la organización */}
       <div className="space-y-2">
         <Label htmlFor="organizationName">Nombre de tu negocio</Label>
         <Input
@@ -148,7 +139,6 @@ export function RegisterForm() {
         )}
       </div>
 
-      {/* Contraseña */}
       <div className="space-y-2">
         <Label htmlFor="password">Contraseña</Label>
         <div className="relative">
@@ -176,7 +166,6 @@ export function RegisterForm() {
         )}
       </div>
 
-      {/* Confirmar contraseña */}
       <div className="space-y-2">
         <Label htmlFor="confirmPassword">Confirmar contraseña</Label>
         <div className="relative">
@@ -206,12 +195,10 @@ export function RegisterForm() {
         )}
       </div>
 
-      {/* Submit */}
       <Button type="submit" className="w-full" disabled={isLoading}>
         {isLoading ? (
           <>
             <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-            Creando cuenta...
           </>
         ) : (
           "Crear cuenta"
