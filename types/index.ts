@@ -1,5 +1,7 @@
+// types/index.ts
+
 // ============================================
-// USUARIO Y ORGANIZACIÓN
+// USUARIO
 // ============================================
 
 export interface User {
@@ -10,25 +12,107 @@ export interface User {
   photo_url: string | null;
   is_active: boolean;
   created_at: string;
-  updated_at: string;
 }
 
-export interface Organization {
+export interface UserProfile {
+  user_id: number;
+  business_name: string | null;
+  business_logo_url: string | null;
+  timezone: string;
+  currency: string;
+  locale: string;
+}
+
+// ============================================
+// SUSCRIPCIONES Y PLANES
+// ============================================
+
+export type SubscriptionStatus = 'TRIAL' | 'ACTIVE' | 'PAST_DUE' | 'CANCELLED' | 'EXPIRED';
+
+export interface SubscriptionPlan {
   id: number;
   name: string;
   slug: string;
-  description: string | null;
-  logo_url: string | null;
-  created_at: string;
-  updated_at: string;
+  price_usd: number;
+  billing_interval: 'MONTHLY' | 'YEARLY' | 'LIFETIME';
+  limits: {
+    max_products: number | null;
+    max_sales_per_month: number | null;
+    max_storage_mb: number | null;
+  };
 }
 
-export interface OrganizationMember {
+export interface UserSubscription {
   id: number;
-  organization_id: number;
-  user_id: number;
-  role: 'OWNER' | 'ADMIN' | 'MEMBER';
-  joined_at: string;
+  status: SubscriptionStatus;
+  plan: SubscriptionPlan;
+  current_period_start: string | null;
+  current_period_end: string | null;
+  cancel_at_period_end: boolean;
+}
+
+// ============================================
+// FEATURES
+// ============================================
+
+export type FeatureCategory =
+  | 'PRODUCTS'
+  | 'INVENTORY'
+  | 'SALES'
+  | 'CUSTOMERS'
+  | 'FINANCES'
+  | 'EVENTS'
+  | 'REPORTS'
+  | 'INTEGRATIONS'
+  | 'ADMIN';
+
+export type FeatureKey =
+  // PRODUCTS
+  | 'products.create'
+  | 'products.variants'
+  | 'products.bulk_import'
+  // INVENTORY
+  | 'inventory.view'
+  | 'inventory.adjust'
+  | 'inventory.purchases'
+  // SALES
+  | 'sales.create'
+  | 'sales.view'
+  | 'sales.reports'
+  // CUSTOMERS
+  | 'customers.manage'
+  | 'customers.loyalty'
+  // FINANCES
+  | 'finances.accounts'
+  | 'finances.transactions'
+  | 'finances.reports'
+  // EVENTS
+  | 'events.manage'
+  | 'events.inventory'
+  // REPORTS
+  | 'reports.basic'
+  | 'reports.advanced'
+  // ADMIN
+  | 'admin.multi_user'
+  | 'admin.export';
+
+export interface Feature {
+  key: FeatureKey;
+  name: string;
+  category: FeatureCategory;
+}
+
+export type FeaturesByCategory = Partial<Record<FeatureCategory, Feature[]>>;
+
+// ============================================
+// PERFIL COMPLETO (respuesta de /api/auth/me)
+// ============================================
+
+export interface UserProfileResponse {
+  user: User;
+  profile: UserProfile;
+  subscription: UserSubscription;
+  features: FeaturesByCategory;
 }
 
 // ============================================
@@ -37,115 +121,104 @@ export interface OrganizationMember {
 
 export interface Product {
   id: number;
-  organization_id: number;
+  user_id: number;
   name: string;
   description: string | null;
+  sku: string | null;
+  barcode: string | null;
+  price: number;
   image_url: string | null;
-  price_lempiras: number;
-  created_by: number | null;
+  is_active: boolean;
   created_at: string;
   updated_at: string;
-  stock?: number; // Calculado desde inventory
+  stock?: number;
 }
 
 export interface ProductVariant {
   id: number;
+  user_id: number;
   product_id: number;
-  name: string;
+  variant_name: string | null;
   sku: string | null;
+  attributes: Record<string, string> | null;
+  price_override: number | null;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+// ============================================
+// INVENTARIO
+// ============================================
+
+export interface InventoryBatch {
+  id: number;
+  user_id: number;
+  product_id: number;
+  variant_id: number | null;
+  purchase_batch_item_id: number | null;
+  qty_in: number;
+  qty_available: number;
+  unit_cost: number;
+  received_at: string;
+}
+
+export interface InventoryMovement {
+  id: number;
+  user_id: number;
+  movement_type: 'IN' | 'OUT' | 'ADJUST';
+  product_id: number;
+  variant_id: number | null;
+  quantity: number;
+  reference_type: 'PURCHASE' | 'SALE' | 'ADJUSTMENT' | null;
+  reference_id: number | null;
+  notes: string | null;
   created_at: string;
 }
 
 // ============================================
-// COMPRAS E INVENTARIO
+// COMPRAS
 // ============================================
 
 export interface PurchaseBatch {
   id: number;
-  organization_id: number;
-  batch_date: string;
-  usd_to_lempiras_rate: number;
-  total_cost: number | null;
-  payment_account_id: number | null;
+  user_id: number;
+  supplier_id: number | null;
+  supplier_name: string | null;
+  currency: string;
+  exchange_rate: number;
+  subtotal: number;
+  shipping: number;
+  tax: number;
+  total: number;
   is_paid: boolean;
-  payment_date: string | null;
+  purchased_at: string;
   notes: string | null;
-  created_by: number | null;
   created_at: string;
 }
 
-export interface BatchItem {
+export interface PurchaseBatchItem {
   id: number;
-  batch_id: number;
+  user_id: number;
+  purchase_batch_id: number;
   product_id: number;
   variant_id: number | null;
   quantity: number;
-  price_usd: number;
-  price_lempiras: number;
-  supplier_shipping_cost: number;
   unit_cost: number;
-  created_at: string;
-}
-
-export interface Inventory {
-  organization_id: number;
-  product_id: number;
-  variant_id: number | null;
-  quantity: number;
-  last_updated: string;
+  total_cost: number;
 }
 
 // ============================================
-// SUMINISTROS
+// PROVEEDORES
 // ============================================
 
-export interface Supply {
+export interface Supplier {
   id: number;
-  organization_id: number;
+  user_id: number;
   name: string;
-  description: string | null;
-  type: 'COUNTABLE' | 'NON_COUNTABLE';
-  unit_type: string | null;
-  stock: number | null;
-  min_stock: number;
-  estimated_usage_per_sale: number | null;
-  unit_cost: number;
-  is_active: boolean;
-  created_by: number | null;
-  created_at: string;
-  updated_at: string;
-}
-
-// ============================================
-// FINANZAS
-// ============================================
-
-export interface Account {
-  id: number;
-  organization_id: number;
-  name: string;
-  type: 'CASH' | 'BANK' | 'CREDIT_CARD';
-  account_number: string | null;
-  balance: number;
-  is_active: boolean;
-  created_at: string;
-  updated_at: string;
-}
-
-export interface Transaction {
-  id: number;
-  organization_id: number;
-  transaction_date: string;
-  type: 'SALE' | 'PURCHASE_PRODUCT' | 'PURCHASE_SUPPLY' | 'TRANSFER' | 'EXPENSE' | 'INCOME' | 'WITHDRAWAL' | 'DEPOSIT';
-  category: string | null;
-  from_account_id: number | null;
-  to_account_id: number | null;
-  amount: number;
-  reference_type: string | null;
-  reference_id: number | null;
-  description: string | null;
+  phone: string | null;
+  email: string | null;
   notes: string | null;
-  created_by: number | null;
   created_at: string;
 }
 
@@ -155,14 +228,13 @@ export interface Transaction {
 
 export interface Customer {
   id: number;
-  organization_id: number;
+  user_id: number;
   name: string;
   phone: string | null;
-  address: string | null;
-  is_loyal: boolean;
-  total_purchases: number;
+  email: string | null;
+  notes: string | null;
+  total_orders: number;
   total_spent: number;
-  created_by: number | null;
   created_at: string;
   updated_at: string;
 }
@@ -173,38 +245,74 @@ export interface Customer {
 
 export interface Sale {
   id: number;
-  organization_id: number;
-  sale_date: string;
+  user_id: number;
+  sale_number: string;
   customer_id: number | null;
-  event_id: number | null;
   subtotal: number;
-  discount_amount: number;
-  discount_type: string | null;
+  discount: number;
+  tax: number;
   total: number;
-  product_cost: number;
-  supply_cost: number;
-  total_cost: number;
-  net_profit: number;
-  shipping_type: 'LOCAL' | 'NATIONAL' | null;
-  shipping_cost: number;
-  payment_method: 'CASH' | 'TRANSFER';
-  account_id: number;
+  payment_method: 'CASH' | 'CARD' | 'TRANSFER' | 'MIXED' | 'OTHER' | null;
+  account_id: number | null;
+  sold_at: string;
   notes: string | null;
-  created_by: number | null;
   created_at: string;
 }
 
 export interface SaleItem {
   id: number;
+  user_id: number;
   sale_id: number;
   product_id: number;
   variant_id: number | null;
-  inventory_batch_id: number | null;
   quantity: number;
   unit_price: number;
   unit_cost: number;
-  subtotal: number;
-  profit: number;
+  line_total: number;
+  created_at: string;
+}
+
+// ============================================
+// INSUMOS
+// ============================================
+
+export interface Supply {
+  id: number;
+  user_id: number;
+  name: string;
+  unit: string;
+  stock: number;
+  min_stock: number;
+  unit_cost: number;
+  created_at: string;
+}
+
+// ============================================
+// FINANZAS
+// ============================================
+
+export interface Account {
+  id: number;
+  user_id: number;
+  name: string;
+  type: 'CASH' | 'BANK' | 'WALLET' | 'OTHER';
+  balance: number;
+  is_active: boolean;
+  created_at: string;
+}
+
+export interface Transaction {
+  id: number;
+  user_id: number;
+  type: 'INCOME' | 'EXPENSE' | 'TRANSFER';
+  account_id: number;
+  to_account_id: number | null;
+  amount: number;
+  category: string | null;
+  description: string | null;
+  reference_type: 'SALE' | 'PURCHASE' | 'SUPPLY_PURCHASE' | 'EVENT' | 'OTHER' | null;
+  reference_id: number | null;
+  occurred_at: string;
   created_at: string;
 }
 
@@ -214,24 +322,26 @@ export interface SaleItem {
 
 export interface Event {
   id: number;
-  organization_id: number;
+  user_id: number;
   name: string;
-  event_type: 'FAIR' | 'MARKET' | 'POPUP' | 'EXHIBITION';
   location: string | null;
-  address: string | null;
-  start_date: string;
-  end_date: string;
-  status: 'PLANNED' | 'ACTIVE' | 'COMPLETED' | 'CANCELLED';
-  booth_cost: number;
-  transport_cost: number;
-  setup_cost: number;
-  other_costs: number;
-  total_fixed_costs: number;
-  cash_account_id: number | null;
+  starts_at: string | null;
+  ends_at: string | null;
+  fixed_cost: number;
   notes: string | null;
-  created_by: number | null;
   created_at: string;
-  updated_at: string;
+}
+
+export interface EventInventory {
+  id: number;
+  user_id: number;
+  event_id: number;
+  product_id: number;
+  variant_id: number | null;
+  planned_qty: number;
+  actual_qty: number;
+  sold_qty: number;
+  returned_qty: number;
 }
 
 // ============================================

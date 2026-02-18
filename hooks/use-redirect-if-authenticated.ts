@@ -1,19 +1,25 @@
-"use client";
+'use client';
 
-import { useEffect } from "react";
-import { useRouter } from "next/navigation";
-import { useAuth } from "./use-auth";
-
+import { useEffect } from 'react';
+import { useRouter } from 'next/navigation';
+import { useAuth } from './use-auth';
 
 export function useRedirectIfAuthenticated() {
-  const { user, loading } = useAuth();
+  const { firebaseUser, loading, emailVerified } = useAuth();
   const router = useRouter();
 
   useEffect(() => {
-    if (!loading && user) {
-      router.push("/dashboard");
-    }
-  }, [user, loading, router]);
+    if (loading) return;
 
-  return { user, loading };
+    if (firebaseUser && emailVerified) {
+      router.push('/dashboard');
+      return;
+    }
+
+    if (firebaseUser && !emailVerified) {
+      router.push('/verify-email');
+    }
+  }, [firebaseUser, loading, emailVerified, router]);
+
+  return { firebaseUser, loading };
 }

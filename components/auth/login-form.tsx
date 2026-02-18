@@ -1,3 +1,4 @@
+// components/auth/login-form.tsx
 "use client";
 
 import { useState } from "react";
@@ -10,7 +11,7 @@ import { Label } from "@/components/ui/label";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
-import { Loader2, Eye, EyeOff } from "lucide-react";
+import { Loader2, Eye, EyeOff, AlertCircle } from "lucide-react";
 import { toast } from "sonner";
 
 const loginSchema = z.object({
@@ -24,6 +25,8 @@ export function LoginForm() {
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const [formError, setFormError] = useState<string | null>(null);
+  const [isResetting, setIsResetting] = useState(false);
 
   const {
     register,
@@ -35,29 +38,60 @@ export function LoginForm() {
 
   const onSubmit = async (data: LoginFormData) => {
     setIsLoading(true);
+    setFormError(null);
+
     try {
-      await signInWithEmailAndPassword(auth, data.email, data.password);
-      toast.success("¡Bienvenido de vuelta!");  
+      const userCredential = await signInWithEmailAndPassword(
+        auth,
+        data.email,
+        data.password,
+      );
+
+      const idToken = await userCredential.user.getIdToken();
+
+      const response = await fetch("/api/auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ idToken }),
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        await auth.signOut();
+        throw new Error(result.error || "Error al iniciar sesión");
+      }
+
+      toast.success("¡Bienvenido de vuelta!");
       router.push("/dashboard");
     } catch (error: any) {
       console.error("Error en login:", error);
-      
-      let errorMessage = "Error al iniciar sesión";
-      
-      if (error.code === "auth/user-not-found") {
-        errorMessage = "No existe una cuenta con este email";
-      } else if (error.code === "auth/wrong-password") {
-        errorMessage = "Contraseña incorrecta";
+
+      let errorMessage = "Error al iniciar sesión. Intenta de nuevo.";
+
+      if (
+        error.code === "auth/user-not-found" ||
+        error.code === "auth/wrong-password" ||
+        error.code === "auth/invalid-credential"
+      ) {
+        errorMessage = "El email o la contraseña son incorrectos";
       } else if (error.code === "auth/invalid-email") {
-        errorMessage = "Email inválido";
+        errorMessage = "El formato del email no es válido";
       } else if (error.code === "auth/user-disabled") {
-        errorMessage = "Esta cuenta ha sido deshabilitada";
+        errorMessage = "Esta cuenta ha sido deshabilitada. Contacta a soporte.";
       } else if (error.code === "auth/too-many-requests") {
-        errorMessage = "Demasiados intentos. Intenta más tarde";
-      } else if (error.code === "auth/invalid-credential") {
-        errorMessage = "Email o contraseña incorrectos";
+        errorMessage =
+          "Demasiados intentos fallidos. Espera unos minutos e intenta de nuevo.";
+      } else if (error.message === "Usuario no encontrado") {
+        errorMessage = "No existe una cuenta asociada a este email";
+      } else if (error.message === "Esta cuenta ha sido deshabilitada") {
+        errorMessage = "Esta cuenta ha sido deshabilitada. Contacta a soporte.";
+      } else if (error.message) {
+        errorMessage = error.message;
       }
-      
+
+      // Error visible en el form Y en el toast
+      setFormError(errorMessage);
       toast.error(errorMessage);
     } finally {
       setIsLoading(false);
@@ -66,6 +100,14 @@ export function LoginForm() {
 
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+      {/* Error general del form */}
+      {formError && (
+        <div className="flex items-start gap-3 rounded-lg border border-destructive/50 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+          <AlertCircle className="h-4 w-4 mt-0.5 shrink-0" />
+          <span>{formError}</span>
+        </div>
+      )}
+
       <div className="space-y-2">
         <Label htmlFor="email">Email</Label>
         <Input
@@ -75,6 +117,7 @@ export function LoginForm() {
           autoComplete="email"
           {...register("email")}
           disabled={isLoading}
+          className={errors.email ? "border-destructive" : ""}
         />
         {errors.email && (
           <p className="text-sm text-destructive">{errors.email.message}</p>
@@ -86,25 +129,66 @@ export function LoginForm() {
           <Label htmlFor="password">Contraseña</Label>
           <button
             type="button"
-            className="text-sm text-primary hover:underline"
-            onClick={() => toast.info("Funcionalidad próximamente")}
+            className="text-sm text-primary hover:underline disabled:opacity-50"
+            disabled={isResetting}
+            onClick={async () => {
+              const email = (
+                document.getElementById("email") as HTMLInputElement
+              )?.value;
+
+              if (!email) {
+                toast.error("Ingresa tu email primero");
+                return;
+              }
+
+              if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+                toast.error("Ingresa un email válido");
+                return;
+              }
+
+              setIsResetting(true);
+              try {
+                const { sendPasswordResetEmail } =
+                  await import("firebase/auth");
+                await sendPasswordResetEmail(auth, email);
+
+                toast.success(
+                  "Si el email está registrado, recibirás un correo en breve",
+                  {
+                    duration: 6000,
+                  },
+                );
+              } catch (error: any) {
+                // Respuesta genérica para no revelar si el email existe
+                toast.success(
+                  "Si el email está registrado, recibirás un correo en breve",
+                  {
+                    duration: 6000,
+                  },
+                );
+              } finally {
+                setIsResetting(false);
+              }
+            }}
           >
-            ¿Olvidaste tu contraseña?
+            {isResetting ? "Enviando..." : "¿Olvidaste tu contraseña?"}
           </button>
         </div>
         <div className="relative">
           <Input
             id="password"
             type={showPassword ? "text" : "password"}
-            placeholder="••••••••"
+            placeholder="Ingresa tu contraseña"
             autoComplete="current-password"
             {...register("password")}
             disabled={isLoading}
+            className={errors.password ? "border-destructive" : ""}
           />
           <button
             type="button"
             onClick={() => setShowPassword(!showPassword)}
             className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+            tabIndex={-1}
           >
             {showPassword ? (
               <EyeOff className="w-4 h-4" />
@@ -125,7 +209,7 @@ export function LoginForm() {
             Iniciando sesión...
           </>
         ) : (
-          "Iniciar Sesión"
+          "Iniciar sesión"
         )}
       </Button>
     </form>

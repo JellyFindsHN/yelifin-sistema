@@ -1,8 +1,12 @@
+// components/auth/register-form.tsx
 "use client";
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { createUserWithEmailAndPassword } from "firebase/auth";
+import {
+  sendEmailVerification,
+  signInWithEmailAndPassword,
+} from "firebase/auth";
 import { auth } from "@/lib/firebase";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -13,16 +17,22 @@ import * as z from "zod";
 import { Loader2, Eye, EyeOff } from "lucide-react";
 import { toast } from "sonner";
 
-const registerSchema = z.object({
-  name: z.string().min(2, "El nombre debe tener al menos 2 caracteres"),
-  email: z.string().email("Email inválido"),
-  organizationName: z.string().min(2, "El nombre del negocio debe tener al menos 2 caracteres"),
-  password: z.string().min(6, "La contraseña debe tener al menos 6 caracteres"),
-  confirmPassword: z.string(),
-}).refine((data) => data.password === data.confirmPassword, {
-  message: "Las contraseñas no coinciden",
-  path: ["confirmPassword"],
-});
+const registerSchema = z
+  .object({
+    name: z.string().min(2, "El nombre debe tener al menos 2 caracteres"),
+    email: z.string().email("Email inválido"),
+    business_name: z
+      .string()
+      .min(2, "El nombre del negocio debe tener al menos 2 caracteres"),
+    password: z
+      .string()
+      .min(6, "La contraseña debe tener al menos 6 caracteres"),
+    confirmPassword: z.string(),
+  })
+  .refine((data) => data.password === data.confirmPassword, {
+    message: "Las contraseñas no coinciden",
+    path: ["confirmPassword"],
+  });
 
 type RegisterFormData = z.infer<typeof registerSchema>;
 
@@ -42,53 +52,56 @@ export function RegisterForm() {
 
   const onSubmit = async (data: RegisterFormData) => {
     setIsLoading(true);
+
     try {
-      const userCredential = await createUserWithEmailAndPassword(
-        auth,
-        data.email,
-        data.password
-      );
-
-      const firebaseUser = userCredential.user;
-      const token = await firebaseUser.getIdToken();
-
       const response = await fetch("/api/auth/register", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${token}`,
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          firebase_uid: firebaseUser.uid,
           email: data.email,
+          password: data.password,
           display_name: data.name,
-          organization_name: data.organizationName,
+          business_name: data.business_name,
         }),
       });
 
+      const result = await response.json();
+
       if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.message || "Error al crear la cuenta");
+        throw new Error(result.error || "Error al crear la cuenta");
       }
 
-      toast.success("¡Cuenta creada exitosamente!");
-      
+      await signInWithEmailAndPassword(auth, data.email, data.password);
+      const currentUser = auth.currentUser;
+      if (currentUser) {
+        await sendEmailVerification(currentUser);
+      }
+      toast.success("¡Bienvenido a Nexly! Tu cuenta ha sido creada 🎉", {
+        duration: 5000,
+      });
+
       router.push("/dashboard");
     } catch (error: any) {
       console.error("Error en registro:", error);
-      
+
       let errorMessage = "Error al crear la cuenta";
-      
-      if (error.code === "auth/email-already-in-use") {
+
+      if (error.message === "Este correo ya está registrado") {
         errorMessage = "Este email ya está registrado";
-      } else if (error.code === "auth/invalid-email") {
-        errorMessage = "Email inválido";
-      } else if (error.code === "auth/weak-password") {
-        errorMessage = "La contraseña es muy débil";
+      } else if (
+        error.message === "La contraseña debe tener al menos 6 caracteres"
+      ) {
+        errorMessage = "La contraseña debe tener al menos 6 caracteres";
+      } else if (error.message === "Error de configuración del sistema") {
+        errorMessage = "Error del sistema. Por favor contacta a soporte.";
+      } else if (error.code === "auth/invalid-credential") {
+        errorMessage = "Error al autenticar. Intenta iniciar sesión.";
+      } else if (error.code === "auth/too-many-requests") {
+        errorMessage = "Demasiados intentos. Intenta más tarde.";
       } else if (error.message) {
         errorMessage = error.message;
       }
-      
+
       toast.error(errorMessage);
     } finally {
       setIsLoading(false);
@@ -102,6 +115,7 @@ export function RegisterForm() {
         <Input
           id="name"
           placeholder="Juan Pérez"
+          autoComplete="name"
           {...register("name")}
           disabled={isLoading}
         />
@@ -116,6 +130,7 @@ export function RegisterForm() {
           id="email"
           type="email"
           placeholder="tu@email.com"
+          autoComplete="email"
           {...register("email")}
           disabled={isLoading}
         />
@@ -125,16 +140,17 @@ export function RegisterForm() {
       </div>
 
       <div className="space-y-2">
-        <Label htmlFor="organizationName">Nombre de tu negocio</Label>
+        <Label htmlFor="business_name">Nombre de tu negocio</Label>
         <Input
-          id="organizationName"
+          id="business_name"
           placeholder="Mi Emprendimiento"
-          {...register("organizationName")}
+          autoComplete="organization"
+          {...register("business_name")}
           disabled={isLoading}
         />
-        {errors.organizationName && (
+        {errors.business_name && (
           <p className="text-sm text-destructive">
-            {errors.organizationName.message}
+            {errors.business_name.message}
           </p>
         )}
       </div>
@@ -146,6 +162,7 @@ export function RegisterForm() {
             id="password"
             type={showPassword ? "text" : "password"}
             placeholder="••••••••"
+            autoComplete="new-password"
             {...register("password")}
             disabled={isLoading}
           />
@@ -153,6 +170,7 @@ export function RegisterForm() {
             type="button"
             onClick={() => setShowPassword(!showPassword)}
             className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+            tabIndex={-1}
           >
             {showPassword ? (
               <EyeOff className="w-4 h-4" />
@@ -173,6 +191,7 @@ export function RegisterForm() {
             id="confirmPassword"
             type={showConfirmPassword ? "text" : "password"}
             placeholder="••••••••"
+            autoComplete="new-password"
             {...register("confirmPassword")}
             disabled={isLoading}
           />
@@ -180,6 +199,7 @@ export function RegisterForm() {
             type="button"
             onClick={() => setShowConfirmPassword(!showConfirmPassword)}
             className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+            tabIndex={-1}
           >
             {showConfirmPassword ? (
               <EyeOff className="w-4 h-4" />
@@ -199,15 +219,22 @@ export function RegisterForm() {
         {isLoading ? (
           <>
             <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+            Creando cuenta...
           </>
         ) : (
-          "Crear cuenta"
+          "Crear cuenta gratis"
         )}
       </Button>
 
-      <p className="text-xs text-center text-muted-foreground">
-        Al crear una cuenta, aceptas nuestros términos de servicio y política de privacidad
-      </p>
+      <div className="text-center space-y-2">
+        <p className="text-sm text-muted-foreground">
+          ✨ Gratis para siempre en el plan básico • Sin tarjeta de crédito
+        </p>
+        <p className="text-xs text-muted-foreground">
+          Al crear una cuenta, aceptas nuestros términos de servicio y política
+          de privacidad
+        </p>
+      </div>
     </form>
   );
 }
