@@ -11,7 +11,6 @@ import {
   ShoppingCart,
   Users,
   Warehouse,
-  FileText,
   Settings,
   LogOut,
   Sparkles,
@@ -27,6 +26,7 @@ import { signOut } from "firebase/auth"
 import { auth } from "@/lib/firebase"
 import { useAuth } from "@/hooks/use-auth"
 import { toast } from "sonner"
+import { useSidebar } from "@/components/ui/sidebar"
 
 import {
   Sidebar,
@@ -58,16 +58,8 @@ import {
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 
 const mainNav = [
-  {
-    title: "Dashboard",
-    url: "/dashboard",
-    icon: Home,
-  },
-  {
-    title: "Productos",
-    url: "/products",
-    icon: Package,
-  },
+  { title: "Dashboard", url: "/dashboard", icon: Home },
+  { title: "Productos", url: "/products", icon: Package },
   {
     title: "Inventario",
     url: "/inventory",
@@ -87,11 +79,7 @@ const mainNav = [
       { title: "Nueva Venta (POS)", url: "/sales/new" },
     ],
   },
-  {
-    title: "Clientes",
-    url: "/customers",
-    icon: Users,
-  },
+  { title: "Clientes", url: "/customers", icon: Users },
   {
     title: "Finanzas",
     url: "/finances",
@@ -102,16 +90,8 @@ const mainNav = [
       { title: "Transacciones", url: "/finances/transactions" },
     ],
   },
-  {
-    title: "Eventos",
-    url: "/events",
-    icon: Calendar,
-  },
-  {
-    title: "Suministros",
-    url: "/supplies",
-    icon: Box,
-  },
+  { title: "Eventos", url: "/events", icon: Calendar },
+  { title: "Suministros", url: "/supplies", icon: Box },
 ]
 
 const secondaryNav = [
@@ -146,12 +126,16 @@ const settingsNav = [
 export function AppSidebar() {
   const pathname = usePathname()
   const router = useRouter()
-  const { user } = useAuth()
+  const { user, firebaseUser } = useAuth()
+
+  const { isMobile, setOpenMobile } = useSidebar()
+
+  const closeOnMobile = () => {
+    if (isMobile) setOpenMobile(false)
+  }
 
   const isActive = (url: string) => {
-    if (url === "/dashboard") {
-      return pathname === url || pathname === "/"
-    }
+    if (url === "/dashboard") return pathname === url || pathname === "/"
     return pathname.startsWith(url)
   }
 
@@ -159,6 +143,7 @@ export function AppSidebar() {
     try {
       await signOut(auth)
       toast.success("Sesión cerrada exitosamente")
+      closeOnMobile()
       router.push("/")
     } catch (error) {
       console.error("Error al cerrar sesión:", error)
@@ -166,25 +151,76 @@ export function AppSidebar() {
     }
   }
 
+  const displayName =
+    user?.profile?.business_name ||
+    firebaseUser?.displayName ||
+    firebaseUser?.email?.split("@")[0] ||
+    "Usuario"
+
   const getUserInitials = () => {
-    if (user?.displayName) {
-      return user.displayName
-        .split(" ")
-        .map((n) => n[0])
-        .join("")
-        .toUpperCase()
-        .slice(0, 2)
-    }
-    if (user?.email) {
-      return user.email.slice(0, 2).toUpperCase()
-    }
-    return "NX"
+    return displayName
+      .split(" ")
+      .map((n: string) => n[0])
+      .join("")
+      .toUpperCase()
+      .slice(0, 2)
   }
 
+  const renderNavItems = (items: any[]) =>
+    items.map((item) => (
+      <SidebarMenuItem key={item.title}>
+        {item.submenu ? (
+          <Collapsible
+            defaultOpen={isActive(item.url)}
+            className="group/collapsible"
+          >
+            <CollapsibleTrigger asChild>
+              <SidebarMenuButton isActive={isActive(item.url)}>
+                <item.icon className="h-4 w-4" />
+                <span>{item.title}</span>
+                <ChevronDown className="ml-auto h-4 w-4 transition-transform group-data-[state=open]/collapsible:rotate-180" />
+              </SidebarMenuButton>
+            </CollapsibleTrigger>
+
+            <CollapsibleContent>
+              <SidebarMenuSub>
+                {item.submenu.map((subitem: any) => (
+                  <SidebarMenuSubItem key={subitem.title}>
+                    <SidebarMenuSubButton
+                      asChild
+                      isActive={pathname === subitem.url}
+                    >
+                      <Link href={subitem.url} onClick={closeOnMobile}>
+                        {subitem.title}
+                      </Link>
+                    </SidebarMenuSubButton>
+                  </SidebarMenuSubItem>
+                ))}
+              </SidebarMenuSub>
+            </CollapsibleContent>
+          </Collapsible>
+        ) : (
+          <SidebarMenuButton asChild isActive={isActive(item.url)}>
+            <Link href={item.url} onClick={closeOnMobile}>
+              <item.icon className="h-4 w-4" />
+              <span>{item.title}</span>
+            </Link>
+          </SidebarMenuButton>
+        )}
+      </SidebarMenuItem>
+    ))
+
   return (
-    <Sidebar>
+    <Sidebar
+      // Esto ayuda a que el sidebar quede "pegado" y con su propio scroll
+      className="sticky top-0 h-svh"
+    >
       <SidebarHeader className="border-b border-sidebar-border px-4 py-4">
-        <Link href="/dashboard" className="flex items-center gap-2">
+        <Link
+          href="/dashboard"
+          onClick={closeOnMobile}
+          className="flex items-center gap-2"
+        >
           <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary">
             <Sparkles className="h-5 w-5 text-primary-foreground" />
           </div>
@@ -195,144 +231,24 @@ export function AppSidebar() {
       </SidebarHeader>
 
       <SidebarContent>
-        {/* Menú Principal */}
         <SidebarGroup>
           <SidebarGroupLabel>Menú Principal</SidebarGroupLabel>
           <SidebarGroupContent>
-            <SidebarMenu>
-              {mainNav.map((item) => (
-                <SidebarMenuItem key={item.title}>
-                  {item.submenu ? (
-                    <Collapsible
-                      defaultOpen={isActive(item.url)}
-                      className="group/collapsible"
-                    >
-                      <CollapsibleTrigger asChild>
-                        <SidebarMenuButton isActive={isActive(item.url)}>
-                          <item.icon className="h-4 w-4" />
-                          <span>{item.title}</span>
-                          <ChevronDown className="ml-auto h-4 w-4 transition-transform group-data-[state=open]/collapsible:rotate-180" />
-                        </SidebarMenuButton>
-                      </CollapsibleTrigger>
-                      <CollapsibleContent>
-                        <SidebarMenuSub>
-                          {item.submenu.map((subitem) => (
-                            <SidebarMenuSubItem key={subitem.title}>
-                              <SidebarMenuSubButton
-                                asChild
-                                isActive={pathname === subitem.url}
-                              >
-                                <Link href={subitem.url}>
-                                  {subitem.title}
-                                </Link>
-                              </SidebarMenuSubButton>
-                            </SidebarMenuSubItem>
-                          ))}
-                        </SidebarMenuSub>
-                      </CollapsibleContent>
-                    </Collapsible>
-                  ) : (
-                    <SidebarMenuButton asChild isActive={isActive(item.url)}>
-                      <Link href={item.url}>
-                        <item.icon className="h-4 w-4" />
-                        <span>{item.title}</span>
-                      </Link>
-                    </SidebarMenuButton>
-                  )}
-                </SidebarMenuItem>
-              ))}
-            </SidebarMenu>
+            <SidebarMenu>{renderNavItems(mainNav)}</SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
 
-        {/* Reportes */}
         <SidebarGroup>
           <SidebarGroupLabel>Análisis</SidebarGroupLabel>
           <SidebarGroupContent>
-            <SidebarMenu>
-              {secondaryNav.map((item) => (
-                <SidebarMenuItem key={item.title}>
-                  {item.submenu ? (
-                    <Collapsible
-                      defaultOpen={isActive(item.url)}
-                      className="group/collapsible"
-                    >
-                      <CollapsibleTrigger asChild>
-                        <SidebarMenuButton isActive={isActive(item.url)}>
-                          <item.icon className="h-4 w-4" />
-                          <span>{item.title}</span>
-                          <ChevronDown className="ml-auto h-4 w-4 transition-transform group-data-[state=open]/collapsible:rotate-180" />
-                        </SidebarMenuButton>
-                      </CollapsibleTrigger>
-                      <CollapsibleContent>
-                        <SidebarMenuSub>
-                          {item.submenu.map((subitem) => (
-                            <SidebarMenuSubItem key={subitem.title}>
-                              <SidebarMenuSubButton
-                                asChild
-                                isActive={pathname === subitem.url}
-                              >
-                                <Link href={subitem.url}>
-                                  {subitem.title}
-                                </Link>
-                              </SidebarMenuSubButton>
-                            </SidebarMenuSubItem>
-                          ))}
-                        </SidebarMenuSub>
-                      </CollapsibleContent>
-                    </Collapsible>
-                  ) : (
-                    <SidebarMenuButton asChild isActive={isActive(item.url)}>
-                      <Link href={item.url}>
-                        <item.icon className="h-4 w-4" />
-                        <span>{item.title}</span>
-                      </Link>
-                    </SidebarMenuButton>
-                  )}
-                </SidebarMenuItem>
-              ))}
-            </SidebarMenu>
+            <SidebarMenu>{renderNavItems(secondaryNav)}</SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
 
-        {/* Configuración */}
         <SidebarGroup>
           <SidebarGroupLabel>Sistema</SidebarGroupLabel>
           <SidebarGroupContent>
-            <SidebarMenu>
-              {settingsNav.map((item) => (
-                <SidebarMenuItem key={item.title}>
-                  <Collapsible
-                    defaultOpen={isActive(item.url)}
-                    className="group/collapsible"
-                  >
-                    <CollapsibleTrigger asChild>
-                      <SidebarMenuButton isActive={isActive(item.url)}>
-                        <item.icon className="h-4 w-4" />
-                        <span>{item.title}</span>
-                        <ChevronDown className="ml-auto h-4 w-4 transition-transform group-data-[state=open]/collapsible:rotate-180" />
-                      </SidebarMenuButton>
-                    </CollapsibleTrigger>
-                    <CollapsibleContent>
-                      <SidebarMenuSub>
-                        {item.submenu?.map((subitem) => (
-                          <SidebarMenuSubItem key={subitem.title}>
-                            <SidebarMenuSubButton
-                              asChild
-                              isActive={pathname === subitem.url}
-                            >
-                              <Link href={subitem.url}>
-                                {subitem.title}
-                              </Link>
-                            </SidebarMenuSubButton>
-                          </SidebarMenuSubItem>
-                        ))}
-                      </SidebarMenuSub>
-                    </CollapsibleContent>
-                  </Collapsible>
-                </SidebarMenuItem>
-              ))}
-            </SidebarMenu>
+            <SidebarMenu>{renderNavItems(settingsNav)}</SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
       </SidebarContent>
@@ -341,48 +257,75 @@ export function AppSidebar() {
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <button className="flex w-full items-center gap-3 rounded-lg p-2 hover:bg-sidebar-accent transition-colors">
-              <Avatar className="h-8 w-8">
+              <Avatar className="h-8 w-8 shrink-0">
                 <AvatarFallback className="bg-primary text-primary-foreground text-sm">
                   {getUserInitials()}
                 </AvatarFallback>
               </Avatar>
-              <div className="flex flex-1 flex-col items-start text-sm">
-                <span className="font-medium text-sidebar-foreground truncate max-w-35">
-                  {user?.displayName || user?.email?.split("@")[0] || "Usuario"}
+
+              <div className="flex flex-1 flex-col items-start text-sm min-w-0">
+                <span className="font-medium text-sidebar-foreground truncate w-full">
+                  {displayName}
                 </span>
-                <span className="text-xs text-muted-foreground truncate max-w-35">
-                  {user?.email}
+                <span className="text-xs text-muted-foreground truncate w-full">
+                  {firebaseUser?.email}
                 </span>
               </div>
-              <ChevronDown className="h-4 w-4 text-muted-foreground" />
+
+              <ChevronDown className="h-4 w-4 text-muted-foreground shrink-0" />
             </button>
           </DropdownMenuTrigger>
+
           <DropdownMenuContent align="end" className="w-56">
+            <div className="px-2 py-2 border-b mb-1">
+              <p className="text-sm font-medium truncate">{displayName}</p>
+              <p className="text-xs text-muted-foreground truncate">
+                {firebaseUser?.email}
+              </p>
+
+              {user?.subscription?.plan?.name && (
+                <span className="inline-flex items-center gap-1 mt-1.5 text-xs text-primary font-medium">
+                  <Crown className="h-3 w-3" />
+                  Plan {user.subscription.plan.name}
+                </span>
+              )}
+            </div>
+
             <DropdownMenuItem asChild>
-              <Link href="/settings/profile" className="flex items-center cursor-pointer">
+              <Link
+                href="/settings/profile"
+                onClick={closeOnMobile}
+                className="flex items-center cursor-pointer"
+              >
                 <User className="mr-2 h-4 w-4" />
                 Mi Perfil
               </Link>
             </DropdownMenuItem>
+
             <DropdownMenuItem asChild>
               <Link
                 href="/settings/organization"
+                onClick={closeOnMobile}
                 className="flex items-center cursor-pointer"
               >
                 <Building2 className="mr-2 h-4 w-4" />
                 Mi Negocio
               </Link>
             </DropdownMenuItem>
+
             <DropdownMenuItem asChild>
               <Link
                 href="/settings/billing"
+                onClick={closeOnMobile}
                 className="flex items-center cursor-pointer"
               >
                 <Receipt className="mr-2 h-4 w-4" />
                 Suscripción
               </Link>
             </DropdownMenuItem>
+
             <DropdownMenuSeparator />
+
             <DropdownMenuItem
               onClick={handleLogout}
               className="text-destructive cursor-pointer"

@@ -204,8 +204,10 @@ export interface PurchaseBatchItem {
   product_id: number;
   variant_id: number | null;
   quantity: number;
+  unit_cost_usd: number;
   unit_cost: number;
   total_cost: number;
+  created_at: string;
 }
 
 // ============================================

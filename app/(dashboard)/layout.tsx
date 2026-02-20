@@ -5,7 +5,11 @@ import React from "react";
 import { useRequireAuth } from "@/hooks/use-require-auth";
 import { LoadingScreen } from "@/hooks/ui/loading-screen";
 import { SWRProvider } from "@/components/providers/swr-provider";
-import { SidebarProvider, SidebarInset, SidebarTrigger } from "@/components/ui/sidebar";
+import {
+  SidebarProvider,
+  SidebarInset,
+  SidebarTrigger,
+} from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/app-sidebar";
 import { Separator } from "@/components/ui/separator";
 import {
@@ -46,10 +50,14 @@ export default function DashboardLayout({
     <SWRProvider>
       <SidebarProvider>
         <AppSidebar />
-        <SidebarInset>
-          <header className="flex h-14 shrink-0 items-center gap-2 border-b px-4 lg:px-6">
+
+        {/* Clave: que el "inset" sea un contenedor full-height y column */}
+        <SidebarInset className="min-h-svh flex flex-col">
+          {/* Header fijo */}
+          <header className="sticky top-0 z-20 flex h-14 shrink-0 items-center gap-2 border-b bg-background px-4 lg:px-6">
             <SidebarTrigger className="-ml-1" />
             <Separator orientation="vertical" className="mr-2 h-4" />
+
             <Breadcrumb>
               <BreadcrumbList>
                 <BreadcrumbItem>
@@ -59,6 +67,7 @@ export default function DashboardLayout({
                 </BreadcrumbItem>
               </BreadcrumbList>
             </Breadcrumb>
+
             <div className="ml-auto flex items-center gap-2">
               <span className="hidden sm:inline text-xs text-muted-foreground">
                 {firebaseUser.email}
@@ -74,6 +83,8 @@ export default function DashboardLayout({
               </Button>
             </div>
           </header>
+
+          {/* Clave: main toma el espacio restante y scrollea */}
           <main className="flex-1 overflow-auto p-4 lg:p-6">
             {children}
           </main>

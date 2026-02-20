@@ -10,8 +10,10 @@ import { ProductGrid } from "@/components/products/product-grid";
 import { CreateProductDialog } from "@/components/products/create-product-dialog";
 import { EditProductDialog } from "@/components/products/edit-product-dialog";
 import { DeleteProductDialog } from "@/components/products/delete-product-dialog";
+// import { AddInventoryDialog } from "@/components/products/add-inventory-dialog"; // próximamente
 import { Product } from "@/types";
 import { Skeleton } from "@/components/ui/skeleton";
+import { AddInventoryDialog } from "@/components/products/add-inventory-dialog";
 
 export default function ProductsPage() {
   const { products, isLoading, mutate } = useProducts();
@@ -19,6 +21,7 @@ export default function ProductsPage() {
   const [createOpen, setCreateOpen] = useState(false);
   const [editProduct, setEditProduct] = useState<Product | null>(null);
   const [deleteProduct, setDeleteProduct] = useState<Product | null>(null);
+  const [inventoryProduct, setInventoryProduct] = useState<Product | null>(null);
 
   const filtered = products.filter((p) =>
     p.name.toLowerCase().includes(search.toLowerCase()) ||
@@ -27,7 +30,6 @@ export default function ProductsPage() {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Productos</h1>
@@ -41,7 +43,6 @@ export default function ProductsPage() {
         </Button>
       </div>
 
-      {/* Búsqueda */}
       <div className="relative max-w-sm">
         <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
         <Input
@@ -52,7 +53,6 @@ export default function ProductsPage() {
         />
       </div>
 
-      {/* Grid */}
       {isLoading ? (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
           {Array.from({ length: 8 }).map((_, i) => (
@@ -64,10 +64,10 @@ export default function ProductsPage() {
           products={filtered}
           onEdit={setEditProduct}
           onDelete={setDeleteProduct}
+          onAddInventory={setInventoryProduct}
         />
       )}
 
-      {/* Modales */}
       <CreateProductDialog
         open={createOpen}
         onOpenChange={setCreateOpen}
@@ -85,6 +85,12 @@ export default function ProductsPage() {
         onOpenChange={(open) => !open && setDeleteProduct(null)}
         onSuccess={() => mutate()}
       />
+       <AddInventoryDialog
+        product={inventoryProduct}
+        open={!!inventoryProduct}
+        onOpenChange={(open) => !open && setInventoryProduct(null)}
+        onSuccess={() => mutate()}
+      /> 
     </div>
   );
 }

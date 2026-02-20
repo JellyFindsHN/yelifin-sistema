@@ -14,6 +14,8 @@ import {
 import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { useDeleteProduct } from "@/hooks/swr/use-products";
+import { storage } from "@/lib/firebase";
+import { ref, deleteObject } from "firebase/storage";
 import { Product } from "@/types";
 
 type Props = {
@@ -24,18 +26,32 @@ type Props = {
 };
 
 export function DeleteProductDialog({ product, open, onOpenChange, onSuccess }: Props) {
-  const { deleteProduct, isDeleting } = useDeleteProduct(product?.id ?? null);
+  const { deleteProduct, isDeleting } = useDeleteProduct();
 
   const handleDelete = async () => {
-    try {
-      await deleteProduct();
-      toast.success("Producto eliminado correctamente");
-      onOpenChange(false);
-      onSuccess();
-    } catch (error: any) {
-      toast.error(error.message || "Error al eliminar el producto");
+  try {
+    if (product?.image_url) {
+      try {
+        const imageRef = ref(storage, product.image_url);
+        await deleteObject(imageRef);
+      } catch {
+        console.warn("No se pudo eliminar la imagen");
+      }
     }
-  };
+
+    console.log("Eliminando producto:", product?.id); // ← agrega esto
+    await deleteProduct(product!.id);
+    console.log("Producto eliminado"); // ← y esto
+
+    toast.success("Producto eliminado correctamente");
+    onOpenChange(false);
+    onSuccess();
+
+  } catch (error: any) {
+    console.error("Error al eliminar:", error); // ← y esto
+    toast.error(error.message || "Error al eliminar el producto");
+  }
+};
 
   return (
     <AlertDialog open={open} onOpenChange={onOpenChange}>

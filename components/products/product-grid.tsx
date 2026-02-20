@@ -10,9 +10,10 @@ type Props = {
   products: Product[];
   onEdit: (product: Product) => void;
   onDelete: (product: Product) => void;
+  onAddInventory: (product: Product) => void;
 };
 
-export function ProductGrid({ products, onEdit, onDelete }: Props) {
+export function ProductGrid({ products, onEdit, onDelete, onAddInventory }: Props) {
   if (products.length === 0) {
     return (
       <Card>
@@ -30,11 +31,12 @@ export function ProductGrid({ products, onEdit, onDelete }: Props) {
   return (
     <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
       {products.map((product) => (
-        <ProductCard
+          <ProductCard
           key={product.id}
           product={product}
           onEdit={onEdit}
           onDelete={onDelete}
+          onAddInventory={onAddInventory}
         />
       ))}
     </div>

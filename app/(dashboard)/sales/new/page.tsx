@@ -1,551 +1,489 @@
-"use client"
+// app/(dashboard)/sales/new/page.tsx
+"use client";
 
-import { useState } from "react"
-import { useRouter } from "next/navigation"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
-import { Label } from "@/components/ui/label"
-import { Separator } from "@/components/ui/separator"
+import { useState, useMemo } from "react";
+import { useRouter } from "next/navigation";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Separator } from "@/components/ui/separator";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@/components/ui/select"
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog"
+} from "@/components/ui/select";
 import {
   Search,
+  Package,
   Plus,
   Minus,
   Trash2,
-  Package,
-  CreditCard,
-  Banknote,
-  ArrowLeftRight,
-  Truck,
+  ShoppingCart,
+  Loader2,
+  ArrowLeft,
+  Tag,
   User,
-  Receipt,
-  CheckCircle,
-} from "lucide-react"
-import { mockProducts, mockCustomers, mockAccounts, type Product, type Customer } from "@/lib/mock-data"
-import { Suspense } from "react"
-import Loading from "@/components/ui/loading" // Assuming Loading is a component that needs to be imported
+} from "lucide-react";
+import Image from "next/image";
+import { toast } from "sonner";
+import { useProducts } from "@/hooks/swr/use-products";
+import { useCreateSale, CartItem } from "@/hooks/swr/use-sales";
+import { useAccounts } from "@/hooks/swr/use-accounts";
+import { useCustomers } from "@/hooks/swr/use-costumers";
+import Link from "next/link";
 
-interface CartItem {
-  product: Product
-  quantity: number
-}
+const formatCurrency = (value: number) =>
+  new Intl.NumberFormat("es-HN", {
+    style: "currency",
+    currency: "HNL",
+    minimumFractionDigits: 2,
+  }).format(value);
 
-export default function POSPage() {
-  const router = useRouter()
-  const [searchQuery, setSearchQuery] = useState("")
-  const [cart, setCart] = useState<CartItem[]>([])
-  const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null)
-  const [discount, setDiscount] = useState(0)
-  const [shippingType, setShippingType] = useState<"none" | "local" | "national">("none")
-  const [paymentMethod, setPaymentMethod] = useState<"CASH" | "CARD" | "TRANSFER">("CASH")
-  const [selectedAccount, setSelectedAccount] = useState(mockAccounts[0].id)
-  const [isCheckoutOpen, setIsCheckoutOpen] = useState(false)
-  const [isSuccessOpen, setIsSuccessOpen] = useState(false)
+type DiscountType = "none" | "global" | "per_item";
 
-  const filteredProducts = mockProducts.filter(
-    (product) =>
-      product.is_active &&
-      product.stock > 0 &&
-      (product.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        product.sku.toLowerCase().includes(searchQuery.toLowerCase()))
-  )
+export default function NewSalePage() {
+  const router = useRouter();
+  const { products } = useProducts();
+  const { createSale, isCreating } = useCreateSale();
+  const { accounts } = useAccounts();
+  const { customers } = useCustomers();
 
-  const addToCart = (product: Product) => {
+  const [search, setSearch] = useState("");
+  const [cart, setCart] = useState<CartItem[]>([]);
+  const [customerId, setCustomerId] = useState<number | null>(null);
+  const [paymentMethod, setPaymentMethod] = useState<string>("");
+  const [accountId, setAccountId] = useState<number | null>(null);
+  const [notes, setNotes] = useState("");
+  const [discountType, setDiscountType] = useState<DiscountType>("none");
+  const [globalDiscount, setGlobalDiscount] = useState<number>(0);
+
+  // Productos con stock > 0
+  const availableProducts = useMemo(() =>
+    products.filter((p) =>
+      (p.stock ?? 0) > 0 &&
+      (p.name.toLowerCase().includes(search.toLowerCase()) ||
+        (p.sku?.toLowerCase().includes(search.toLowerCase()) ?? false))
+    ), [products, search]
+  );
+
+  // ── Carrito ────────────────────────────────────────────────────────
+
+  const addToCart = (product: any) => {
     setCart((prev) => {
-      const existing = prev.find((item) => item.product.id === product.id)
+      const existing = prev.find((i) => i.product_id === product.id);
       if (existing) {
-        if (existing.quantity < product.stock) {
-          return prev.map((item) =>
-            item.product.id === product.id
-              ? { ...item, quantity: item.quantity + 1 }
-              : item
-          )
+        if (existing.quantity >= (product.stock ?? 0)) {
+          toast.error(`Stock máximo: ${product.stock} unidades`);
+          return prev;
         }
-        return prev
+        return prev.map((i) =>
+          i.product_id === product.id
+            ? { ...i, quantity: i.quantity + 1 }
+            : i
+        );
       }
-      return [...prev, { product, quantity: 1 }]
-    })
-  }
+      return [...prev, {
+        product_id: product.id,
+        product_name: product.name,
+        image_url: product.image_url,
+        quantity: 1,
+        unit_price: product.price,
+        discount: 0,
+      }];
+    });
+  };
 
-  const updateQuantity = (productId: string, delta: number) => {
+  const updateQuantity = (productId: number, delta: number) => {
     setCart((prev) =>
       prev
-        .map((item) => {
-          if (item.product.id === productId) {
-            const newQty = item.quantity + delta
-            if (newQty <= 0) return null
-            if (newQty > item.product.stock) return item
-            return { ...item, quantity: newQty }
-          }
-          return item
-        })
-        .filter(Boolean) as CartItem[]
-    )
-  }
+        .map((i) =>
+          i.product_id === productId
+            ? { ...i, quantity: i.quantity + delta }
+            : i
+        )
+        .filter((i) => i.quantity > 0)
+    );
+  };
 
-  const removeFromCart = (productId: string) => {
-    setCart((prev) => prev.filter((item) => item.product.id !== productId))
-  }
+  const removeFromCart = (productId: number) => {
+    setCart((prev) => prev.filter((i) => i.product_id !== productId));
+  };
 
-  const subtotal = cart.reduce(
-    (acc, item) => acc + item.product.base_price * item.quantity,
-    0
-  )
+  const updateItemDiscount = (productId: number, value: number) => {
+    setCart((prev) =>
+      prev.map((i) =>
+        i.product_id === productId ? { ...i, discount: value } : i
+      )
+    );
+  };
 
-  const loyaltyDiscount = selectedCustomer?.loyalty_discount
-    ? (subtotal * selectedCustomer.loyalty_discount) / 100
-    : 0
-  const manualDiscount = discount
-  const totalDiscount = loyaltyDiscount + manualDiscount
+  const updateItemPrice = (productId: number, value: number) => {
+    setCart((prev) =>
+      prev.map((i) =>
+        i.product_id === productId ? { ...i, unit_price: value } : i
+      )
+    );
+  };
 
-  const shippingCost =
-    shippingType === "local" ? 50 : shippingType === "national" ? 150 : 0
+  // ── Cálculos ───────────────────────────────────────────────────────
 
-  const total = subtotal - totalDiscount + shippingCost
+  const subtotal = cart.reduce((acc, i) => acc + i.unit_price * i.quantity, 0);
+  const itemDiscounts = cart.reduce((acc, i) => acc + i.discount, 0);
+  const appliedGlobalDiscount = discountType === "global" ? globalDiscount : 0;
+  const appliedItemDiscounts = discountType === "per_item" ? itemDiscounts : 0;
+  const totalDiscount = appliedGlobalDiscount + appliedItemDiscounts;
+  const total = subtotal - totalDiscount;
 
-  const totalCost = cart.reduce(
-    (acc, item) => acc + item.product.cost * item.quantity,
-    0
-  )
-  const netProfit = total - totalCost
+  // ── Checkout ───────────────────────────────────────────────────────
 
-  const formatCurrency = (value: number) => {
-    return new Intl.NumberFormat("es-HN", {
-      style: "currency",
-      currency: "HNL",
-      minimumFractionDigits: 0,
-    }).format(value)
-  }
+  const handleCheckout = async () => {
+    if (cart.length === 0) return toast.error("El carrito está vacío");
+    if (!paymentMethod) return toast.error("Selecciona un método de pago");
+    if (!accountId) return toast.error("Selecciona una cuenta de destino");
 
-  const handleCheckout = () => {
-    setIsCheckoutOpen(false)
-    setIsSuccessOpen(true)
-  }
+    try {
+      const result = await createSale({
+        customer_id: customerId,
+        items: cart.map((i) => ({
+          product_id: i.product_id,
+          quantity: i.quantity,
+          unit_price: i.unit_price,
+          discount: discountType === "per_item" ? i.discount : 0,
+        })),
+        discount: appliedGlobalDiscount,
+        payment_method: paymentMethod as any,
+        account_id: accountId,
+        notes: notes || undefined,
+      });
 
-  const handleFinish = () => {
-    setIsSuccessOpen(false)
-    setCart([])
-    setSelectedCustomer(null)
-    setDiscount(0)
-    setShippingType("none")
-    router.push("/sales")
-  }
+      toast.success(`Venta ${result.data.sale_number} registrada`);
+      router.push("/sales");
+
+    } catch (error: any) {
+      toast.error(error.message || "Error al registrar la venta");
+    }
+  };
 
   return (
-    <div className="flex h-[calc(100vh-8rem)] gap-4">
-      {/* Products Grid */}
-      <div className="flex flex-1 flex-col">
-        <div className="mb-4 flex items-center gap-4">
-          <div className="relative flex-1">
+    <div className="space-y-4">
+      {/* Header */}
+      <div className="flex items-center gap-3">
+        <Button variant="ghost" size="icon" asChild>
+          <Link href="/sales"><ArrowLeft className="h-4 w-4" /></Link>
+        </Button>
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight">Nueva Venta</h1>
+          <p className="text-muted-foreground text-sm">POS — Punto de venta</p>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-5 gap-4">
+
+        {/* ── Panel izquierdo: Productos ── */}
+        <div className="lg:col-span-3 space-y-4">
+          <div className="relative">
             <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
             <Input
-              placeholder="Buscar producto..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Buscar producto por nombre o SKU..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
               className="pl-9"
             />
           </div>
-        </div>
 
-        <div className="flex-1 overflow-auto">
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
-            {filteredProducts.map((product) => {
-              const inCart = cart.find((item) => item.product.id === product.id)
-              return (
-                <Card
-                  key={product.id}
-                  className={`cursor-pointer transition-all hover:border-primary ${
-                    inCart ? "border-primary bg-primary/5" : ""
-                  }`}
-                  onClick={() => addToCart(product)}
-                >
-                  <CardContent className="p-3">
-                    <div className="mb-2 flex aspect-square items-center justify-center rounded-lg bg-muted">
-                      <Package className="h-8 w-8 text-muted-foreground/50" />
-                    </div>
-                    <div className="space-y-1">
-                      <p className="line-clamp-1 text-sm font-medium">{product.name}</p>
-                      <div className="flex items-center justify-between">
-                        <p className="text-sm font-bold text-primary">
-                          {formatCurrency(product.base_price)}
-                        </p>
-                        <Badge variant="outline" className="text-xs">
-                          {product.stock}
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 max-h-[calc(100vh-220px)] overflow-y-auto pr-1">
+            {availableProducts.length === 0 ? (
+              <div className="col-span-3 flex flex-col items-center justify-center py-16 text-muted-foreground">
+                <Package className="h-10 w-10 mb-3 opacity-40" />
+                <p className="text-sm">
+                  {search ? "No se encontraron productos" : "No hay productos con stock"}
+                </p>
+              </div>
+            ) : (
+              availableProducts.map((product) => {
+                const inCart = cart.find((i) => i.product_id === product.id);
+                return (
+                  <Card
+                    key={product.id}
+                    className="overflow-hidden cursor-pointer hover:shadow-md transition-shadow"
+                    onClick={() => addToCart(product)}
+                  >
+                    <div className="relative aspect-square bg-muted flex items-center justify-center overflow-hidden">
+                      {product.image_url ? (
+                        <Image src={product.image_url} alt={product.name} fill className="object-cover" />
+                      ) : (
+                        <Package className="h-10 w-10 text-muted-foreground/30" />
+                      )}
+                      {inCart && (
+                        <div className="absolute top-1.5 right-1.5 bg-primary text-primary-foreground text-xs font-bold rounded-full h-5 w-5 flex items-center justify-center">
+                          {inCart.quantity}
+                        </div>
+                      )}
+                      <div className="absolute bottom-1.5 right-1.5">
+                        <Badge className="text-xs bg-background/80 text-foreground border">
+                          {product.stock} uds
                         </Badge>
                       </div>
-                      {inCart && (
-                        <Badge className="w-full justify-center bg-primary">
-                          {inCart.quantity} en carrito
-                        </Badge>
-                      )}
                     </div>
-                  </CardContent>
-                </Card>
-              )
-            })}
+                    <CardContent className="p-2.5">
+                      <p className="text-sm font-medium truncate">{product.name}</p>
+                      <p className="text-sm font-bold text-primary">{formatCurrency(product.price)}</p>
+                    </CardContent>
+                  </Card>
+                );
+              })
+            )}
           </div>
+        </div>
 
-          {filteredProducts.length === 0 && (
-            <div className="flex flex-col items-center justify-center py-12 text-center">
-              <Package className="h-12 w-12 text-muted-foreground/50" />
-              <p className="mt-4 text-lg font-medium">No hay productos disponibles</p>
-              <p className="text-sm text-muted-foreground">
-                Intenta buscar otro producto
-              </p>
-            </div>
+        {/* ── Panel derecho: Carrito ── */}
+        <div className="lg:col-span-2 space-y-3">
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base flex items-center gap-2">
+                <ShoppingCart className="h-4 w-4" />
+                Carrito
+                {cart.length > 0 && (
+                  <Badge variant="secondary" className="ml-auto">{cart.length}</Badge>
+                )}
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              {cart.length === 0 ? (
+                <p className="text-sm text-muted-foreground text-center py-6">
+                  Agrega productos desde el panel izquierdo
+                </p>
+              ) : (
+                <div className="space-y-2 max-h-64 overflow-y-auto pr-1">
+                  {cart.map((item) => (
+                    <div key={item.product_id} className="space-y-1.5 p-2.5 rounded-lg border">
+                      <div className="flex items-start gap-2">
+                        <div className="relative h-9 w-9 rounded-md overflow-hidden bg-muted shrink-0">
+                          {item.image_url ? (
+                            <Image src={item.image_url} alt={item.product_name} fill className="object-cover" />
+                          ) : (
+                            <Package className="h-4 w-4 m-auto mt-2.5 text-muted-foreground/40" />
+                          )}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium truncate">{item.product_name}</p>
+                          {/* Precio editable */}
+                          <Input
+                            type="number"
+                            value={item.unit_price}
+                            onChange={(e) => updateItemPrice(item.product_id, Number(e.target.value))}
+                            className="h-6 text-xs px-1.5 w-24 mt-0.5"
+                            min="0"
+                            step="0.01"
+                          />
+                        </div>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-7 w-7 text-destructive shrink-0"
+                          onClick={() => removeFromCart(item.product_id)}
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </Button>
+                      </div>
+
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-1">
+                          <Button
+                            variant="outline"
+                            size="icon"
+                            className="h-6 w-6"
+                            onClick={() => updateQuantity(item.product_id, -1)}
+                          >
+                            <Minus className="h-3 w-3" />
+                          </Button>
+                          <span className="text-sm font-medium w-6 text-center">{item.quantity}</span>
+                          <Button
+                            variant="outline"
+                            size="icon"
+                            className="h-6 w-6"
+                            onClick={() => updateQuantity(item.product_id, 1)}
+                          >
+                            <Plus className="h-3 w-3" />
+                          </Button>
+                        </div>
+
+                        {/* Descuento por item */}
+                        {discountType === "per_item" && (
+                          <div className="flex items-center gap-1">
+                            <Tag className="h-3 w-3 text-muted-foreground" />
+                            <Input
+                              type="number"
+                              value={item.discount}
+                              onChange={(e) => updateItemDiscount(item.product_id, Number(e.target.value))}
+                              className="h-6 text-xs px-1.5 w-20"
+                              min="0"
+                              placeholder="Desc. L"
+                            />
+                          </div>
+                        )}
+
+                        <span className="text-sm font-bold">
+                          {formatCurrency((item.unit_price * item.quantity) - (discountType === "per_item" ? item.discount : 0))}
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Tipo de descuento */}
+              {cart.length > 0 && (
+                <div className="space-y-2 pt-1">
+                  <div className="flex gap-2">
+                    {(["none", "global", "per_item"] as DiscountType[]).map((type) => (
+                      <Button
+                        key={type}
+                        variant={discountType === type ? "default" : "outline"}
+                        size="sm"
+                        className="flex-1 text-xs h-7"
+                        onClick={() => setDiscountType(type)}
+                      >
+                        {type === "none" ? "Sin descuento" : type === "global" ? "Desc. global" : "Por producto"}
+                      </Button>
+                    ))}
+                  </div>
+                  {discountType === "global" && (
+                    <Input
+                      type="number"
+                      value={globalDiscount}
+                      onChange={(e) => setGlobalDiscount(Number(e.target.value))}
+                      placeholder="Descuento en L"
+                      min="0"
+                      className="h-8 text-sm"
+                    />
+                  )}
+                </div>
+              )}
+
+              {/* Totales */}
+              {cart.length > 0 && (
+                <div className="space-y-1.5 pt-2 border-t text-sm">
+                  <div className="flex justify-between text-muted-foreground">
+                    <span>Subtotal</span>
+                    <span>{formatCurrency(subtotal)}</span>
+                  </div>
+                  {totalDiscount > 0 && (
+                    <div className="flex justify-between text-green-600">
+                      <span>Descuento</span>
+                      <span>-{formatCurrency(totalDiscount)}</span>
+                    </div>
+                  )}
+                  <Separator />
+                  <div className="flex justify-between font-bold text-base">
+                    <span>Total</span>
+                    <span>{formatCurrency(total)}</span>
+                  </div>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Opciones de venta */}
+          {cart.length > 0 && (
+            <Card>
+              <CardContent className="p-4 space-y-3">
+
+                {/* Cliente */}
+                <div className="space-y-1.5">
+                  <Label className="text-xs flex items-center gap-1.5">
+                    <User className="h-3.5 w-3.5" />
+                    Cliente
+                    <span className="text-muted-foreground">(opcional)</span>
+                  </Label>
+                  <Select
+                    value={customerId?.toString() ?? "anonymous"}
+                    onValueChange={(v) => setCustomerId(v === "anonymous" ? null : Number(v))}
+                  >
+                    <SelectTrigger className="h-8 text-sm">
+                      <SelectValue placeholder="Venta anónima" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="anonymous">Venta anónima</SelectItem>
+                      {customers.map((c) => (
+                        <SelectItem key={c.id} value={c.id.toString()}>
+                          {c.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {/* Método de pago */}
+                <div className="space-y-1.5">
+                  <Label className="text-xs">Método de pago *</Label>
+                  <Select value={paymentMethod} onValueChange={setPaymentMethod}>
+                    <SelectTrigger className="h-8 text-sm">
+                      <SelectValue placeholder="Seleccionar..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="CASH">Efectivo</SelectItem>
+                      <SelectItem value="CARD">Tarjeta</SelectItem>
+                      <SelectItem value="TRANSFER">Transferencia</SelectItem>
+                      <SelectItem value="MIXED">Mixto</SelectItem>
+                      <SelectItem value="OTHER">Otro</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {/* Cuenta destino */}
+                <div className="space-y-1.5">
+                  <Label className="text-xs">Cuenta de destino *</Label>
+                  <Select
+                    value={accountId?.toString() ?? ""}
+                    onValueChange={(v) => setAccountId(Number(v))}
+                  >
+                    <SelectTrigger className="h-8 text-sm">
+                      <SelectValue placeholder="Seleccionar cuenta..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {accounts.map((a) => (
+                        <SelectItem key={a.id} value={a.id.toString()}>
+                          {a.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {/* Notas */}
+                <div className="space-y-1.5">
+                  <Label className="text-xs">Notas <span className="text-muted-foreground">(opcional)</span></Label>
+                  <Textarea
+                    value={notes}
+                    onChange={(e) => setNotes(e.target.value)}
+                    placeholder="Observaciones..."
+                    rows={2}
+                    className="text-sm resize-none"
+                  />
+                </div>
+
+                <Button
+                  className="w-full"
+                  onClick={handleCheckout}
+                  disabled={isCreating || cart.length === 0}
+                >
+                  {isCreating ? (
+                    <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Procesando...</>
+                  ) : (
+                    `Confirmar venta · ${formatCurrency(total)}`
+                  )}
+                </Button>
+              </CardContent>
+            </Card>
           )}
         </div>
-
-        {/* Cart */}
-        <Card className="flex w-96 flex-col">
-          <CardHeader className="border-b px-4 py-3">
-            <CardTitle className="flex items-center gap-2 text-lg">
-              <Receipt className="h-5 w-5" />
-              Carrito de Venta
-            </CardTitle>
-          </CardHeader>
-
-          <CardContent className="flex-1 overflow-auto p-4">
-            {/* Customer Selection */}
-            <div className="mb-4">
-              <Label className="text-xs text-muted-foreground">Cliente</Label>
-              <Select
-                value={selectedCustomer?.id || "none"}
-                onValueChange={(value) => {
-                  if (value === "none") {
-                    setSelectedCustomer(null)
-                  } else {
-                    setSelectedCustomer(
-                      mockCustomers.find((c) => c.id === value) || null
-                    )
-                  }
-                }}
-              >
-                <SelectTrigger className="mt-1">
-                  <SelectValue placeholder="Sin cliente" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="none">Sin cliente</SelectItem>
-                  {mockCustomers.map((customer) => (
-                    <SelectItem key={customer.id} value={customer.id}>
-                      <div className="flex items-center gap-2">
-                        <User className="h-4 w-4" />
-                        {customer.name}
-                        {customer.is_loyal && (
-                          <Badge variant="secondary" className="ml-1 text-xs">
-                            Leal
-                          </Badge>
-                        )}
-                      </div>
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              {selectedCustomer?.is_loyal && (
-                <p className="mt-1 text-xs text-success">
-                  Descuento de lealtad: {selectedCustomer.loyalty_discount}%
-                </p>
-              )}
-            </div>
-
-            <Separator className="mb-4" />
-
-            {/* Cart Items */}
-            <div className="space-y-3">
-              {cart.length === 0 ? (
-                <div className="py-8 text-center">
-                  <Package className="mx-auto h-8 w-8 text-muted-foreground/50" />
-                  <p className="mt-2 text-sm text-muted-foreground">
-                    Agrega productos al carrito
-                  </p>
-                </div>
-              ) : (
-                cart.map((item) => (
-                  <div
-                    key={item.product.id}
-                    className="flex items-center gap-3 rounded-lg border p-2"
-                  >
-                    <div className="flex h-12 w-12 items-center justify-center rounded bg-muted">
-                      <Package className="h-5 w-5 text-muted-foreground/50" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="truncate text-sm font-medium">{item.product.name}</p>
-                      <p className="text-xs text-muted-foreground">
-                        {formatCurrency(item.product.base_price)} c/u
-                      </p>
-                    </div>
-                    <div className="flex items-center gap-1">
-                      <Button
-                        variant="outline"
-                        size="icon"
-                        className="h-7 w-7 bg-transparent"
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          updateQuantity(item.product.id, -1)
-                        }}
-                      >
-                        <Minus className="h-3 w-3" />
-                      </Button>
-                      <span className="w-6 text-center text-sm font-medium">
-                        {item.quantity}
-                      </span>
-                      <Button
-                        variant="outline"
-                        size="icon"
-                        className="h-7 w-7 bg-transparent"
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          updateQuantity(item.product.id, 1)
-                        }}
-                      >
-                        <Plus className="h-3 w-3" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-7 w-7 text-destructive"
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          removeFromCart(item.product.id)
-                        }}
-                      >
-                        <Trash2 className="h-3 w-3" />
-                      </Button>
-                    </div>
-                  </div>
-                ))
-              )}
-            </div>
-          </CardContent>
-
-          {/* Cart Footer */}
-          <CardFooter className="flex-col gap-3 border-t p-4">
-            {/* Shipping */}
-            <div className="w-full">
-              <Label className="text-xs text-muted-foreground">Envío</Label>
-              <div className="mt-1 flex gap-2">
-                <Button
-                  variant={shippingType === "none" ? "default" : "outline"}
-                  size="sm"
-                  className="flex-1"
-                  onClick={() => setShippingType("none")}
-                >
-                  Sin envío
-                </Button>
-                <Button
-                  variant={shippingType === "local" ? "default" : "outline"}
-                  size="sm"
-                  className="flex-1"
-                  onClick={() => setShippingType("local")}
-                >
-                  <Truck className="mr-1 h-3 w-3" />
-                  L50
-                </Button>
-                <Button
-                  variant={shippingType === "national" ? "default" : "outline"}
-                  size="sm"
-                  className="flex-1"
-                  onClick={() => setShippingType("national")}
-                >
-                  <Truck className="mr-1 h-3 w-3" />
-                  L150
-                </Button>
-              </div>
-            </div>
-
-            {/* Discount */}
-            <div className="w-full">
-              <Label htmlFor="discount" className="text-xs text-muted-foreground">
-                Descuento Manual (L)
-              </Label>
-              <Input
-                id="discount"
-                type="number"
-                value={discount || ""}
-                onChange={(e) => setDiscount(Number(e.target.value))}
-                placeholder="0"
-                className="mt-1"
-              />
-            </div>
-
-            <Separator />
-
-            {/* Totals */}
-            <div className="w-full space-y-1 text-sm">
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Subtotal</span>
-                <span>{formatCurrency(subtotal)}</span>
-              </div>
-              {totalDiscount > 0 && (
-                <div className="flex justify-between text-success">
-                  <span>Descuento</span>
-                  <span>-{formatCurrency(totalDiscount)}</span>
-                </div>
-              )}
-              {shippingCost > 0 && (
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Envío</span>
-                  <span>{formatCurrency(shippingCost)}</span>
-                </div>
-              )}
-              <Separator />
-              <div className="flex justify-between text-lg font-bold">
-                <span>Total</span>
-                <span>{formatCurrency(total)}</span>
-              </div>
-            </div>
-
-            <Button
-              className="w-full"
-              size="lg"
-              disabled={cart.length === 0}
-              onClick={() => setIsCheckoutOpen(true)}
-            >
-              <CreditCard className="mr-2 h-4 w-4" />
-              Cobrar {formatCurrency(total)}
-            </Button>
-          </CardFooter>
-        </Card>
-
-        {/* Checkout Dialog */}
-        <Dialog open={isCheckoutOpen} onOpenChange={setIsCheckoutOpen}>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Confirmar Venta</DialogTitle>
-              <DialogDescription>
-                Selecciona el método de pago para completar la venta
-              </DialogDescription>
-            </DialogHeader>
-
-            <div className="space-y-4 py-4">
-              {/* Payment Method */}
-              <div>
-                <Label className="text-sm">Método de Pago</Label>
-                <div className="mt-2 grid grid-cols-3 gap-2">
-                  <Button
-                    variant={paymentMethod === "CASH" ? "default" : "outline"}
-                    className="flex-col gap-1 py-4"
-                    onClick={() => setPaymentMethod("CASH")}
-                  >
-                    <Banknote className="h-5 w-5" />
-                    <span className="text-xs">Efectivo</span>
-                  </Button>
-                  <Button
-                    variant={paymentMethod === "CARD" ? "default" : "outline"}
-                    className="flex-col gap-1 py-4"
-                    onClick={() => setPaymentMethod("CARD")}
-                  >
-                    <CreditCard className="h-5 w-5" />
-                    <span className="text-xs">Tarjeta</span>
-                  </Button>
-                  <Button
-                    variant={paymentMethod === "TRANSFER" ? "default" : "outline"}
-                    className="flex-col gap-1 py-4"
-                    onClick={() => setPaymentMethod("TRANSFER")}
-                  >
-                    <ArrowLeftRight className="h-5 w-5" />
-                    <span className="text-xs">Transferencia</span>
-                  </Button>
-                </div>
-              </div>
-
-              {/* Account Selection */}
-              <div>
-                <Label className="text-sm">Cuenta de Destino</Label>
-                <Select value={selectedAccount} onValueChange={setSelectedAccount}>
-                  <SelectTrigger className="mt-2">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {mockAccounts.map((account) => (
-                      <SelectItem key={account.id} value={account.id}>
-                        {account.name} - {formatCurrency(account.balance)}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <Separator />
-
-              {/* Summary */}
-              <div className="rounded-lg bg-muted p-4 space-y-2">
-                <div className="flex justify-between text-sm">
-                  <span>Productos</span>
-                  <span>{cart.reduce((acc, i) => acc + i.quantity, 0)} items</span>
-                </div>
-                <div className="flex justify-between text-sm">
-                  <span>Cliente</span>
-                  <span>{selectedCustomer?.name || "Sin cliente"}</span>
-                </div>
-                <Separator />
-                <div className="flex justify-between font-bold">
-                  <span>Total a Cobrar</span>
-                  <span>{formatCurrency(total)}</span>
-                </div>
-                <div className="flex justify-between text-sm text-success">
-                  <span>Ganancia Neta</span>
-                  <span>{formatCurrency(netProfit)}</span>
-                </div>
-              </div>
-            </div>
-
-            <DialogFooter>
-              <Button variant="outline" onClick={() => setIsCheckoutOpen(false)}>
-                Cancelar
-              </Button>
-              <Button onClick={handleCheckout}>
-                <CheckCircle className="mr-2 h-4 w-4" />
-                Confirmar Venta
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
-
-        {/* Success Dialog */}
-        <Dialog open={isSuccessOpen} onOpenChange={setIsSuccessOpen}>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle className="flex items-center gap-2 text-success">
-                <CheckCircle className="h-6 w-6" />
-                Venta Registrada
-              </DialogTitle>
-              <DialogDescription>
-                La venta se ha procesado exitosamente
-              </DialogDescription>
-            </DialogHeader>
-
-            <div className="py-4 text-center">
-              <p className="text-3xl font-bold">{formatCurrency(total)}</p>
-              <p className="text-sm text-muted-foreground">Total cobrado</p>
-            </div>
-
-            <DialogFooter className="gap-2 sm:gap-0">
-              <Button variant="outline" onClick={handleFinish}>
-                Nueva Venta
-              </Button>
-              <Button onClick={() => router.push("/sales")}>
-                Ver Ventas
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
       </div>
-  )
+    </div>
+  );
 }

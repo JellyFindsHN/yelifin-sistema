@@ -1,349 +1,349 @@
-"use client"
+// app/(dashboard)/sales/page.tsx
+"use client";
 
-import { useState } from "react"
-import Link from "next/link"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
+import { useMemo, useState } from "react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Card, CardContent } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table"
+  Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
+} from "@/components/ui/table";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from "@/components/ui/select";
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog"
-import { Separator } from "@/components/ui/separator"
-import { Suspense } from "react"
-import { useSearchParams } from "next/navigation"
-import {
-  Plus,
-  Search,
-  Eye,
-  Receipt,
-  Banknote,
-  CreditCard,
-  ArrowLeftRight,
-  TrendingUp,
-  DollarSign,
-  ShoppingCart,
-} from "lucide-react"
-import { mockSales, type Sale } from "@/lib/mock-data"
-import Loading from "./loading"
+  Plus, Search, Receipt, Banknote, CreditCard, ArrowLeftRight,
+  TrendingUp, DollarSign, ShoppingCart, HelpCircle, X,
+} from "lucide-react";
+
+import { useSales } from "@/hooks/swr/use-sales";
+import { useAccounts } from "@/hooks/swr/use-accounts";
+
+// ── Utils ──────────────────────────────────────────────────────────────
+const formatCurrency = (value: number) =>
+  new Intl.NumberFormat("es-HN", { style: "currency", currency: "HNL", minimumFractionDigits: 0 }).format(value);
+
+const formatDateOnly = (dateString: string) =>
+  new Date(dateString).toLocaleDateString("es-HN", { year: "numeric", month: "short", day: "numeric" });
+
+type Preset      = "today" | "7d" | "this_month" | "last_month" | "all";
+type PaymentFilter = "all" | "CASH" | "CARD" | "TRANSFER" | "MIXED" | "OTHER";
+
+const paymentConfig: Record<string, { label: string; icon: any }> = {
+  CASH:     { label: "Efectivo",      icon: Banknote },
+  CARD:     { label: "Tarjeta",       icon: CreditCard },
+  TRANSFER: { label: "Transferencia", icon: ArrowLeftRight },
+  MIXED:    { label: "Mixto",         icon: HelpCircle },
+  OTHER:    { label: "Otro",          icon: HelpCircle },
+};
+
+const PRESET_LABELS: Record<Preset, string> = {
+  today:      "Hoy",
+  "7d":       "Últimos 7 días",
+  this_month: "Este mes",
+  last_month: "Mes pasado",
+  all:        "Todas",
+};
 
 export default function SalesPage() {
-  const [searchQuery, setSearchQuery] = useState("")
-  const [paymentFilter, setPaymentFilter] = useState<string>("all")
-  const [selectedSale, setSelectedSale] = useState<Sale | null>(null)
-  const searchParams = useSearchParams()
+  const router = useRouter();
 
-  const filteredSales = mockSales.filter((sale) => {
-    const matchesSearch =
-      sale.sale_number.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (sale.customer_name?.toLowerCase().includes(searchQuery.toLowerCase()) ?? false)
-    const matchesPayment =
-      paymentFilter === "all" || sale.payment_method === paymentFilter
-    return matchesSearch && matchesPayment
-  })
+  const [preset,        setPreset]        = useState<Preset>("this_month");
+  const [dateFrom,      setDateFrom]      = useState("");
+  const [dateTo,        setDateTo]        = useState("");
+  const [paymentFilter, setPaymentFilter] = useState<PaymentFilter>("all");
+  const [accountFilter, setAccountFilter] = useState<string>("all");
+  const [search,        setSearch]        = useState("");
 
-  const totalRevenue = filteredSales.reduce((acc, s) => acc + s.total, 0)
-  const totalProfit = filteredSales.reduce((acc, s) => acc + s.net_profit, 0)
+  const { sales, isLoading } = useSales({
+    preset,
+    from:    dateFrom || undefined,
+    to:      dateTo   || undefined,
+    payment: paymentFilter,
+  });
 
-  const formatCurrency = (value: number) => {
-    return new Intl.NumberFormat("es-HN", {
-      style: "currency",
-      currency: "HNL",
-      minimumFractionDigits: 0,
-    }).format(value)
-  }
+  const { accounts } = useAccounts();
 
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString("es-HN", {
-      year: "numeric",
-      month: "short",
-      day: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-    })
-  }
+  const filtered = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    return sales.filter((s) => {
+      const matchSearch = !q ||
+        s.sale_number.toLowerCase().includes(q) ||
+        (s.customer_name?.toLowerCase().includes(q) ?? false);
+      const matchAccount = accountFilter === "all" || String(s.account_id) === accountFilter;
+      return matchSearch && matchAccount;
+    });
+  }, [sales, search, accountFilter]);
 
-  const getPaymentIcon = (method: string) => {
-    switch (method) {
-      case "CASH":
-        return <Banknote className="h-4 w-4" />
-      case "CARD":
-        return <CreditCard className="h-4 w-4" />
-      case "TRANSFER":
-        return <ArrowLeftRight className="h-4 w-4" />
-      default:
-        return null
-    }
-  }
+  const totalRevenue = useMemo(() => filtered.reduce((acc, s) => acc + Number(s.total), 0), [filtered]);
+  const totalProfit  = useMemo(() => filtered.reduce((acc, s) => acc + Number(s.net_profit), 0), [filtered]);
 
-  const getPaymentLabel = (method: string) => {
-    switch (method) {
-      case "CASH":
-        return "Efectivo"
-      case "CARD":
-        return "Tarjeta"
-      case "TRANSFER":
-        return "Transferencia"
-      default:
-        return method
-    }
-  }
+  const hasFilters = dateFrom || dateTo || paymentFilter !== "all" || accountFilter !== "all" || search;
+
+  const clearAll = () => {
+    setDateFrom(""); setDateTo(""); setSearch("");
+    setPaymentFilter("all"); setAccountFilter("all");
+    setPreset("this_month");
+  };
+
+  const onChangePreset = (v: Preset) => { setPreset(v); setDateFrom(""); setDateTo(""); };
+  const onManualFrom   = (v: string) => { setDateFrom(v); setPreset("all"); };
+  const onManualTo     = (v: string) => { setDateTo(v);   setPreset("all"); };
+
+  const activePeriodLabel = dateFrom || dateTo
+    ? [dateFrom && `Desde ${formatDateOnly(dateFrom)}`, dateTo && `Hasta ${formatDateOnly(dateTo)}`].filter(Boolean).join(" · ")
+    : PRESET_LABELS[preset];
 
   return (
-    <Suspense fallback={<Loading />}>
-      <div className="space-y-6">
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <h1 className="text-2xl font-bold tracking-tight">Ventas</h1>
-            <p className="text-muted-foreground">
-              Historial y gestión de ventas
-            </p>
-          </div>
-          <Button asChild>
-            <Link href="/sales/new">
-              <Plus className="mr-2 h-4 w-4" />
-              Nueva Venta (POS)
-            </Link>
-          </Button>
-        </div>
+    <div className="space-y-4 pb-8">
 
-        {/* Summary Cards */}
-        <div className="grid gap-4 md:grid-cols-3">
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Total Ventas</CardTitle>
-              <ShoppingCart className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{filteredSales.length}</div>
-              <p className="text-xs text-muted-foreground">ventas registradas</p>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Ingresos</CardTitle>
-              <DollarSign className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{formatCurrency(totalRevenue)}</div>
-              <p className="text-xs text-muted-foreground">total facturado</p>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Ganancia Neta</CardTitle>
-              <TrendingUp className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-success">{formatCurrency(totalProfit)}</div>
-              <p className="text-xs text-muted-foreground">utilidad generada</p>
-            </CardContent>
-          </Card>
+      {/* ── Header ── */}
+      <div className="flex items-center justify-between gap-3">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight">Ventas</h1>
+          <p className="text-muted-foreground text-sm">{activePeriodLabel}</p>
         </div>
+        <Button asChild size="sm">
+          <Link href="/sales/new">
+            <Plus className="h-4 w-4 mr-1.5" />
+            Nueva venta
+          </Link>
+        </Button>
+      </div>
 
-        {/* Filters */}
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
-              <div className="relative flex-1">
-                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                <Input
-                  placeholder="Buscar por número o cliente..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="pl-9"
-                />
+      {/* ── Stats — compactas, 3 cols móvil ── */}
+      <div className="grid grid-cols-3 gap-2 lg:gap-3">
+        {[
+          { title: "Ventas",        value: isLoading ? null : filtered.length,              icon: ShoppingCart },
+          { title: "Ingresos",      value: isLoading ? null : formatCurrency(totalRevenue), icon: DollarSign },
+          { title: "Ganancia",      value: isLoading ? null : formatCurrency(totalProfit),  icon: TrendingUp, valueClass: "text-green-600" },
+        ].map((stat) => (
+          <Card key={stat.title}>
+            <CardContent className="p-3">
+              <div className="flex items-center justify-between mb-1">
+                <span className="text-[11px] font-medium text-muted-foreground">{stat.title}</span>
+                <stat.icon className="h-3 w-3 text-muted-foreground shrink-0" />
               </div>
-              <Select value={paymentFilter} onValueChange={setPaymentFilter}>
-                <SelectTrigger className="w-full sm:w-[180px]">
-                  <SelectValue placeholder="Método de pago" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Todos los métodos</SelectItem>
-                  <SelectItem value="CASH">Efectivo</SelectItem>
-                  <SelectItem value="CARD">Tarjeta</SelectItem>
-                  <SelectItem value="TRANSFER">Transferencia</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          </CardContent>
-        </Card>
+              <div className={`text-base font-bold lg:text-xl ${(stat as any).valueClass ?? ""}`}>
+                {stat.value === null ? <Skeleton className="h-5 w-16" /> : stat.value}
+              </div>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
 
-        {/* Sales Table */}
-        <Card>
-          <CardContent className="p-0">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Número</TableHead>
-                  <TableHead>Fecha</TableHead>
-                  <TableHead>Cliente</TableHead>
-                  <TableHead>Productos</TableHead>
-                  <TableHead>Método</TableHead>
-                  <TableHead className="text-right">Total</TableHead>
-                  <TableHead className="text-right">Ganancia</TableHead>
-                  <TableHead className="text-right">Acciones</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredSales.map((sale) => (
-                  <TableRow key={sale.id}>
-                    <TableCell className="font-medium">{sale.sale_number}</TableCell>
-                    <TableCell className="text-muted-foreground">
-                      {formatDate(sale.sale_date)}
-                    </TableCell>
-                    <TableCell>{sale.customer_name || "Sin cliente"}</TableCell>
-                    <TableCell>
-                      <Badge variant="secondary">
-                        {sale.items.length} {sale.items.length === 1 ? "producto" : "productos"}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant="outline" className="gap-1">
-                        {getPaymentIcon(sale.payment_method)}
-                        {getPaymentLabel(sale.payment_method)}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="text-right font-medium">
-                      {formatCurrency(sale.total)}
-                    </TableCell>
-                    <TableCell className="text-right text-success">
-                      {formatCurrency(sale.net_profit)}
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => setSelectedSale(sale)}
-                      >
-                        <Eye className="h-4 w-4" />
-                      </Button>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </CardContent>
-        </Card>
+      {/* ── Filtros ── */}
+      <div className="space-y-2.5">
 
-        {filteredSales.length === 0 && (
+        {/* Fila 1: búsqueda + preset */}
+        <div className="flex gap-2">
+          <div className="relative flex-1">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder="Número o cliente..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="pl-9"
+            />
+          </div>
+          <Select value={preset} onValueChange={(v) => onChangePreset(v as Preset)}>
+            <SelectTrigger className="w-36 shrink-0">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="today">Hoy</SelectItem>
+              <SelectItem value="7d">Últimos 7 días</SelectItem>
+              <SelectItem value="this_month">Este mes</SelectItem>
+              <SelectItem value="last_month">Mes pasado</SelectItem>
+              <SelectItem value="all">Todas</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+
+        {/* Fila 2: desde/hasta en 2 cols */}
+        <div className="grid grid-cols-2 gap-2">
+          <Input
+            type="date"
+            value={dateFrom}
+            onChange={(e) => onManualFrom(e.target.value)}
+            className="text-sm"
+            placeholder="Desde"
+          />
+          <Input
+            type="date"
+            value={dateTo}
+            onChange={(e) => onManualTo(e.target.value)}
+            className="text-sm"
+            placeholder="Hasta"
+          />
+        </div>
+
+        {/* Fila 3: cuenta + método */}
+        <div className="grid grid-cols-2 gap-2">
+          <Select value={accountFilter} onValueChange={setAccountFilter}>
+            <SelectTrigger>
+              <SelectValue placeholder="Cuenta" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todas las cuentas</SelectItem>
+              {accounts.map((a) => (
+                <SelectItem key={a.id} value={String(a.id)}>{a.name}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+
+          <Select value={paymentFilter} onValueChange={(v) => setPaymentFilter(v as PaymentFilter)}>
+            <SelectTrigger>
+              <SelectValue placeholder="Método" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todos los métodos</SelectItem>
+              <SelectItem value="CASH">Efectivo</SelectItem>
+              <SelectItem value="CARD">Tarjeta</SelectItem>
+              <SelectItem value="TRANSFER">Transferencia</SelectItem>
+              <SelectItem value="MIXED">Mixto</SelectItem>
+              <SelectItem value="OTHER">Otro</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+
+        {/* Limpiar */}
+        {hasFilters && (
+          <Button variant="ghost" size="sm" className="gap-1.5 text-muted-foreground w-full" onClick={clearAll}>
+            <X className="h-3.5 w-3.5" />
+            Limpiar filtros
+          </Button>
+        )}
+      </div>
+
+      {/* ── Cards — móvil ── */}
+      <div className="space-y-2.5 lg:hidden">
+        {isLoading ? (
+          Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-24 w-full rounded-xl" />)
+        ) : filtered.length === 0 ? (
           <Card>
             <CardContent className="flex flex-col items-center justify-center py-12">
-              <Receipt className="h-12 w-12 text-muted-foreground/50" />
-              <p className="mt-4 text-lg font-medium">No se encontraron ventas</p>
-              <p className="text-sm text-muted-foreground">
-                Intenta con otros filtros de búsqueda
-              </p>
+              <Receipt className="h-10 w-10 text-muted-foreground/40" />
+              <p className="mt-3 text-sm text-muted-foreground">No se encontraron ventas</p>
             </CardContent>
           </Card>
-        )}
-
-        {/* Sale Detail Dialog */}
-        <Dialog open={!!selectedSale} onOpenChange={() => setSelectedSale(null)}>
-          <DialogContent className="sm:max-w-[500px]">
-            <DialogHeader>
-              <DialogTitle className="flex items-center gap-2">
-                <Receipt className="h-5 w-5" />
-                {selectedSale?.sale_number}
-              </DialogTitle>
-              <DialogDescription>
-                {selectedSale && formatDate(selectedSale.sale_date)}
-              </DialogDescription>
-            </DialogHeader>
-
-            {selectedSale && (
-              <div className="space-y-4">
-                {/* Customer */}
-                <div className="rounded-lg bg-muted p-3">
-                  <p className="text-sm text-muted-foreground">Cliente</p>
-                  <p className="font-medium">{selectedSale.customer_name || "Sin cliente"}</p>
-                </div>
-
-                {/* Items */}
-                <div>
-                  <p className="mb-2 text-sm font-medium">Productos</p>
-                  <div className="space-y-2">
-                    {selectedSale.items.map((item) => (
-                      <div
-                        key={item.id}
-                        className="flex items-center justify-between rounded-lg border p-3"
-                      >
-                        <div>
-                          <p className="font-medium">{item.product_name}</p>
-                          {item.variant_name && (
-                            <p className="text-xs text-muted-foreground">{item.variant_name}</p>
-                          )}
-                          <p className="text-sm text-muted-foreground">
-                            {item.quantity} x {formatCurrency(item.unit_price)}
-                          </p>
-                        </div>
-                        <p className="font-medium">{formatCurrency(item.total)}</p>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                <Separator />
-
-                {/* Totals */}
-                <div className="space-y-2">
-                  <div className="flex justify-between text-sm">
-                    <span className="text-muted-foreground">Subtotal</span>
-                    <span>{formatCurrency(selectedSale.subtotal)}</span>
-                  </div>
-                  {selectedSale.discount > 0 && (
-                    <div className="flex justify-between text-sm text-success">
-                      <span>Descuento</span>
-                      <span>-{formatCurrency(selectedSale.discount)}</span>
+        ) : (
+          filtered.map((sale) => {
+            const payment = paymentConfig[sale.payment_method] ?? paymentConfig.OTHER;
+            const PayIcon = payment.icon;
+            return (
+              <Card
+                key={sale.id}
+                className="cursor-pointer active:scale-[0.99] transition-transform"
+                onClick={() => router.push(`/sales/${sale.id}`)}
+              >
+                <CardContent className="p-3.5">
+                  {/* Top */}
+                  <div className="flex items-start justify-between gap-2 mb-2.5">
+                    <div className="min-w-0">
+                      <p className="font-mono text-sm font-semibold">{sale.sale_number}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {sale.customer_name ?? "Anónimo"} · {formatDateOnly(sale.sold_at)}
+                      </p>
                     </div>
-                  )}
-                  {selectedSale.shipping > 0 && (
-                    <div className="flex justify-between text-sm">
-                      <span className="text-muted-foreground">Envío</span>
-                      <span>{formatCurrency(selectedSale.shipping)}</span>
-                    </div>
-                  )}
-                  <Separator />
-                  <div className="flex justify-between font-bold">
-                    <span>Total</span>
-                    <span>{formatCurrency(selectedSale.total)}</span>
-                  </div>
-                  <div className="flex justify-between text-sm">
-                    <span className="text-muted-foreground">Método de pago</span>
-                    <Badge variant="outline" className="gap-1">
-                      {getPaymentIcon(selectedSale.payment_method)}
-                      {getPaymentLabel(selectedSale.payment_method)}
+                    <Badge variant="outline" className="gap-1 shrink-0 text-xs">
+                      <PayIcon className="h-3 w-3" />
+                      {payment.label}
                     </Badge>
                   </div>
-                  <div className="flex justify-between text-sm text-success">
-                    <span>Ganancia Neta</span>
-                    <span className="font-medium">{formatCurrency(selectedSale.net_profit)}</span>
+
+                  {/* Bottom */}
+                  <div className="grid grid-cols-3 gap-2 pt-2.5 border-t text-center">
+                    <div>
+                      <p className="text-[11px] text-muted-foreground">Productos</p>
+                      <p className="text-sm font-semibold">{sale.items_count}</p>
+                    </div>
+                    <div>
+                      <p className="text-[11px] text-muted-foreground">Total</p>
+                      <p className="text-sm font-bold">{formatCurrency(Number(sale.total))}</p>
+                    </div>
+                    <div>
+                      <p className="text-[11px] text-muted-foreground">Ganancia</p>
+                      <p className="text-sm font-bold text-green-600">{formatCurrency(Number(sale.net_profit))}</p>
+                    </div>
                   </div>
-                </div>
-              </div>
-            )}
-          </DialogContent>
-        </Dialog>
+                </CardContent>
+              </Card>
+            );
+          })
+        )}
       </div>
-    </Suspense>
-  )
+
+      {/* ── Tabla — desktop ── */}
+      <Card className="hidden lg:block">
+        <CardContent className="p-0">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Número</TableHead>
+                <TableHead>Fecha</TableHead>
+                <TableHead>Cliente</TableHead>
+                <TableHead>Productos</TableHead>
+                <TableHead>Método</TableHead>
+                <TableHead>Cuenta</TableHead>
+                <TableHead className="text-right">Total</TableHead>
+                <TableHead className="text-right">Ganancia</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {isLoading ? (
+                Array.from({ length: 5 }).map((_, i) => (
+                  <TableRow key={i}>
+                    {Array.from({ length: 8 }).map((__, j) => (
+                      <TableCell key={j}><Skeleton className="h-4 w-full" /></TableCell>
+                    ))}
+                  </TableRow>
+                ))
+              ) : filtered.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={8} className="text-center py-12 text-muted-foreground">
+                    No se encontraron ventas
+                  </TableCell>
+                </TableRow>
+              ) : (
+                filtered.map((sale) => {
+                  const payment = paymentConfig[sale.payment_method] ?? paymentConfig.OTHER;
+                  const PayIcon = payment.icon;
+                  return (
+                    <TableRow
+                      key={sale.id}
+                      className="cursor-pointer hover:bg-muted/50"
+                      onClick={() => router.push(`/sales/${sale.id}`)}
+                    >
+                      <TableCell className="font-medium font-mono">{sale.sale_number}</TableCell>
+                      <TableCell className="text-muted-foreground text-sm">{formatDateOnly(sale.sold_at)}</TableCell>
+                      <TableCell>{sale.customer_name ?? <span className="text-muted-foreground">Anónimo</span>}</TableCell>
+                      <TableCell>
+                        <Badge variant="secondary">{sale.items_count} {sale.items_count === 1 ? "producto" : "productos"}</Badge>
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant="outline" className="gap-1">
+                          <PayIcon className="h-3 w-3" />{payment.label}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-muted-foreground text-sm">
+                        {(sale as any).account_name ?? "—"}
+                      </TableCell>
+                      <TableCell className="text-right font-medium">{formatCurrency(Number(sale.total))}</TableCell>
+                      <TableCell className="text-right text-green-600 font-medium">{formatCurrency(Number(sale.net_profit))}</TableCell>
+                    </TableRow>
+                  );
+                })
+              )}
+            </TableBody>
+          </Table>
+        </CardContent>
+      </Card>
+    </div>
+  );
 }

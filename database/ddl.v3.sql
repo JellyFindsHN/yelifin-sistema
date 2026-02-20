@@ -447,4 +447,8 @@ CREATE TABLE event_inventory (
 CREATE INDEX idx_event_inventory_user ON event_inventory(user_id);
 CREATE INDEX idx_event_inventory_event ON event_inventory(event_id);
 ALTER TABLE products ADD COLUMN image_url TEXT;
-
+ALTER TABLE purchase_batch_items ADD COLUMN unit_cost_usd NUMERIC(10,4) DEFAULT 0;
+ALTER TABLE purchase_batches ADD COLUMN IF NOT EXISTS account_id INTEGER REFERENCES accounts(id);
+-- Opcional pero recomendado:
+ALTER TABLE transactions ADD COLUMN IF NOT EXISTS reference_type VARCHAR(20) 
+  CHECK (reference_type IN ('SALE','PURCHASE','SUPPLY_PURCHASE','EVENT','OTHER'));

@@ -21,7 +21,7 @@ import { toast } from "sonner";
 import { useUpdateProduct } from "@/hooks/swr/use-products";
 import { useAuth } from "@/hooks/use-auth";
 import { storage } from "@/lib/firebase";
-import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
+import { ref, uploadBytes, getDownloadURL, deleteObject } from "firebase/storage";
 import { Product } from "@/types";
 import Image from "next/image";
 
@@ -29,7 +29,6 @@ const schema = z.object({
   name: z.string().min(1, "El nombre es requerido"),
   description: z.string().optional(),
   sku: z.string().optional(),
-  barcode: z.string().optional(),
   price: z.coerce.number().min(0, "El precio debe ser mayor o igual a 0"),
 });
 
@@ -41,6 +40,55 @@ type Props = {
   onOpenChange: (open: boolean) => void;
   onSuccess: () => void;
 };
+
+async function convertToWebP(file: File, quality = 0.85): Promise<Blob> {
+  return new Promise((resolve, reject) => {
+    const img = document.createElement("img");
+    const url = URL.createObjectURL(file);
+
+    img.onload = () => {
+      const MAX = 1200;
+      let { width, height } = img;
+      if (width > MAX || height > MAX) {
+        if (width > height) {
+          height = Math.round((height * MAX) / width);
+          width = MAX;
+        } else {
+          width = Math.round((width * MAX) / height);
+          height = MAX;
+        }
+      }
+      const canvas = document.createElement("canvas");
+      canvas.width = width;
+      canvas.height = height;
+      canvas.getContext("2d")!.drawImage(img, 0, 0, width, height);
+      canvas.toBlob(
+        (blob) => {
+          URL.revokeObjectURL(url);
+          blob ? resolve(blob) : reject(new Error("Error al convertir imagen"));
+        },
+        "image/webp",
+        quality
+      );
+    };
+
+    img.onerror = () => {
+      URL.revokeObjectURL(url);
+      reject(new Error("Error al cargar imagen"));
+    };
+
+    img.src = url;
+  });
+}
+
+async function deleteOldImage(imageUrl: string) {
+  try {
+    const imageRef = ref(storage, imageUrl);
+    await deleteObject(imageRef);
+  } catch {
+    console.warn("No se pudo eliminar la imagen anterior de Storage");
+  }
+}
 
 export function EditProductDialog({ product, open, onOpenChange, onSuccess }: Props) {
   const { firebaseUser } = useAuth();
@@ -57,14 +105,12 @@ export function EditProductDialog({ product, open, onOpenChange, onSuccess }: Pr
     formState: { errors },
   } = useForm<FormData>({ resolver: zodResolver(schema) });
 
-  // Cargar datos del producto al abrir
   useEffect(() => {
     if (product && open) {
       reset({
         name: product.name,
         description: product.description ?? "",
         sku: product.sku ?? "",
-        barcode: product.barcode ?? "",
         price: product.price,
       });
       setImagePreview(product.image_url ?? null);
@@ -75,7 +121,6 @@ export function EditProductDialog({ product, open, onOpenChange, onSuccess }: Pr
   const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-
     if (!file.type.startsWith("image/")) {
       toast.error("Solo se permiten archivos de imagen");
       return;
@@ -84,35 +129,46 @@ export function EditProductDialog({ product, open, onOpenChange, onSuccess }: Pr
       toast.error("La imagen no puede superar 5MB");
       return;
     }
-
     setImageFile(file);
     setImagePreview(URL.createObjectURL(file));
   };
 
   const handleRemoveImage = () => {
     setImageFile(null);
+    if (imagePreview && imagePreview.startsWith("blob:")) {
+      URL.revokeObjectURL(imagePreview);
+    }
     setImagePreview(null);
     if (fileInputRef.current) fileInputRef.current.value = "";
   };
 
   const uploadImage = async (file: File): Promise<string> => {
-    const ext = file.name.split(".").pop();
-    const path = `products/${firebaseUser!.uid}/${Date.now()}.${ext}`;
+    const webpBlob = await convertToWebP(file);
+    const path = `products/${firebaseUser!.uid}/${Date.now()}.webp`;
     const storageRef = ref(storage, path);
-    await uploadBytes(storageRef, file);
+    await uploadBytes(storageRef, webpBlob, { contentType: "image/webp" });
     return getDownloadURL(storageRef);
   };
 
   const onSubmit = async (data: FormData) => {
     try {
-      let image_url = product?.image_url;
+      let image_url: string | null | undefined = product?.image_url;
 
       if (imageFile) {
         setIsUploadingImage(true);
+
+        // Eliminar imagen vieja antes de subir la nueva
+        if (product?.image_url) {
+          await deleteOldImage(product.image_url);
+        }
+
         image_url = await uploadImage(imageFile);
         setIsUploadingImage(false);
-      } else if (!imagePreview) {
-        image_url = undefined; // imagen eliminada
+
+      } else if (!imagePreview && product?.image_url) {
+        // Usuario eliminó la imagen sin subir una nueva
+        await deleteOldImage(product.image_url);
+        image_url = null;
       }
 
       await updateProduct({ ...data, image_url });
@@ -131,18 +187,19 @@ export function EditProductDialog({ product, open, onOpenChange, onSuccess }: Pr
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-130">
+      <DialogContent className="sm:max-w-[520px] max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Editar producto</DialogTitle>
         </DialogHeader>
 
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+
           {/* Imagen */}
           <div className="space-y-2">
             <Label>Imagen del producto</Label>
             <div
-              className="relative w-full aspect-video rounded-lg border-2 border-dashed border-muted-foreground/25 flex items-center justify-center cursor-pointer hover:border-primary/50 transition-colors overflow-hidden"
-              onClick={() => fileInputRef.current?.click()}
+              className="relative w-full aspect-video rounded-lg border-2 border-dashed border-muted-foreground/25 flex items-center justify-center cursor-pointer hover:border-primary/50 transition-colors overflow-hidden bg-muted/20"
+              onClick={() => !isLoading && fileInputRef.current?.click()}
             >
               {imagePreview ? (
                 <>
@@ -150,16 +207,16 @@ export function EditProductDialog({ product, open, onOpenChange, onSuccess }: Pr
                   <button
                     type="button"
                     onClick={(e) => { e.stopPropagation(); handleRemoveImage(); }}
-                    className="absolute top-2 right-2 bg-background/80 rounded-full p-1 hover:bg-background transition-colors"
+                    className="absolute top-2 right-2 bg-background/80 rounded-full p-1.5 hover:bg-background transition-colors shadow"
                   >
-                    <X className="h-4 w-4" />
+                    <X className="h-3.5 w-3.5" />
                   </button>
                 </>
               ) : (
-                <div className="flex flex-col items-center gap-2 text-muted-foreground">
+                <div className="flex flex-col items-center gap-2 text-muted-foreground py-6">
                   <Upload className="h-8 w-8" />
-                  <p className="text-sm">Haz clic para subir una imagen</p>
-                  <p className="text-xs">PNG, JPG hasta 5MB</p>
+                  <p className="text-sm font-medium">Haz clic para subir una imagen</p>
+                  <p className="text-xs">PNG, JPG, WebP hasta 5MB · Se convierte a WebP automáticamente</p>
                 </div>
               )}
             </div>
@@ -169,6 +226,7 @@ export function EditProductDialog({ product, open, onOpenChange, onSuccess }: Pr
               accept="image/*"
               className="hidden"
               onChange={handleImageSelect}
+              disabled={isLoading}
             />
           </div>
 
@@ -179,29 +237,29 @@ export function EditProductDialog({ product, open, onOpenChange, onSuccess }: Pr
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="description">Descripción</Label>
-            <Textarea id="description" placeholder="Descripción opcional" rows={2} {...register("description")} disabled={isLoading} />
+            <Label htmlFor="description">
+              Descripción
+              <span className="text-xs text-muted-foreground ml-2">opcional</span>
+            </Label>
+            <Textarea id="description" placeholder="Describe el producto brevemente..." rows={2} {...register("description")} disabled={isLoading} />
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="sku">SKU</Label>
-              <Input id="sku" placeholder="PRO-001" {...register("sku")} disabled={isLoading} />
-              {errors.sku && <p className="text-sm text-destructive">{errors.sku.message}</p>}
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="barcode">Código de barras</Label>
-              <Input id="barcode" placeholder="123456789" {...register("barcode")} disabled={isLoading} />
-            </div>
+          <div className="space-y-2">
+            <Label htmlFor="sku">
+              SKU
+              <span className="text-xs text-muted-foreground ml-2">opcional</span>
+            </Label>
+            <Input id="sku" placeholder="PRO-001" {...register("sku")} disabled={isLoading} />
+            {errors.sku && <p className="text-sm text-destructive">{errors.sku.message}</p>}
           </div>
 
           <div className="space-y-2">
             <Label htmlFor="price">Precio de venta (L) *</Label>
-            <Input id="price" type="number" step="0.01" placeholder="0.00" {...register("price")} disabled={isLoading} />
+            <Input id="price" type="number" step="0.01" min="0" placeholder="0.00" {...register("price")} disabled={isLoading} />
             {errors.price && <p className="text-sm text-destructive">{errors.price.message}</p>}
           </div>
 
-          <DialogFooter>
+          <DialogFooter className="pt-2">
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={isLoading}>
               Cancelar
             </Button>

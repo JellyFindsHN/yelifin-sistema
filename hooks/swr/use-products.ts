@@ -5,6 +5,7 @@ import useSWR from 'swr';
 import useSWRMutation from 'swr/mutation';
 import { useAuth } from '@/hooks/use-auth';
 import { Product } from '@/types';
+import { useState } from 'react';
 
 const KEY = '/api/products';
 
@@ -126,14 +127,20 @@ export function useUpdateProduct(id: number | null) {
 
 // ── useDeleteProduct ───────────────────────────────────────────────────
 
-export function useDeleteProduct(id: number | null) {
+// En use-products.ts reemplaza useDeleteProduct
+export function useDeleteProduct() {
   const { firebaseUser } = useAuth();
   const authFetch = useAuthFetch();
+  const [isDeleting, setIsDeleting] = useState(false);
 
-  const { trigger, isMutating } = useSWRMutation(
-    firebaseUser && id ? `${KEY}/${id}` : null,
-    () => authFetch(`${KEY}/${id}`, { method: 'DELETE' })
-  );
+  const deleteProduct = async (id: number) => {
+    setIsDeleting(true);
+    try {
+      await authFetch(`${KEY}/${id}`, { method: 'DELETE' });
+    } finally {
+      setIsDeleting(false);
+    }
+  };
 
-  return { deleteProduct: trigger, isDeleting: isMutating };
+  return { deleteProduct, isDeleting };
 }

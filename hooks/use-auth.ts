@@ -1,65 +1,62 @@
-// hooks/use-auth.ts
 'use client';
 
 import { useEffect, useState } from 'react';
 import { User as FirebaseUser, onAuthStateChanged } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
 import { UserProfileResponse } from '@/types';
+import useSWR from 'swr';
 
-type AuthState = {
-  firebaseUser: FirebaseUser | null;
-  user: UserProfileResponse | null;
-  loading: boolean;
-  emailVerified: boolean;
-  refreshProfile: () => Promise<void>;
-};
+const PROFILE_KEY = '/api/auth/me';
 
-export function useAuth(): AuthState {
+export function useAuth() {
   const [firebaseUser, setFirebaseUser] = useState<FirebaseUser | null>(null);
-  const [user, setUser] = useState<UserProfileResponse | null>(null);
-  const [loading, setLoading] = useState(true);
-
-  const fetchProfile = async (idToken: string) => {
-    try {
-      const response = await fetch('/api/auth/me', {
-        headers: { Authorization: `Bearer ${idToken}` },
-      });
-      if (!response.ok) {
-        setUser(null);
-        return;
-      }
-      const profile: UserProfileResponse = await response.json();
-      setUser(profile);
-    } catch {
-      setUser(null);
-    }
-  };
+  const [token, setToken] = useState<string | null>(null);
+  const [firebaseLoading, setFirebaseLoading] = useState(true);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (fbUser) => {
       setFirebaseUser(fbUser);
       if (fbUser) {
         const idToken = await fbUser.getIdToken();
-        await fetchProfile(idToken);
+        setToken(idToken);
       } else {
-        setUser(null);
+        setToken(null);
       }
-      setLoading(false);
+      setFirebaseLoading(false);
     });
 
     return () => unsubscribe();
   }, []);
 
+  // SWR cachea el perfil — no se vuelve a pedir hasta que expire
+  const { data: user, isLoading: profileLoading, mutate: mutateProfile } = useSWR<UserProfileResponse>(
+    token ? PROFILE_KEY : null,
+    async (url: string) => {
+      const res = await fetch(url, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) throw new Error('Error al obtener perfil');
+      return res.json();
+    },
+    {
+      revalidateOnFocus: false,
+      dedupingInterval: 60_000, // 1 minuto sin re-fetch
+      revalidateOnReconnect: false,
+    }
+  );
+
   const refreshProfile = async () => {
-    if (!firebaseUser) return;
-    const idToken = await firebaseUser.getIdToken(true);
-    await fetchProfile(idToken);
+    if (firebaseUser) {
+      const idToken = await firebaseUser.getIdToken(true);
+      setToken(idToken);
+      await mutateProfile();
+    }
   };
 
   return {
     firebaseUser,
     user,
-    loading,
+    loading: firebaseLoading || (!!token && profileLoading),
     emailVerified: firebaseUser?.emailVerified ?? false,
     refreshProfile,
   };
