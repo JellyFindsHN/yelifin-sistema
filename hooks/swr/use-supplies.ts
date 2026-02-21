@@ -33,6 +33,7 @@ export type UpdateSupplyInput = {
 };
 
 export type SupplyPurchaseInput = {
+  account_id: number;            // ← nuevo, requerido
   supplier_id?: number | null;
   purchased_at?: string;
   items: { supply_id: number; quantity: number; unit_cost: number }[];

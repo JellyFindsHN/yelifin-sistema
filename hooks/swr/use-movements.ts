@@ -77,3 +77,19 @@ export function useMovements(filters?: MovementFilters) {
     mutate,
   };
 }
+
+export function useMovementPeriods() {
+  const { firebaseUser } = useAuth();
+  const authFetch = useAuthFetch();
+
+  const { data, isLoading } = useSWR(
+    firebaseUser ? "/api/inventory/movements/periods" : null,
+    (u: string) => authFetch(u),
+    { revalidateOnFocus: false, dedupingInterval: 300_000 }
+  );
+
+  return {
+    periods:   (data?.data ?? []) as { year: number; month: number }[],
+    isLoading,
+  };
+}

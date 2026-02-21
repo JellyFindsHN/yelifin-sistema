@@ -104,18 +104,16 @@ export default function InventoryPage() {
             valueClass: "text-destructive",
           },
         ].map((stat) => (
-          <Card key={stat.title} className="p-0">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 p-3 pb-1 md:p-4 md:pb-2">
-              <CardTitle className="text-xs font-medium text-muted-foreground md:text-sm">
-                {stat.title}
-              </CardTitle>
-              <stat.icon className="h-3.5 w-3.5 text-muted-foreground md:h-4 md:w-4" />
-            </CardHeader>
-            <CardContent className="p-3 pt-0 md:p-4 md:pt-0">
-              <div className={`text-xl font-bold md:text-2xl ${stat.valueClass ?? ""}`}>
-                {isLoading ? <Skeleton className="h-7 w-16" /> : stat.value}
+          <Card key={stat.title}>
+            <CardContent className="pl-3">
+              <div className="flex items-center justify-between mb-1.5">
+                <span className="text-xs font-medium text-muted-foreground">{stat.title}</span>
+                <stat.icon className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
               </div>
-              <p className="text-xs text-muted-foreground truncate">{stat.sub}</p>
+              <div className={`text-lg font-bold md:text-xl ${stat.valueClass ?? ""}`}>
+                {isLoading ? <Skeleton className="h-5 w-16" /> : stat.value}
+              </div>
+              <p className="text-xs text-muted-foreground truncate mt-0.5">{stat.sub}</p>
             </CardContent>
           </Card>
         ))}
@@ -222,7 +220,7 @@ export default function InventoryPage() {
         ) : (
           filtered.map((item) => (
             <Card key={item.product_id}>
-              <CardContent className="p-4">
+              <CardContent className="pl-3">
                 <div className="flex items-center gap-3">
                   {/* Imagen */}
                   <div className="relative h-12 w-12 rounded-lg overflow-hidden bg-muted flex items-center justify-center shrink-0">

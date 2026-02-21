@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Skeleton } from "@/components/ui/skeleton";
+import { Skeleton } from "@/components/ui/skeleton"
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
@@ -15,6 +15,7 @@ import { useCustomers, Customer } from "@/hooks/swr/use-costumers";
 import { CreateCustomerDialog } from "@/components/customers/create-customer-dialog";
 import { EditCustomerDialog } from "@/components/customers/edit-customer-dialog";
 import { DeleteCustomerDialog } from "@/components/customers/delete-customer-dialog";
+import { Fab } from "@/components/ui/fab";
 
 const formatCurrency = (value: number) =>
   new Intl.NumberFormat("es-HN", { style: "currency", currency: "HNL", minimumFractionDigits: 0 }).format(value);
@@ -45,10 +46,6 @@ export default function CustomersPage() {
             {isLoading ? "Cargando..." : `${customers.length} cliente${customers.length !== 1 ? "s" : ""}`}
           </p>
         </div>
-        <Button onClick={() => setCreateOpen(true)}>
-          <Plus className="mr-2 h-4 w-4" />
-          Nuevo cliente
-        </Button>
       </div>
 
       {/* Stats */}
@@ -59,11 +56,11 @@ export default function CustomersPage() {
           { title: "Total facturado", value: formatCurrency(totalSpent), sub: "a clientes registrados", icon: TrendingUp },
         ].map((stat) => (
           <Card key={stat.title} className={stat.title === "Total facturado" ? "col-span-2 md:col-span-1" : ""}>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 p-3 pb-1 md:p-4 md:pb-2">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pl-3.5">
               <CardTitle className="text-xs font-medium text-muted-foreground md:text-sm">{stat.title}</CardTitle>
-              <stat.icon className="h-3.5 w-3.5 text-muted-foreground" />
+              <stat.icon className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
-            <CardContent className="p-3 pt-0 md:p-4 md:pt-0">
+            <CardContent className="pl-3.5">
               <div className="text-xl font-bold md:text-2xl">
                 {isLoading ? <Skeleton className="h-7 w-20" /> : stat.value}
               </div>
@@ -159,7 +156,7 @@ export default function CustomersPage() {
         ) : (
           filtered.map((customer) => (
             <Card key={customer.id}>
-              <CardContent className="p-4">
+              <CardContent className="pl-4">
                 <div className="flex items-start justify-between gap-2">
                   <div className="min-w-0">
                     <p className="font-medium truncate">{customer.name}</p>
@@ -204,6 +201,15 @@ export default function CustomersPage() {
         open={!!deleteCustomer}
         onOpenChange={(open) => !open && setDeleteCustomer(null)}
         onSuccess={() => mutate()}
+      />
+       <Fab
+        actions={[
+          {
+            label: "Nuevo Cliente",
+            icon: Users,
+            onClick: () => setCreateOpen(true),
+          }
+        ]}
       />
     </div>
   );

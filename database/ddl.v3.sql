@@ -452,3 +452,5 @@ ALTER TABLE purchase_batches ADD COLUMN IF NOT EXISTS account_id INTEGER REFEREN
 -- Opcional pero recomendado:
 ALTER TABLE transactions ADD COLUMN IF NOT EXISTS reference_type VARCHAR(20) 
   CHECK (reference_type IN ('SALE','PURCHASE','SUPPLY_PURCHASE','EVENT','OTHER'));
+
+ALTER TABLE supply_purchases ADD COLUMN IF NOT EXISTS account_id INTEGER REFERENCES accounts(id);

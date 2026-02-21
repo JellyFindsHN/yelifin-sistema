@@ -4,7 +4,7 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Plus, Search } from "lucide-react";
+import { Plus, Search, Box } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Card, CardContent } from "@/components/ui/card";
 
@@ -14,6 +14,7 @@ import { CreateSupplyDialog } from "@/components/supplies/create-supply-dialog";
 import { EditSupplyDialog } from "@/components/supplies/edit-supply-dialog";
 import { DeleteSupplyDialog } from "@/components/supplies/delete-supply-dialog";
 import { AddSupplyPurchaseDialog } from "@/components/supplies/add-supply-purchase-dialog";
+import { Fab } from "@/components/ui/fab";
 
 export default function SuppliesPage() {
   const [search, setSearch] = useState("");
@@ -34,11 +35,6 @@ export default function SuppliesPage() {
             {isLoading ? "Cargando..." : `${supplies.length} suministro${supplies.length !== 1 ? "s" : ""}`}
           </p>
         </div>
-
-        <Button onClick={() => setCreateOpen(true)}>
-          <Plus className="mr-2 h-4 w-4" />
-          Nuevo suministro
-        </Button>
       </div>
 
       {/* Search */}
@@ -102,6 +98,15 @@ export default function SuppliesPage() {
         onOpenChange={(open) => !open && setPurchaseSupply(null)}
         onSuccess={() => mutate()}
       />
+
+      <Fab
+        actions={[
+          {
+            label: "Nuevo Cliente",
+            icon: Box,
+            onClick: () => setCreateOpen(true),
+          }
+        ]}/>
     </div>
   );
 }

@@ -362,7 +362,7 @@ export default function FinancesPage() {
             <CardDescription>Últimos 7 días</CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="h-[300px]">
+            <div className="h-75">
               <ResponsiveContainer width="100%" height="100%">
                 <AreaChart data={cashFlowData}>
                   <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />

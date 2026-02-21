@@ -4,7 +4,7 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
@@ -12,11 +12,14 @@ import {
 } from "@/components/ui/table";
 import {
   Plus, Search, Wallet, Banknote, CreditCard, Building2, Pencil, Trash2,
+  PackagePlus,
 } from "lucide-react";
 import { useAccounts, Account } from "@/hooks/swr/use-accounts";
 import { CreateAccountDialog } from "@/components/accounts/create-account-dialog";
 import { EditAccountDialog } from "@/components/accounts/edit-account-dialog";
 import { DeleteAccountDialog } from "@/components/accounts/delete-account-dialog";
+import { CreateTransactionModal } from "@/components/transactions/create-transaction-modal";
+import { Fab } from "@/components/ui/fab";
 
 const formatCurrency = (value: number) =>
   new Intl.NumberFormat("es-HN", { style: "currency", currency: "HNL", minimumFractionDigits: 2 }).format(value);
@@ -32,6 +35,7 @@ export default function AccountsPage() {
   const { accounts, isLoading, mutate } = useAccounts();
   const [search, setSearch] = useState("");
   const [createOpen, setCreateOpen] = useState(false);
+  const [modalTransactionOpen, setModalTransactionOpen] = useState(false);
   const [editAccount, setEditAccount] = useState<Account | null>(null);
   const [deleteAccount, setDeleteAccount] = useState<Account | null>(null);
 
@@ -40,6 +44,10 @@ export default function AccountsPage() {
   );
 
   const totalBalance = accounts.reduce((acc, a) => acc + Number(a.balance), 0);
+
+  function setCreateTransactionOpen(arg0: boolean): void {
+    throw new Error("Function not implemented.");
+  }
 
   return (
     <div className="space-y-6">
@@ -51,21 +59,17 @@ export default function AccountsPage() {
             {isLoading ? "Cargando..." : `${accounts.length} cuenta${accounts.length !== 1 ? "s" : ""}`}
           </p>
         </div>
-        <Button onClick={() => setCreateOpen(true)}>
-          <Plus className="mr-2 h-4 w-4" />
-          Nueva cuenta
-        </Button>
       </div>
 
       {/* Balance total */}
       <Card className="border-primary/20 bg-primary/5">
-        <CardContent className="p-4 md:p-6">
+        <CardContent className="pl-4 md:p-6">
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm text-muted-foreground">Balance total</p>
-              <p className="text-3xl font-bold text-primary mt-1">
+              <div className="text-3xl font-bold text-primary mt-1">
                 {isLoading ? <Skeleton className="h-9 w-40" /> : formatCurrency(totalBalance)}
-              </p>
+              </div>
               <p className="text-xs text-muted-foreground mt-1">
                 sumando todas las cuentas activas
               </p>
@@ -173,7 +177,7 @@ export default function AccountsPage() {
             const Icon = config.icon;
             return (
               <Card key={account.id}>
-                <CardContent className="p-4">
+                <CardContent className="pl-4">
                   <div className="flex items-center gap-3">
                     <div className="h-10 w-10 rounded-lg bg-muted flex items-center justify-center shrink-0">
                       <Icon className="h-5 w-5 text-muted-foreground" />
@@ -219,6 +223,26 @@ export default function AccountsPage() {
         onOpenChange={(open) => !open && setDeleteAccount(null)}
         onSuccess={() => mutate()}
       />
+       <CreateTransactionModal
+        open={modalTransactionOpen}
+        onOpenChange={setModalTransactionOpen}
+        accounts={accounts}
+        onSuccess={() => { mutate(); setModalTransactionOpen(false); }}
+      />
+
+       <Fab
+        actions={[
+          {
+            label: "Nueva Cuenta",
+            icon: Wallet,
+            onClick: () => setCreateOpen(true),
+          },
+          {
+            label: "Registrar Transacción",
+            icon: PackagePlus,
+            onClick: () => setModalTransactionOpen(true),
+          }
+        ]}/>
     </div>
   );
 }

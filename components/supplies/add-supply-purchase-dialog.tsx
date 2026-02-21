@@ -1,140 +1,177 @@
 // components/supplies/add-supply-purchase-dialog.tsx
 "use client";
 
-import { useEffect } from "react";
-import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
-import * as z from "zod";
+import { useEffect, useState } from "react";
 import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Loader2 } from "lucide-react";
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from "@/components/ui/select";
+import { Separator } from "@/components/ui/separator";
+import { Loader2, ShoppingBag, Wallet } from "lucide-react";
 import { toast } from "sonner";
-import { Supply, useCreateSupplyPurchase } from "@/hooks/swr/use-supplies";
+import { useCreateSupplyPurchase, Supply } from "@/hooks/swr/use-supplies";
+import { useAccounts } from "@/hooks/swr/use-accounts";
 
-const schema = z.object({
-  quantity: z.coerce.number().min(1, "La cantidad debe ser mayor a 0"),
-  unit_cost: z.coerce.number().min(0, "Costo inválido"),
-  purchased_at: z.string().optional(), // YYYY-MM-DD
-});
+const formatCurrency = (v: number) =>
+  new Intl.NumberFormat("es-HN", { style: "currency", currency: "HNL", minimumFractionDigits: 0 }).format(v);
 
-type FormData = z.infer<typeof schema>;
-
-export function AddSupplyPurchaseDialog({
-  supply,
-  open,
-  onOpenChange,
-  onSuccess,
-}: {
+type Props = {
   supply: Supply | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onSuccess: () => void;
-}) {
-  const { createSupplyPurchase, isCreating } = useCreateSupplyPurchase();
+};
 
-  const {
-    register,
-    handleSubmit,
-    reset,
-    formState: { errors },
-  } = useForm<FormData>({
-    resolver: zodResolver(schema),
-    defaultValues: { quantity: 1, unit_cost: 0 },
-  });
+export function AddSupplyPurchaseDialog({ supply, open, onOpenChange, onSuccess }: Props) {
+  const { createSupplyPurchase, isCreating } = useCreateSupplyPurchase();
+  const { accounts } = useAccounts();
+
+  const [accountId,   setAccountId]   = useState("");
+  const [quantity,    setQuantity]    = useState("1");
+  const [unitCost,    setUnitCost]    = useState("");
+  const [purchasedAt, setPurchasedAt] = useState(new Date().toISOString().split("T")[0]);
+
+  const qty   = Number(quantity)  || 0;
+  const cost  = Number(unitCost)  || 0;
+  const total = qty * cost;
 
   useEffect(() => {
-    if (supply && open) {
-      reset({ quantity: 1, unit_cost: Number(supply.unit_cost ?? 0) });
+    if (open && supply) {
+      setAccountId("");
+      setQuantity("1");
+      setUnitCost(supply.unit_cost > 0 ? String(supply.unit_cost) : "");
+      setPurchasedAt(new Date().toISOString().split("T")[0]);
     }
-  }, [supply, open, reset]);
+  }, [open, supply]);
 
-  const onSubmit = async (data: FormData) => {
+  const onSubmit = async () => {
+    if (!supply) return;
+    if (!accountId)          return toast.error("Selecciona una cuenta");
+    if (qty <= 0)            return toast.error("La cantidad debe ser mayor a 0");
+    if (cost < 0)            return toast.error("El costo no puede ser negativo");
+
     try {
-      if (!supply) return;
-
-      // Si viene "YYYY-MM-DD", lo convertimos a ISO con hora 00:00
-      const purchased_at =
-        data.purchased_at?.trim()
-          ? new Date(`${data.purchased_at}T00:00:00`).toISOString()
-          : new Date().toISOString();
-
       await createSupplyPurchase({
-        purchased_at,
-        items: [
-          {
-            supply_id: supply.id,
-            quantity: Number(data.quantity),
-            unit_cost: Number(data.unit_cost),
-          },
-        ],
+        account_id:   Number(accountId),
+        purchased_at: purchasedAt,
+        items: [{ supply_id: supply.id, quantity: qty, unit_cost: cost }],
       });
-
-      toast.success("Compra registrada");
-      reset();
+      toast.success(`${qty} ${supply.unit ?? "uds"} de ${supply.name} agregados`);
       onOpenChange(false);
       onSuccess();
-    } catch (e: any) {
-      toast.error(e.message || "Error al registrar compra");
+    } catch (error: any) {
+      toast.error(error.message || "Error al registrar la compra");
     }
   };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[520px]">
+      <DialogContent className="sm:max-w-sm">
         <DialogHeader>
-          <DialogTitle>Registrar compra</DialogTitle>
+          <DialogTitle className="flex items-center gap-2">
+            <ShoppingBag className="h-5 w-5 text-primary" />
+            Registrar compra
+          </DialogTitle>
+          {supply && (
+            <p className="text-sm text-muted-foreground">{supply.name}</p>
+          )}
         </DialogHeader>
 
-        <div className="text-sm text-muted-foreground">
-          Suministro: <span className="font-medium text-foreground">{supply?.name ?? "-"}</span>
-        </div>
+        <div className="space-y-4">
 
-        <form onSubmit={handleSubmit(onSubmit)} className="space-y-4 mt-2">
+          {/* Cuenta */}
+          <div className="space-y-2">
+            <Label className="flex items-center gap-1.5">
+              <Wallet className="h-3.5 w-3.5 text-muted-foreground" />
+              Cuenta *
+            </Label>
+            <Select value={accountId} onValueChange={setAccountId} disabled={isCreating}>
+              <SelectTrigger className="w-full">
+                <SelectValue placeholder="Selecciona una cuenta" />
+              </SelectTrigger>
+              <SelectContent>
+                {accounts.map((a) => (
+                  <SelectItem key={a.id} value={String(a.id)}>
+                    <span>{a.name}</span>
+                    <span className="text-xs text-muted-foreground ml-2 font-mono">
+                      {formatCurrency(Number(a.balance))}
+                    </span>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <Separator />
+
+          {/* Cantidad + Costo en 2 cols */}
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-2">
-              <Label>Cantidad *</Label>
-              <Input type="number" min="1" {...register("quantity")} disabled={isCreating} />
-              {errors.quantity && <p className="text-sm text-destructive">{errors.quantity.message}</p>}
+              <Label htmlFor="quantity">
+                Cantidad ({supply?.unit ?? "uds"}) *
+              </Label>
+              <Input
+                id="quantity"
+                type="number"
+                min="1"
+                placeholder="0"
+                value={quantity}
+                onChange={(e) => setQuantity(e.target.value)}
+                disabled={isCreating}
+              />
             </div>
             <div className="space-y-2">
-              <Label>Costo unitario (L) *</Label>
-              <Input type="number" step="0.0001" min="0" {...register("unit_cost")} disabled={isCreating} />
-              {errors.unit_cost && <p className="text-sm text-destructive">{errors.unit_cost.message}</p>}
+              <Label htmlFor="unit_cost">Costo unitario (L)</Label>
+              <Input
+                id="unit_cost"
+                type="number"
+                step="0.01"
+                min="0"
+                placeholder="0.00"
+                value={unitCost}
+                onChange={(e) => setUnitCost(e.target.value)}
+                disabled={isCreating}
+              />
             </div>
           </div>
 
-          <div className="space-y-2">
-            <Label>Fecha (opcional)</Label>
-            <Input type="date" {...register("purchased_at")} disabled={isCreating} />
-            <p className="text-xs text-muted-foreground">
-              Si no seleccionás fecha, se usa la fecha actual.
-            </p>
-          </div>
+          {/* Total */}
+          {qty > 0 && cost > 0 && (
+            <div className="bg-muted/40 rounded-lg p-3 flex items-center justify-between">
+              <span className="text-sm text-muted-foreground">Total a descontar</span>
+              <span className="font-bold text-primary">{formatCurrency(total)}</span>
+            </div>
+          )}
 
-          <DialogFooter className="pt-2">
-            <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={isCreating}>
-              Cancelar
-            </Button>
-            <Button type="submit" disabled={isCreating}>
-              {isCreating ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Guardando...
-                </>
-              ) : (
-                "Registrar"
-              )}
-            </Button>
-          </DialogFooter>
-        </form>
+          {/* Fecha */}
+          <div className="space-y-2">
+            <Label htmlFor="purchased_at">Fecha de compra</Label>
+            <Input
+              id="purchased_at"
+              type="date"
+              value={purchasedAt}
+              onChange={(e) => setPurchasedAt(e.target.value)}
+              disabled={isCreating}
+            />
+          </div>
+        </div>
+
+        <DialogFooter className="pt-2">
+          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={isCreating}>
+            Cancelar
+          </Button>
+          <Button onClick={onSubmit} disabled={isCreating}>
+            {isCreating
+              ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Registrando...</>
+              : "Registrar compra"
+            }
+          </Button>
+        </DialogFooter>
       </DialogContent>
     </Dialog>
   );

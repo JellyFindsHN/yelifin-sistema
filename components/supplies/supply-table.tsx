@@ -8,7 +8,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
-import { Pencil, Trash2, PackagePlus, Boxes } from "lucide-react";
+import { Pencil, Trash2, PackagePlus, Boxes, Box } from "lucide-react";
 
 const formatCurrency = (value: number) =>
   new Intl.NumberFormat("es-HN", {
@@ -61,7 +61,7 @@ export function SupplyTable({
 
           return (
             <Card key={s.id}>
-              <CardContent className="p-4">
+              <CardContent className="pl-4">
                 {/* Top row */}
                 <div className="flex items-start justify-between gap-2 mb-3">
                   <div className="min-w-0">
@@ -70,7 +70,7 @@ export function SupplyTable({
                       Unidad: <span className="font-mono">{s.unit ?? "unit"}</span>
                     </p>
                   </div>
-                  {getStatusBadge(stock, min)}
+                  <Box className="h-4 w-4 text-muted-foreground" />
                 </div>
 
                 {/* Stats */}
@@ -137,7 +137,7 @@ export function SupplyTable({
                 <TableHead className="text-right">Stock</TableHead>
                 <TableHead className="text-right">Mínimo</TableHead>
                 <TableHead className="text-right">Costo/u</TableHead>
-                <TableHead>Estado</TableHead>
+                <TableHead className="text-right">Estado</TableHead>
                 <TableHead className="text-right">Acciones</TableHead>
               </TableRow>
             </TableHeader>
@@ -157,7 +157,7 @@ export function SupplyTable({
                     <TableCell className="text-right font-mono">
                       {formatCurrency(Number(s.unit_cost ?? 0))}
                     </TableCell>
-                    <TableCell>{getStatusBadge(stock, min)}</TableCell>
+                    <TableCell className="text-right">{getStatusBadge(stock, min)}</TableCell>
                     <TableCell className="text-right">
                       <div className="inline-flex items-center gap-1">
                         <Button
