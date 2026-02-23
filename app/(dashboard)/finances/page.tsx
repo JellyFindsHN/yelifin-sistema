@@ -1,459 +1,411 @@
-"use client"
+// app/(dashboard)/finances/page.tsx
+"use client";
 
-import { useState } from "react"
-import Link from "next/link"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
-import { Badge } from "@/components/ui/badge"
+import { useState } from "react";
+import Link from "next/link";
+import { Card, CardContent } from "@/components/ui/card";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table"
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from "@/components/ui/select";
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog"
+  AreaChart, Area, XAxis, YAxis, CartesianGrid,
+  Tooltip, ResponsiveContainer,
+} from "recharts";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { Textarea } from "@/components/ui/textarea"
-import {
-  LineChart,
-  Line,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  ResponsiveContainer,
-  AreaChart,
-  Area,
-} from "recharts"
-import {
-  Wallet,
-  Building,
-  Banknote,
-  TrendingUp,
-  TrendingDown,
-  ArrowUpRight,
-  ArrowDownRight,
-  Plus,
-  ArrowLeftRight,
-} from "lucide-react"
-import { mockAccounts, mockTransactions, type Transaction } from "@/lib/mock-data"
+  Wallet, Building, Banknote, CreditCard, TrendingUp, TrendingDown,
+  ArrowUpCircle, ArrowDownCircle, ArrowLeftRight, ExternalLink,
+  Pencil, Trash2, Building2,
+} from "lucide-react";
+import { useFinances, useFinancePeriods } from "@/hooks/swr/use-finances";
+import { useAccounts, Account } from "@/hooks/swr/use-accounts";
+import { CreateTransactionModal } from "@/components/transactions/create-transaction-modal";
+import { CreateAccountDialog } from "@/components/accounts/create-account-dialog";
+import { EditAccountDialog } from "@/components/accounts/edit-account-dialog";
+import { DeleteAccountDialog } from "@/components/accounts/delete-account-dialog";
+import { Fab } from "@/components/ui/fab";
 
+// ── Helpers ────────────────────────────────────────────────────────────
+const formatCurrency = (v: number) =>
+  new Intl.NumberFormat("es-HN", { style: "currency", currency: "HNL", minimumFractionDigits: 0 }).format(v);
+
+const formatTime = (d: string) =>
+  new Date(d).toLocaleTimeString("es-HN", { hour: "2-digit", minute: "2-digit" });
+
+const MONTH_NAMES = [
+  "", "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
+  "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre",
+];
+
+const ACCOUNT_ICONS: Record<string, any> = {
+  CASH:   Banknote,
+  BANK:   Building2,
+  WALLET: CreditCard,
+  OTHER:  Wallet,
+};
+
+const ACCOUNT_TYPE_CONFIG: Record<string, { label: string; color: string }> = {
+  CASH:   { label: "Efectivo",          color: "bg-green-100 text-green-700 border-green-200" },
+  BANK:   { label: "Banco",             color: "bg-blue-100 text-blue-700 border-blue-200" },
+  WALLET: { label: "Billetera digital", color: "bg-purple-100 text-purple-700 border-purple-200" },
+  OTHER:  { label: "Otro",              color: "bg-gray-100 text-gray-700 border-gray-200" },
+};
+
+const TYPE_CONFIG = {
+  INCOME:   { icon: ArrowDownCircle, color: "text-green-600",  sign: "+" },
+  EXPENSE:  { icon: ArrowUpCircle,   color: "text-destructive", sign: "-" },
+  TRANSFER: { icon: ArrowLeftRight,  color: "text-blue-600",   sign: "" },
+};
+
+const REF_LABELS: Record<string, string> = {
+  SALE:            "Venta",
+  PURCHASE:        "Compra inventario",
+  SUPPLY_PURCHASE: "Compra suministros",
+  OTHER:           "Manual",
+};
+
+// ── Page ───────────────────────────────────────────────────────────────
 export default function FinancesPage() {
-  const [isNewTransactionOpen, setIsNewTransactionOpen] = useState(false)
-  const [transactionType, setTransactionType] = useState<"INCOME" | "EXPENSE" | "TRANSFER">("EXPENSE")
-  const [newTransaction, setNewTransaction] = useState({
-    account_id: mockAccounts[0].id,
-    to_account_id: mockAccounts[1].id,
-    amount: "",
-    description: "",
-  })
+  const now = new Date();
 
-  const totalBalance = mockAccounts.reduce((acc, a) => acc + a.balance, 0)
-  
-  const todayTransactions = mockTransactions.filter((t) => {
-    const today = new Date().toDateString()
-    return new Date(t.created_at).toDateString() === today
-  })
+  const [selectedMonth,     setSelectedMonth]     = useState<number | undefined>();
+  const [selectedYear,      setSelectedYear]      = useState<number | undefined>();
+  const [transactionOpen,   setTransactionOpen]   = useState(false);
+  const [createAccountOpen, setCreateAccountOpen] = useState(false);
+  const [editAccount,       setEditAccount]       = useState<Account | null>(null);
+  const [deleteAccount,     setDeleteAccount]     = useState<Account | null>(null);
 
-  const todayIncome = todayTransactions
-    .filter((t) => t.type === "INCOME")
-    .reduce((acc, t) => acc + t.amount, 0)
+  const { summary, isLoading, mutate: mutateSummary } = useFinances({
+    month: selectedMonth,
+    year:  selectedYear,
+  });
+  const { periods }                                    = useFinancePeriods();
+  const { accounts, mutate: mutateAccounts }           = useAccounts();
 
-  const todayExpense = todayTransactions
-    .filter((t) => t.type === "EXPENSE")
-    .reduce((acc, t) => acc + t.amount, 0)
+  const availableYears = [...new Set(periods.map((p) => p.year))].sort((a, b) => b - a);
+  const monthsForYear  = (y: number) =>
+    periods.filter((p) => p.year === y).map((p) => p.month).sort((a, b) => b - a);
 
-  const formatCurrency = (value: number) => {
-    return new Intl.NumberFormat("es-HN", {
-      style: "currency",
-      currency: "HNL",
-      minimumFractionDigits: 0,
-    }).format(value)
-  }
+  const totalBalance = (summary?.accounts ?? []).reduce((acc, a) => acc + Number(a.balance), 0);
 
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString("es-HN", {
-      month: "short",
-      day: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-    })
-  }
+  const periodLabel = selectedYear && selectedMonth
+    ? `${MONTH_NAMES[selectedMonth]} ${selectedYear}`
+    : selectedYear ? `Año ${selectedYear}`
+    : `${MONTH_NAMES[now.getMonth() + 1]} ${now.getFullYear()}`;
 
-  // Generate cash flow chart data
-  const cashFlowData = Array.from({ length: 7 }, (_, i) => {
-    const date = new Date()
-    date.setDate(date.getDate() - (6 - i))
-    return {
-      date: date.toLocaleDateString("es-HN", { weekday: "short" }),
-      ingresos: Math.floor(Math.random() * 3000) + 1000,
-      gastos: Math.floor(Math.random() * 1500) + 500,
-    }
-  })
+  const cashFlow = (summary?.cash_flow ?? []).map((d) => ({
+    date:    new Date(d.date + "T00:00:00").toLocaleDateString("es-HN", { day: "numeric", month: "short" }),
+    income:  Number(d.income),
+    expense: Number(d.expense),
+  }));
 
-  const getAccountIcon = (type: string) => {
-    return type === "CASH" ? (
-      <Banknote className="h-5 w-5" />
-    ) : (
-      <Building className="h-5 w-5" />
-    )
-  }
-
-  const getTransactionIcon = (type: string) => {
-    switch (type) {
-      case "INCOME":
-        return <ArrowUpRight className="h-4 w-4 text-success" />
-      case "EXPENSE":
-        return <ArrowDownRight className="h-4 w-4 text-destructive" />
-      case "TRANSFER":
-        return <ArrowLeftRight className="h-4 w-4 text-primary" />
-      default:
-        return null
-    }
-  }
-
-  const getTransactionBadge = (type: string) => {
-    switch (type) {
-      case "INCOME":
-        return <Badge className="bg-success text-success-foreground">Ingreso</Badge>
-      case "EXPENSE":
-        return <Badge variant="destructive">Gasto</Badge>
-      case "TRANSFER":
-        return <Badge variant="secondary">Transferencia</Badge>
-      default:
-        return null
-    }
-  }
-
-  const handleCreateTransaction = () => {
-    // In a real app, this would save to the database
-    setIsNewTransactionOpen(false)
-    setNewTransaction({
-      account_id: mockAccounts[0].id,
-      to_account_id: mockAccounts[1].id,
-      amount: "",
-      description: "",
-    })
-  }
+  const onAccountSuccess = () => { mutateAccounts(); mutateSummary(); };
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+    <div className="space-y-4 pb-24">
+
+      {/* Header */}
+      <div className="flex items-center justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">Finanzas</h1>
-          <p className="text-muted-foreground">
-            Control de cuentas y flujo de efectivo
-          </p>
+          <h1 className="text-2xl font-bold tracking-tight">Cuentas</h1>
+          <p className="text-muted-foreground text-sm">{periodLabel}</p>
         </div>
-        <Dialog open={isNewTransactionOpen} onOpenChange={setIsNewTransactionOpen}>
-          <DialogTrigger asChild>
-            <Button>
-              <Plus className="mr-2 h-4 w-4" />
-              Nueva Transacción
-            </Button>
-          </DialogTrigger>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Registrar Transacción</DialogTitle>
-              <DialogDescription>
-                Registra un ingreso, gasto o transferencia
-              </DialogDescription>
-            </DialogHeader>
-            <div className="grid gap-4 py-4">
-              <div className="grid gap-2">
-                <Label>Tipo de Transacción</Label>
-                <div className="flex gap-2">
-                  <Button
-                    variant={transactionType === "INCOME" ? "default" : "outline"}
-                    className="flex-1"
-                    onClick={() => setTransactionType("INCOME")}
-                  >
-                    <ArrowUpRight className="mr-1 h-4 w-4" />
-                    Ingreso
-                  </Button>
-                  <Button
-                    variant={transactionType === "EXPENSE" ? "default" : "outline"}
-                    className="flex-1"
-                    onClick={() => setTransactionType("EXPENSE")}
-                  >
-                    <ArrowDownRight className="mr-1 h-4 w-4" />
-                    Gasto
-                  </Button>
-                  <Button
-                    variant={transactionType === "TRANSFER" ? "default" : "outline"}
-                    className="flex-1"
-                    onClick={() => setTransactionType("TRANSFER")}
-                  >
-                    <ArrowLeftRight className="mr-1 h-4 w-4" />
-                    Transferir
-                  </Button>
-                </div>
-              </div>
-
-              <div className="grid gap-2">
-                <Label>{transactionType === "TRANSFER" ? "Cuenta Origen" : "Cuenta"}</Label>
-                <Select
-                  value={newTransaction.account_id}
-                  onValueChange={(value) =>
-                    setNewTransaction({ ...newTransaction, account_id: value })
-                  }
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {mockAccounts.map((account) => (
-                      <SelectItem key={account.id} value={account.id}>
-                        {account.name} - {formatCurrency(account.balance)}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              {transactionType === "TRANSFER" && (
-                <div className="grid gap-2">
-                  <Label>Cuenta Destino</Label>
-                  <Select
-                    value={newTransaction.to_account_id}
-                    onValueChange={(value) =>
-                      setNewTransaction({ ...newTransaction, to_account_id: value })
-                    }
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {mockAccounts
-                        .filter((a) => a.id !== newTransaction.account_id)
-                        .map((account) => (
-                          <SelectItem key={account.id} value={account.id}>
-                            {account.name} - {formatCurrency(account.balance)}
-                          </SelectItem>
-                        ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              )}
-
-              <div className="grid gap-2">
-                <Label htmlFor="amount">Monto (L)</Label>
-                <Input
-                  id="amount"
-                  type="number"
-                  value={newTransaction.amount}
-                  onChange={(e) =>
-                    setNewTransaction({ ...newTransaction, amount: e.target.value })
-                  }
-                  placeholder="0"
-                />
-              </div>
-
-              <div className="grid gap-2">
-                <Label htmlFor="description">Descripción</Label>
-                <Textarea
-                  id="description"
-                  value={newTransaction.description}
-                  onChange={(e) =>
-                    setNewTransaction({ ...newTransaction, description: e.target.value })
-                  }
-                  placeholder="Detalle de la transacción"
-                />
-              </div>
-            </div>
-            <DialogFooter>
-              <Button variant="outline" onClick={() => setIsNewTransactionOpen(false)}>
-                Cancelar
-              </Button>
-              <Button onClick={handleCreateTransaction}>Registrar</Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
       </div>
 
-      {/* Summary Cards */}
-      <div className="grid gap-4 md:grid-cols-4">
-        <Card className="md:col-span-2">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Balance Total</CardTitle>
-            <Wallet className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-3xl font-bold">{formatCurrency(totalBalance)}</div>
-            <p className="text-xs text-muted-foreground">
-              En {mockAccounts.length} cuentas activas
+      {/* Filtros período */}
+      <div className="grid grid-cols-2 gap-2">
+        <Select
+          value={selectedMonth ? String(selectedMonth) : "all"}
+          onValueChange={(v) => setSelectedMonth(v === "all" ? undefined : Number(v))}
+        >
+          <SelectTrigger className="w-full">
+            <SelectValue placeholder="Mes" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Todo el año</SelectItem>
+            {(selectedYear ? monthsForYear(selectedYear) : monthsForYear(now.getFullYear())).map((m) => (
+              <SelectItem key={m} value={String(m)}>{MONTH_NAMES[m]}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+
+        <Select
+          value={selectedYear ? String(selectedYear) : String(now.getFullYear())}
+          onValueChange={(v) => {
+            const y = Number(v);
+            setSelectedYear(y);
+            const months = periods.filter((p) => p.year === y).map((p) => p.month);
+            if (selectedMonth && !months.includes(selectedMonth)) setSelectedMonth(undefined);
+          }}
+        >
+          <SelectTrigger className="w-full">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {availableYears.length === 0 && (
+              <SelectItem value={String(now.getFullYear())}>{now.getFullYear()}</SelectItem>
+            )}
+            {availableYears.map((y) => (
+              <SelectItem key={y} value={String(y)}>{y}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+
+      {/* Balance total */}
+      <Card className="bg-primary text-primary-foreground">
+        <CardContent className="p-4">
+          <div className="flex items-center justify-between mb-1">
+            <span className="text-sm font-medium opacity-80">Balance total</span>
+            <Wallet className="h-4 w-4 opacity-60" />
+          </div>
+          <p className="text-3xl font-bold">
+            {isLoading
+              ? <Skeleton className="h-8 w-32 bg-primary-foreground/20" />
+              : formatCurrency(totalBalance)
+            }
+          </p>
+          <p className="text-xs opacity-60 mt-1">
+            {summary?.accounts.length ?? 0} cuentas activas
+          </p>
+        </CardContent>
+      </Card>
+
+      {/* Stats período */}
+      <div className="grid grid-cols-2 gap-2">
+        <Card>
+          <CardContent className="p-3">
+            <div className="flex items-center justify-between mb-1.5">
+              <span className="text-[11px] font-medium text-muted-foreground">Ingresos</span>
+              <TrendingUp className="h-3 w-3 text-green-600" />
+            </div>
+            <p className="text-base font-bold text-green-600">
+              {isLoading ? <Skeleton className="h-5 w-20" /> : formatCurrency(summary?.period.income ?? 0)}
             </p>
+            <p className="text-[11px] text-muted-foreground mt-0.5">{periodLabel}</p>
           </CardContent>
         </Card>
         <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Ingresos Hoy</CardTitle>
-            <TrendingUp className="h-4 w-4 text-success" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-success">{formatCurrency(todayIncome)}</div>
-            <p className="text-xs text-muted-foreground">
-              +{todayTransactions.filter((t) => t.type === "INCOME").length} transacciones
+          <CardContent className="p-3">
+            <div className="flex items-center justify-between mb-1.5">
+              <span className="text-[11px] font-medium text-muted-foreground">Egresos</span>
+              <TrendingDown className="h-3 w-3 text-destructive" />
+            </div>
+            <p className="text-base font-bold text-destructive">
+              {isLoading ? <Skeleton className="h-5 w-20" /> : formatCurrency(summary?.period.expense ?? 0)}
             </p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Gastos Hoy</CardTitle>
-            <TrendingDown className="h-4 w-4 text-destructive" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-destructive">{formatCurrency(todayExpense)}</div>
-            <p className="text-xs text-muted-foreground">
-              {todayTransactions.filter((t) => t.type === "EXPENSE").length} transacciones
-            </p>
+            <p className="text-[11px] text-muted-foreground mt-0.5">{periodLabel}</p>
           </CardContent>
         </Card>
       </div>
 
-      {/* Accounts */}
-      <div className="grid gap-4 md:grid-cols-3">
-        {mockAccounts.map((account) => (
-          <Card key={account.id} className="relative overflow-hidden">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <div className="flex items-center gap-2">
-                <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10 text-primary">
-                  {getAccountIcon(account.type)}
+{/* Cuentas — una card con lista */}
+<div>
+  <p className="text-sm font-semibold mb-2.5">Cuentas</p>
+  <Card>
+    <CardContent className="p-0">
+      {isLoading ? (
+        <div className="divide-y">
+          {Array.from({ length: 3 }).map((_, i) => (
+            <div key={i} className="flex items-center gap-3 p-3.5">
+              <Skeleton className="h-8 w-8 rounded-lg shrink-0" />
+              <div className="flex-1 space-y-1.5">
+                <Skeleton className="h-3.5 w-24" />
+                <Skeleton className="h-3 w-16" />
+              </div>
+              <Skeleton className="h-4 w-20" />
+            </div>
+          ))}
+        </div>
+      ) : (summary?.accounts ?? []).length === 0 ? (
+        <div className="py-8 flex flex-col items-center justify-center">
+          <Wallet className="h-8 w-8 text-muted-foreground/30" />
+          <p className="text-sm text-muted-foreground mt-2">Sin cuentas creadas</p>
+        </div>
+      ) : (
+        <div className="divide-y">
+          {(summary?.accounts ?? []).map((account) => {
+            const Icon       = ACCOUNT_ICONS[account.type] ?? Wallet;
+            const typeConfig = ACCOUNT_TYPE_CONFIG[account.type] ?? ACCOUNT_TYPE_CONFIG.OTHER;
+            const fullAccount = accounts.find((a) => a.id === account.id);
+            return (
+              <div key={account.id} className="flex items-center gap-3 p-3.5">
+                <div className="h-8 w-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
+                  <Icon className="h-4 w-4 text-primary" />
                 </div>
-                <div>
-                  <CardTitle className="text-base">{account.name}</CardTitle>
-                  <CardDescription>
-                    {account.type === "CASH" ? "Efectivo" : "Cuenta Bancaria"}
-                  </CardDescription>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium truncate">{account.name}</p>
+                  <Badge className={`text-[10px] mt-0.5 ${typeConfig.color}`} variant="outline">
+                    {typeConfig.label}
+                  </Badge>
+                </div>
+                <div className="flex items-center gap-1 shrink-0">
+                  <p className="text-sm font-bold">{formatCurrency(Number(account.balance))}</p>
+                  <Button
+                    variant="ghost" size="icon" className="h-7 w-7"
+                    onClick={() => fullAccount && setEditAccount(fullAccount)}
+                  >
+                    <Pencil className="h-3 w-3" />
+                  </Button>
+                  <Button
+                    variant="ghost" size="icon" className="h-7 w-7 text-destructive"
+                    onClick={() => fullAccount && setDeleteAccount(fullAccount)}
+                  >
+                    <Trash2 className="h-3 w-3" />
+                  </Button>
                 </div>
               </div>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{formatCurrency(account.balance)}</div>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
+            );
+          })}
+        </div>
+      )}
+    </CardContent>
+  </Card>
+</div>
+      {/* ── Flujo de efectivo ── */}
+      <Card>
+        <CardContent className="p-4">
+          <div className="flex items-center justify-between mb-4">
+            <p className="text-sm font-semibold">Flujo de efectivo</p>
+            <span className="text-xs text-muted-foreground">{periodLabel}</span>
+          </div>
+          {isLoading ? (
+            <Skeleton className="h-48 w-full" />
+          ) : cashFlow.length === 0 ? (
+            <p className="text-sm text-muted-foreground text-center py-8">
+              Sin datos en este período
+            </p>
+          ) : (
+            <ResponsiveContainer width="100%" height={200}>
+              <AreaChart data={cashFlow}>
+                <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                <XAxis dataKey="date" tick={{ fontSize: 10 }} tickLine={false} axisLine={false} />
+                <YAxis
+                  tick={{ fontSize: 10 }} tickLine={false} axisLine={false}
+                  tickFormatter={(v) => v >= 1000 ? `L${Math.round(v / 1000)}k` : `L${v}`}
+                />
+                <Tooltip
+                  formatter={(v: number) => formatCurrency(v)}
+                  contentStyle={{
+                    backgroundColor: "hsl(var(--card))",
+                    border: "1px solid hsl(var(--border))",
+                    borderRadius: "8px",
+                    fontSize: 12,
+                  }}
+                />
+                <Area type="monotone" dataKey="income"  stroke="#10B981" fill="#10B981" fillOpacity={0.15} strokeWidth={2} name="Ingresos" />
+                <Area type="monotone" dataKey="expense" stroke="#EF4444" fill="#EF4444" fillOpacity={0.15} strokeWidth={2} name="Egresos" />
+              </AreaChart>
+            </ResponsiveContainer>
+          )}
+        </CardContent>
+      </Card>
 
-      {/* Charts and Transactions */}
-      <div className="grid gap-4 lg:grid-cols-7">
-        {/* Cash Flow Chart */}
-        <Card className="lg:col-span-4">
-          <CardHeader>
-            <CardTitle>Flujo de Efectivo</CardTitle>
-            <CardDescription>Últimos 7 días</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="h-75">
-              <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={cashFlowData}>
-                  <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-                  <XAxis dataKey="date" tick={{ fontSize: 12 }} tickLine={false} axisLine={false} />
-                  <YAxis
-                    tick={{ fontSize: 12 }}
-                    tickLine={false}
-                    axisLine={false}
-                    tickFormatter={(value) => `L${value / 1000}k`}
-                  />
-                  <Tooltip
-                    formatter={(value: number) => formatCurrency(value)}
-                    contentStyle={{
-                      backgroundColor: "hsl(var(--card))",
-                      border: "1px solid hsl(var(--border))",
-                      borderRadius: "8px",
-                    }}
-                  />
-                  <Area
-                    type="monotone"
-                    dataKey="ingresos"
-                    stackId="1"
-                    stroke="#10B981"
-                    fill="#10B981"
-                    fillOpacity={0.3}
-                    name="Ingresos"
-                  />
-                  <Area
-                    type="monotone"
-                    dataKey="gastos"
-                    stackId="2"
-                    stroke="#EF4444"
-                    fill="#EF4444"
-                    fillOpacity={0.3}
-                    name="Gastos"
-                  />
-                </AreaChart>
-              </ResponsiveContainer>
-            </div>
-          </CardContent>
-        </Card>
+      {/* ── Movimientos de hoy ── */}
+      <div>
+        <div className="flex items-center justify-between mb-2.5">
+          <div>
+            <p className="text-sm font-semibold">Movimientos de hoy</p>
+            <p className="text-xs text-muted-foreground">
+              {summary?.today.count ?? 0} transacciones ·
+              <span className="text-green-600 ml-1">+{formatCurrency(summary?.today.income ?? 0)}</span>
+              <span className="text-destructive ml-1">-{formatCurrency(summary?.today.expense ?? 0)}</span>
+            </p>
+          </div>
+          <Button variant="ghost" size="sm" asChild className="gap-1 text-xs">
+            <Link href="/finances/transactions">
+              Ver todas <ExternalLink className="h-3 w-3" />
+            </Link>
+          </Button>
+        </div>
 
-        {/* Recent Transactions */}
-        <Card className="lg:col-span-3">
-          <CardHeader className="flex flex-row items-center justify-between">
-            <div>
-              <CardTitle>Transacciones Recientes</CardTitle>
-              <CardDescription>Últimos movimientos</CardDescription>
-            </div>
-            <Button variant="outline" size="sm" asChild>
-              <Link href="/finances/transactions">Ver todas</Link>
-            </Button>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-3">
-              {mockTransactions.slice(0, 6).map((transaction) => (
-                <div
-                  key={transaction.id}
-                  className="flex items-center justify-between rounded-lg border p-3"
-                >
-                  <div className="flex items-center gap-3">
-                    {getTransactionIcon(transaction.type)}
-                    <div>
-                      <p className="text-sm font-medium line-clamp-1">
-                        {transaction.description}
-                      </p>
-                      <p className="text-xs text-muted-foreground">
-                        {formatDate(transaction.created_at)}
+        <div className="space-y-2">
+          {isLoading ? (
+            Array.from({ length: 3 }).map((_, i) => (
+              <Skeleton key={i} className="h-16 w-full rounded-xl" />
+            ))
+          ) : !summary?.today_transactions.length ? (
+            <Card>
+              <CardContent className="py-8 flex flex-col items-center justify-center">
+                <ArrowLeftRight className="h-8 w-8 text-muted-foreground/30" />
+                <p className="text-sm text-muted-foreground mt-2">Sin movimientos hoy</p>
+              </CardContent>
+            </Card>
+          ) : (
+            summary.today_transactions.map((t) => {
+              const cfg  = TYPE_CONFIG[t.type];
+              const Icon = cfg.icon;
+              return (
+                <Card key={t.id}>
+                  <CardContent className="p-3.5">
+                    <div className="flex items-center gap-3">
+                      <div className="h-8 w-8 rounded-full bg-muted flex items-center justify-center shrink-0">
+                        <Icon className={`h-4 w-4 ${cfg.color}`} />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium truncate">
+                          {t.description || REF_LABELS[t.reference_type ?? "OTHER"] || "—"}
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          {t.account_name}
+                          {t.to_account_name && <span> → {t.to_account_name}</span>}
+                          {" · "}{formatTime(t.occurred_at)}
+                        </p>
+                      </div>
+                      <p className={`text-sm font-bold shrink-0 ${cfg.color}`}>
+                        {cfg.sign}{formatCurrency(Number(t.amount))}
                       </p>
                     </div>
-                  </div>
-                  <div className="text-right">
-                    <p
-                      className={`font-medium ${
-                        transaction.type === "INCOME"
-                          ? "text-success"
-                          : transaction.type === "EXPENSE"
-                          ? "text-destructive"
-                          : ""
-                      }`}
-                    >
-                      {transaction.type === "INCOME" ? "+" : transaction.type === "EXPENSE" ? "-" : ""}
-                      {formatCurrency(transaction.amount)}
-                    </p>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
+                  </CardContent>
+                </Card>
+              );
+            })
+          )}
+        </div>
       </div>
+
+      {/* FAB */}
+      <Fab
+        actions={[
+          {
+            label:   "Nueva cuenta",
+            icon:    Wallet,
+            onClick: () => setCreateAccountOpen(true),
+          },
+          {
+            label:   "Nueva transacción",
+            icon:    ArrowLeftRight,
+            onClick: () => setTransactionOpen(true),
+          },
+        ]}
+      />
+
+      {/* Modales */}
+      <CreateTransactionModal
+        open={transactionOpen}
+        onOpenChange={setTransactionOpen}
+        accounts={accounts}
+        onSuccess={() => { mutateSummary(); setTransactionOpen(false); }}
+      />
+      <CreateAccountDialog
+        open={createAccountOpen}
+        onOpenChange={setCreateAccountOpen}
+        onSuccess={onAccountSuccess}
+      />
+      <EditAccountDialog
+        account={editAccount}
+        open={!!editAccount}
+        onOpenChange={(open) => !open && setEditAccount(null)}
+        onSuccess={onAccountSuccess}
+      />
+      <DeleteAccountDialog
+        account={deleteAccount}
+        open={!!deleteAccount}
+        onOpenChange={(open) => !open && setDeleteAccount(null)}
+        onSuccess={onAccountSuccess}
+      />
     </div>
-  )
+  );
 }

@@ -85,8 +85,7 @@ const mainNav = [
     url: "/finances",
     icon: CreditCard,
     submenu: [
-      { title: "Dashboard", url: "/finances" },
-      { title: "Cuentas", url: "/finances/accounts" },
+      { title: "Cuentas", url: "/finances" },
       { title: "Transacciones", url: "/finances/transactions" },
     ],
   },
