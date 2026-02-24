@@ -3,6 +3,13 @@
 
 @custom-variant dark (&:is(.dark *));
 
+.scrollbar-none::-webkit-scrollbar {
+  display: none;
+}
+
+.hide-scrollbar::-webkit-scrollbar {
+  display: none;
+}
 :root {
   --background: oklch(1 0 0);
   --foreground: oklch(0.145 0 0);

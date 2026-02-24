@@ -2,9 +2,8 @@
 "use client";
 
 import { Product } from "@/types";
-import { Card, CardContent, CardFooter } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import { Package, Pencil, Trash2, PackagePlus } from "lucide-react";
 import Image from "next/image";
 
@@ -24,81 +23,75 @@ const formatCurrency = (value: number) =>
 
 const getStockBadge = (stock: number = 0) => {
   if (stock > 10)
-    return <Badge className="bg-green-100 text-green-700 border-green-200">{stock} uds</Badge>;
+    return <Badge className="bg-green-100 text-green-700 border-green-200 text-[10px] px-1.5 py-0">{stock} uds</Badge>;
   if (stock >= 5)
-    return <Badge className="bg-yellow-100 text-yellow-700 border-yellow-200">{stock} uds</Badge>;
+    return <Badge className="bg-yellow-100 text-yellow-700 border-yellow-200 text-[10px] px-1.5 py-0">{stock} uds</Badge>;
   if (stock === 0)
-    return <Badge variant="destructive">Sin stock</Badge>;
-  return <Badge variant="destructive">{stock} uds</Badge>;
+    return <Badge variant="destructive" className="text-[10px] px-1.5 py-0">Sin stock</Badge>;
+  return <Badge variant="destructive" className="text-[10px] px-1.5 py-0">{stock} uds</Badge>;
 };
+
+const ActionBtn = ({
+  icon: Icon,
+  label,
+  onClick,
+  destructive = false,
+}: {
+  icon: any;
+  label: string;
+  onClick: () => void;
+  destructive?: boolean;
+}) => (
+  <button
+    onClick={onClick}
+    className={`flex flex-col items-center gap-0.5 px-2.5 py-1.5 rounded-lg border text-[10px] font-medium transition-colors cursor-pointer
+      ${destructive
+        ? "text-destructive border-destructive/20 hover:bg-destructive/10"
+        : "text-muted-foreground border-border hover:bg-muted hover:text-foreground"
+      }`}
+  >
+    <Icon className="h-3.5 w-3.5" />
+    {label}
+  </button>
+);
 
 export function ProductCard({ product, onEdit, onDelete, onAddInventory }: Props) {
   return (
-    <Card className="overflow-hidden flex flex-col">
-      {/* Imagen */}
-      <div className="relative aspect-square bg-muted flex items-center justify-center overflow-hidden">
-        {product.image_url ? (
-          <Image
-            src={product.image_url}
-            alt={product.name}
-            fill
-            className="object-cover"
-          />
-        ) : (
-          <Package className="h-16 w-16 text-muted-foreground/40" />
-        )}
-      </div>
-
-      {/* Info */}
-      <CardContent className="p-4 space-y-1.5 flex-1">
-        <div className="flex items-start justify-between gap-2">
-          <div className="min-w-0">
-            <p className="font-medium truncate">{product.name}</p>
-            {product.sku && (
-              <p className="text-xs text-muted-foreground font-mono">{product.sku}</p>
+    <Card className="overflow-hidden">
+      <CardContent className="p-0">
+        <div className="flex items-stretch">
+          {/* Imagen */}
+          <div className="relative w-20 shrink-0 bg-muted flex items-center justify-center overflow-hidden">
+            {product.image_url ? (
+              <Image src={product.image_url} alt={product.name} fill className="object-cover" />
+            ) : (
+              <Package className="h-8 w-8 text-muted-foreground/20" />
             )}
           </div>
-          {getStockBadge(product.stock)}
-        </div>
-        <p className="text-lg font-bold text-primary">
-          {formatCurrency(product.price)}
-        </p>
-        {product.description && (
-          <p className="text-xs text-muted-foreground line-clamp-2">
-            {product.description}
-          </p>
-        )}
-      </CardContent>
 
-      {/* Footer con acciones */}
-      <CardFooter className="p-3 pt-0 gap-2">
-        <Button
-          variant="outline"
-          size="sm"
-          className="flex-1 gap-1.5"
-          onClick={() => onAddInventory(product)}
-        >
-          <PackagePlus className="h-3.5 w-3.5" />
-          Inventario
-        </Button>
-        <Button
-          variant="outline"
-          size="sm"
-          className="flex-1 gap-1.5"
-          onClick={() => onEdit(product)}
-        >
-          <Pencil className="h-3.5 w-3.5" />
-          Editar
-        </Button>
-        <Button
-          variant="outline"
-          size="sm"
-          className="text-destructive hover:text-destructive hover:bg-destructive/10"
-          onClick={() => onDelete(product)}
-        >
-          <Trash2 className="h-3.5 w-3.5" />
-        </Button>
-      </CardFooter>
+          {/* Info + acciones */}
+          <div className="flex-1 min-w-0 p-3 flex flex-col justify-between">
+            <div className="flex items-start justify-between gap-2">
+              <div className="min-w-0">
+                <p className="text-sm font-semibold truncate leading-tight">{product.name}</p>
+                {product.sku && (
+                  <p className="text-[11px] text-muted-foreground font-mono mt-0.5">{product.sku}</p>
+                )}
+              </div>
+              {getStockBadge(product.stock)}
+            </div>
+
+            <div className="flex items-center justify-between mt-2">
+              <p className="text-base font-bold text-primary">{formatCurrency(product.price)}</p>
+              <div className="flex gap-1.5">
+                <ActionBtn icon={PackagePlus} label="Stock"  onClick={() => onAddInventory(product)} />
+                <ActionBtn icon={Pencil}     label="Editar"  onClick={() => onEdit(product)} />
+                <ActionBtn icon={Trash2}     label="Borrar"  onClick={() => onDelete(product)} destructive />
+              </div>
+            </div>
+          </div>
+        </div>
+      </CardContent>
     </Card>
   );
 }

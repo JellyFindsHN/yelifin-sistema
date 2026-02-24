@@ -2,26 +2,27 @@
 "use client";
 
 import { useState } from "react";
-import { Button } from "@/components/ui/button";
+import { useRouter } from "next/navigation";
 import { Input } from "@/components/ui/input";
-import { Plus, Search } from "lucide-react";
+import { Search, Plus, Layers } from "lucide-react";
 import { useProducts } from "@/hooks/swr/use-products";
 import { ProductGrid } from "@/components/products/product-grid";
 import { CreateProductDialog } from "@/components/products/create-product-dialog";
 import { EditProductDialog } from "@/components/products/edit-product-dialog";
 import { DeleteProductDialog } from "@/components/products/delete-product-dialog";
-// import { AddInventoryDialog } from "@/components/products/add-inventory-dialog"; // próximamente
+import { AddInventoryDialog } from "@/components/products/add-inventory-dialog";
+import { Fab } from "@/components/ui/fab";
 import { Product } from "@/types";
 import { Skeleton } from "@/components/ui/skeleton";
-import { AddInventoryDialog } from "@/components/products/add-inventory-dialog";
 
 export default function ProductsPage() {
+  const router = useRouter();
   const { products, isLoading, mutate } = useProducts();
-  const [search, setSearch] = useState("");
-  const [createOpen, setCreateOpen] = useState(false);
-  const [editProduct, setEditProduct] = useState<Product | null>(null);
-  const [deleteProduct, setDeleteProduct] = useState<Product | null>(null);
-  const [inventoryProduct, setInventoryProduct] = useState<Product | null>(null);
+  const [search,          setSearch]          = useState("");
+  const [createOpen,      setCreateOpen]      = useState(false);
+  const [editProduct,     setEditProduct]     = useState<Product | null>(null);
+  const [deleteProduct,   setDeleteProduct]   = useState<Product | null>(null);
+  const [inventoryProduct,setInventoryProduct]= useState<Product | null>(null);
 
   const filtered = products.filter((p) =>
     p.name.toLowerCase().includes(search.toLowerCase()) ||
@@ -29,21 +30,18 @@ export default function ProductsPage() {
   );
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight">Productos</h1>
-          <p className="text-muted-foreground">
-            {isLoading ? "Cargando..." : `${products.length} producto${products.length !== 1 ? "s" : ""}`}
-          </p>
-        </div>
-        <Button onClick={() => setCreateOpen(true)}>
-          <Plus className="mr-2 h-4 w-4" />
-          Nuevo producto
-        </Button>
+    <div className="space-y-4 pb-24">
+
+      {/* Header */}
+      <div>
+        <h1 className="text-2xl font-bold tracking-tight">Productos</h1>
+        <p className="text-muted-foreground text-sm">
+          {isLoading ? "Cargando..." : `${products.length} producto${products.length !== 1 ? "s" : ""}`}
+        </p>
       </div>
 
-      <div className="relative max-w-sm">
+      {/* Búsqueda */}
+      <div className="relative">
         <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
         <Input
           placeholder="Buscar por nombre o SKU..."
@@ -53,10 +51,11 @@ export default function ProductsPage() {
         />
       </div>
 
+      {/* Lista */}
       {isLoading ? (
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-          {Array.from({ length: 8 }).map((_, i) => (
-            <Skeleton key={i} className="aspect-square rounded-xl" />
+        <div className="space-y-2.5">
+          {Array.from({ length: 6 }).map((_, i) => (
+            <Skeleton key={i} className="h-20 w-full rounded-xl" />
           ))}
         </div>
       ) : (
@@ -68,6 +67,23 @@ export default function ProductsPage() {
         />
       )}
 
+      {/* FAB */}
+      <Fab
+        actions={[
+          {
+            label:   "Nuevo producto",
+            icon:    Plus,
+            onClick: () => setCreateOpen(true),
+          },
+          {
+            label:   "Registro por lotes",
+            icon:    Layers,
+            onClick: () => router.push("/products/batch"),
+          },
+        ]}
+      />
+
+      {/* Diálogos */}
       <CreateProductDialog
         open={createOpen}
         onOpenChange={setCreateOpen}
@@ -85,12 +101,12 @@ export default function ProductsPage() {
         onOpenChange={(open) => !open && setDeleteProduct(null)}
         onSuccess={() => mutate()}
       />
-       <AddInventoryDialog
+      <AddInventoryDialog
         product={inventoryProduct}
         open={!!inventoryProduct}
         onOpenChange={(open) => !open && setInventoryProduct(null)}
         onSuccess={() => mutate()}
-      /> 
+      />
     </div>
   );
 }

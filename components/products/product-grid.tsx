@@ -18,9 +18,9 @@ export function ProductGrid({ products, onEdit, onDelete, onAddInventory }: Prop
     return (
       <Card>
         <CardContent className="flex flex-col items-center justify-center py-16">
-          <Package className="h-12 w-12 text-muted-foreground/40" />
-          <p className="mt-4 text-lg font-medium">No se encontraron productos</p>
-          <p className="text-sm text-muted-foreground">
+          <Package className="h-12 w-12 text-muted-foreground/30" />
+          <p className="mt-4 text-sm font-medium">No se encontraron productos</p>
+          <p className="text-xs text-muted-foreground mt-1">
             Intenta con otros filtros o crea un nuevo producto
           </p>
         </CardContent>
@@ -29,9 +29,9 @@ export function ProductGrid({ products, onEdit, onDelete, onAddInventory }: Prop
   }
 
   return (
-    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+    <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-2.5">
       {products.map((product) => (
-          <ProductCard
+        <ProductCard
           key={product.id}
           product={product}
           onEdit={onEdit}

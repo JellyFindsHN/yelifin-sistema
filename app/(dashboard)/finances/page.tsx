@@ -161,12 +161,12 @@ export default function FinancesPage() {
             <span className="text-sm font-medium opacity-80">Balance total</span>
             <Wallet className="h-4 w-4 opacity-60" />
           </div>
-          <p className="text-3xl font-bold">
+          <div className="text-3xl font-bold">
             {isLoading
               ? <Skeleton className="h-8 w-32 bg-primary-foreground/20" />
               : formatCurrency(totalBalance)
             }
-          </p>
+          </div>
           <p className="text-xs opacity-60 mt-1">
             {summary?.accounts.length ?? 0} cuentas activas
           </p>

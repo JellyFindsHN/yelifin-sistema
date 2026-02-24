@@ -28,6 +28,11 @@ export type CreateSaleInput = {
   account_id: number;
   notes?: string;
   sold_at?: string;
+  supplies_used?: {
+  supply_id: number;
+  quantity:  number;
+  unit_cost: number;
+}[];
 };
 
 export type Sale = {
