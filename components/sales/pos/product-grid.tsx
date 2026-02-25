@@ -8,7 +8,11 @@ import { Package } from "lucide-react";
 import { CartItem } from "@/hooks/swr/use-sales";
 
 const formatCurrency = (v: number) =>
-  new Intl.NumberFormat("es-HN", { style: "currency", currency: "HNL", minimumFractionDigits: 0 }).format(v);
+  new Intl.NumberFormat("es-HN", {
+    style: "currency",
+    currency: "HNL",
+    minimumFractionDigits: 0,
+  }).format(v);
 
 type Props = {
   products: any[];
@@ -41,7 +45,12 @@ export function PosProductGrid({ products, cart, onAdd, search }: Props) {
           >
             <div className="relative aspect-square bg-muted flex items-center justify-center overflow-hidden">
               {product.image_url ? (
-                <Image src={product.image_url} alt={product.name} fill className="object-cover" />
+                <Image
+                  src={product.image_url}
+                  alt={product.name}
+                  fill
+                  className="object-cover"
+                />
               ) : (
                 <Package className="h-8 w-8 text-muted-foreground/20" />
               )}
@@ -57,8 +66,12 @@ export function PosProductGrid({ products, cart, onAdd, search }: Props) {
               </div>
             </div>
             <CardContent className="p-2.5">
-              <p className="text-xs font-medium truncate leading-tight">{product.name}</p>
-              <p className="text-sm font-bold text-primary mt-0.5">{formatCurrency(product.price)}</p>
+              <p className="text-xs font-medium truncate leading-tight">
+                {product.name}
+              </p>
+              <p className="text-sm font-bold text-primary mt-0.5">
+                {formatCurrency(product.price)}
+              </p>
             </CardContent>
           </Card>
         );

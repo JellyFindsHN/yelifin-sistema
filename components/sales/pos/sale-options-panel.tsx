@@ -5,39 +5,46 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Loader2, User, Wallet, CreditCard, FlaskConical } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from "@/components/ui/select";
+import { Loader2, User, Wallet, CreditCard, FlaskConical, Truck } from "lucide-react";
 
 const formatCurrency = (v: number) =>
-  new Intl.NumberFormat("es-HN", { style: "currency", currency: "HNL", minimumFractionDigits: 0 }).format(v);
+  new Intl.NumberFormat("es-HN", {
+    style: "currency",
+    currency: "HNL",
+    minimumFractionDigits: 0,
+  }).format(v);
 
 type Props = {
   customers: any[];
   accounts: any[];
   hasSupplies: boolean;
   customerId: number | null;
-  paymentMethod: string;
   accountId: number | null;
   notes: string;
-  total: number;
+  grandTotal: number;
+  shippingCost: number;
   isCreating: boolean;
   onCustomerChange: (id: number | null) => void;
-  onPaymentMethodChange: (v: string) => void;
   onAccountChange: (id: number) => void;
   onNotesChange: (v: string) => void;
+  onShippingCostChange: (v: number) => void;
   onCheckout: () => void;
   onOpenSupplies: () => void;
 };
 
 export function SaleOptionsPanel({
   customers, accounts, hasSupplies,
-  customerId, paymentMethod, accountId, notes, total, isCreating,
-  onCustomerChange, onPaymentMethodChange, onAccountChange, onNotesChange,
-  onCheckout, onOpenSupplies,
+  customerId, accountId, notes, grandTotal, shippingCost, isCreating,
+  onCustomerChange, onAccountChange, onNotesChange,
+  onShippingCostChange, onCheckout, onOpenSupplies,
 }: Props) {
   return (
     <Card>
-      <CardContent className="pl-4 space-y-3">
+      <CardContent className="pl-4 space-y-3 pt-4">
 
         {/* Cliente */}
         <div className="space-y-1.5">
@@ -62,26 +69,6 @@ export function SaleOptionsPanel({
           </Select>
         </div>
 
-        {/* Método de pago */}
-        <div className="space-y-1.5">
-          <Label className="text-xs flex items-center gap-1.5">
-            <CreditCard className="h-3.5 w-3.5" />
-            Método de pago *
-          </Label>
-          <Select value={paymentMethod} onValueChange={onPaymentMethodChange}>
-            <SelectTrigger className="h-8 text-sm w-full">
-              <SelectValue placeholder="Seleccionar..." />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="CASH">Efectivo</SelectItem>
-              <SelectItem value="CARD">Tarjeta</SelectItem>
-              <SelectItem value="TRANSFER">Transferencia</SelectItem>
-              <SelectItem value="MIXED">Mixto</SelectItem>
-              <SelectItem value="OTHER">Otro</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-
         {/* Cuenta destino */}
         <div className="space-y-1.5">
           <Label className="text-xs flex items-center gap-1.5">
@@ -97,12 +84,32 @@ export function SaleOptionsPanel({
             </SelectTrigger>
             <SelectContent>
               {accounts.map((a) => (
-                <SelectItem key={a.id} value={a.id.toString()}>
-                  {a.name}
-                </SelectItem>
+                <SelectItem key={a.id} value={a.id.toString()}>{a.name}</SelectItem>
               ))}
             </SelectContent>
           </Select>
+        </div>
+
+        {/* Envío */}
+        <div className="space-y-1.5">
+          <Label className="text-xs flex items-center gap-1.5">
+            <Truck className="h-3.5 w-3.5" />
+            Costo de envío
+            <span className="text-muted-foreground ml-1">(opcional)</span>
+          </Label>
+          <Input
+            type="number"
+            value={shippingCost === 0 ? "" : shippingCost}
+            onChange={(e) => {
+              const raw = e.target.value.replace(/^0+(\d)/, "$1");
+              const n = parseFloat(raw);
+              onShippingCostChange(isNaN(n) ? 0 : Math.max(0, n));
+            }}
+            placeholder="0"
+            min="0"
+            step="0.01"
+            className="h-8 text-sm"
+          />
         </div>
 
         {/* Notas */}
@@ -119,7 +126,7 @@ export function SaleOptionsPanel({
           />
         </div>
 
-        {/* Suministros usados */}
+        {/* Suministros */}
         {hasSupplies && (
           <Button
             variant="outline"
@@ -133,15 +140,12 @@ export function SaleOptionsPanel({
           </Button>
         )}
 
-        <Button
-          className="w-full"
-          onClick={onCheckout}
-          disabled={isCreating}
-        >
-          {isCreating
-            ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Procesando...</>
-            : `Confirmar venta · ${formatCurrency(total)}`
-          }
+        <Button className="w-full" onClick={onCheckout} disabled={isCreating}>
+          {isCreating ? (
+            <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Procesando...</>
+          ) : (
+            `Confirmar venta · ${formatCurrency(grandTotal)}`
+          )}
         </Button>
       </CardContent>
     </Card>

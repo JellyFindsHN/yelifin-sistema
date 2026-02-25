@@ -454,3 +454,11 @@ ALTER TABLE transactions ADD COLUMN IF NOT EXISTS reference_type VARCHAR(20)
   CHECK (reference_type IN ('SALE','PURCHASE','SUPPLY_PURCHASE','EVENT','OTHER'));
 
 ALTER TABLE supply_purchases ADD COLUMN IF NOT EXISTS account_id INTEGER REFERENCES accounts(id);
+
+-- Agregar shipping_cost a sales
+ALTER TABLE sales ADD COLUMN IF NOT EXISTS shipping_cost NUMERIC(12,2) NOT NULL DEFAULT 0 CHECK (shipping_cost >= 0);
+
+-- sale_supplies ya soporta decimales en quantity? No, es INT
+-- Hay que cambiarlo para soportar kg, litros, etc.
+ALTER TABLE sale_supplies ALTER COLUMN quantity TYPE NUMERIC(12,4);
+ALTER TABLE supply_movements ALTER COLUMN quantity TYPE NUMERIC(12,4);
