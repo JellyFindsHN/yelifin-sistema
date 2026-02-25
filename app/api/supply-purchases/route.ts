@@ -182,4 +182,4 @@ export async function POST(request: NextRequest) {
     console.error("❌ POST /api/supply-purchases:", error);
     return createErrorResponse("Error al registrar compra de suministros", 500);
   }
-}
+} 

@@ -33,11 +33,18 @@ export function MobileCartSheet({
 }: Props) {
   const sheetRef = useRef<HTMLDivElement>(null);
 
-  // Cierra al tocar el overlay
+  // Cierra al tocar el overlay — ignora portales de shadcn (Select, Dialog, etc.)
   useEffect(() => {
     if (!open) return;
     const handler = (e: MouseEvent) => {
-      if (sheetRef.current && !sheetRef.current.contains(e.target as Node)) {
+      const target = e.target as Node;
+
+      // Ignorar clicks en portales de Radix/shadcn que se montan en body
+      // SelectContent, DialogContent, etc. se montan en [data-radix-portal]
+      const inPortal = (target as Element).closest?.("[data-radix-popper-content-wrapper], [data-radix-portal], [role='listbox'], [role='dialog']");
+      if (inPortal) return;
+
+      if (sheetRef.current && !sheetRef.current.contains(target)) {
         onOpenChange(false);
       }
     };
