@@ -89,7 +89,7 @@ export default function Home() {
               </Button>
             </Link>
             <p className="text-xs sm:text-sm text-center text-muted-foreground mt-3 sm:mt-4">
-              7 días gratis, sin tarjeta de crédito requerida
+              30 días gratis, sin tarjeta de crédito requerida
             </p>
           </div>
         </div>
@@ -155,7 +155,7 @@ export default function Home() {
             Comienza a gestionar tu emprendimiento hoy
           </h2>
           <p className="text-base sm:text-lg lg:text-xl text-muted-foreground mb-6 sm:mb-8 max-w-2xl mx-auto">
-            Prueba gratuita de 7 días. Sin tarjeta de crédito requerida. Cancela cuando quieras.
+            Prueba gratuita de 30 días. Sin tarjeta de crédito requerida. Cancela cuando quieras.
           </p>
           <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 justify-center items-center">
             <LandingCta />

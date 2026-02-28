@@ -60,14 +60,14 @@ export default function LoginPage() {
 
       {/* Right Side - Image/Info */}
       <div className="hidden lg:block bg-primary relative overflow-hidden">
-        <div className="absolute inset-0 bg-gradient-to-br from-primary to-primary/80" />
+        <div className="absolute inset-0 bg-linear-to-br from-primary to-primary/80" />
         <div className="relative h-full flex flex-col items-center justify-center p-12 text-primary-foreground">
           <div className="max-w-md space-y-6 text-center">
             <h2 className="text-4xl font-bold">
               Tu negocio, siempre contigo
             </h2>
             <p className="text-xl text-primary-foreground/90">
-              Accede desde cualquier dispositivo y mantén el control total 
+              Accede desde cualquier dispositivo y mantén el control total
               de tu emprendimiento en tiempo real.
             </p>
             <div className="grid grid-cols-2 gap-4 pt-8">

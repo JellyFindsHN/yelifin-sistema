@@ -76,9 +76,11 @@ export function RegisterForm() {
       if (currentUser) {
         await sendEmailVerification(currentUser);
       }
-      toast.success("¡Bienvenido a Nexly! Tu cuenta ha sido creada 🎉", {
-        duration: 5000,
-      });
+
+      toast.success(
+        "¡Bienvenido a Nexly! Tu prueba gratuita de 30 días ha comenzado.",
+        { duration: 5000 }
+      );
 
       router.push("/dashboard");
     } catch (error: any) {
@@ -197,7 +199,9 @@ export function RegisterForm() {
           />
           <button
             type="button"
-            onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+            onClick={() =>
+              setShowConfirmPassword(!showConfirmPassword)
+            }
             className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
             tabIndex={-1}
           >
@@ -222,17 +226,23 @@ export function RegisterForm() {
             Creando cuenta...
           </>
         ) : (
-          "Crear cuenta gratis"
+          "Comenzar prueba de 30 días"
         )}
       </Button>
 
       <div className="text-center space-y-2">
         <p className="text-sm text-muted-foreground">
-          ✨ Gratis para siempre en el plan básico • Sin tarjeta de crédito
+          30 días de prueba gratuita • Sin tarjeta de crédito
         </p>
         <p className="text-xs text-muted-foreground">
-          Al crear una cuenta, aceptas nuestros términos de servicio y política
-          de privacidad
+          Al crear una cuenta, aceptas nuestros{" "}
+          <a href="/terms" className="underline hover:text-primary">
+            términos de servicio
+          </a>{" "}
+          y{" "}
+          <a href="/privacy" className="underline hover:text-primary">
+            política de privacidad
+          </a>.
         </p>
       </div>
     </form>
