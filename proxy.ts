@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 
 // Rutas públicas que no requieren autenticación
-const PUBLIC_PATHS = ["","/login", "/register", "/forgot-password"];
+const PUBLIC_PATHS = ["", "/login", "/register", "/forgot-password"];
 
 // Rutas de auth que no requieren onboarding completo
 const AUTH_ONLY_PATHS = ["/verify-email", "/onboarding"];
@@ -18,15 +18,17 @@ export async function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
-  // Obtener token de la cookie de Firebase (si usas next-firebase-session)
-  // o del header. Ajusta según tu implementación de auth.
-  const token = request.cookies.get("__session")?.value ?? 
-                request.cookies.get("token")?.value;
+  // Obtener token desde cookies
+  const token =
+    request.cookies.get("__session")?.value ??
+    request.cookies.get("token")?.value;
 
-  const isPublic   = PUBLIC_PATHS.some((p) => pathname.startsWith(p));
+  const isPublic = PUBLIC_PATHS.some((p) =>
+    p === "" ? pathname === "/" : pathname.startsWith(p)
+  );
   const isAuthOnly = AUTH_ONLY_PATHS.some((p) => pathname.startsWith(p));
 
-  // Sin token → solo puede estar en rutas públicas
+  // Sin token → solo puede estar en rutas públicas o auth-only
   if (!token) {
     if (isPublic || isAuthOnly) return NextResponse.next();
     return NextResponse.redirect(new URL("/login", request.url));
@@ -59,7 +61,5 @@ export async function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: [
-    "/((?!_next/static|_next/image|favicon.ico).*)",
-  ],
+  matcher: ["/((?!_next/static|_next/image|favicon.ico).*)"],
 };

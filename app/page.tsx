@@ -10,7 +10,7 @@ import { LandingCta }    from "@/components/landing/landing-cta";
 
 export default function Home() {
   return (
-    <div className="min-h-screen bg-gradient-to-b from-primary/5 via-background to-primary/5">
+    <div className="min-h-screen bg-linear-to-b from-primary/5 via-background to-primary/5">
 
       <LandingHeader />
 
@@ -77,7 +77,7 @@ export default function Home() {
                 "Soporte prioritario en español",
               ].map((item) => (
                 <li key={item} className="flex items-start gap-3">
-                  <CheckCircle2 className="w-5 h-5 text-primary flex-shrink-0 mt-0.5" />
+                  <CheckCircle2 className="w-5 h-5 text-primary shrink-0 mt-0.5" />
                   <span className="text-sm sm:text-base">{item}</span>
                 </li>
               ))}
@@ -137,7 +137,7 @@ export default function Home() {
               { title: "Soporte en Español",         desc: "Todo el sistema en tu idioma" },
             ].map((b) => (
               <div key={b.title} className="flex gap-3 sm:gap-4">
-                <CheckCircle2 className="w-5 h-5 sm:w-6 sm:h-6 flex-shrink-0 mt-1" />
+                <CheckCircle2 className="w-5 h-5 sm:w-6 sm:h-6 shrink-0 mt-1" />
                 <div>
                   <h3 className="font-bold text-base sm:text-lg mb-1">{b.title}</h3>
                   <p className="text-sm sm:text-base text-primary-foreground/80">{b.desc}</p>
