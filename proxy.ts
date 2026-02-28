@@ -1,17 +1,12 @@
 // proxy.ts
 import { NextRequest, NextResponse } from "next/server"
 
-// Rutas públicas que no requieren autenticación
 const PUBLIC_PATHS = ["", "/login", "/register", "/forgot-password"]
-
-// Rutas de auth que no requieren onboarding completo
 const AUTH_ONLY_PATHS = ["/verify-email", "/onboarding"]
 
-// Esta es la función que Next ejecuta en cada request del proxy
 export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl
 
-  // Dejar pasar assets y rutas de API
   if (
     pathname.startsWith("/_next") ||
     pathname.startsWith("/api") ||
@@ -20,7 +15,7 @@ export async function proxy(request: NextRequest) {
     return NextResponse.next()
   }
 
-  // Obtener token de la cookie
+  // OJO: esto solo mira cookies, no el estado de Firebase en el cliente
   const token =
     request.cookies.get("__session")?.value ??
     request.cookies.get("token")?.value
@@ -30,18 +25,20 @@ export async function proxy(request: NextRequest) {
   )
   const isAuthOnly = AUTH_ONLY_PATHS.some((p) => pathname.startsWith(p))
 
-  // Sin token → solo puede estar en rutas públicas o de auth-only
+  // 1) Si NO hay token, ya no redirigimos a /login.
+  // Dejamos que el front decida (useAuth ya hace redirect en el cliente).
   if (!token) {
+    // Solo evitamos que un usuario logueado vuelva a /login
     if (isPublic || isAuthOnly) return NextResponse.next()
-    return NextResponse.redirect(new URL("/login", request.url))
+    return NextResponse.next()
   }
 
-  // Con token en ruta pública → redirigir al dashboard
+  // 2) Si HAY token y está en páginas públicas → mandamos al dashboard
   if (token && isPublic) {
     return NextResponse.redirect(new URL("/dashboard", request.url))
   }
 
-  // Rutas del dashboard → verificar onboarding
+  // 3) Check de onboarding solo si hay token
   if (!isPublic && !isAuthOnly) {
     try {
       const res = await fetch(new URL("/api/onboarding", request.url), {
@@ -55,14 +52,13 @@ export async function proxy(request: NextRequest) {
         }
       }
     } catch {
-      // Si falla el check, dejar pasar (fail-open)
+      // Si falla, dejamos pasar igual
     }
   }
 
   return NextResponse.next()
 }
 
-// Igual que antes: qué rutas pasan por el proxy
 export const config = {
   matcher: ["/((?!_next/static|_next/image|favicon.ico).*)"],
 }
