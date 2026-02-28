@@ -1,12 +1,10 @@
 // components/dashboard/metrics-grid.tsx
 "use client";
-
+import { useCurrency } from "@/hooks/swr/use-currency";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { DollarSign, TrendingUp, Users, Wallet, ArrowUpRight, ArrowDownRight } from "lucide-react";
 
-const formatCurrency = (v: number) =>
-  new Intl.NumberFormat("es-HN", { style: "currency", currency: "HNL", minimumFractionDigits: 0 }).format(v);
 
 function ChangeIndicator({ value }: { value: number | null }) {
   if (value === null)
@@ -23,6 +21,7 @@ function ChangeIndicator({ value }: { value: number | null }) {
 type Props = { metrics: any; isLoading: boolean };
 
 export function MetricsGrid({ metrics: m, isLoading }: Props) {
+  const { format: formatCurrency } = useCurrency();
   const stats = [
     {
       title: "Ingresos",

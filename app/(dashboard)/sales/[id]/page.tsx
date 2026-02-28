@@ -131,7 +131,7 @@ export default function SaleDetailPage({ params }: Props) {
 
       {/* Productos vendidos */}
       <Card>
-        <CardHeader>
+        <CardHeader >
           <CardTitle className="text-base flex items-center gap-2">
             <Package className="h-4 w-4" />
             Productos vendidos

@@ -7,10 +7,7 @@ import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip,
   ResponsiveContainer, PieChart, Pie, Cell,
 } from "recharts";
-
-const formatCurrency = (v: number) =>
-  new Intl.NumberFormat("es-HN", { style: "currency", currency: "HNL", minimumFractionDigits: 0 }).format(v);
-
+import { useCurrency } from "@/hooks/swr/use-currency";
 function formatAxisMoney(v: number) {
   if (v >= 1_000_000) return `L${Math.round(v / 1_000_000)}M`;
   if (v >= 1_000)     return `L${Math.round(v / 1_000)}k`;
@@ -27,6 +24,8 @@ type Props = {
 };
 
 export function SalesCharts({ salesChart, paymentMethods, periodLabel, isLoading }: Props) {
+  const { format: formatCurrency } = useCurrency();
+  
   return (
     <div className="hidden lg:grid gap-4 grid-cols-7">
       <Card className="col-span-4">

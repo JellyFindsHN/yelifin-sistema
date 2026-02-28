@@ -3,13 +3,11 @@
 
 import { useRouter } from "next/navigation";
 import Image from "next/image";
+import { useCurrency } from "@/hooks/swr/use-currency";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Package, AlertTriangle } from "lucide-react";
-
-const formatCurrency = (v: number) =>
-  new Intl.NumberFormat("es-HN", { style: "currency", currency: "HNL", minimumFractionDigits: 0 }).format(v);
 
 const formatDateFull = (d: string) =>
   new Date(d).toLocaleDateString("es-HN", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" });
@@ -18,6 +16,7 @@ type Props = { lowStock: any[]; recentSales: any[]; isLoading: boolean };
 
 export function MobileSummary({ lowStock, recentSales, isLoading }: Props) {
   const router = useRouter();
+  const { format } = useCurrency();
 
   return (
     <div className="space-y-3 lg:hidden">
@@ -72,8 +71,8 @@ export function MobileSummary({ lowStock, recentSales, isLoading }: Props) {
                       </p>
                     </div>
                     <div className="text-right shrink-0 ml-3">
-                      <p className="font-bold text-sm">{formatCurrency(Number(sale.total))}</p>
-                      <p className="text-xs text-green-600">{formatCurrency(Number(sale.profit))}</p>
+                      <p className="font-bold text-sm">{format(Number(sale.total))}</p>
+                      <p className="text-xs text-green-600">{format(Number(sale.profit))}</p>
                     </div>
                   </div>
                 ))

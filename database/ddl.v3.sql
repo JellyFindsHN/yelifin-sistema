@@ -462,3 +462,13 @@ ALTER TABLE sales ADD COLUMN IF NOT EXISTS shipping_cost NUMERIC(12,2) NOT NULL 
 -- Hay que cambiarlo para soportar kg, litros, etc.
 ALTER TABLE sale_supplies ALTER COLUMN quantity TYPE NUMERIC(12,4);
 ALTER TABLE supply_movements ALTER COLUMN quantity TYPE NUMERIC(12,4);
+-- Agregar flag de onboarding a user_profile
+ALTER TABLE user_profile
+  ADD COLUMN IF NOT EXISTS onboarding_completed BOOLEAN NOT NULL DEFAULT FALSE;
+
+ALTER TABLE inventory_movements 
+DROP CONSTRAINT inventory_movements_reference_type_check;
+
+ALTER TABLE inventory_movements 
+ADD CONSTRAINT inventory_movements_reference_type_check 
+CHECK (reference_type IN ('PURCHASE', 'SALE', 'ADJUSTMENT', 'INITIAL'));

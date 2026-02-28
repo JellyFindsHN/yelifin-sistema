@@ -14,14 +14,16 @@ export type Movement = {
   image_url: string | null;
   sku: string | null;
   quantity: number;
-  reference_type: 'PURCHASE' | 'SALE' | 'ADJUSTMENT';
-  reference_id: number;
+  reference_type: 'PURCHASE' | 'SALE' | 'ADJUSTMENT' | 'INITIAL';
+  reference_id: number | null;
   notes: string | null;
   created_at: string;
+  // IN — compra
   unit_cost_usd: number | null;
   unit_cost_hnl: number | null;
   shipping_per_unit: number | null;
   total_cost: number | null;
+  // OUT — venta
   unit_price: number | null;
   unit_cost: number | null;
   line_total: number | null;
@@ -31,9 +33,9 @@ export type Movement = {
 };
 
 export type MovementFilters = {
-  date?: string;       // YYYY-MM-DD (día específico)
-  month?: number;      // 1-12
-  year?: number;       // YYYY
+  date?: string;
+  month?: number;
+  year?: number;
   product_id?: number;
 };
 

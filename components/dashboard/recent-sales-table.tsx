@@ -2,14 +2,12 @@
 "use client";
 
 import { useRouter } from "next/navigation";
+import { useCurrency } from "@/hooks/swr/use-currency";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Banknote, CreditCard, ArrowLeftRight, HelpCircle } from "lucide-react";
-
-const formatCurrency = (v: number) =>
-  new Intl.NumberFormat("es-HN", { style: "currency", currency: "HNL", minimumFractionDigits: 0 }).format(v);
 
 const formatDateFull = (d: string) =>
   new Date(d).toLocaleDateString("es-HN", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" });
@@ -26,6 +24,7 @@ type Props = { recentSales: any[]; isLoading: boolean };
 
 export function RecentSalesTable({ recentSales, isLoading }: Props) {
   const router = useRouter();
+  const { format: formatCurrency } = useCurrency();
 
   return (
     <Card className="hidden lg:block">

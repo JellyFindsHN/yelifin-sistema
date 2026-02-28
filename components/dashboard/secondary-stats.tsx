@@ -4,13 +4,11 @@
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ShoppingCart, Package, DollarSign } from "lucide-react";
-
-const formatCurrency = (v: number) =>
-  new Intl.NumberFormat("es-HN", { style: "currency", currency: "HNL", minimumFractionDigits: 0 }).format(v);
-
+import { useCurrency } from "@/hooks/swr/use-currency";
 type Props = { metrics: any; isLoading: boolean };
 
 export function SecondaryStats({ metrics: m, isLoading }: Props) {
+  const { format: formatCurrency } = useCurrency();
   const stats = [
     { label: "Órdenes del período", value: Number(m?.sales_count ?? 0),                                      icon: ShoppingCart },
     { label: "Unidades en stock",   value: Number(m?.inventory?.total_units ?? 0),                           icon: Package },

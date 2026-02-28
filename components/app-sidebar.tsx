@@ -59,15 +59,13 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 
 const mainNav = [
   { title: "Dashboard", url: "/dashboard", icon: Home },
-  { title: "Productos", url: "/products", icon: Package },
   {
     title: "Inventario",
     url: "/inventory",
     icon: Warehouse,
     submenu: [
-      { title: "Vista General", url: "/inventory" },
+      { title: "Productos", url: "/inventory" },
       { title: "Movimientos", url: "/inventory/movements" },
-      { title: "Ajustes", url: "/inventory/adjustments" },
     ],
   },
   {

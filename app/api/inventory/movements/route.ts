@@ -13,18 +13,16 @@ export async function GET(request: NextRequest) {
     const { userId } = auth.data;
     const { searchParams } = new URL(request.url);
 
-    const date      = searchParams.get("date");       // YYYY-MM-DD (día específico)
-    const month     = searchParams.get("month");      // 1-12
-    const year      = searchParams.get("year");       // YYYY
+    const date      = searchParams.get("date");
+    const month     = searchParams.get("month");
+    const year      = searchParams.get("year");
     const productId = searchParams.get("product_id");
 
-    // Calcular rango de fechas
     const now = new Date();
-    let startISO: string | null = null;
-    let endISO:   string | null = null;
+    let startISO: string;
+    let endISO:   string;
 
     if (date) {
-      // Día específico
       startISO = `${date}T00:00:00.000Z`;
       endISO   = `${date}T23:59:59.999Z`;
     } else if (year && month) {
@@ -36,7 +34,6 @@ export async function GET(request: NextRequest) {
       startISO = new Date(y, 0, 1).toISOString();
       endISO   = new Date(y + 1, 0, 1).toISOString();
     } else {
-      // Default: mes actual
       startISO = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
       endISO   = new Date(now.getFullYear(), now.getMonth() + 1, 1).toISOString();
     }
@@ -46,7 +43,7 @@ export async function GET(request: NextRequest) {
         im.id,
         im.movement_type,
         im.product_id,
-        p.name       AS product_name,
+        p.name      AS product_name,
         p.image_url,
         p.sku,
         im.quantity,
@@ -55,30 +52,34 @@ export async function GET(request: NextRequest) {
         im.notes,
         im.created_at,
 
-        -- IN (compra)
-        pbi.unit_cost_usd,
-        ib.unit_cost AS unit_cost_hnl,
+        -- ── PURCHASE (IN) ──────────────────────────────────────────
+        CASE WHEN im.reference_type = 'PURCHASE' THEN pbi.unit_cost_usd  END AS unit_cost_usd,
+        CASE WHEN im.reference_type = 'PURCHASE' THEN ib.unit_cost       END AS unit_cost_hnl,
         CASE
-          WHEN pbi.quantity > 0
-          THEN ROUND(pb.shipping::numeric / NULLIF(
-            (SELECT SUM(i2.quantity) FROM purchase_batch_items i2
-             WHERE i2.purchase_batch_id = pb.id), 0
-          ), 4)
+          WHEN im.reference_type = 'PURCHASE' AND COALESCE(pbi.quantity, 0) > 0
+          THEN ROUND(
+            pb.shipping::numeric / NULLIF(
+              (SELECT SUM(i2.quantity) FROM purchase_batch_items i2
+               WHERE i2.purchase_batch_id = pb.id), 0
+            ), 4)
           ELSE 0
         END AS shipping_per_unit,
-        pbi.total_cost,
+        CASE WHEN im.reference_type = 'PURCHASE' THEN pbi.total_cost     END AS total_cost,
 
-        -- OUT (venta)
-        si.unit_price,
-        si.unit_cost,
-        si.line_total,
-        ROUND((si.line_total - (si.unit_cost * im.quantity))::numeric, 2) AS profit,
-        s.sale_number,
-        c.name AS customer_name
+        -- ── SALE (OUT) ─────────────────────────────────────────────
+        CASE WHEN im.reference_type = 'SALE' THEN si.unit_price          END AS unit_price,
+        CASE WHEN im.reference_type = 'SALE' THEN si.unit_cost           END AS unit_cost,
+        CASE WHEN im.reference_type = 'SALE' THEN si.line_total          END AS line_total,
+        CASE WHEN im.reference_type = 'SALE'
+          THEN ROUND((si.line_total - (si.unit_cost * im.quantity))::numeric, 2)
+        END AS profit,
+        CASE WHEN im.reference_type = 'SALE' THEN s.sale_number          END AS sale_number,
+        CASE WHEN im.reference_type = 'SALE' THEN c.name                 END AS customer_name
 
       FROM inventory_movements im
       JOIN products p ON p.id = im.product_id
 
+      -- PURCHASE joins
       LEFT JOIN purchase_batch_items pbi
         ON im.reference_type = 'PURCHASE'
        AND pbi.purchase_batch_id = im.reference_id
@@ -89,6 +90,7 @@ export async function GET(request: NextRequest) {
         ON ib.purchase_batch_item_id = pbi.id
        AND ib.user_id = im.user_id
 
+      -- SALE joins
       LEFT JOIN sale_items si
         ON im.reference_type = 'SALE'
        AND si.sale_id = im.reference_id
@@ -98,8 +100,8 @@ export async function GET(request: NextRequest) {
       LEFT JOIN customers c ON c.id = s.customer_id
 
       WHERE im.user_id = ${userId}
-        AND im.created_at >= ${startISO!}::timestamptz
-        AND im.created_at <  ${endISO!}::timestamptz
+        AND im.created_at >= ${startISO}::timestamptz
+        AND im.created_at <  ${endISO}::timestamptz
         ${productId ? sql`AND im.product_id = ${Number(productId)}` : sql``}
 
       ORDER BY im.created_at DESC

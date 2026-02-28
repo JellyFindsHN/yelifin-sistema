@@ -3,6 +3,7 @@
 
 import React from "react";
 import { useRequireAuth } from "@/hooks/use-require-auth";
+import { useOnboardingGuard } from "@/hooks/use-onboarding-guard";
 import { LoadingScreen } from "@/hooks/ui/loading-screen";
 import { SWRProvider } from "@/components/providers/swr-provider";
 import {
@@ -31,6 +32,7 @@ export default function DashboardLayout({
   children: React.ReactNode;
 }) {
   const { firebaseUser, loading } = useRequireAuth();
+  const { checking }              = useOnboardingGuard();
   const router = useRouter();
 
   const handleLogout = async () => {
@@ -43,7 +45,7 @@ export default function DashboardLayout({
     }
   };
 
-  if (loading) return <LoadingScreen />;
+  if (loading || checking) return <LoadingScreen />;
   if (!firebaseUser) return null;
 
   return (
@@ -51,7 +53,6 @@ export default function DashboardLayout({
       <SidebarProvider>
         <AppSidebar />
 
-        {/* Clave: que el "inset" sea un contenedor full-height y column */}
         <SidebarInset className="min-h-svh flex flex-col">
           {/* Header fijo */}
           <header className="sticky top-0 z-20 flex h-14 shrink-0 items-center gap-2 border-b bg-background px-4 lg:px-6">
@@ -84,7 +85,6 @@ export default function DashboardLayout({
             </div>
           </header>
 
-          {/* Clave: main toma el espacio restante y scrollea */}
           <main className="flex-1 overflow-auto p-4 lg:p-6">
             {children}
           </main>

@@ -1,25 +1,26 @@
 // components/products/add-inventory-dialog.tsx
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import { useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import {
-  Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
+  Dialog, DialogContent, DialogHeader, DialogTitle,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
 import { Loader2, PackagePlus, Calculator, Wallet } from "lucide-react";
 import { toast } from "sonner";
+import { cn } from "@/lib/utils";
 import { useCreatePurchase } from "@/hooks/swr/use-purchases";
 import { useAccounts } from "@/hooks/swr/use-accounts";
+import { useCurrency } from "@/hooks/swr/use-currency";
 import { Product } from "@/types";
 
 const TASA_DEFAULT = 24.89;
@@ -38,18 +39,16 @@ const schema = z.object({
 type FormData = z.infer<typeof schema>;
 
 type Props = {
-  product: Product | null;
-  open: boolean;
+  product:      Product | null;
+  open:         boolean;
   onOpenChange: (open: boolean) => void;
-  onSuccess: () => void;
+  onSuccess:    () => void;
 };
-
-const formatCurrency = (value: number, currency = "HNL") =>
-  new Intl.NumberFormat("es-HN", { style: "currency", currency, minimumFractionDigits: 2 }).format(value);
 
 export function AddInventoryDialog({ product, open, onOpenChange, onSuccess }: Props) {
   const { createPurchase, isCreating } = useCreatePurchase();
-  const { accounts } = useAccounts();
+  const { accounts }                   = useAccounts();
+  const { format, symbol }             = useCurrency();
 
   const {
     register, handleSubmit, reset, control, setValue,
@@ -75,13 +74,12 @@ export function AddInventoryDialog({ product, open, onOpenChange, onSuccess }: P
   const cost = Number(unitCostUsd)  || 0;
   const rate = Number(exchangeRate) || TASA_DEFAULT;
   const ship = Number(shipping)     || 0;
+  const isUSD = currency === "USD";
 
-  const unitCostHnl     = currency === "USD" ? cost * rate : cost;
+  const unitCostHnl     = isUSD ? cost * rate : cost;
   const shippingPerUnit = qty > 0 ? ship / qty : 0;
   const finalUnitCost   = unitCostHnl + shippingPerUnit;
   const totalCost       = finalUnitCost * qty;
-
-  const isUSD = currency === "USD";
 
   useEffect(() => {
     if (open) {
@@ -100,17 +98,17 @@ export function AddInventoryDialog({ product, open, onOpenChange, onSuccess }: P
     if (!product) return;
     try {
       await createPurchase({
-        account_id:   data.account_id,
-        currency:     data.currency,
+        account_id:    data.account_id,
+        currency:      data.currency,
         exchange_rate: data.exchange_rate,
-        shipping:     data.shipping,
-        notes:        data.notes,
-        purchased_at: data.purchased_at
+        shipping:      data.shipping,
+        notes:         data.notes,
+        purchased_at:  data.purchased_at
           ? new Date(data.purchased_at).toISOString()
           : new Date().toISOString(),
         items: [{ product_id: product.id, quantity: data.quantity, unit_cost_usd: data.unit_cost_usd }],
       });
-      toast.success(`Inventario agregado: ${data.quantity} unidades de ${product.name}`);
+      toast.success(`${data.quantity} unidades de ${product.name} registradas`);
       onOpenChange(false);
       onSuccess();
     } catch (error: any) {
@@ -118,35 +116,63 @@ export function AddInventoryDialog({ product, open, onOpenChange, onSuccess }: P
     }
   };
 
+  if (!product) return null;
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
+      <DialogContent
+        className={cn(
+          "fixed bottom-0 left-0 right-0 top-auto translate-x-0 translate-y-0",
+          "w-full max-w-full rounded-t-2xl rounded-b-none border-t border-x-0 border-b-0",
+          "max-h-[92dvh] flex flex-col p-0",
+          "sm:bottom-auto sm:left-1/2 sm:right-auto sm:top-1/2",
+          "sm:-translate-x-1/2 sm:-translate-y-1/2",
+          "sm:w-full sm:max-w-lg sm:rounded-2xl sm:border",
+          "sm:max-h-[88vh]",
+          "data-[state=open]:animate-in data-[state=closed]:animate-out",
+          "data-[state=open]:slide-in-from-bottom sm:data-[state=open]:slide-in-from-bottom-[48%]",
+          "data-[state=closed]:slide-out-to-bottom sm:data-[state=closed]:slide-out-to-bottom-[48%]",
+          "duration-300",
+        )}
+        onInteractOutside={(e) => e.preventDefault()}
+        onEscapeKeyDown={() => onOpenChange(false)}
+      >
+        {/* Handle móvil */}
+        <div className="sm:hidden flex justify-center pt-3 pb-1 shrink-0">
+          <div className="w-10 h-1 rounded-full bg-muted-foreground/30" />
+        </div>
+
+        {/* Header */}
+        <DialogHeader className="shrink-0 px-5 pt-2 pb-3 sm:pt-5 border-b">
+          <DialogTitle className="flex items-center gap-2 text-lg font-bold">
             <PackagePlus className="h-5 w-5 text-primary" />
-            Agregar inventario
+            Agregar stock
           </DialogTitle>
-          {product && (
-            <p className="text-sm text-muted-foreground">
-              {product.name}
-              {product.sku && <span className="font-mono ml-2 text-xs">({product.sku})</span>}
-            </p>
-          )}
+          <p className="text-sm text-muted-foreground truncate">
+            {product.name}
+            {product.sku && <span className="font-mono ml-2 text-xs">({product.sku})</span>}
+          </p>
         </DialogHeader>
 
-        <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+        {/* Scroll */}
+        <form
+          id="add-inventory-form"
+          onSubmit={handleSubmit(onSubmit)}
+          className="flex-1 overflow-y-auto px-5 py-4 space-y-4"
+          style={{ scrollbarWidth: "none" } as React.CSSProperties}
+        >
 
           {/* Cuenta */}
-          <div className="space-y-2">
-            <Label className="flex items-center gap-1.5">
+          <div className="space-y-1.5">
+            <Label className="text-sm font-medium flex items-center gap-1.5">
               <Wallet className="h-3.5 w-3.5 text-muted-foreground" />
-              Cuenta *
+              Cuenta <span className="text-destructive text-xs">*</span>
             </Label>
             <Select
               onValueChange={(val) => setValue("account_id", Number(val))}
               disabled={isCreating}
             >
-              <SelectTrigger className={errors.account_id ? "border-destructive" : ""}>
+              <SelectTrigger className={cn("h-11", errors.account_id && "border-destructive")}>
                 <SelectValue placeholder="Selecciona una cuenta" />
               </SelectTrigger>
               <SelectContent>
@@ -155,7 +181,7 @@ export function AddInventoryDialog({ product, open, onOpenChange, onSuccess }: P
                     <div className="flex items-center justify-between gap-4 w-full">
                       <span>{a.name}</span>
                       <span className="text-xs text-muted-foreground font-mono">
-                        {formatCurrency(Number(a.balance))}
+                        {format(Number(a.balance))}
                       </span>
                     </div>
                   </SelectItem>
@@ -163,32 +189,38 @@ export function AddInventoryDialog({ product, open, onOpenChange, onSuccess }: P
               </SelectContent>
             </Select>
             {errors.account_id && (
-              <p className="text-sm text-destructive">{errors.account_id.message}</p>
+              <p className="text-xs text-destructive">{errors.account_id.message}</p>
             )}
           </div>
 
           <Separator />
 
           {/* Cantidad */}
-          <div className="space-y-2">
-            <Label htmlFor="quantity">Cantidad *</Label>
+          <div className="space-y-1.5">
+            <Label className="text-sm font-medium">
+              Cantidad <span className="text-destructive text-xs">*</span>
+            </Label>
             <Input
-              id="quantity" type="number" min="1" placeholder="0"
-              {...register("quantity")} disabled={isCreating}
+              type="number" min="1"
+              {...register("quantity")}
+              disabled={isCreating}
+              className="h-11 text-base"
             />
-            {errors.quantity && <p className="text-sm text-destructive">{errors.quantity.message}</p>}
+            {errors.quantity && <p className="text-xs text-destructive">{errors.quantity.message}</p>}
           </div>
 
-          {/* Moneda y Tasa */}
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label>Moneda *</Label>
+          {/* Moneda + Tasa */}
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1.5">
+              <Label className="text-sm font-medium">
+                Moneda <span className="text-destructive text-xs">*</span>
+              </Label>
               <Select
                 defaultValue="USD"
                 onValueChange={(val) => setValue("currency", val as "USD" | "HNL")}
                 disabled={isCreating}
               >
-                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectTrigger className="h-11"><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="USD">USD — Dólares</SelectItem>
                   <SelectItem value="HNL">HNL — Lempiras</SelectItem>
@@ -196,69 +228,91 @@ export function AddInventoryDialog({ product, open, onOpenChange, onSuccess }: P
               </Select>
             </div>
             {isUSD && (
-              <div className="space-y-2">
-                <Label htmlFor="exchange_rate">Tasa de cambio *</Label>
+              <div className="space-y-1.5">
+                <Label className="text-sm font-medium">
+                  Tasa de cambio <span className="text-destructive text-xs">*</span>
+                </Label>
                 <Input
-                  id="exchange_rate" type="number" step="0.01"
+                  type="number" step="0.01"
                   placeholder={`${TASA_DEFAULT}`}
-                  {...register("exchange_rate")} disabled={isCreating}
+                  {...register("exchange_rate")}
+                  disabled={isCreating}
+                  className="h-11 text-base"
                 />
-                {errors.exchange_rate && <p className="text-sm text-destructive">{errors.exchange_rate.message}</p>}
+                {errors.exchange_rate && (
+                  <p className="text-xs text-destructive">{errors.exchange_rate.message}</p>
+                )}
               </div>
             )}
           </div>
 
           {/* Costo unitario */}
-          <div className="space-y-2">
-            <Label htmlFor="unit_cost_usd">Costo unitario ({isUSD ? "USD" : "L"}) *</Label>
-            <Input
-              id="unit_cost_usd" type="number" step="0.01" min="0" placeholder="0.00"
-              {...register("unit_cost_usd")} disabled={isCreating}
-            />
-            {errors.unit_cost_usd && <p className="text-sm text-destructive">{errors.unit_cost_usd.message}</p>}
+          <div className="space-y-1.5">
+            <Label className="text-sm font-medium">
+              Costo unitario ({isUSD ? "USD" : symbol}) <span className="text-destructive text-xs">*</span>
+            </Label>
+            <div className="relative">
+              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm font-medium">
+                {isUSD ? "$" : symbol}
+              </span>
+              <Input
+                type="number" step="0.01" min="0" placeholder="0.00"
+                {...register("unit_cost_usd")}
+                disabled={isCreating}
+                className="h-11 pl-8 text-base"
+              />
+            </div>
+            {errors.unit_cost_usd && (
+              <p className="text-xs text-destructive">{errors.unit_cost_usd.message}</p>
+            )}
           </div>
 
           {/* Envío */}
-          <div className="space-y-2">
-            <Label htmlFor="shipping">
-              Gastos de envío (L)
-              <span className="text-xs text-muted-foreground ml-2">opcional · se distribuye entre unidades</span>
+          <div className="space-y-1.5">
+            <Label className="text-sm font-medium">
+              Gastos de envío ({symbol})
+              <span className="text-xs text-muted-foreground font-normal ml-1">· se distribuye entre unidades</span>
             </Label>
-            <Input
-              id="shipping" type="number" step="0.01" min="0" placeholder="0.00"
-              {...register("shipping")} disabled={isCreating}
-            />
+            <div className="relative">
+              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm font-medium">
+                {symbol}
+              </span>
+              <Input
+                type="number" step="0.01" min="0" placeholder="0.00"
+                {...register("shipping")}
+                disabled={isCreating}
+                className="h-11 pl-8 text-base"
+              />
+            </div>
           </div>
 
           {/* Resumen */}
           {qty > 0 && cost > 0 && (
-            <div className="bg-muted/40 rounded-lg p-4 space-y-2">
-              <div className="flex items-center gap-2 text-sm font-medium mb-3">
-                <Calculator className="h-4 w-4 text-primary" />
-                Resumen de costos
+            <div className="rounded-lg bg-primary/5 border border-primary/10 p-3 space-y-1.5">
+              <div className="flex items-center gap-1.5 text-xs font-medium text-primary mb-2">
+                <Calculator className="h-3.5 w-3.5" />
+                Resumen
               </div>
-              <div className="space-y-1.5 text-sm">
-                {isUSD && (
-                  <div className="flex justify-between text-muted-foreground">
-                    <span>Costo unitario (USD → L)</span>
-                    <span>{formatCurrency(cost, "USD")} × {rate} = {formatCurrency(unitCostHnl)}</span>
-                  </div>
-                )}
-                {ship > 0 && (
-                  <div className="flex justify-between text-muted-foreground">
-                    <span>Envío por unidad</span>
-                    <span>{formatCurrency(shippingPerUnit)}</span>
-                  </div>
-                )}
-                <Separator />
-                <div className="flex justify-between font-medium">
-                  <span>Costo unitario final</span>
-                  <span>{formatCurrency(finalUnitCost)}</span>
+              {isUSD && (
+                <div className="flex justify-between text-xs text-muted-foreground">
+                  <span>Costo (USD → {symbol})</span>
+                  <span>${cost.toFixed(2)} × {rate} = {format(unitCostHnl)}</span>
                 </div>
-                <div className="flex justify-between font-bold text-primary">
-                  <span>Total ({qty} uds)</span>
-                  <span>{formatCurrency(totalCost)}</span>
+              )}
+              {ship > 0 && (
+                <div className="flex justify-between text-xs text-muted-foreground">
+                  <span>Envío por unidad</span>
+                  <span>{format(shippingPerUnit)}</span>
                 </div>
+              )}
+              <Separator className="my-1" />
+              <div className="flex justify-between text-xs font-medium">
+                <span>Costo unitario final</span>
+                <span>{format(finalUnitCost)}</span>
+              </div>
+              <div className="flex justify-between text-sm font-bold text-primary">
+                <span>Total ({qty} uds)</span>
+                <span>{format(totalCost)}</span>
               </div>
             </div>
           )}
@@ -266,38 +320,55 @@ export function AddInventoryDialog({ product, open, onOpenChange, onSuccess }: P
           <Separator />
 
           {/* Fecha */}
-          <div className="space-y-2">
-            <Label htmlFor="purchased_at">Fecha de compra</Label>
+          <div className="space-y-1.5">
+            <Label className="text-sm font-medium">Fecha de compra</Label>
             <Input
-              id="purchased_at" type="date"
-              {...register("purchased_at")} disabled={isCreating}
+              type="date"
+              {...register("purchased_at")}
+              disabled={isCreating}
+              className="h-11 text-base"
             />
           </div>
 
           {/* Notas */}
-          <div className="space-y-2">
-            <Label htmlFor="notes">
+          <div className="space-y-1.5">
+            <Label className="text-sm font-medium">
               Notas
-              <span className="text-xs text-muted-foreground ml-2">opcional</span>
+              <span className="text-xs text-muted-foreground font-normal ml-1">opcional</span>
             </Label>
-            <Textarea
-              id="notes" placeholder="Observaciones de la compra..." rows={2}
-              {...register("notes")} disabled={isCreating}
+            <Input
+              placeholder="Ej: Reposición de stock, lote #2..."
+              {...register("notes")}
+              disabled={isCreating}
+              className="h-11 text-base"
             />
           </div>
 
-          <DialogFooter className="pt-2">
-            <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={isCreating}>
-              Cancelar
-            </Button>
-            <Button type="submit" disabled={isCreating}>
-              {isCreating
-                ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Registrando...</>
-                : "Registrar compra"
-              }
-            </Button>
-          </DialogFooter>
         </form>
+
+        {/* Footer fijo */}
+        <div className="shrink-0 px-5 py-4 border-t bg-background flex gap-3">
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => onOpenChange(false)}
+            disabled={isCreating}
+            className="flex-1 h-11"
+          >
+            Cancelar
+          </Button>
+          <Button
+            type="submit"
+            form="add-inventory-form"
+            disabled={isCreating}
+            className="flex-1 h-11 gap-2"
+          >
+            {isCreating
+              ? <><Loader2 className="h-4 w-4 animate-spin" />Registrando...</>
+              : <><PackagePlus className="h-4 w-4" />Registrar compra</>
+            }
+          </Button>
+        </div>
       </DialogContent>
     </Dialog>
   );

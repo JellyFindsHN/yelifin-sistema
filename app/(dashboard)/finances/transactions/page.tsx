@@ -4,7 +4,6 @@
 import { useState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
@@ -15,27 +14,17 @@ import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
 import {
-  ArrowDownCircle, ArrowUpCircle, ArrowLeftRight,
-  Plus, SlidersHorizontal, TrendingUp, TrendingDown, Loader2,
+  ArrowDownCircle, ArrowUpCircle, ArrowLeftRight, SlidersHorizontal, TrendingUp, TrendingDown
 } from "lucide-react";
 import {
   useTransactions, useTransactionPeriods
 } from "@/hooks/swr/use-transactions";
 import { Fab } from "@/components/ui/fab";
 import { useAccounts } from "@/hooks/swr/use-accounts";
+import { useCurrency } from "@/hooks/swr/use-currency";
 import { CreateTransactionModal } from "@/components/transactions/create-transaction-modal";
 
 // ── Helpers ────────────────────────────────────────────────────────────
-const formatCurrency = (v: number) =>
-  new Intl.NumberFormat("es-HN", {
-    style: "currency", currency: "HNL", minimumFractionDigits: 2,
-  }).format(v);
-
-const formatCurrencyShort = (v: number) =>
-  new Intl.NumberFormat("es-HN", {
-    style: "currency", currency: "HNL", minimumFractionDigits: 0,
-  }).format(v);
-
 const formatDate = (d: string) =>
   new Date(d).toLocaleDateString("es-HN", {
     day: "numeric", month: "short", year: "numeric",
@@ -99,6 +88,7 @@ export default function TransactionsPage() {
 
   const { periods }  = useTransactionPeriods();
   const { accounts } = useAccounts();
+  const { format }   = useCurrency();
 
   const availableYears = [...new Set(periods.map((p) => p.year))].sort((a, b) => b - a);
   const monthsForYear  = (y: number) =>
@@ -139,7 +129,7 @@ export default function TransactionsPage() {
                 <s.icon className="h-3 w-3 text-muted-foreground shrink-0" />
               </div>
               <div className={`text-sm font-bold ${s.color}`}>
-                {isLoading ? <Skeleton className="h-4 w-16" /> : formatCurrencyShort(s.value)}
+                {isLoading ? <Skeleton className="h-4 w-16" /> : format(s.value)}
               </div>
             </CardContent>
           </Card>
@@ -259,7 +249,7 @@ export default function TransactionsPage() {
             const cfg  = TYPE_CONFIG[t.type];
             const Icon = cfg.icon;
             return (
-              <Card key={t.id}>
+              <Card className="pt-3 pb-2.5" key={t.id}>
                 <CardContent className="pl-3.5">
                   <div className="flex items-start gap-3">
                     <div className="h-8 w-8 rounded-full bg-muted flex items-center justify-center shrink-0">
@@ -283,7 +273,7 @@ export default function TransactionsPage() {
                         </div>
                         <div className="text-right shrink-0">
                           <p className={`text-sm font-bold ${cfg.color}`}>
-                            {cfg.sign}{formatCurrency(Number(t.amount))}
+                            {cfg.sign}{format(Number(t.amount))}
                           </p>
                           <Badge className={`text-[10px] mt-0.5 ${cfg.badge}`} variant="outline">
                             {cfg.label}
@@ -358,7 +348,7 @@ export default function TransactionsPage() {
                         {formatDate(t.occurred_at)}
                       </TableCell>
                       <TableCell className={`text-right font-bold ${cfg.color}`}>
-                        {cfg.sign}{formatCurrency(Number(t.amount))}
+                        {cfg.sign}{format(Number(t.amount))}
                       </TableCell>
                     </TableRow>
                   );

@@ -1,4 +1,3 @@
-// app/(auth)/verify-email/page.tsx
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -16,13 +15,14 @@ const RESEND_COOLDOWN = 60;
 export default function VerifyEmailPage() {
   const { firebaseUser, loading, emailVerified } = useAuth();
   const router = useRouter();
-  const [isSending, setIsSending] = useState(false);
-  const [isChecking, setIsChecking] = useState(false);
-  const [cooldown, setCooldown] = useState(0);
+  const [isSending,   setIsSending]   = useState(false);
+  const [isChecking,  setIsChecking]  = useState(false);
+  const [cooldown,    setCooldown]    = useState(0);
 
   useEffect(() => {
     if (loading) return;
-    if (emailVerified) { router.push('/dashboard'); return; }
+    // ✅ Redirige a onboarding (no a dashboard) después de verificar
+    if (emailVerified) { router.push('/onboarding'); return; }
     if (!firebaseUser) { router.push('/login'); return; }
   }, [firebaseUser, loading, emailVerified, router]);
 
@@ -56,8 +56,9 @@ export default function VerifyEmailPage() {
     try {
       await firebaseUser.reload();
       if (firebaseUser.emailVerified) {
-        toast.success('¡Email verificado! Redirigiendo...');
-        router.push('/dashboard');
+        toast.success('¡Email verificado! Configurando tu cuenta...');
+        // ✅ Va a onboarding, no a dashboard
+        router.push('/onboarding');
       } else {
         toast.error('Tu email aún no ha sido verificado.');
       }
