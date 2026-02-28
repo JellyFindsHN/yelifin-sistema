@@ -2,6 +2,7 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -16,20 +17,16 @@ import {
 import {
   ArrowDownCircle, ArrowUpCircle, Package,
   SlidersHorizontal, X, TrendingUp, TrendingDown, BoxIcon,
+  Plus, ShoppingCart, PackagePlus,
 } from "lucide-react";
 import Image from "next/image";
 import { useMovements, Movement } from "@/hooks/swr/use-movements";
 import { useProducts }            from "@/hooks/swr/use-products";
 import { useMovementPeriods }     from "@/hooks/swr/use-movements";
+import { useCurrency }            from "@/hooks/swr/use-currency";
+import { Fab }                    from "@/components/ui/fab";
 
 // ── Helpers ────────────────────────────────────────────────────────────
-const formatCurrency = (value: number | null) => {
-  if (value === null || value === undefined) return "—";
-  return new Intl.NumberFormat("es-HN", {
-    style: "currency", currency: "HNL", minimumFractionDigits: 2,
-  }).format(Number(value));
-};
-
 const formatUSD = (value: number | null) => {
   if (value === null || value === undefined) return "—";
   return new Intl.NumberFormat("en-US", {
@@ -84,9 +81,10 @@ function TypeBadge({ m }: { m: Movement }) {
   );
 }
 
-// ── Detalle de movimiento (columna "Detalle" en desktop) ───────────────
-function MovementDetail({ m }: { m: Movement }) {
-  // Ajuste o inicial — solo mostrar notas
+// ── Sub-components — reciben format para evitar hook en render ─────────
+type FormatFn = (v: number | null) => string;
+
+function MovementDetail({ m, format }: { m: Movement; format: FormatFn }) {
   if (m.reference_type === "ADJUSTMENT" || m.reference_type === "INITIAL") {
     return (
       <p className="text-xs text-muted-foreground italic">
@@ -94,8 +92,6 @@ function MovementDetail({ m }: { m: Movement }) {
       </p>
     );
   }
-
-  // Compra
   if (m.movement_type === "IN") {
     return (
       <div className="text-xs space-y-0.5">
@@ -103,25 +99,23 @@ function MovementDetail({ m }: { m: Movement }) {
           USD: <span className="text-foreground font-medium">{formatUSD(m.unit_cost_usd)}</span>
         </p>
         <p className="text-muted-foreground">
-          HNL: <span className="text-foreground font-medium">{formatCurrency(m.unit_cost_hnl)}</span>
+          HNL: <span className="text-foreground font-medium">{format(m.unit_cost_hnl)}</span>
         </p>
         {Number(m.shipping_per_unit) > 0 && (
           <p className="text-muted-foreground">
-            Envío/u: <span className="text-foreground font-medium">{formatCurrency(m.shipping_per_unit)}</span>
+            Envío/u: <span className="text-foreground font-medium">{format(m.shipping_per_unit)}</span>
           </p>
         )}
       </div>
     );
   }
-
-  // Venta
   return (
     <div className="text-xs space-y-0.5">
       <p className="text-muted-foreground">
-        Precio: <span className="text-foreground font-medium">{formatCurrency(m.unit_price)}</span>
+        Precio: <span className="text-foreground font-medium">{format(m.unit_price)}</span>
       </p>
       <p className="text-muted-foreground">
-        Costo: <span className="text-foreground font-medium">{formatCurrency(m.unit_cost)}</span>
+        Costo: <span className="text-foreground font-medium">{format(m.unit_cost)}</span>
       </p>
       {m.customer_name && (
         <p className="text-muted-foreground">
@@ -135,25 +129,22 @@ function MovementDetail({ m }: { m: Movement }) {
   );
 }
 
-// ── Total column ───────────────────────────────────────────────────────
-function MovementTotal({ m }: { m: Movement }) {
+function MovementTotal({ m, format }: { m: Movement; format: FormatFn }) {
   if (m.reference_type === "ADJUSTMENT" || m.reference_type === "INITIAL") {
     return <span className="text-muted-foreground text-sm">—</span>;
   }
-  if (m.movement_type === "IN")  return <span className="font-medium">{formatCurrency(m.total_cost)}</span>;
-  return <span className="font-medium">{formatCurrency(m.line_total)}</span>;
+  if (m.movement_type === "IN") return <span className="font-medium">{format(m.total_cost)}</span>;
+  return <span className="font-medium">{format(m.line_total)}</span>;
 }
 
-// ── Ganancia column ────────────────────────────────────────────────────
-function MovementProfit({ m }: { m: Movement }) {
+function MovementProfit({ m, format }: { m: Movement; format: FormatFn }) {
   if (m.reference_type === "SALE") {
-    return <span className="text-green-600 font-medium">{formatCurrency(m.profit)}</span>;
+    return <span className="text-green-600 font-medium">{format(m.profit)}</span>;
   }
   return <span className="text-muted-foreground">—</span>;
 }
 
-// ── Detalle en mobile card ─────────────────────────────────────────────
-function MobileDetail({ m }: { m: Movement }) {
+function MobileDetail({ m, format }: { m: Movement; format: FormatFn }) {
   if (m.reference_type === "ADJUSTMENT" || m.reference_type === "INITIAL") {
     return (
       <div className="pt-3 border-t">
@@ -161,7 +152,6 @@ function MobileDetail({ m }: { m: Movement }) {
       </div>
     );
   }
-
   if (m.movement_type === "IN") {
     return (
       <div className="grid grid-cols-3 gap-2 pt-3 border-t text-center text-xs">
@@ -171,36 +161,35 @@ function MobileDetail({ m }: { m: Movement }) {
         </div>
         <div>
           <p className="text-muted-foreground">Costo HNL</p>
-          <p className="font-medium">{formatCurrency(m.unit_cost_hnl)}</p>
+          <p className="font-medium">{format(m.unit_cost_hnl)}</p>
         </div>
         <div>
           <p className="text-muted-foreground">Total</p>
-          <p className="font-bold text-primary">{formatCurrency(m.total_cost)}</p>
+          <p className="font-bold text-primary">{format(m.total_cost)}</p>
         </div>
         {Number(m.shipping_per_unit) > 0 && (
           <div className="col-span-3 pt-1.5 border-t text-left">
             <span className="text-muted-foreground">Envío/u: </span>
-            <span className="font-medium">{formatCurrency(m.shipping_per_unit)}</span>
+            <span className="font-medium">{format(m.shipping_per_unit)}</span>
           </div>
         )}
       </div>
     );
   }
-
   return (
     <div className="pt-3 border-t space-y-2">
       <div className="grid grid-cols-3 gap-2 text-center text-xs">
         <div>
           <p className="text-muted-foreground">Precio</p>
-          <p className="font-medium">{formatCurrency(m.unit_price)}</p>
+          <p className="font-medium">{format(m.unit_price)}</p>
         </div>
         <div>
           <p className="text-muted-foreground">Total</p>
-          <p className="font-bold">{formatCurrency(m.line_total)}</p>
+          <p className="font-bold">{format(m.line_total)}</p>
         </div>
         <div>
           <p className="text-muted-foreground">Ganancia</p>
-          <p className="font-bold text-green-600">{formatCurrency(m.profit)}</p>
+          <p className="font-bold text-green-600">{format(m.profit)}</p>
         </div>
       </div>
       {(m.customer_name || m.sale_number) && (
@@ -217,7 +206,8 @@ function MobileDetail({ m }: { m: Movement }) {
 
 // ── Page ───────────────────────────────────────────────────────────────
 export default function MovementsPage() {
-  const now = new Date();
+  const now    = new Date();
+  const router = useRouter();
 
   const [filterMode,    setFilterMode]    = useState<"month" | "date">("month");
   const [selectedYear,  setSelectedYear]  = useState<number>(now.getFullYear());
@@ -235,6 +225,13 @@ export default function MovementsPage() {
 
   const { products } = useProducts();
   const { periods }  = useMovementPeriods();
+  const { format: formatCurrency } = useCurrency();
+
+  // Wrapper para aceptar null igual que el helper original
+  const format = (v: number | null | undefined): string => {
+    if (v === null || v === undefined) return "—";
+    return formatCurrency(Number(v));
+  };
 
   const filtered = movements.filter((m) => {
     if (typeFilter === "all")        return true;
@@ -271,7 +268,7 @@ export default function MovementsPage() {
       : `${MONTH_NAMES[selectedMonth]} ${selectedYear}`;
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-5 pb-24">
       {/* Header */}
       <div>
         <h1 className="text-2xl font-bold tracking-tight">Movimientos</h1>
@@ -434,9 +431,9 @@ export default function MovementsPage() {
                     </TableCell>
                     <TableCell><TypeBadge m={m} /></TableCell>
                     <TableCell className="font-medium">{m.quantity}</TableCell>
-                    <TableCell><MovementDetail m={m} /></TableCell>
-                    <TableCell className="text-right"><MovementTotal m={m} /></TableCell>
-                    <TableCell className="text-right"><MovementProfit m={m} /></TableCell>
+                    <TableCell><MovementDetail m={m} format={format} /></TableCell>
+                    <TableCell className="text-right"><MovementTotal m={m} format={format} /></TableCell>
+                    <TableCell className="text-right"><MovementProfit m={m} format={format} /></TableCell>
                     <TableCell className="text-muted-foreground text-sm whitespace-nowrap">
                       {formatDateOnly(m.created_at)}
                     </TableCell>
@@ -481,12 +478,21 @@ export default function MovementsPage() {
                     <span className="text-xs text-muted-foreground">{m.quantity} uds</span>
                   </div>
                 </div>
-                <MobileDetail m={m} />
+                <MobileDetail m={m} format={format} />
               </CardContent>
             </Card>
           ))
         )}
       </div>
+
+      {/* FAB */}
+      <Fab
+        actions={[
+          { label: "Nuevo producto",    icon: Plus,         onClick: () => router.push("/inventory") },
+          { label: "Registrar venta",   icon: ShoppingCart, onClick: () => router.push("/sales/new") },
+          { label: "Agregar stock",     icon: PackagePlus,  onClick: () => router.push("/inventory") },
+        ]}
+      />
     </div>
   );
 }

@@ -49,11 +49,9 @@ export async function GET(request: NextRequest) {
         t.reference_id,
         t.occurred_at,
         t.created_at,
-        -- Cuenta origen
         a.id   AS account_id,
         a.name AS account_name,
         a.type AS account_type,
-        -- Cuenta destino (transferencias)
         ta.id   AS to_account_id,
         ta.name AS to_account_name
       FROM transactions t
@@ -67,7 +65,6 @@ export async function GET(request: NextRequest) {
       LIMIT 500
     `;
 
-    // Totales del período
     const [totals] = await sql`
       SELECT
         COALESCE(SUM(CASE WHEN type = 'INCOME'   THEN amount ELSE 0 END), 0) AS total_income,
@@ -103,7 +100,11 @@ export async function POST(request: NextRequest) {
   try {
     const { userId } = auth.data;
     const body = await request.json();
-    const { type, account_id, to_account_id, amount, category, description, occurred_at } = body;
+    const {
+      type, account_id, to_account_id, amount,
+      category, description, occurred_at,
+      reference_type, reference_id,       // ← nuevos
+    } = body;
 
     if (!type || !["INCOME", "EXPENSE", "TRANSFER"].includes(type))
       return createErrorResponse("Tipo de transacción inválido", 400);
@@ -116,26 +117,31 @@ export async function POST(request: NextRequest) {
     if (type === "TRANSFER" && account_id === to_account_id)
       return createErrorResponse("Las cuentas deben ser diferentes", 400);
 
-    // Verificar cuenta origen
+    // Validar reference_type si viene
+    const VALID_REF_TYPES = ["SALE", "PURCHASE", "SUPPLY_PURCHASE", "EVENT", "OTHER"];
+    const refType = reference_type && VALID_REF_TYPES.includes(reference_type)
+      ? reference_type
+      : "OTHER";
+    const refId = reference_id ? Number(reference_id) : null;
+
     const [account] = await sql`
       SELECT id, balance FROM accounts
       WHERE id = ${account_id} AND user_id = ${userId} AND is_active = TRUE
     `;
     if (!account) return createErrorResponse("Cuenta no encontrada", 404);
 
-    const amt = Number(amount);
+    const amt        = Number(amount);
     const occurredAt = occurred_at ?? new Date().toISOString();
 
-    // Insertar transacción
     const [transaction] = await sql`
       INSERT INTO transactions (
         user_id, type, account_id, to_account_id,
         amount, category, description,
-        reference_type, occurred_at
+        reference_type, reference_id, occurred_at
       ) VALUES (
         ${userId}, ${type}, ${account_id}, ${to_account_id ?? null},
         ${amt}, ${category ?? null}, ${description ?? null},
-        'OTHER', ${occurredAt}
+        ${refType}, ${refId}, ${occurredAt}
       )
       RETURNING id
     `;
@@ -150,7 +156,7 @@ export async function POST(request: NextRequest) {
         SELECT id FROM accounts WHERE id = ${to_account_id} AND user_id = ${userId} AND is_active = TRUE
       `;
       if (!toAccount) return createErrorResponse("Cuenta destino no encontrada", 404);
-      await sql`UPDATE accounts SET balance = balance - ${amt} WHERE id = ${account_id}   AND user_id = ${userId}`;
+      await sql`UPDATE accounts SET balance = balance - ${amt} WHERE id = ${account_id}    AND user_id = ${userId}`;
       await sql`UPDATE accounts SET balance = balance + ${amt} WHERE id = ${to_account_id} AND user_id = ${userId}`;
     }
 

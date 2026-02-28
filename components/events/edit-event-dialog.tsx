@@ -1,4 +1,4 @@
-// components/customers/edit-customer-dialog.tsx
+// components/events/edit-event-dialog.tsx
 "use client";
 
 import { useEffect } from "react";
@@ -15,63 +15,77 @@ import { Textarea } from "@/components/ui/textarea";
 import { Loader2, Pencil } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
-import { useUpdateCustomer, Customer } from "@/hooks/swr/use-costumers";
+import { useUpdateEvent, Event } from "@/hooks/swr/use-events";
+import { useCurrency } from "@/hooks/swr/use-currency";
 
 const schema = z.object({
-  name:  z.string().min(1, "El nombre es requerido"),
-  phone: z.string().optional(),
-  email: z.string().email("Email inválido").optional().or(z.literal("")),
-  notes: z.string().optional(),
+  name:       z.string().min(1, "El nombre es requerido"),
+  location:   z.string().optional(),
+  starts_at:  z.string().min(1, "La fecha inicio es requerida"),
+  ends_at:    z.string().min(1, "La fecha fin es requerida"),
+  fixed_cost: z.coerce.number().min(0).default(0),
+  notes:      z.string().optional(),
+}).refine((d) => new Date(d.starts_at) <= new Date(d.ends_at), {
+  message: "La fecha inicio debe ser antes o igual que la fecha fin",
+  path:    ["ends_at"],
 });
 
 type FormData = z.infer<typeof schema>;
 
+// Convert ISO → "YYYY-MM-DD" for date input
+const toDateInput = (iso: string) => iso.split("T")[0];
+
 type Props = {
-  customer:     Customer | null;
+  event:        Event | null;
   open:         boolean;
   onOpenChange: (open: boolean) => void;
   onSuccess:    () => void;
 };
 
-export function EditCustomerDialog({ customer, open, onOpenChange, onSuccess }: Props) {
-  const { updateCustomer, isUpdating } = useUpdateCustomer();
+export function EditEventDialog({ event, open, onOpenChange, onSuccess }: Props) {
+  const { updateEvent }  = useUpdateEvent();
+  const { symbol }       = useCurrency();
 
   const {
     register, handleSubmit, reset,
-    formState: { errors },
+    formState: { errors, isSubmitting },
   } = useForm<FormData>({ resolver: zodResolver(schema) });
 
   useEffect(() => {
-    if (customer && open) {
+    if (event && open) {
       reset({
-        name:  customer.name,
-        phone: customer.phone ?? "",
-        email: customer.email ?? "",
-        notes: customer.notes ?? "",
+        name:       event.name,
+        location:   event.location ?? "",
+        starts_at:  toDateInput(event.starts_at),
+        ends_at:    toDateInput(event.ends_at),
+        fixed_cost: event.fixed_cost,
+        notes:      event.notes ?? "",
       });
     }
-  }, [customer, open, reset]);
+  }, [event, open, reset]);
 
   const handleClose = () => onOpenChange(false);
 
   const onSubmit = async (data: FormData) => {
-    if (!customer) return;
+    if (!event) return;
     try {
-      await updateCustomer(customer.id, {
-        name:  data.name,
-        phone: data.phone || undefined,
-        email: data.email || undefined,
-        notes: data.notes || undefined,
+      await updateEvent(event.id, {
+        name:       data.name,
+        location:   data.location   || undefined,
+        starts_at:  new Date(data.starts_at).toISOString(),
+        ends_at:    new Date(data.ends_at).toISOString(),
+        fixed_cost: data.fixed_cost || 0,
+        notes:      data.notes      || undefined,
       });
-      toast.success("Cliente actualizado exitosamente");
+      toast.success("Evento actualizado exitosamente");
       handleClose();
       onSuccess();
     } catch (error: any) {
-      toast.error(error.message || "Error al actualizar cliente");
+      toast.error(error.message || "Error al actualizar evento");
     }
   };
 
-  if (!customer) return null;
+  if (!event) return null;
 
   return (
     <Dialog open={open} onOpenChange={(v) => !v && handleClose()}>
@@ -82,7 +96,7 @@ export function EditCustomerDialog({ customer, open, onOpenChange, onSuccess }: 
           "max-h-[92dvh] flex flex-col p-0",
           "sm:bottom-auto sm:left-1/2 sm:right-auto sm:top-1/2",
           "sm:-translate-x-1/2 sm:-translate-y-1/2",
-          "sm:w-full sm:max-w-md sm:rounded-2xl sm:border",
+          "sm:w-full sm:max-w-lg sm:rounded-2xl sm:border",
           "data-[state=open]:animate-in data-[state=closed]:animate-out",
           "data-[state=open]:slide-in-from-bottom sm:data-[state=open]:slide-in-from-bottom-[48%]",
           "data-[state=closed]:slide-out-to-bottom sm:data-[state=closed]:slide-out-to-bottom-[48%]",
@@ -91,103 +105,109 @@ export function EditCustomerDialog({ customer, open, onOpenChange, onSuccess }: 
         onInteractOutside={(e) => e.preventDefault()}
         onEscapeKeyDown={handleClose}
       >
-        {/* Handle móvil */}
         <div className="sm:hidden flex justify-center pt-3 pb-1 shrink-0">
           <div className="w-10 h-1 rounded-full bg-muted-foreground/30" />
         </div>
 
-        {/* Header */}
         <DialogHeader className="shrink-0 px-5 pt-2 pb-3 sm:pt-5 border-b">
           <DialogTitle className="flex items-center gap-2 text-lg font-bold">
             <Pencil className="h-4 w-4 text-primary" />
-            Editar cliente
+            Editar evento
           </DialogTitle>
-          <p className="text-sm text-muted-foreground truncate">{customer.name}</p>
+          <p className="text-sm text-muted-foreground truncate">{event.name}</p>
         </DialogHeader>
 
-        {/* Form */}
         <form
-          id="edit-customer-form"
+          id="edit-event-form"
           onSubmit={handleSubmit(onSubmit)}
           className="flex-1 overflow-y-auto px-5 py-4 space-y-4"
           style={{ scrollbarWidth: "none" } as React.CSSProperties}
         >
-
-          {/* Nombre */}
           <div className="space-y-1.5">
             <Label className="text-sm font-medium">
               Nombre <span className="text-destructive text-xs">*</span>
             </Label>
-            <Input
-              {...register("name")}
-              disabled={isUpdating}
-              className="h-11 text-base"
-            />
+            <Input {...register("name")} disabled={isSubmitting} className="h-11 text-base" />
             {errors.name && <p className="text-xs text-destructive">{errors.name.message}</p>}
           </div>
 
-          {/* Teléfono + Email */}
+          <div className="space-y-1.5">
+            <Label className="text-sm font-medium">
+              Ubicación{" "}
+              <span className="text-xs text-muted-foreground font-normal">opcional</span>
+            </Label>
+            <Input
+              placeholder="Centro de Convenciones..."
+              {...register("location")}
+              disabled={isSubmitting}
+              className="h-11 text-base"
+            />
+          </div>
+
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1.5">
               <Label className="text-sm font-medium">
-                Teléfono{" "}
-                <span className="text-xs text-muted-foreground font-normal">opcional</span>
+                Inicio <span className="text-destructive text-xs">*</span>
               </Label>
-              <Input
-                placeholder="+504 9999-9999"
-                {...register("phone")}
-                disabled={isUpdating}
-                className="h-11 text-base"
-              />
+              <Input type="date" {...register("starts_at")} disabled={isSubmitting} className="h-11 text-base" />
+              {errors.starts_at && <p className="text-xs text-destructive">{errors.starts_at.message}</p>}
             </div>
             <div className="space-y-1.5">
               <Label className="text-sm font-medium">
-                Email{" "}
-                <span className="text-xs text-muted-foreground font-normal">opcional</span>
+                Fin <span className="text-destructive text-xs">*</span>
               </Label>
-              <Input
-                type="email"
-                placeholder="correo@email.com"
-                {...register("email")}
-                disabled={isUpdating}
-                className="h-11 text-base"
-              />
-              {errors.email && <p className="text-xs text-destructive">{errors.email.message}</p>}
+              <Input type="date" {...register("ends_at")} disabled={isSubmitting} className="h-11 text-base" />
+              {errors.ends_at && <p className="text-xs text-destructive">{errors.ends_at.message}</p>}
             </div>
           </div>
 
-          {/* Notas */}
+          <div className="space-y-1.5">
+            <Label className="text-sm font-medium">
+              Costos fijos ({symbol}){" "}
+              <span className="text-xs text-muted-foreground font-normal">opcional</span>
+            </Label>
+            <div className="relative">
+              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm font-medium">
+                {symbol}
+              </span>
+              <Input
+                type="number" step="0.01" min="0" placeholder="0.00"
+                {...register("fixed_cost")}
+                disabled={isSubmitting}
+                className="h-11 pl-8 text-base"
+              />
+            </div>
+          </div>
+
           <div className="space-y-1.5">
             <Label className="text-sm font-medium">
               Notas{" "}
               <span className="text-xs text-muted-foreground font-normal">opcional</span>
             </Label>
             <Textarea
-              placeholder="Observaciones del cliente..."
+              placeholder="Detalles del evento..."
               rows={2}
               {...register("notes")}
-              disabled={isUpdating}
+              disabled={isSubmitting}
               className="resize-none text-base"
             />
           </div>
-
         </form>
 
-        {/* Footer fijo */}
         <div className="shrink-0 px-5 py-4 border-t bg-background flex gap-3">
           <Button
             type="button" variant="outline"
-            onClick={handleClose} disabled={isUpdating}
+            onClick={handleClose} disabled={isSubmitting}
             className="flex-1 h-11"
           >
             Cancelar
           </Button>
           <Button
-            type="submit" form="edit-customer-form"
-            disabled={isUpdating}
+            type="submit" form="edit-event-form"
+            disabled={isSubmitting}
             className="flex-1 h-11 gap-2"
           >
-            {isUpdating
+            {isSubmitting
               ? <><Loader2 className="h-4 w-4 animate-spin" />Guardando...</>
               : <><Pencil className="h-4 w-4" />Guardar cambios</>
             }
