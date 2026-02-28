@@ -18,7 +18,10 @@ export async function GET(request: NextRequest) {
     try {
       decodedToken = await adminAuth.verifyIdToken(token);
     } catch {
-      return Response.json({ error: "Token inválido o expirado" }, { status: 401 });
+      return Response.json(
+        { error: "Token inválido o expirado" },
+        { status: 401 }
+      );
     }
 
     // 2. Usuario + perfil + suscripción
@@ -37,6 +40,7 @@ export async function GET(request: NextRequest) {
         up.timezone,
         up.currency,
         up.locale,
+        up.onboarding_completed,
 
         us.id               AS subscription_id,
         us.status           AS subscription_status,
@@ -64,7 +68,10 @@ export async function GET(request: NextRequest) {
     `;
 
     if (!userData) {
-      return Response.json({ error: "Usuario no encontrado" }, { status: 404 });
+      return Response.json(
+        { error: "Usuario no encontrado" },
+        { status: 404 }
+      );
     }
 
     // 3. Features del plan
@@ -84,55 +91,65 @@ export async function GET(request: NextRequest) {
     `;
 
     // Agrupar features por categoría
-    const featuresByCategory = features.reduce((acc: Record<string, any[]>, f) => {
-      if (!acc[f.category]) acc[f.category] = [];
-      acc[f.category].push({ key: f.feature_key, name: f.feature_name, category: f.category });
-      return acc;
-    }, {});
+    const featuresByCategory = features.reduce(
+      (acc: Record<string, any[]>, f) => {
+        if (!acc[f.category]) acc[f.category] = [];
+        acc[f.category].push({
+          key: f.feature_key,
+          name: f.feature_name,
+          category: f.category,
+        });
+        return acc;
+      },
+      {}
+    );
 
     // 4. Construir respuesta
-    return Response.json({
-      user: {
-        id: userData.id,
-        firebase_uid: userData.firebase_uid,
-        email: userData.email,
-        display_name: userData.display_name,
-        photo_url: userData.photo_url,
-        is_active: userData.is_active,
-        created_at: userData.created_at,
-      },
-      profile: {
-        user_id: userData.id,
-        business_name: userData.business_name,
-        business_logo_url: userData.business_logo_url,
-        timezone: userData.timezone ?? 'America/Tegucigalpa',
-        currency: userData.currency ?? 'HNL',
-        locale: userData.locale ?? 'es-HN',
-      },
-      subscription: {
-        id: userData.subscription_id,
-        status: userData.subscription_status,
-        plan: {
-          id: userData.plan_id,
-          name: userData.plan_name,
-          slug: userData.plan_slug,
-          price_usd: userData.price_usd,
-          billing_interval: userData.billing_interval,
-          limits: {
-            max_products: userData.max_products,
-            max_sales_per_month: userData.max_sales_per_month,
-            max_storage_mb: userData.max_storage_mb,
-          },
+    return Response.json(
+      {
+        user: {
+          id: userData.id,
+          firebase_uid: userData.firebase_uid,
+          email: userData.email,
+          display_name: userData.display_name,
+          photo_url: userData.photo_url,
+          is_active: userData.is_active,
+          created_at: userData.created_at,
         },
-        current_period_start: userData.current_period_start,
-        current_period_end: userData.current_period_end,
-        cancel_at_period_end: userData.cancel_at_period_end,
+        profile: {
+          user_id: userData.id,
+          business_name: userData.business_name,
+          business_logo_url: userData.business_logo_url,
+          timezone: userData.timezone ?? "America/Tegucigalpa",
+          currency: userData.currency ?? "HNL",
+          locale: userData.locale ?? "es-HN",
+          onboarding_completed: userData.onboarding_completed ?? false,
+        },
+        subscription: {
+          id: userData.subscription_id,
+          status: userData.subscription_status,
+          plan: {
+            id: userData.plan_id,
+            name: userData.plan_name,
+            slug: userData.plan_slug,
+            price_usd: userData.price_usd,
+            billing_interval: userData.billing_interval,
+            limits: {
+              max_products: userData.max_products,
+              max_sales_per_month: userData.max_sales_per_month,
+              max_storage_mb: userData.max_storage_mb,
+            },
+          },
+          current_period_start: userData.current_period_start,
+          current_period_end: userData.current_period_end,
+          cancel_at_period_end: userData.cancel_at_period_end,
+        },
+        features: featuresByCategory,
       },
-      features: featuresByCategory,
-    }, { status: 200 });
-
+      { status: 200 }
+    );
   } catch (error: any) {
-    console.error("❌ Error en /api/auth/me:", error);
+    console.error("Error en /api/auth/me:", error);
     return Response.json(
       { error: "Error al obtener información del usuario" },
       { status: 500 }

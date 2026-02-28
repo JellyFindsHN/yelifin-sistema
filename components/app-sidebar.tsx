@@ -19,6 +19,7 @@ import {
   Crown,
   Receipt,
   UserPlus,
+  Shield,          //NUEVO ICONO PARA ADMIN
 } from "lucide-react"
 import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
@@ -124,7 +125,6 @@ export function AppSidebar() {
   const pathname = usePathname()
   const router = useRouter()
   const { user, firebaseUser } = useAuth()
-
   const { isMobile, setOpenMobile } = useSidebar()
 
   const closeOnMobile = () => {
@@ -162,6 +162,9 @@ export function AppSidebar() {
       .toUpperCase()
       .slice(0, 2)
   }
+
+  //Detectar si el usuario es Admin por el plan
+  const isAdmin = user?.subscription?.plan?.name === "Admin"
 
   const renderNavItems = (items: any[]) =>
     items.map((item) => (
@@ -208,10 +211,7 @@ export function AppSidebar() {
     ))
 
   return (
-    <Sidebar
-      // Esto ayuda a que el sidebar quede "pegado" y con su propio scroll
-      className="sticky top-0 h-svh"
-    >
+    <Sidebar className="sticky top-0 h-svh">
       <SidebarHeader className="border-b border-sidebar-border px-4 py-4">
         <Link
           href="/dashboard"
@@ -235,19 +235,25 @@ export function AppSidebar() {
           </SidebarGroupContent>
         </SidebarGroup>
 
-        <SidebarGroup>
-          <SidebarGroupLabel>Análisis</SidebarGroupLabel>
-          <SidebarGroupContent>
-            <SidebarMenu>{renderNavItems(secondaryNav)}</SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
+        {/*Solo admin ve Análisis / Reportes */}
+        {isAdmin && (
+          <SidebarGroup>
+            <SidebarGroupLabel>Análisis</SidebarGroupLabel>
+            <SidebarGroupContent>
+              <SidebarMenu>{renderNavItems(secondaryNav)}</SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
+        )}
 
-        <SidebarGroup>
-          <SidebarGroupLabel>Sistema</SidebarGroupLabel>
-          <SidebarGroupContent>
-            <SidebarMenu>{renderNavItems(settingsNav)}</SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
+        {/*Solo admin ve Sistema / Configuración */}
+        {isAdmin && (
+          <SidebarGroup>
+            <SidebarGroupLabel>Sistema</SidebarGroupLabel>
+            <SidebarGroupContent>
+              <SidebarMenu>{renderNavItems(settingsNav)}</SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
+        )}
       </SidebarContent>
 
       <SidebarFooter className="border-t border-sidebar-border p-4">
@@ -280,11 +286,19 @@ export function AppSidebar() {
                 {firebaseUser?.email}
               </p>
 
-              {user?.subscription?.plan?.name && (
-                <span className="inline-flex items-center gap-1 mt-1.5 text-xs text-primary font-medium">
-                  <Crown className="h-3 w-3" />
-                  Plan {user.subscription.plan.name}
+              {/* Badge según si es Admin o plan normal */}
+              {isAdmin ? (
+                <span className="inline-flex items-center gap-1 mt-1.5 text-xs font-medium text-emerald-600">
+                  <Shield className="h-3 w-3" />
+                  Admin
                 </span>
+              ) : (
+                user?.subscription?.plan?.name && (
+                  <span className="inline-flex items-center gap-1 mt-1.5 text-xs text-primary font-medium">
+                    <Crown className="h-3 w-3" />
+                    Plan {user.subscription.plan.name}
+                  </span>
+                )
               )}
             </div>
 

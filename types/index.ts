@@ -21,8 +21,8 @@ export interface UserProfile {
   timezone: string;
   currency: string;
   locale: string;
+  onboarding_completed: boolean;
 }
-
 // ============================================
 // SUSCRIPCIONES Y PLANES
 // ============================================

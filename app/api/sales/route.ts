@@ -5,18 +5,10 @@ import { verifyAuth, createErrorResponse, isAuthSuccess } from "@/lib/auth";
 
 const sql = neon(process.env.DATABASE_URL!);
 
-function startOfMonth(d: Date) {
-  return new Date(d.getFullYear(), d.getMonth(), 1, 0, 0, 0, 0);
-}
-function endOfMonth(d: Date) {
-  return new Date(d.getFullYear(), d.getMonth() + 1, 0, 23, 59, 59, 999);
-}
-function startOfDay(d: Date) {
-  return new Date(d.getFullYear(), d.getMonth(), d.getDate(), 0, 0, 0, 0);
-}
-function endOfDay(d: Date) {
-  return new Date(d.getFullYear(), d.getMonth(), d.getDate(), 23, 59, 59, 999);
-}
+function startOfMonth(d: Date) { return new Date(d.getFullYear(), d.getMonth(), 1, 0, 0, 0, 0); }
+function endOfMonth(d: Date)   { return new Date(d.getFullYear(), d.getMonth() + 1, 0, 23, 59, 59, 999); }
+function startOfDay(d: Date)   { return new Date(d.getFullYear(), d.getMonth(), d.getDate(), 0, 0, 0, 0); }
+function endOfDay(d: Date)     { return new Date(d.getFullYear(), d.getMonth(), d.getDate(), 23, 59, 59, 999); }
 
 type Preset = "today" | "7d" | "this_month" | "last_month" | "all";
 
@@ -25,8 +17,7 @@ function resolveRange(params: URLSearchParams) {
   const from    = params.get("from");
   const to      = params.get("to");
   const payment = params.get("payment");
-
-  const now = new Date();
+  const now     = new Date();
   let fromDate: Date | null = null;
   let toDate:   Date | null = null;
 
@@ -36,7 +27,7 @@ function resolveRange(params: URLSearchParams) {
   } else {
     switch (preset) {
       case "today":
-        fromDate = startOfDay(now); toDate = endOfDay(now); break;
+        fromDate = startOfDay(now);  toDate = endOfDay(now);  break;
       case "7d": {
         const seven = new Date(now);
         seven.setDate(seven.getDate() - 6);
@@ -55,9 +46,9 @@ function resolveRange(params: URLSearchParams) {
 
   return {
     preset,
-    fromDateISO: fromDate ? fromDate.toISOString() : null,
-    toDateISO:   toDate   ? toDate.toISOString()   : null,
-    payment: payment && payment !== "all" ? payment : null,
+    fromDateISO: fromDate?.toISOString() ?? null,
+    toDateISO:   toDate?.toISOString()   ?? null,
+    payment:     payment && payment !== "all" ? payment : null,
   };
 }
 
@@ -85,6 +76,7 @@ export async function GET(request: NextRequest) {
         s.payment_method,
         s.account_id,
         a.name       AS account_name,
+        s.event_id,              -- ✅
         s.sold_at,
         s.notes,
         s.created_at,
@@ -127,7 +119,8 @@ export async function POST(request: NextRequest) {
       account_id,
       notes,
       sold_at,
-      supplies_used,   // [{ supply_id, quantity, unit_cost }]
+      supplies_used,
+      event_id,      // ✅ viene opcional
     } = body;
 
     // ── Validaciones básicas ───────────────────────────────────────────
@@ -152,7 +145,16 @@ export async function POST(request: NextRequest) {
     `;
     if (!account) return createErrorResponse("Cuenta no encontrada", 404);
 
-    // ── Pre-procesar items: costo FIFO + validar stock ─────────────────
+    // ── Verificar evento si viene ─────────────────────────────────────
+    const eventIdNum = event_id ? Number(event_id) : null;
+    if (eventIdNum) {
+      const [ev] = await sql`
+        SELECT id FROM events WHERE id = ${eventIdNum} AND user_id = ${userId}
+      `;
+      if (!ev) return createErrorResponse("Evento no encontrado", 404);
+    }
+
+    // ── Pre-procesar items FIFO ────────────────────────────────────────
     const processedItems: any[] = [];
 
     for (const item of items) {
@@ -166,13 +168,17 @@ export async function POST(request: NextRequest) {
       `;
 
       const totalAvailable = batches.reduce(
-        (acc: number, b: any) => acc + Number(b.qty_available), 0
+        (acc: number, b: any) => acc + Number(b.qty_available),
+        0
       );
 
       if (totalAvailable < item.quantity) {
-        const [product] = await sql`SELECT name FROM products WHERE id = ${item.product_id}`;
+        const [product] = await sql`
+          SELECT name FROM products WHERE id = ${item.product_id}
+        `;
         return createErrorResponse(
-          `Stock insuficiente para "${product?.name}". Disponible: ${totalAvailable}`, 400
+          `Stock insuficiente para "${product?.name}". Disponible: ${totalAvailable}`,
+          400
         );
       }
 
@@ -242,9 +248,11 @@ export async function POST(request: NextRequest) {
 
     // ── Número de venta ────────────────────────────────────────────────
     const [lastSale] = await sql`
-      SELECT sale_number FROM sales
+      SELECT sale_number
+      FROM sales
       WHERE user_id = ${userId}
-      ORDER BY created_at DESC LIMIT 1
+      ORDER BY created_at DESC
+      LIMIT 1
     `;
     const lastNum    = lastSale ? parseInt(String(lastSale.sale_number).replace(/\D/g, "")) || 0 : 0;
     const saleNumber = `VTA-${String(lastNum + 1).padStart(5, "0")}`;
@@ -255,24 +263,24 @@ export async function POST(request: NextRequest) {
     await sql`BEGIN`;
     try {
 
-      // 1. Crear la venta
+      // 1. Crear la venta (guardando event_id) ✅
       const [sale] = await sql`
         INSERT INTO sales (
           user_id, sale_number, customer_id,
           subtotal, discount, tax, shipping_cost, total,
-          payment_method, account_id,
+          payment_method, account_id, event_id,
           sold_at, notes
         ) VALUES (
           ${userId}, ${saleNumber}, ${customer_id ?? null},
           ${subtotal}, ${totalDiscount}, ${0}, ${shippingAmount}, ${grandTotal},
-          ${payment_method}, ${account_id},
+          ${payment_method}, ${account_id}, ${eventIdNum},
           ${occurredAt}::timestamptz, ${notes ?? null}
         )
         RETURNING id
       `;
       const saleId = sale.id as number;
 
-      // 2. Items + descuento FIFO de inventario
+      // 2. Items + FIFO de inventario
       for (const item of processedItems) {
         await sql`
           INSERT INTO sale_items (
@@ -336,7 +344,10 @@ export async function POST(request: NextRequest) {
         `;
       }
 
-      // 4. Transacción INCOME — venta + envío entran a la cuenta
+      // 4. Transacción INCOME — referencia a EVENT o SALE según corresponda ✅
+      const txRefType = eventIdNum ? "EVENT" : "SALE";
+      const txRefId   = eventIdNum ? eventIdNum : saleId;
+
       await sql`
         INSERT INTO transactions (
           user_id, type, account_id, amount,
@@ -348,26 +359,24 @@ export async function POST(request: NextRequest) {
             ? `Venta ${saleNumber} (incluye envío L ${shippingAmount.toFixed(2)})`
             : `Venta ${saleNumber}`
           },
-          'SALE', ${saleId}, ${occurredAt}::timestamptz
+          ${txRefType}, ${txRefId}, ${occurredAt}::timestamptz
         )
       `;
 
-      // 5. Balance: entra grandTotal completo (el costo de suministros ya
-      //    se descontó cuando se hizo la compra de suministros)
+      // 5. Actualizar balance de la cuenta
       await sql`
         UPDATE accounts
         SET balance = balance + ${grandTotal}
         WHERE id = ${account_id} AND user_id = ${userId}
       `;
 
-      // 6. Actualizar totales del cliente
+      // 6. Actualizar métricas de cliente
       if (customer_id) {
         await sql`
           UPDATE customers
-          SET
-            total_orders = total_orders + 1,
-            total_spent  = total_spent + ${grandTotal},
-            updated_at   = CURRENT_TIMESTAMP
+          SET total_orders = total_orders + 1,
+              total_spent  = total_spent + ${grandTotal},
+              updated_at   = CURRENT_TIMESTAMP
           WHERE id = ${customer_id} AND user_id = ${userId}
         `;
       }

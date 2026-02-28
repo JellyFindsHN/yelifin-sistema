@@ -6,116 +6,116 @@ import { useAuth } from "@/hooks/use-auth";
 export type EventStatus = "PLANNED" | "ACTIVE" | "COMPLETED";
 
 export interface Event {
-  id:             number;
-  name:           string;
-  location:       string | null;
-  starts_at:      string;
-  ends_at:        string;
-  fixed_cost:     number;
-  notes:          string | null;
-  status:         EventStatus;
-  total_sales:    number;
-  total_expenses: number;
-  net_profit:     number;
-  roi:            number;
-  created_at:     string;
+    id: number;
+    name: string;
+    location: string | null;
+    starts_at: string;
+    ends_at: string;
+    fixed_cost: number;
+    notes: string | null;
+    status: EventStatus;
+    total_sales: number;
+    total_expenses: number;
+    net_profit: number;
+    roi: number;
+    created_at: string;
 }
 
 export interface CreateEventData {
-  name:        string;
-  location?:   string;
-  starts_at:   string;
-  ends_at:     string;
-  fixed_cost?: number;
-  notes?:      string;
+    name: string;
+    location?: string;
+    starts_at: string;
+    ends_at: string;
+    fixed_cost?: number;
+    notes?: string;
 }
 
 export type UpdateEventData = Partial<CreateEventData>;
 
 // ── Fetcher ────────────────────────────────────────────────────────────
 async function authFetch(url: string, token: string, options?: RequestInit) {
-  const res = await fetch(url, {
-    ...options,
-    headers: {
-      Authorization:  `Bearer ${token}`,
-      "Content-Type": "application/json",
-      ...options?.headers,
-    },
-  });
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({}));
-    throw new Error(err.error || "Error en la solicitud");
-  }
-  return res.json();
+    const res = await fetch(url, {
+        ...options,
+        headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+            ...options?.headers,
+        },
+    });
+    if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || "Error en la solicitud");
+    }
+    return res.json();
 }
 
 // ── useEvents ──────────────────────────────────────────────────────────
 export function useEvents() {
-  const { firebaseUser } = useAuth();
+    const { firebaseUser } = useAuth();
 
-  const { data, isLoading, error, mutate } = useSWR(
-    firebaseUser ? ["events", firebaseUser.uid] : null,
-    async () => {
-      const token = await firebaseUser!.getIdToken();
-      return authFetch("/api/events", token);
-    },
-    { revalidateOnFocus: false }
-  );
+    const { data, isLoading, error, mutate } = useSWR(
+        firebaseUser ? ["events", firebaseUser.uid] : null,
+        async () => {
+            const token = await firebaseUser!.getIdToken();
+            return authFetch("/api/events", token);
+        },
+        { revalidateOnFocus: false }
+    );
 
-  return {
-    events:    (data?.data ?? []) as Event[],
-    isLoading,
-    error,
-    mutate,
-  };
+    return {
+        events: (data?.data ?? []) as Event[],
+        isLoading,
+        error,
+        mutate,
+    };
 }
 
 // ── useCreateEvent ─────────────────────────────────────────────────────
 export function useCreateEvent() {
-  const { firebaseUser } = useAuth();
-  const { mutate }       = useEvents();
+    const { firebaseUser } = useAuth();
+    const { mutate } = useEvents();
 
-  const createEvent = async (data: CreateEventData): Promise<Event> => {
-    const token  = await firebaseUser!.getIdToken();
-    const result = await authFetch("/api/events", token, {
-      method: "POST",
-      body:   JSON.stringify(data),
-    });
-    await mutate();
-    return result.data;
-  };
+    const createEvent = async (data: CreateEventData): Promise<Event> => {
+        const token = await firebaseUser!.getIdToken();
+        const result = await authFetch("/api/events", token, {
+            method: "POST",
+            body: JSON.stringify(data),
+        });
+        await mutate();
+        return result.data;
+    };
 
-  return { createEvent };
+    return { createEvent };
 }
 
 // ── useUpdateEvent ─────────────────────────────────────────────────────
 export function useUpdateEvent() {
-  const { firebaseUser } = useAuth();
-  const { mutate }       = useEvents();
+    const { firebaseUser } = useAuth();
+    const { mutate } = useEvents();
 
-  const updateEvent = async (id: number, data: UpdateEventData): Promise<Event> => {
-    const token  = await firebaseUser!.getIdToken();
-    const result = await authFetch(`/api/events/${id}`, token, {
-      method: "PUT",
-      body:   JSON.stringify(data),
-    });
-    await mutate();
-    return result.data;
-  };
+    const updateEvent = async (id: number, data: UpdateEventData): Promise<Event> => {
+        const token = await firebaseUser!.getIdToken();
+        const result = await authFetch(`/api/events/${id}`, token, {
+            method: "PUT",
+            body: JSON.stringify(data),
+        });
+        await mutate();
+        return result.data;
+    };
 
-  return { updateEvent };
+    return { updateEvent };
 }
 
 // ── useDeleteEvent ─────────────────────────────────────────────────────
 export function useDeleteEvent() {
-  const { firebaseUser } = useAuth();
-  const { mutate }       = useEvents();
+    const { firebaseUser } = useAuth();
+    const { mutate } = useEvents();
 
-  const deleteEvent = async (id: number): Promise<void> => {
-    const token = await firebaseUser!.getIdToken();
-    await authFetch(`/api/events/${id}`, token, { method: "DELETE" });
-    await mutate();
-  };
+    const deleteEvent = async (id: number): Promise<void> => {
+        const token = await firebaseUser!.getIdToken();
+        await authFetch(`/api/events/${id}`, token, { method: "DELETE" });
+        await mutate();
+    };
 
-  return { deleteEvent };
+    return { deleteEvent };
 }

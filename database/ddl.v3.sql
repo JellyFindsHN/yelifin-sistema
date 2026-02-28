@@ -472,3 +472,5 @@ DROP CONSTRAINT inventory_movements_reference_type_check;
 ALTER TABLE inventory_movements 
 ADD CONSTRAINT inventory_movements_reference_type_check 
 CHECK (reference_type IN ('PURCHASE', 'SALE', 'ADJUSTMENT', 'INITIAL'));
+
+ALTER TABLE sales ADD COLUMN IF NOT EXISTS event_id BIGINT REFERENCES events(id) ON DELETE SET NULL;
