@@ -17,16 +17,17 @@ export type CartItem = {
 
 
 export type CreateSaleInput = {
-  customer_id?:   number | null;
-  items:          { product_id: number; quantity: number; unit_price: number; discount: number }[];
-  discount?:      number;
-  shipping_cost?: number;                 
+  customer_id?: number | null;
+  items: { product_id: number; quantity: number; unit_price: number; discount: number }[];
+  discount?: number;
+  shipping_cost?: number;
   payment_method: string;
-  account_id:     number;
-  notes?:         string;
-  supplies_used?: {                    
+  account_id: number;
+  notes?: string;
+  tax_rate?: number;
+  supplies_used?: {
     supply_id: number;
-    quantity:  number;
+    quantity: number;
     unit_cost: number;
   }[];
 };
@@ -39,6 +40,8 @@ export type Sale = {
   subtotal: number;
   discount: number;
   shipping_cost: number;
+  tax: number;
+  tax_rate: number;
   total: number;
   payment_method: string;
   account_id: number;
@@ -60,7 +63,7 @@ export type SaleDetail = Sale & {
     unit_cost: number;
     line_total: number;
   }[];
-  supplies: {          
+  supplies: {
     id: number;
     supply_id: number;
     supply_name: string;

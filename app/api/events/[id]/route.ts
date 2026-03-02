@@ -1,116 +1,127 @@
-// app/api/events/route.ts
+// app/api/events/[id]/route.ts
 import { NextRequest } from "next/server";
 import { neon } from "@neondatabase/serverless";
 import { verifyAuth, createErrorResponse, isAuthSuccess } from "@/lib/auth";
 
 const sql = neon(process.env.DATABASE_URL!);
 
-// ── GET /api/events ────────────────────────────────────────────────────
-export async function GET(request: NextRequest) {
+export async function GET(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
   const auth = await verifyAuth(request);
   if (!isAuthSuccess(auth)) return createErrorResponse(auth.error, auth.status);
 
   try {
     const { userId } = auth.data;
+    const { id }     = await params;
+    const eventId    = Number(id);
 
-    const rows = await sql`
+    // ── Evento base ────────────────────────────────────────────────────
+    const [event] = await sql`
+      SELECT id, name, location, starts_at, ends_at, fixed_cost, notes, created_at
+      FROM events
+      WHERE id = ${eventId} AND user_id = ${userId}
+    `;
+    if (!event) return createErrorResponse("Evento no encontrado", 404);
+
+    // ── Ventas del evento ──────────────────────────────────────────────
+    // Profit TAX-INCLUSIVE: restamos el ISV de cada venta
+    const sales = await sql`
       SELECT
-        e.id,
-        e.name,
-        e.location,
-        e.starts_at,
-        e.ends_at,
-        e.fixed_cost,
-        e.notes,
-        e.created_at,
-        COALESCE(SUM(t.amount) FILTER (WHERE t.type = 'INCOME'),  0) AS total_sales,
-        COALESCE(SUM(t.amount) FILTER (WHERE t.type = 'EXPENSE'), 0) AS total_tx_expenses
-      FROM events e
-      LEFT JOIN transactions t
-        ON  t.reference_type = 'EVENT'
-        AND t.reference_id   = e.id
-        AND t.user_id        = e.user_id
-      WHERE e.user_id = ${userId}
-      GROUP BY e.id
-      ORDER BY e.starts_at DESC
+        s.id,
+        s.sale_number,
+        s.subtotal,
+        s.discount,
+        s.tax_rate,
+        s.tax,
+        s.shipping_cost,
+        s.total,
+        s.payment_method,
+        s.sold_at,
+        c.name AS customer_name,
+        COUNT(si.id)::int AS items_count,
+        COALESCE(SUM(si.line_total - (si.unit_cost * si.quantity)), 0)
+          - COALESCE(s.tax, 0) AS profit
+      FROM sales s
+      LEFT JOIN customers c   ON c.id = s.customer_id
+      LEFT JOIN sale_items si ON si.sale_id = s.id AND si.user_id = s.user_id
+      WHERE s.event_id = ${eventId} AND s.user_id = ${userId}
+      GROUP BY s.id, c.name
+      ORDER BY s.sold_at ASC
     `;
 
-    const now = new Date();
+    // ── Gastos del evento (transacciones EXPENSE) ──────────────────────
+    const expenses = await sql`
+      SELECT id, description, amount, occurred_at
+      FROM transactions
+      WHERE reference_type = 'EVENT'
+        AND reference_id   = ${eventId}
+        AND type           = 'EXPENSE'
+        AND user_id        = ${userId}
+      ORDER BY occurred_at ASC
+    `;
 
-    const events = rows.map((e) => {
-      const start         = new Date(e.starts_at);
-      const end           = new Date(e.ends_at);
-      const totalSales    = Number(e.total_sales);
-      const fixedCost     = Number(e.fixed_cost);
-      const txExpenses    = Number(e.total_tx_expenses);
-      const totalExpenses = fixedCost + txExpenses;
-      const netProfit     = totalSales - totalExpenses;
+    // ── Totales ────────────────────────────────────────────────────────
+    const totalSales    = sales.reduce((acc: number, s: any) => acc + Number(s.total), 0);
+    const totalTax      = sales.reduce((acc: number, s: any) => acc + Number(s.tax ?? 0), 0);
+    const totalProfit   = sales.reduce((acc: number, s: any) => acc + Number(s.profit), 0);
+    const fixedCost     = Number(event.fixed_cost ?? 0);
+    const txExpenses    = expenses.reduce((acc: number, e: any) => acc + Number(e.amount), 0);
+    const totalExpenses = fixedCost + txExpenses;
+    const netProfit     = totalProfit - totalExpenses;
 
-      const status =
-        now < start  ? "PLANNED" :
-        now <= end   ? "ACTIVE"  : "COMPLETED";
+    const now    = new Date();
+    const start  = new Date(event.starts_at);
+    const end    = new Date(event.ends_at);
+    const status = now < start ? "PLANNED" : now <= end ? "ACTIVE" : "COMPLETED";
 
-      return {
-        id:             e.id,
-        name:           e.name,
-        location:       e.location,
-        starts_at:      e.starts_at,
-        ends_at:        e.ends_at,
-        fixed_cost:     fixedCost,
-        notes:          e.notes,
-        created_at:     e.created_at,
+    return Response.json({
+      data: {
+        id:          event.id,
+        name:        event.name,
+        location:    event.location,
+        starts_at:   event.starts_at,
+        ends_at:     event.ends_at,
+        fixed_cost:  fixedCost,
+        notes:       event.notes,
+        created_at:  event.created_at,
         status,
-        total_sales:    totalSales,
-        total_expenses: totalExpenses,
-        net_profit:     netProfit,
-        roi:            totalExpenses > 0 ? (netProfit / totalExpenses) * 100 : 0,
-      };
+        summary: {
+          total_sales:    totalSales,     // lo que cobró el cliente (con ISV y envío)
+          total_tax:      totalTax,       // ISV extraído de las ventas
+          total_profit:   totalProfit,    // ganancia bruta de ventas (sin ISV, sin costos evento)
+          total_expenses: totalExpenses,  // costos fijos + gastos extra
+          net_profit:     netProfit,      // ganancia final
+          roi:            totalExpenses > 0 ? (netProfit / totalExpenses) * 100 : 0,
+          sales_count:    sales.length,
+        },
+        sales:    sales.map((s: any) => ({
+          id:             Number(s.id),
+          sale_number:    String(s.sale_number),
+          subtotal:       Number(s.subtotal),
+          discount:       Number(s.discount ?? 0),
+          tax_rate:       Number(s.tax_rate ?? 0),
+          tax:            Number(s.tax ?? 0),
+          shipping_cost:  Number(s.shipping_cost ?? 0),
+          total:          Number(s.total),
+          payment_method: s.payment_method ?? "OTHER",
+          sold_at:        String(s.sold_at),
+          customer_name:  s.customer_name ?? null,
+          items_count:    Number(s.items_count),
+          profit:         Number(s.profit),
+        })),
+        expenses: expenses.map((e: any) => ({
+          id:          Number(e.id),
+          description: String(e.description),
+          amount:      Number(e.amount),
+          occurred_at: String(e.occurred_at),
+        })),
+      },
     });
 
-    return Response.json({ data: events, total: events.length });
-
   } catch (error) {
-    console.error("❌ GET /api/events:", error);
-    return createErrorResponse("Error al obtener eventos", 500);
-  }
-}
-
-// ── POST /api/events ───────────────────────────────────────────────────
-export async function POST(request: NextRequest) {
-  const auth = await verifyAuth(request);
-  if (!isAuthSuccess(auth)) return createErrorResponse(auth.error, auth.status);
-
-  try {
-    const { userId } = auth.data;
-    const { name, location, starts_at, ends_at, fixed_cost = 0, notes } = await request.json();
-
-    if (!name?.trim())
-      return createErrorResponse("El nombre es requerido", 400);
-    if (!starts_at)
-      return createErrorResponse("La fecha inicio es requerida", 400);
-    if (!ends_at)
-      return createErrorResponse("La fecha fin es requerida", 400);
-    if (new Date(starts_at) > new Date(ends_at))
-      return createErrorResponse("La fecha inicio debe ser antes que la fecha fin", 400);
-
-    const [event] = await sql`
-      INSERT INTO events (user_id, name, location, starts_at, ends_at, fixed_cost, notes)
-      VALUES (
-        ${userId},
-        ${name.trim()},
-        ${location?.trim() || null},
-        ${starts_at},
-        ${ends_at},
-        ${fixed_cost},
-        ${notes?.trim() || null}
-      )
-      RETURNING *
-    `;
-
-    return Response.json({ data: event }, { status: 201 });
-
-  } catch (error) {
-    console.error("❌ POST /api/events:", error);
-    return createErrorResponse("Error al crear evento", 500);
+    console.error("❌ GET /api/events/[id]:", error);
+    return createErrorResponse("Error al obtener evento", 500);
   }
 }

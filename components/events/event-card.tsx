@@ -12,7 +12,7 @@ import {
 import {
   Calendar, MapPin, TrendingUp, TrendingDown,
   MoreVertical, Pencil, Trash2, ShoppingCart, Receipt,
-  CalendarClock, CalendarCheck, AlertCircle,
+  CalendarClock, CalendarCheck, AlertCircle, Eye,
 } from "lucide-react";
 import { Event, EventStatus } from "@/hooks/swr/use-events";
 import { useCurrency } from "@/hooks/swr/use-currency";
@@ -33,15 +33,16 @@ const STATUS_CONFIG: Record<EventStatus, {
 
 // ── Props ──────────────────────────────────────────────────────────────
 type Props = {
-  event:         Event;
-  onEdit:        (event: Event) => void;
-  onDelete:      (event: Event) => void;
-  onAddExpense:  (event: Event) => void;
+  event:        Event;
+  onView:       (event: Event) => void;
+  onEdit:       (event: Event) => void;
+  onDelete:     (event: Event) => void;
+  onAddExpense: (event: Event) => void;
 };
 
 // ── Component ──────────────────────────────────────────────────────────
-export function EventCard({ event, onEdit, onDelete, onAddExpense }: Props) {
-  const router    = useRouter();
+export function EventCard({ event, onView, onEdit, onDelete, onAddExpense }: Props) {
+  const router     = useRouter();
   const { format } = useCurrency();
 
   const cfg        = STATUS_CONFIG[event.status];
@@ -55,12 +56,17 @@ export function EventCard({ event, onEdit, onDelete, onAddExpense }: Props) {
 
       {/* ── Header ── */}
       <div className="p-4 pb-3 flex items-start justify-between gap-2">
-        <div className="min-w-0 flex-1">
+        <div
+          className="min-w-0 flex-1 cursor-pointer"
+          onClick={() => onView(event)}
+        >
           <Badge className={`text-[11px] gap-1 mb-1.5 ${cfg.badge}`} variant="outline">
             <StatusIcon className="h-3 w-3" />
             {cfg.label}
           </Badge>
-          <p className="font-semibold text-base truncate">{event.name}</p>
+          <p className="font-semibold text-base truncate hover:text-primary transition-colors">
+            {event.name}
+          </p>
 
           {event.location && (
             <p className="text-xs text-muted-foreground flex items-center gap-1 mt-0.5 truncate">
@@ -86,6 +92,9 @@ export function EventCard({ event, onEdit, onDelete, onAddExpense }: Props) {
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
+            <DropdownMenuItem onClick={() => onView(event)}>
+              <Eye className="h-4 w-4 mr-2" /> Ver detalle
+            </DropdownMenuItem>
             <DropdownMenuItem onClick={() => onEdit(event)}>
               <Pencil className="h-4 w-4 mr-2" /> Editar
             </DropdownMenuItem>
@@ -141,7 +150,16 @@ export function EventCard({ event, onEdit, onDelete, onAddExpense }: Props) {
       </div>
 
       {/* ── Action buttons ── */}
-      <div className="px-4 pb-4 grid grid-cols-2 gap-2 mt-auto">
+      <div className="px-4 pb-4 grid grid-cols-3 gap-2 mt-auto">
+        <Button
+          variant="outline"
+          size="sm"
+          className="gap-1.5"
+          onClick={() => onView(event)}
+        >
+          <Eye className="h-3.5 w-3.5" />
+          Detalle
+        </Button>
         <Button
           variant="outline"
           size="sm"
@@ -149,7 +167,7 @@ export function EventCard({ event, onEdit, onDelete, onAddExpense }: Props) {
           onClick={() => onAddExpense(event)}
         >
           <Receipt className="h-3.5 w-3.5" />
-          Agregar gasto
+          Gasto
         </Button>
         <Button
           size="sm"
@@ -157,7 +175,7 @@ export function EventCard({ event, onEdit, onDelete, onAddExpense }: Props) {
           onClick={() => router.push(`/sales/new?event_id=${event.id}`)}
         >
           <ShoppingCart className="h-3.5 w-3.5" />
-          Registrar venta
+          Venta
         </Button>
       </div>
 

@@ -474,3 +474,7 @@ ADD CONSTRAINT inventory_movements_reference_type_check
 CHECK (reference_type IN ('PURCHASE', 'SALE', 'ADJUSTMENT', 'INITIAL'));
 
 ALTER TABLE sales ADD COLUMN IF NOT EXISTS event_id BIGINT REFERENCES events(id) ON DELETE SET NULL;
+
+ALTER TABLE sales 
+  ADD COLUMN IF NOT EXISTS tax_rate NUMERIC(5,2) NOT NULL DEFAULT 0 
+  CHECK (tax_rate >= 0 AND tax_rate <= 100);

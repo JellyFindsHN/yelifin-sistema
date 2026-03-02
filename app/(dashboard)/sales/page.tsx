@@ -31,15 +31,15 @@ const formatDateOnly = (dateString: string) =>
     year: "numeric", month: "short", day: "numeric",
   });
 
-type Preset      = "today" | "7d" | "this_month" | "last_month" | "all";
+type Preset        = "today" | "7d" | "this_month" | "last_month" | "all";
 type PaymentFilter = "all" | "CASH" | "CARD" | "TRANSFER" | "MIXED" | "OTHER";
 
 const paymentConfig: Record<string, { label: string; icon: any }> = {
-  CASH:     { label: "Efectivo",       icon: Banknote },
-  CARD:     { label: "Tarjeta",        icon: CreditCard },
-  TRANSFER: { label: "Transferencia",  icon: ArrowLeftRight },
-  MIXED:    { label: "Mixto",          icon: HelpCircle },
-  OTHER:    { label: "Otro",           icon: HelpCircle },
+  CASH:     { label: "Efectivo",      icon: Banknote },
+  CARD:     { label: "Tarjeta",       icon: CreditCard },
+  TRANSFER: { label: "Transferencia", icon: ArrowLeftRight },
+  MIXED:    { label: "Mixto",         icon: HelpCircle },
+  OTHER:    { label: "Otro",          icon: HelpCircle },
 };
 
 const PRESET_LABELS: Record<Preset, string> = {
@@ -50,8 +50,11 @@ const PRESET_LABELS: Record<Preset, string> = {
   all:        "Todas",
 };
 
+// null | 0 → sin impuesto
+const getTaxRate = (v: any): number => Number(v) || 0;
+
 export default function SalesPage() {
-  const router = useRouter();
+  const router     = useRouter();
   const { format } = useCurrency();
 
   const [preset,        setPreset]        = useState<Preset>("this_month");
@@ -89,9 +92,9 @@ export default function SalesPage() {
     setPaymentFilter("all"); setAccountFilter("all"); setPreset("this_month");
   };
 
-  const onChangePreset  = (v: Preset)  => { setPreset(v); setDateFrom(""); setDateTo(""); };
-  const onManualFrom    = (v: string)  => { setDateFrom(v); setPreset("all"); };
-  const onManualTo      = (v: string)  => { setDateTo(v);   setPreset("all"); };
+  const onChangePreset = (v: Preset) => { setPreset(v); setDateFrom(""); setDateTo(""); };
+  const onManualFrom   = (v: string) => { setDateFrom(v); setPreset("all"); };
+  const onManualTo     = (v: string) => { setDateTo(v);   setPreset("all"); };
 
   const activePeriodLabel = dateFrom || dateTo
     ? [dateFrom && `Desde ${formatDateOnly(dateFrom)}`, dateTo && `Hasta ${formatDateOnly(dateTo)}`]
@@ -107,7 +110,6 @@ export default function SalesPage() {
           <h1 className="text-2xl font-bold tracking-tight">Ventas</h1>
           <p className="text-muted-foreground text-sm">{activePeriodLabel}</p>
         </div>
-        {/* Total de ventas junto al título — solo móvil */}
         <div className="text-right shrink-0 sm:hidden">
           {isLoading
             ? <Skeleton className="h-8 w-10 ml-auto" />
@@ -117,9 +119,8 @@ export default function SalesPage() {
         </div>
       </div>
 
-      {/* ── Stats — móvil: 2 cards / desktop: 3 cards ── */}
+      {/* ── Stats ── */}
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 sm:gap-3">
-        {/* Ventas — solo visible en desktop (en móvil va en el header) */}
         <Card className="hidden sm:block pt-1 pb-1">
           <CardContent className="pl-3.5 py-3">
             <div className="flex items-center justify-between mb-1">
@@ -230,6 +231,7 @@ export default function SalesPage() {
           filtered.map((sale) => {
             const payment = paymentConfig[sale.payment_method] ?? paymentConfig.OTHER;
             const PayIcon = payment.icon;
+            const taxRate = getTaxRate(sale.tax_rate);
             return (
               <Card
                 key={sale.id}
@@ -240,7 +242,14 @@ export default function SalesPage() {
                   {/* Top */}
                   <div className="flex items-start justify-between gap-2 mb-2.5">
                     <div className="min-w-0">
-                      <p className="font-mono text-sm font-semibold">{sale.sale_number}</p>
+                      <div className="flex items-center gap-1.5">
+                        <p className="font-mono text-sm font-semibold">{sale.sale_number}</p>
+                        {taxRate > 0 && (
+                          <Badge className="text-[10px] px-1.5 py-0 bg-amber-100 text-amber-700 border-amber-200" variant="outline">
+                            ISV {taxRate}%
+                          </Badge>
+                        )}
+                      </div>
                       <p className="text-xs text-muted-foreground truncate">
                         {sale.customer_name ?? "Anónimo"} · {formatDateOnly(sale.sold_at)}
                       </p>
@@ -285,6 +294,7 @@ export default function SalesPage() {
                 <TableHead>Productos</TableHead>
                 <TableHead>Método</TableHead>
                 <TableHead>Cuenta</TableHead>
+                <TableHead className="text-right">ISV</TableHead>
                 <TableHead className="text-right">Total</TableHead>
                 <TableHead className="text-right">Ganancia</TableHead>
               </TableRow>
@@ -293,14 +303,14 @@ export default function SalesPage() {
               {isLoading ? (
                 Array.from({ length: 5 }).map((_, i) => (
                   <TableRow key={i}>
-                    {Array.from({ length: 8 }).map((__, j) => (
+                    {Array.from({ length: 9 }).map((__, j) => (
                       <TableCell key={j}><Skeleton className="h-4 w-full" /></TableCell>
                     ))}
                   </TableRow>
                 ))
               ) : filtered.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={8} className="text-center py-12 text-muted-foreground">
+                  <TableCell colSpan={9} className="text-center py-12 text-muted-foreground">
                     Aún no se han registrado ventas en este período
                   </TableCell>
                 </TableRow>
@@ -308,6 +318,7 @@ export default function SalesPage() {
                 filtered.map((sale) => {
                   const payment = paymentConfig[sale.payment_method] ?? paymentConfig.OTHER;
                   const PayIcon = payment.icon;
+                  const taxRate = getTaxRate(sale.tax_rate);
                   return (
                     <TableRow
                       key={sale.id}
@@ -318,7 +329,9 @@ export default function SalesPage() {
                       <TableCell className="text-muted-foreground text-sm">{formatDateOnly(sale.sold_at)}</TableCell>
                       <TableCell>{sale.customer_name ?? <span className="text-muted-foreground">Anónimo</span>}</TableCell>
                       <TableCell>
-                        <Badge variant="secondary">{sale.items_count} {sale.items_count === 1 ? "producto" : "productos"}</Badge>
+                        <Badge variant="secondary">
+                          {sale.items_count} {sale.items_count === 1 ? "producto" : "productos"}
+                        </Badge>
                       </TableCell>
                       <TableCell>
                         <Badge variant="outline" className="gap-1">
@@ -326,7 +339,15 @@ export default function SalesPage() {
                           {payment.label}
                         </Badge>
                       </TableCell>
-                      <TableCell className="text-muted-foreground text-sm">{(sale as any).account_name ?? "—"}</TableCell>
+                      <TableCell className="text-muted-foreground text-sm">
+                        {(sale as any).account_name ?? "—"}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        {taxRate > 0
+                          ? <Badge className="bg-amber-100 text-amber-700 border-amber-200" variant="outline">{taxRate}%</Badge>
+                          : <span className="text-muted-foreground text-sm">—</span>
+                        }
+                      </TableCell>
                       <TableCell className="text-right font-medium">{format(Number(sale.total))}</TableCell>
                       <TableCell className="text-right text-green-600 font-medium">{format(Number(sale.net_profit))}</TableCell>
                     </TableRow>

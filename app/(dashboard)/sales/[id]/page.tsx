@@ -7,27 +7,25 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Separator } from "@/components/ui/separator";
+import { Badge } from "@/components/ui/badge";
 import {
   ArrowLeft, Receipt, User, Package,
   TrendingUp, Tag, Building2, Truck, FlaskConical,
 } from "lucide-react";
 import Image from "next/image";
 import { useSale } from "@/hooks/swr/use-sales";
+import { useCurrency } from "@/hooks/swr/use-currency";
 import Link from "next/link";
-
-const formatCurrency = (value: number) =>
-  new Intl.NumberFormat("es-HN", {
-    style: "currency",
-    currency: "HNL",
-    minimumFractionDigits: 2,
-  }).format(value);
 
 type Props = { params: Promise<{ id: string }> };
 
+const getTaxRate = (v: any): number => Number(v) || 0;
+
 export default function SaleDetailPage({ params }: Props) {
-  const { id } = use(params);
+  const { id }              = use(params);
   const { sale, isLoading } = useSale(Number(id));
-  const router = useRouter();
+  const router              = useRouter();
+  const { format }          = useCurrency();
 
   if (isLoading) return <SaleDetailSkeleton />;
 
@@ -42,12 +40,18 @@ export default function SaleDetailPage({ params }: Props) {
       </div>
     );
 
+  const taxRate        = getTaxRate(sale.tax_rate);
+  const taxAmount      = Number(sale.tax ?? 0);
   const productsCost   = sale.items.reduce((acc, i) => acc + Number(i.unit_cost) * i.quantity, 0);
   const suppliesCost   = (sale.supplies ?? []).reduce((acc, s) => acc + Number(s.line_total), 0);
   const shippingAmount = Number(sale.shipping_cost ?? 0);
-  const totalCost      = productsCost + suppliesCost;
-  const totalProfit    = Number(sale.total) - totalCost;  // total ya incluye envío
-  const margin         = Number(sale.total) > 0 ? (totalProfit / Number(sale.total)) * 100 : 0;
+
+  // TAX-INCLUSIVE: el ISV está dentro del precio, no es ganancia del vendedor
+  // Ganancia = (precio venta - descuento) - ISV extraído - costos
+  const taxableBase = Number(sale.subtotal) - Number(sale.discount ?? 0);
+  const totalProfit = taxableBase - taxAmount - productsCost - suppliesCost;
+  const netBase     = taxableBase - taxAmount; // lo que realmente queda después del ISV
+  const margin      = netBase > 0 ? (totalProfit / netBase) * 100 : 0;
 
   return (
     <div className="space-y-6 max-w-3xl mx-auto">
@@ -58,9 +62,16 @@ export default function SaleDetailPage({ params }: Props) {
           <ArrowLeft className="h-4 w-4" />
         </Button>
         <div className="flex-1 min-w-0">
-          <h1 className="text-2xl font-bold tracking-tight font-mono">
-            {sale.sale_number}
-          </h1>
+          <div className="flex items-center gap-2">
+            <h1 className="text-2xl font-bold tracking-tight font-mono">
+              {sale.sale_number}
+            </h1>
+            {taxRate > 0 && (
+              <Badge className="bg-amber-100 text-amber-700 border-amber-200" variant="outline">
+                ISV {taxRate}% incluido
+              </Badge>
+            )}
+          </div>
           <p className="text-muted-foreground text-sm">
             {new Date(sale.sold_at).toLocaleDateString("es-HN", {
               day: "numeric", month: "short", year: "numeric",
@@ -106,11 +117,16 @@ export default function SaleDetailPage({ params }: Props) {
           <CardContent className="pl-3.5 text-center">
             <p className="text-xs text-muted-foreground">Total cobrado</p>
             <p className="text-lg md:text-xl font-bold mt-0.5">
-              {formatCurrency(Number(sale.total))}
+              {format(Number(sale.total))}
             </p>
             {shippingAmount > 0 && (
               <p className="text-xs text-muted-foreground mt-0.5">
-                incl. envío {formatCurrency(shippingAmount)}
+                incl. envío {format(shippingAmount)}
+              </p>
+            )}
+            {taxRate > 0 && (
+              <p className="text-xs text-amber-600 mt-0.5">
+                incl. ISV {format(taxAmount)}
               </p>
             )}
           </CardContent>
@@ -120,7 +136,7 @@ export default function SaleDetailPage({ params }: Props) {
           <CardContent className="pl-3.5 text-center">
             <p className="text-xs text-muted-foreground">Ganancia neta</p>
             <p className="text-lg md:text-xl font-bold mt-0.5 text-green-600">
-              {formatCurrency(totalProfit)}
+              {format(totalProfit)}
             </p>
             <p className="text-xs text-green-600">
               {margin.toFixed(1)}% margen
@@ -131,7 +147,7 @@ export default function SaleDetailPage({ params }: Props) {
 
       {/* Productos vendidos */}
       <Card>
-        <CardHeader >
+        <CardHeader>
           <CardTitle className="text-base flex items-center gap-2">
             <Package className="h-4 w-4" />
             Productos vendidos
@@ -156,13 +172,13 @@ export default function SaleDetailPage({ params }: Props) {
                 <div className="flex-1 min-w-0">
                   <p className="font-medium truncate">{item.product_name}</p>
                   <div className="flex flex-wrap gap-x-3 gap-y-0.5 mt-1 text-xs text-muted-foreground">
-                    <span>{item.quantity} × {formatCurrency(Number(item.unit_price))}</span>
-                    <span>Costo: {formatCurrency(Number(item.unit_cost))}/u</span>
+                    <span>{item.quantity} × {format(Number(item.unit_price))}</span>
+                    <span>Costo: {format(Number(item.unit_cost))}/u</span>
                   </div>
                 </div>
                 <div className="text-right shrink-0">
-                  <p className="font-bold text-sm">{formatCurrency(Number(item.line_total))}</p>
-                  <p className="text-xs text-green-600 font-medium">+{formatCurrency(itemProfit)}</p>
+                  <p className="font-bold text-sm">{format(Number(item.line_total))}</p>
+                  <p className="text-xs text-green-600 font-medium">+{format(itemProfit)}</p>
                   <p className="text-xs text-muted-foreground">{itemMargin.toFixed(1)}%</p>
                 </div>
               </div>
@@ -186,18 +202,18 @@ export default function SaleDetailPage({ params }: Props) {
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-medium truncate">{s.supply_name}</p>
                   <p className="text-xs text-muted-foreground">
-                    {s.quantity} × {formatCurrency(Number(s.unit_cost))}
+                    {s.quantity} × {format(Number(s.unit_cost))}
                   </p>
                 </div>
                 <p className="text-sm font-semibold text-orange-700 dark:text-orange-400 shrink-0">
-                  -{formatCurrency(Number(s.line_total))}
+                  -{format(Number(s.line_total))}
                 </p>
               </div>
             ))}
             <div className="flex justify-between items-center pt-1 border-t border-orange-200/60">
               <span className="text-xs text-orange-600">Total suministros</span>
               <span className="text-sm font-bold text-orange-700 dark:text-orange-400">
-                -{formatCurrency(suppliesCost)}
+                -{format(suppliesCost)}
               </span>
             </div>
           </CardContent>
@@ -216,13 +232,13 @@ export default function SaleDetailPage({ params }: Props) {
 
           <div className="flex justify-between">
             <span className="text-muted-foreground">Subtotal productos</span>
-            <span>{formatCurrency(Number(sale.subtotal))}</span>
+            <span>{format(Number(sale.subtotal))}</span>
           </div>
 
           {Number(sale.discount) > 0 && (
             <div className="flex justify-between text-green-600">
               <span>Descuento</span>
-              <span>-{formatCurrency(Number(sale.discount))}</span>
+              <span>-{format(Number(sale.discount))}</span>
             </div>
           )}
 
@@ -232,7 +248,7 @@ export default function SaleDetailPage({ params }: Props) {
                 <Truck className="h-3.5 w-3.5" />
                 Envío
               </span>
-              <span>+{formatCurrency(shippingAmount)}</span>
+              <span>+{format(shippingAmount)}</span>
             </div>
           )}
 
@@ -240,14 +256,22 @@ export default function SaleDetailPage({ params }: Props) {
 
           <div className="flex justify-between font-bold">
             <span>Total cobrado</span>
-            <span>{formatCurrency(Number(sale.total))}</span>
+            <span>{format(Number(sale.total))}</span>
           </div>
+
+          {/* ISV como nota informativa — está dentro del precio, no lo suma */}
+          {taxRate > 0 && (
+            <div className="flex justify-between text-amber-600 text-xs">
+              <span>ISV {taxRate}% incluido en el precio</span>
+              <span>-{format(taxAmount)}</span>
+            </div>
+          )}
 
           <Separator />
 
           <div className="flex justify-between text-muted-foreground">
             <span>Costo productos</span>
-            <span>-{formatCurrency(productsCost)}</span>
+            <span>-{format(productsCost)}</span>
           </div>
 
           {suppliesCost > 0 && (
@@ -256,7 +280,7 @@ export default function SaleDetailPage({ params }: Props) {
                 <FlaskConical className="h-3.5 w-3.5" />
                 Costo suministros
               </span>
-              <span>-{formatCurrency(suppliesCost)}</span>
+              <span>-{format(suppliesCost)}</span>
             </div>
           )}
 
@@ -267,7 +291,7 @@ export default function SaleDetailPage({ params }: Props) {
               <TrendingUp className="h-4 w-4" />
               Ganancia neta
             </span>
-            <span>{formatCurrency(totalProfit)}</span>
+            <span>{format(totalProfit)}</span>
           </div>
 
         </CardContent>

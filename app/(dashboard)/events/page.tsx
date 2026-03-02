@@ -2,6 +2,7 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -17,17 +18,18 @@ import { AddExpenseDialog }    from "@/components/events/add-expense-dialog";
 import { Fab }                 from "@/components/ui/fab";
 
 export default function EventsPage() {
+  const router                        = useRouter();
   const { events, isLoading, mutate } = useEvents();
   const { format }                    = useCurrency();
 
-  const [createOpen,  setCreateOpen]  = useState(false);
-  const [editEvent,   setEditEvent]   = useState<Event | null>(null);
-  const [deleteEvent, setDeleteEvent] = useState<Event | null>(null);
+  const [createOpen,   setCreateOpen]   = useState(false);
+  const [editEvent,    setEditEvent]    = useState<Event | null>(null);
+  const [deleteEvent,  setDeleteEvent]  = useState<Event | null>(null);
   const [expenseEvent, setExpenseEvent] = useState<Event | null>(null);
 
   // ── Stats globales ──────────────────────────────────────────────────
-  const totalSales  = events.reduce((s, e) => s + e.total_sales,    0);
-  const totalProfit = events.reduce((s, e) => s + e.net_profit,     0);
+  const totalSales  = events.reduce((s, e) => s + e.total_sales, 0);
+  const totalProfit = events.reduce((s, e) => s + e.net_profit,  0);
   const avgRoi      = events.length
     ? events.reduce((s, e) => s + e.roi, 0) / events.length
     : 0;
@@ -50,10 +52,10 @@ export default function EventsPage() {
       {/* Stats */}
       <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
         {[
-          { title: "Eventos",       value: String(events.length), sub: `${activeCount} activos`,      icon: Calendar,   cls: "" },
-          { title: "Ventas",        value: format(totalSales),    sub: "total acumulado",              icon: DollarSign, cls: "" },
-          { title: "Ganancia neta", value: format(totalProfit),   sub: "ingresos − gastos",            icon: TrendingUp, cls: totalProfit >= 0 ? "text-green-600" : "text-destructive" },
-          { title: "ROI promedio",  value: `${avgRoi.toFixed(1)}%`, sub: "retorno sobre inversión",  icon: BarChart3,  cls: avgRoi >= 0 ? "text-green-600" : "text-destructive" },
+          { title: "Eventos",       value: String(events.length),    sub: `${activeCount} activos`,    icon: Calendar,   cls: "" },
+          { title: "Ventas",        value: format(totalSales),       sub: "total acumulado",           icon: DollarSign, cls: "" },
+          { title: "Ganancia neta", value: format(totalProfit),      sub: "ingresos − gastos",         icon: TrendingUp, cls: totalProfit >= 0 ? "text-green-600" : "text-destructive" },
+          { title: "ROI promedio",  value: `${avgRoi.toFixed(1)}%`,  sub: "retorno sobre inversión",   icon: BarChart3,  cls: avgRoi >= 0 ? "text-green-600" : "text-destructive" },
         ].map((s) => (
           <Card key={s.title}>
             <CardContent className="pl-3 py-3">
@@ -99,6 +101,7 @@ export default function EventsPage() {
             <EventCard
               key={event.id}
               event={event}
+              onView={(e) => router.push(`/events/${e.id}`)}
               onEdit={setEditEvent}
               onDelete={setDeleteEvent}
               onAddExpense={setExpenseEvent}

@@ -40,7 +40,7 @@ export function PosProductGrid({ products, cart, onAdd, search }: Props) {
         return (
           <Card
             key={product.id}
-            className="overflow-hidden cursor-pointer hover:shadow-md active:scale-[0.98] transition-all"
+            className="overflow-hidden cursor-pointer hover:shadow-md active:scale-[0.98] transition-all pb-0 pt-2"
             onClick={() => onAdd(product)}
           >
             <div className="relative aspect-square bg-muted flex items-center justify-center overflow-hidden">
@@ -65,7 +65,7 @@ export function PosProductGrid({ products, cart, onAdd, search }: Props) {
                 </Badge>
               </div>
             </div>
-            <CardContent className="p-2.5">
+            <CardContent className="p-2.5 pt-0">
               <p className="text-xs font-medium truncate leading-tight">
                 {product.name}
               </p>

@@ -9,39 +9,36 @@ import { Input } from "@/components/ui/input";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
-import { Loader2, User, Wallet, CreditCard, FlaskConical, Truck } from "lucide-react";
-
-const formatCurrency = (v: number) =>
-  new Intl.NumberFormat("es-HN", {
-    style: "currency",
-    currency: "HNL",
-    minimumFractionDigits: 0,
-  }).format(v);
+import { Loader2, User, Wallet, CreditCard, FlaskConical, Truck, ArrowLeft } from "lucide-react";
+import { useCurrency } from "@/hooks/swr/use-currency";
 
 type Props = {
-  customers: any[];
-  accounts: any[];
-  hasSupplies: boolean;
-  customerId: number | null;
-  accountId: number | null;
-  notes: string;
-  grandTotal: number;
-  shippingCost: number;
-  isCreating: boolean;
-  onCustomerChange: (id: number | null) => void;
-  onAccountChange: (id: number) => void;
-  onNotesChange: (v: string) => void;
+  customers:            any[];
+  accounts:             any[];
+  hasSupplies:          boolean;
+  customerId:           number | null;
+  accountId:            number | null;
+  notes:                string;
+  grandTotal:           number;
+  shippingCost:         number;
+  isCreating:           boolean;
+  onCustomerChange:     (id: number | null) => void;
+  onAccountChange:      (id: number) => void;
+  onNotesChange:        (v: string) => void;
   onShippingCostChange: (v: number) => void;
-  onCheckout: () => void;
-  onOpenSupplies: () => void;
+  onCheckout:           () => void;
+  onOpenSupplies:       () => void;
+  onBack?:              () => void;
 };
 
 export function SaleOptionsPanel({
   customers, accounts, hasSupplies,
   customerId, accountId, notes, grandTotal, shippingCost, isCreating,
   onCustomerChange, onAccountChange, onNotesChange,
-  onShippingCostChange, onCheckout, onOpenSupplies,
+  onShippingCostChange, onCheckout, onOpenSupplies, onBack,
 }: Props) {
+  const { format, symbol } = useCurrency();
+
   return (
     <Card>
       <CardContent className="pl-4 space-y-3 pt-4">
@@ -97,19 +94,24 @@ export function SaleOptionsPanel({
             Costo de envío
             <span className="text-muted-foreground ml-1">(opcional)</span>
           </Label>
-          <Input
-            type="number"
-            value={shippingCost === 0 ? "" : shippingCost}
-            onChange={(e) => {
-              const raw = e.target.value.replace(/^0+(\d)/, "$1");
-              const n = parseFloat(raw);
-              onShippingCostChange(isNaN(n) ? 0 : Math.max(0, n));
-            }}
-            placeholder="0"
-            min="0"
-            step="0.01"
-            className="h-8 text-sm"
-          />
+          <div className="relative">
+            <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-xs text-muted-foreground font-medium">
+              {symbol}
+            </span>
+            <Input
+              type="number"
+              value={shippingCost === 0 ? "" : shippingCost}
+              onChange={(e) => {
+                const raw = e.target.value.replace(/^0+(\d)/, "$1");
+                const n = parseFloat(raw);
+                onShippingCostChange(isNaN(n) ? 0 : Math.max(0, n));
+              }}
+              placeholder="0"
+              min="0"
+              step="0.01"
+              className="h-8 text-sm pl-7"
+            />
+          </div>
         </div>
 
         {/* Notas */}
@@ -140,13 +142,33 @@ export function SaleOptionsPanel({
           </Button>
         )}
 
-        <Button className="w-full" onClick={onCheckout} disabled={isCreating}>
-          {isCreating ? (
-            <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Procesando...</>
-          ) : (
-            `Confirmar venta · ${formatCurrency(grandTotal)}`
+        {/* Botones de acción */}
+        <div className="flex gap-2 pt-1">
+          {onBack && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={onBack}
+              disabled={isCreating}
+              className="gap-1.5 shrink-0"
+              type="button"
+            >
+              <ArrowLeft className="h-3.5 w-3.5" />
+              Carrito
+            </Button>
           )}
-        </Button>
+          <Button
+            className="flex-1"
+            onClick={onCheckout}
+            disabled={isCreating}
+          >
+            {isCreating
+              ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Procesando...</>
+              : `Confirmar venta · ${format(grandTotal)}`
+            }
+          </Button>
+        </div>
+
       </CardContent>
     </Card>
   );

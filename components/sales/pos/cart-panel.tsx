@@ -9,33 +9,33 @@ import { ShoppingCart, FlaskConical, Minus, Plus, X } from "lucide-react";
 import { CartItem } from "@/hooks/swr/use-sales";
 import { CartItemRow } from "./cart-item-row";
 import { SupplyUsed } from "./supplies-used-modal";
-
-const formatCurrency = (v: number) =>
-  new Intl.NumberFormat("es-HN", {
-    style: "currency",
-    currency: "HNL",
-    minimumFractionDigits: 0,
-  }).format(v);
+import { useCurrency } from "@/hooks/swr/use-currency";
 
 export type DiscountType = "none" | "global" | "per_item";
 
+// Solo 0, 15 y 18 — tax-inclusive
+const TAX_PRESETS = [0, 15, 18];
+
 type Props = {
-  cart: CartItem[];
-  discountType: DiscountType;
-  globalDiscount: number;
-  subtotal: number;
-  totalDiscount: number;
-  total: number;
-  shippingCost: number;
-  suppliesUsed: SupplyUsed[];
-  onQuantity: (id: number, delta: number) => void;
-  onRemove: (id: number) => void;
-  onPriceChange: (id: number, value: number) => void;
-  onDiscountChange: (id: number, value: number) => void;
-  onDiscountTypeChange: (type: DiscountType) => void;
+  cart:                   CartItem[];
+  discountType:           DiscountType;
+  globalDiscount:         number;
+  subtotal:               number;
+  totalDiscount:          number;
+  total:                  number;
+  shippingCost:           number;
+  taxRate:                number;
+  taxAmount:              number;
+  suppliesUsed:           SupplyUsed[];
+  onQuantity:             (id: number, delta: number) => void;
+  onRemove:               (id: number) => void;
+  onPriceChange:          (id: number, value: number) => void;
+  onDiscountChange:       (id: number, value: number) => void;
+  onDiscountTypeChange:   (type: DiscountType) => void;
   onGlobalDiscountChange: (value: number) => void;
-  onSupplyQtyChange: (id: number, qty: number) => void;
-  onSupplyRemove: (id: number) => void;
+  onTaxRateChange:        (value: number) => void;
+  onSupplyQtyChange:      (id: number, qty: number) => void;
+  onSupplyRemove:         (id: number) => void;
 };
 
 const cleanPercentInput = (raw: string): number => {
@@ -47,14 +47,17 @@ const cleanPercentInput = (raw: string): number => {
 
 export function CartPanel({
   cart, discountType, globalDiscount, subtotal, totalDiscount, total,
-  shippingCost, suppliesUsed,
+  shippingCost, taxRate, taxAmount, suppliesUsed,
   onQuantity, onRemove, onPriceChange, onDiscountChange,
-  onDiscountTypeChange, onGlobalDiscountChange,
+  onDiscountTypeChange, onGlobalDiscountChange, onTaxRateChange,
   onSupplyQtyChange, onSupplyRemove,
 }: Props) {
+  const { format } = useCurrency();
+
   const globalDiscountAmount = subtotal * (globalDiscount / 100);
-  const suppliesCost = suppliesUsed.reduce((acc, s) => acc + s.quantity * s.unit_cost, 0);
-  const grandTotal = total + shippingCost;
+  const suppliesCost         = suppliesUsed.reduce((acc, s) => acc + s.quantity * s.unit_cost, 0);
+  // TAX-INCLUSIVE: el total no cambia con el ISV, solo se agrega el envío
+  const grandTotal           = total + shippingCost;
 
   return (
     <Card>
@@ -126,10 +129,38 @@ export function CartPanel({
                 </div>
                 {globalDiscount > 0 && (
                   <p className="text-xs text-green-600 text-right">
-                    -{formatCurrency(globalDiscountAmount)}
+                    -{format(globalDiscountAmount)}
                   </p>
                 )}
               </div>
+            )}
+          </div>
+        )}
+
+        {/* ISV — solo visible si hay items */}
+        {cart.length > 0 && (
+          <div className="space-y-1.5">
+            <p className="text-xs text-muted-foreground font-medium">ISV (incluido en el precio)</p>
+            <div className="flex items-center gap-1.5">
+              {TAX_PRESETS.map((p) => (
+                <button
+                  key={p}
+                  type="button"
+                  onClick={() => onTaxRateChange(p)}
+                  className={`flex-1 py-1.5 rounded-lg text-xs font-semibold border transition-colors cursor-pointer ${
+                    taxRate === p
+                      ? "bg-primary text-primary-foreground border-primary"
+                      : "text-muted-foreground border-border hover:bg-muted"
+                  }`}
+                >
+                  {p === 0 ? "Sin ISV" : `${p}%`}
+                </button>
+              ))}
+            </div>
+            {taxAmount > 0 && (
+              <p className="text-xs text-amber-600 text-right">
+                ISV incluido: <span className="font-medium">{format(taxAmount)}</span>
+              </p>
             )}
           </div>
         )}
@@ -150,7 +181,6 @@ export function CartPanel({
               {suppliesUsed.map((s) => (
                 <div key={s.supply_id} className="flex items-center gap-1.5 bg-background rounded-lg px-2 py-1 border text-xs">
                   <span className="flex-1 truncate font-medium">{s.name}</span>
-                  {/* Controles */}
                   <button
                     className="h-5 w-5 rounded flex items-center justify-center hover:bg-muted transition-colors cursor-pointer shrink-0"
                     onClick={() => onSupplyQtyChange(s.supply_id, Math.max(0.5, s.quantity - 0.5))}
@@ -179,7 +209,7 @@ export function CartPanel({
                     <Plus className="h-2.5 w-2.5" />
                   </button>
                   <span className="text-[10px] text-muted-foreground w-10 text-right shrink-0">
-                    {formatCurrency(s.quantity * s.unit_cost)}
+                    {format(s.quantity * s.unit_cost)}
                   </span>
                   <button
                     className="h-5 w-5 rounded flex items-center justify-center text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors cursor-pointer shrink-0"
@@ -193,7 +223,7 @@ export function CartPanel({
             <div className="flex justify-between items-center pt-0.5 border-t border-orange-200/60">
               <span className="text-[10px] text-orange-600">Costo suministros</span>
               <span className="text-[10px] font-bold text-orange-700">
-                -{formatCurrency(suppliesCost)}
+                -{format(suppliesCost)}
               </span>
             </div>
           </div>
@@ -204,7 +234,7 @@ export function CartPanel({
           <div className="space-y-1.5 pt-1 border-t text-sm">
             <div className="flex justify-between text-muted-foreground">
               <span>Subtotal</span>
-              <span>{formatCurrency(subtotal)}</span>
+              <span>{format(subtotal)}</span>
             </div>
             {totalDiscount > 0 && (
               <div className="flex justify-between text-green-600">
@@ -214,22 +244,29 @@ export function CartPanel({
                     <span className="ml-1 text-xs opacity-70">({globalDiscount}%)</span>
                   )}
                 </span>
-                <span>-{formatCurrency(totalDiscount)}</span>
+                <span>-{format(totalDiscount)}</span>
               </div>
             )}
             {shippingCost > 0 && (
               <div className="flex justify-between text-muted-foreground">
                 <span>Envío</span>
-                <span>+{formatCurrency(shippingCost)}</span>
+                <span>+{format(shippingCost)}</span>
               </div>
             )}
             <Separator />
             <div className="flex justify-between font-bold text-base">
               <span>Total</span>
-              <span>{formatCurrency(grandTotal)}</span>
+              <span>{format(grandTotal)}</span>
             </div>
+            {/* ISV desglosado debajo del total como nota informativa */}
+            {taxAmount > 0 && (
+              <p className="text-[11px] text-amber-600 text-right">
+                Incluye ISV {taxRate}%: {format(taxAmount)}
+              </p>
+            )}
           </div>
         )}
+
       </CardContent>
     </Card>
   );

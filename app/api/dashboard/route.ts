@@ -17,10 +17,9 @@ export async function GET(request: NextRequest) {
     const paramMonth = searchParams.get("month");
     const paramYear  = searchParams.get("year");
 
-    // Si no hay filtros = mes actual. Si hay año pero no mes = todo el año.
-    const filterAll  = !paramMonth && !paramYear;
-    const filterYear = paramYear  ? Number(paramYear)  : now.getFullYear();
-    const filterMonth= paramMonth ? Number(paramMonth) : now.getMonth() + 1;
+    const filterAll   = !paramMonth && !paramYear;
+    const filterYear  = paramYear  ? Number(paramYear)  : now.getFullYear();
+    const filterMonth = paramMonth ? Number(paramMonth) : now.getMonth() + 1;
 
     let startISO: string;
     let endISO:   string;
@@ -28,19 +27,16 @@ export async function GET(request: NextRequest) {
     let prevEndISO:   string;
 
     if (filterAll) {
-      // Sin filtro → mes actual
       startISO     = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
       endISO       = new Date(now.getFullYear(), now.getMonth() + 1, 1).toISOString();
       prevStartISO = new Date(now.getFullYear(), now.getMonth() - 1, 1).toISOString();
       prevEndISO   = startISO;
     } else if (paramYear && !paramMonth) {
-      // Solo año → todo el año vs año anterior
       startISO     = new Date(filterYear, 0, 1).toISOString();
       endISO       = new Date(filterYear + 1, 0, 1).toISOString();
       prevStartISO = new Date(filterYear - 1, 0, 1).toISOString();
       prevEndISO   = startISO;
     } else {
-      // Mes + año específico
       startISO     = new Date(filterYear, filterMonth - 1, 1).toISOString();
       endISO       = new Date(filterYear, filterMonth, 1).toISOString();
       prevStartISO = new Date(filterYear, filterMonth - 2, 1).toISOString();
@@ -61,15 +57,22 @@ export async function GET(request: NextRequest) {
       WHERE user_id = ${userId} AND sold_at >= ${startISO} AND sold_at < ${endISO}
     `;
 
-    // ── Profit ─────────────────────────────────────────────────────────
+    // ── Profit (TAX-INCLUSIVE: se resta el ISV de la venta) ────────────
+    // profit = (line_total - costo) - ISV
+    // El ISV está dentro del precio, no es ganancia del vendedor.
+    // COALESCE(s.tax, 0) ya fue calculado server-side al crear la venta.
     const [profitThis] = await sql`
-      SELECT COALESCE(SUM(si.line_total - (si.unit_cost * si.quantity)), 0) AS profit
-      FROM sale_items si JOIN sales s ON s.id = si.sale_id
+      SELECT COALESCE(SUM(si.line_total - (si.unit_cost * si.quantity)), 0)
+           - COALESCE(SUM(s.tax), 0) AS profit
+      FROM sale_items si
+      JOIN sales s ON s.id = si.sale_id
       WHERE si.user_id = ${userId} AND s.sold_at >= ${startISO} AND s.sold_at < ${endISO}
     `;
     const [profitLast] = await sql`
-      SELECT COALESCE(SUM(si.line_total - (si.unit_cost * si.quantity)), 0) AS profit
-      FROM sale_items si JOIN sales s ON s.id = si.sale_id
+      SELECT COALESCE(SUM(si.line_total - (si.unit_cost * si.quantity)), 0)
+           - COALESCE(SUM(s.tax), 0) AS profit
+      FROM sale_items si
+      JOIN sales s ON s.id = si.sale_id
       WHERE si.user_id = ${userId} AND s.sold_at >= ${prevStartISO} AND s.sold_at < ${prevEndISO}
     `;
 
@@ -105,12 +108,13 @@ export async function GET(request: NextRequest) {
       FROM accounts WHERE user_id = ${userId} AND is_active = TRUE
     `;
 
-    // ── Sales chart (días del período) ─────────────────────────────────
+    // ── Sales chart ────────────────────────────────────────────────────
     const salesChart = await sql`
       SELECT
         DATE(s.sold_at)::text AS date,
         COALESCE(SUM(s.total), 0) AS revenue,
-        COALESCE(SUM(si.line_total - (si.unit_cost * si.quantity)), 0) AS profit
+        COALESCE(SUM(si.line_total - (si.unit_cost * si.quantity)), 0)
+          - COALESCE(SUM(s.tax), 0) AS profit
       FROM sales s
       LEFT JOIN sale_items si ON si.sale_id = s.id AND si.user_id = s.user_id
       WHERE s.user_id = ${userId} AND s.sold_at >= ${startISO} AND s.sold_at < ${endISO}
@@ -130,12 +134,17 @@ export async function GET(request: NextRequest) {
     `;
 
     // ── Top 5 productos ────────────────────────────────────────────────
+    // Profit por producto: proporcional al ISV de la venta
+    // ISV se distribuye en proporción al line_total de cada item
     const topProducts = await sql`
       SELECT
         p.id, p.name, p.image_url,
-        SUM(si.quantity)::int                                          AS units_sold,
-        COALESCE(SUM(si.line_total), 0)                               AS revenue,
-        COALESCE(SUM(si.line_total - (si.unit_cost * si.quantity)), 0) AS profit
+        SUM(si.quantity)::int AS units_sold,
+        COALESCE(SUM(si.line_total), 0) AS revenue,
+        COALESCE(SUM(
+          si.line_total - (si.unit_cost * si.quantity)
+          - (COALESCE(s.tax, 0) * si.line_total / NULLIF(s.subtotal - s.discount, 0))
+        ), 0) AS profit
       FROM sale_items si
       JOIN sales s ON s.id = si.sale_id AND s.user_id = si.user_id
       JOIN products p ON p.id = si.product_id
@@ -145,13 +154,14 @@ export async function GET(request: NextRequest) {
       LIMIT 5
     `;
 
-    // ── Últimas 5 ventas del período ───────────────────────────────────
+    // ── Últimas 5 ventas ───────────────────────────────────────────────
     const recentSales = await sql`
       SELECT
         s.id, s.sale_number, s.total, s.payment_method, s.sold_at,
         c.name AS customer_name,
         COUNT(si.id)::int AS items_count,
-        COALESCE(SUM(si.line_total - (si.unit_cost * si.quantity)), 0) AS profit
+        COALESCE(SUM(si.line_total - (si.unit_cost * si.quantity)), 0)
+          - COALESCE(s.tax, 0) AS profit
       FROM sales s
       LEFT JOIN customers c ON c.id = s.customer_id
       LEFT JOIN sale_items si ON si.sale_id = s.id AND si.user_id = s.user_id
@@ -193,10 +203,10 @@ export async function GET(request: NextRequest) {
           customers_new:   Number(customersNew?.count ?? 0),
           inventory: {
             total_products: Number(inventoryStats?.total_products ?? 0),
-            total_units:    Number(inventoryStats?.total_units ?? 0),
-            total_value:    Number(inventoryStats?.total_value ?? 0),
-            out_of_stock:   Number(inventoryStats?.out_of_stock ?? 0),
-            low_stock:      Number(inventoryStats?.low_stock ?? 0),
+            total_units:    Number(inventoryStats?.total_units    ?? 0),
+            total_value:    Number(inventoryStats?.total_value    ?? 0),
+            out_of_stock:   Number(inventoryStats?.out_of_stock   ?? 0),
+            low_stock:      Number(inventoryStats?.low_stock      ?? 0),
           },
           balance: Number(accountsBalance?.total ?? 0),
         },

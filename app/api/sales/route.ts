@@ -67,21 +67,25 @@ export async function GET(request: NextRequest) {
         s.id,
         s.sale_number,
         s.customer_id,
-        c.name       AS customer_name,
+        c.name         AS customer_name,
         s.subtotal,
         s.discount,
         s.shipping_cost,
+        s.tax_rate,
         s.tax,
         s.total,
         s.payment_method,
         s.account_id,
-        a.name       AS account_name,
-        s.event_id,              -- ✅
+        a.name         AS account_name,
+        s.event_id,
         s.sold_at,
         s.notes,
         s.created_at,
         COUNT(si.id)::int AS items_count,
-        COALESCE(SUM(si.line_total - (si.unit_cost * si.quantity)), 0) AS net_profit
+        -- net_profit = (precio venta - costo) - ISV extraído del precio
+        -- El ISV está dentro del line_total, no es ganancia del vendedor
+        COALESCE(SUM(si.line_total - (si.unit_cost * si.quantity)), 0)
+          - COALESCE(s.tax, 0) AS net_profit
       FROM sales s
       LEFT JOIN customers  c  ON c.id  = s.customer_id
       LEFT JOIN accounts   a  ON a.id  = s.account_id
@@ -115,12 +119,13 @@ export async function POST(request: NextRequest) {
       items,
       discount,
       shipping_cost,
+      tax_rate,        // porcentaje: 0, 15 o 18
       payment_method,
       account_id,
       notes,
       sold_at,
       supplies_used,
-      event_id,      // ✅ viene opcional
+      event_id,
     } = body;
 
     // ── Validaciones básicas ───────────────────────────────────────────
@@ -130,6 +135,10 @@ export async function POST(request: NextRequest) {
       return createErrorResponse("El método de pago es requerido", 400);
     if (!account_id)
       return createErrorResponse("La cuenta de destino es requerida", 400);
+
+    const taxRateNum = Number(tax_rate) || 0;
+    if (![0, 15, 18].includes(taxRateNum))
+      return createErrorResponse("El porcentaje de impuesto debe ser 0, 15 o 18", 400);
 
     for (const item of items) {
       if (!item.product_id || !item.quantity || item.quantity <= 0)
@@ -145,7 +154,7 @@ export async function POST(request: NextRequest) {
     `;
     if (!account) return createErrorResponse("Cuenta no encontrada", 404);
 
-    // ── Verificar evento si viene ─────────────────────────────────────
+    // ── Verificar evento si viene ──────────────────────────────────────
     const eventIdNum = event_id ? Number(event_id) : null;
     if (eventIdNum) {
       const [ev] = await sql`
@@ -168,17 +177,13 @@ export async function POST(request: NextRequest) {
       `;
 
       const totalAvailable = batches.reduce(
-        (acc: number, b: any) => acc + Number(b.qty_available),
-        0
+        (acc: number, b: any) => acc + Number(b.qty_available), 0
       );
 
       if (totalAvailable < item.quantity) {
-        const [product] = await sql`
-          SELECT name FROM products WHERE id = ${item.product_id}
-        `;
+        const [product] = await sql`SELECT name FROM products WHERE id = ${item.product_id}`;
         return createErrorResponse(
-          `Stock insuficiente para "${product?.name}". Disponible: ${totalAvailable}`,
-          400
+          `Stock insuficiente para "${product?.name}". Disponible: ${totalAvailable}`, 400
         );
       }
 
@@ -226,30 +231,39 @@ export async function POST(request: NextRequest) {
         if (!supply)
           return createErrorResponse(`Suministro #${supply_id} no encontrado`, 404);
 
-        normalizedSupplies.push({
-          supply_id,
-          quantity,
-          unit_cost,
-          line_total: quantity * unit_cost,
-        });
+        normalizedSupplies.push({ supply_id, quantity, unit_cost, line_total: quantity * unit_cost });
       }
     }
 
-    // ── Cálculos finales ───────────────────────────────────────────────
+    // ── Cálculos finales (TAX-INCLUSIVE) ──────────────────────────────
+    //
+    // El precio del producto YA INCLUYE el ISV.
+    // El ISV se EXTRAE del precio, no se suma encima.
+    //
+    // Fórmula:  taxAmount = base × rate / (100 + rate)
+    // Ejemplo con L 2,599 al 15%:
+    //   taxAmount = 2,599 × 15 / 115 = L 338.87  ← se extrae
+    //   total     = 2,599 + 180 envío = L 2,779   ← cliente paga lo mismo
+    //   ganancia  = (2,599 - 338.87) - 811 costos = L 1,449.13
+    //
     const subtotal           = processedItems.reduce((acc, i) => acc + i.unit_price * i.quantity, 0);
     const globalDiscount     = Number(discount) || 0;
     const totalItemDiscounts = processedItems.reduce((acc, i) => acc + i.item_discount, 0);
     const totalDiscount      = globalDiscount + totalItemDiscounts;
     const shippingAmount     = Number(shipping_cost) || 0;
-    const saleTotal          = subtotal - totalDiscount;
-    const grandTotal         = saleTotal + shippingAmount;   // total real que entra a la cuenta
+    const taxableBase        = subtotal - totalDiscount;
+    // TAX-INCLUSIVE: ISV extraído del precio, no sumado
+    const taxAmount          = taxRateNum > 0
+      ? taxableBase * taxRateNum / (100 + taxRateNum)
+      : 0;
+    // Total = lo que el cliente paga (el ISV ya está adentro)
+    const grandTotal         = taxableBase + shippingAmount;
     const suppliesCost       = normalizedSupplies.reduce((acc, s) => acc + s.line_total, 0);
     const occurredAt         = sold_at ?? new Date().toISOString();
 
     // ── Número de venta ────────────────────────────────────────────────
     const [lastSale] = await sql`
-      SELECT sale_number
-      FROM sales
+      SELECT sale_number FROM sales
       WHERE user_id = ${userId}
       ORDER BY created_at DESC
       LIMIT 1
@@ -257,22 +271,30 @@ export async function POST(request: NextRequest) {
     const lastNum    = lastSale ? parseInt(String(lastSale.sale_number).replace(/\D/g, "")) || 0 : 0;
     const saleNumber = `VTA-${String(lastNum + 1).padStart(5, "0")}`;
 
+    // ── Descripción de transacción ─────────────────────────────────────
+    const txParts: string[] = [`Venta ${saleNumber}`];
+    if (taxRateNum > 0)     txParts.push(`ISV ${taxRateNum}% incluido`);
+    if (shippingAmount > 0) txParts.push(`envío L ${shippingAmount.toFixed(2)}`);
+    const txDescription = txParts.length > 1
+      ? `${txParts[0]} (${txParts.slice(1).join(", ")})`
+      : txParts[0];
+
     // ══════════════════════════════════════════════════════════════════
     // TRANSACCIÓN DB
     // ══════════════════════════════════════════════════════════════════
     await sql`BEGIN`;
     try {
 
-      // 1. Crear la venta (guardando event_id) ✅
+      // 1. Crear la venta
       const [sale] = await sql`
         INSERT INTO sales (
           user_id, sale_number, customer_id,
-          subtotal, discount, tax, shipping_cost, total,
+          subtotal, discount, tax_rate, tax, shipping_cost, total,
           payment_method, account_id, event_id,
           sold_at, notes
         ) VALUES (
           ${userId}, ${saleNumber}, ${customer_id ?? null},
-          ${subtotal}, ${totalDiscount}, ${0}, ${shippingAmount}, ${grandTotal},
+          ${subtotal}, ${totalDiscount}, ${taxRateNum}, ${taxAmount}, ${shippingAmount}, ${grandTotal},
           ${payment_method}, ${account_id}, ${eventIdNum},
           ${occurredAt}::timestamptz, ${notes ?? null}
         )
@@ -344,7 +366,7 @@ export async function POST(request: NextRequest) {
         `;
       }
 
-      // 4. Transacción INCOME — referencia a EVENT o SALE según corresponda ✅
+      // 4. Transacción INCOME
       const txRefType = eventIdNum ? "EVENT" : "SALE";
       const txRefId   = eventIdNum ? eventIdNum : saleId;
 
@@ -354,28 +376,24 @@ export async function POST(request: NextRequest) {
           category, description, reference_type, reference_id, occurred_at
         ) VALUES (
           ${userId}, 'INCOME', ${account_id}, ${grandTotal},
-          'Ventas',
-          ${shippingAmount > 0
-            ? `Venta ${saleNumber} (incluye envío L ${shippingAmount.toFixed(2)})`
-            : `Venta ${saleNumber}`
-          },
+          'Ventas', ${txDescription},
           ${txRefType}, ${txRefId}, ${occurredAt}::timestamptz
         )
       `;
 
-      // 5. Actualizar balance de la cuenta
+      // 5. Actualizar balance
       await sql`
         UPDATE accounts
         SET balance = balance + ${grandTotal}
         WHERE id = ${account_id} AND user_id = ${userId}
       `;
 
-      // 6. Actualizar métricas de cliente
+      // 6. Métricas del cliente
       if (customer_id) {
         await sql`
           UPDATE customers
           SET total_orders = total_orders + 1,
-              total_spent  = total_spent + ${grandTotal},
+              total_spent  = total_spent  + ${grandTotal},
               updated_at   = CURRENT_TIMESTAMP
           WHERE id = ${customer_id} AND user_id = ${userId}
         `;
@@ -391,6 +409,8 @@ export async function POST(request: NextRequest) {
             sale_number:   saleNumber,
             subtotal,
             discount:      totalDiscount,
+            tax_rate:      taxRateNum,
+            tax:           taxAmount,
             shipping_cost: shippingAmount,
             supplies_cost: suppliesCost,
             total:         grandTotal,
