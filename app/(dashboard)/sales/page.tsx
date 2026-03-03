@@ -5,6 +5,7 @@ import { useMemo, useState } from "react";
 import { useCurrency } from "@/hooks/swr/use-currency";
 import { useRouter } from "next/navigation";
 
+
 import { Fab } from "@/components/ui/fab";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -20,9 +21,15 @@ import {
 import {
   Plus, Search, Receipt, Banknote, CreditCard, ArrowLeftRight,
   TrendingUp, DollarSign, ShoppingCart, HelpCircle, X,
+  CheckCircle, XCircle, Clock, Pencil, MoreVertical,
 } from "lucide-react";
+import {
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem,
+  DropdownMenuSeparator, DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { toast } from "sonner";
 
-import { useSales } from "@/hooks/swr/use-sales";
+import { useSales, usePatchSale } from "@/hooks/swr/use-sales";
 import { useAccounts } from "@/hooks/swr/use-accounts";
 
 // ── Utils ──────────────────────────────────────────────────────────────
@@ -31,43 +38,117 @@ const formatDateOnly = (dateString: string) =>
     year: "numeric", month: "short", day: "numeric",
   });
 
-type Preset        = "today" | "7d" | "this_month" | "last_month" | "all";
+type Preset = "today" | "7d" | "this_month" | "last_month" | "all";
 type PaymentFilter = "all" | "CASH" | "CARD" | "TRANSFER" | "MIXED" | "OTHER";
 
 const paymentConfig: Record<string, { label: string; icon: any }> = {
-  CASH:     { label: "Efectivo",      icon: Banknote },
-  CARD:     { label: "Tarjeta",       icon: CreditCard },
+  CASH: { label: "Efectivo", icon: Banknote },
+  CARD: { label: "Tarjeta", icon: CreditCard },
   TRANSFER: { label: "Transferencia", icon: ArrowLeftRight },
-  MIXED:    { label: "Mixto",         icon: HelpCircle },
-  OTHER:    { label: "Otro",          icon: HelpCircle },
+  MIXED: { label: "Mixto", icon: HelpCircle },
+  OTHER: { label: "Otro", icon: HelpCircle },
 };
 
 const PRESET_LABELS: Record<Preset, string> = {
-  today:      "Hoy",
-  "7d":       "Últimos 7 días",
+  today: "Hoy",
+  "7d": "Últimos 7 días",
   this_month: "Este mes",
   last_month: "Mes pasado",
-  all:        "Todas",
+  all: "Todas",
 };
 
-// null | 0 → sin impuesto
 const getTaxRate = (v: any): number => Number(v) || 0;
 
+// ── Dropdown de acciones para venta pendiente ─────────────────────────
+function PendingActions({
+  saleId,
+  onMutate,
+}: {
+  saleId: number;
+  onMutate: () => void;
+}) {
+  const router = useRouter();
+  const { confirmSale, cancelSale, isPatching } = usePatchSale(saleId);
+
+  const handleConfirm = async () => {
+    try {
+      await confirmSale();
+      toast.success("Venta confirmada");
+      onMutate();
+    } catch (err: any) {
+      toast.error(err.message || "Error al confirmar");
+    }
+  };
+
+  const handleCancel = async () => {
+    try {
+      await cancelSale();
+      toast.success("Venta cancelada · stock devuelto");
+      onMutate();
+    } catch (err: any) {
+      toast.error(err.message || "Error al cancelar");
+    }
+  };
+
+  return (
+    <div onClick={(e) => e.stopPropagation()}>
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button variant="ghost" size="icon" className="h-8 w-8" disabled={isPatching}>
+            {isPatching
+              ? <Clock className="h-4 w-4 animate-spin text-muted-foreground" />
+              : <MoreVertical className="h-4 w-4" />
+            }
+          </Button>
+        </DropdownMenuTrigger>
+
+        <DropdownMenuContent align="end" className="w-44">
+          <DropdownMenuItem
+            onClick={() => router.push(`/sales/${saleId}/edit`)}
+          >
+            <Pencil className="h-4 w-4 mr-2" />
+            Editar
+          </DropdownMenuItem>
+
+          <DropdownMenuItem
+            className="text-green-600 focus:text-green-700 focus:bg-green-50"
+            onClick={handleConfirm}
+          >
+            <CheckCircle className="h-4 w-4 mr-2" />
+            Confirmar pago
+          </DropdownMenuItem>
+
+          <DropdownMenuSeparator />
+
+          <DropdownMenuItem
+            className="text-destructive focus:text-destructive focus:bg-destructive/10"
+            onClick={handleCancel}
+          >
+            <XCircle className="h-4 w-4 mr-2" />
+            Cancelar venta
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
+    </div>
+  );
+}
+
 export default function SalesPage() {
-  const router     = useRouter();
+  const router = useRouter();
   const { format } = useCurrency();
 
-  const [preset,        setPreset]        = useState<Preset>("this_month");
-  const [dateFrom,      setDateFrom]      = useState("");
-  const [dateTo,        setDateTo]        = useState("");
+  const [preset, setPreset] = useState<Preset>("this_month");
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
   const [paymentFilter, setPaymentFilter] = useState<PaymentFilter>("all");
   const [accountFilter, setAccountFilter] = useState<string>("all");
-  const [search,        setSearch]        = useState("");
+  const [search, setSearch] = useState("");
+  const [editSaleId, setEditSaleId] = useState<number | null>(null);
 
-  const { sales, isLoading } = useSales({
+  const { sales, isLoading, mutate } = useSales({
     preset,
-    from:    dateFrom || undefined,
-    to:      dateTo   || undefined,
+    from: dateFrom || undefined,
+    to: dateTo || undefined,
     payment: paymentFilter,
   });
 
@@ -76,29 +157,31 @@ export default function SalesPage() {
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
     return sales.filter((s) => {
-      const matchSearch  = !q || s.sale_number.toLowerCase().includes(q) || (s.customer_name?.toLowerCase().includes(q) ?? false);
+      const matchSearch = !q || s.sale_number.toLowerCase().includes(q) || (s.customer_name?.toLowerCase().includes(q) ?? false);
       const matchAccount = accountFilter === "all" || String(s.account_id) === accountFilter;
       return matchSearch && matchAccount;
     });
   }, [sales, search, accountFilter]);
 
-  const totalRevenue = useMemo(() => filtered.reduce((acc, s) => acc + Number(s.total),      0), [filtered]);
-  const totalProfit  = useMemo(() => filtered.reduce((acc, s) => acc + Number(s.net_profit), 0), [filtered]);
+  // Solo COMPLETED para revenue/profit real
+  const totalRevenue = useMemo(() =>
+    filtered.filter(s => s.status === "COMPLETED").reduce((acc, s) => acc + Number(s.total), 0),
+    [filtered]
+  );
+  const totalProfit = useMemo(() =>
+    filtered.filter(s => s.status === "COMPLETED").reduce((acc, s) => acc + Number(s.net_profit), 0),
+    [filtered]
+  );
+  const pendingCount = useMemo(() => filtered.filter(s => s.status === "PENDING").length, [filtered]);
 
   const hasFilters = dateFrom || dateTo || paymentFilter !== "all" || accountFilter !== "all" || search;
-
-  const clearAll = () => {
-    setDateFrom(""); setDateTo(""); setSearch("");
-    setPaymentFilter("all"); setAccountFilter("all"); setPreset("this_month");
-  };
-
+  const clearAll = () => { setDateFrom(""); setDateTo(""); setSearch(""); setPaymentFilter("all"); setAccountFilter("all"); setPreset("this_month"); };
   const onChangePreset = (v: Preset) => { setPreset(v); setDateFrom(""); setDateTo(""); };
-  const onManualFrom   = (v: string) => { setDateFrom(v); setPreset("all"); };
-  const onManualTo     = (v: string) => { setDateTo(v);   setPreset("all"); };
+  const onManualFrom = (v: string) => { setDateFrom(v); setPreset("all"); };
+  const onManualTo = (v: string) => { setDateTo(v); setPreset("all"); };
 
   const activePeriodLabel = dateFrom || dateTo
-    ? [dateFrom && `Desde ${formatDateOnly(dateFrom)}`, dateTo && `Hasta ${formatDateOnly(dateTo)}`]
-        .filter(Boolean).join(" · ")
+    ? [dateFrom && `Desde ${formatDateOnly(dateFrom)}`, dateTo && `Hasta ${formatDateOnly(dateTo)}`].filter(Boolean).join(" · ")
     : PRESET_LABELS[preset];
 
   return (
@@ -108,13 +191,15 @@ export default function SalesPage() {
       <div className="flex items-center justify-between gap-3">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Ventas</h1>
-          <p className="text-muted-foreground text-sm">{activePeriodLabel}</p>
+          <p className="text-muted-foreground text-sm">
+            {activePeriodLabel}
+            {pendingCount > 0 && (
+              <span className="ml-1.5 text-amber-600 font-medium">· {pendingCount} pendiente{pendingCount !== 1 ? "s" : ""}</span>
+            )}
+          </p>
         </div>
         <div className="text-right shrink-0 sm:hidden">
-          {isLoading
-            ? <Skeleton className="h-8 w-10 ml-auto" />
-            : <p className="text-3xl font-bold">{filtered.length}</p>
-          }
+          {isLoading ? <Skeleton className="h-8 w-10 ml-auto" /> : <p className="text-3xl font-bold">{filtered.length}</p>}
           <p className="text-xs text-muted-foreground">registros</p>
         </div>
       </div>
@@ -127,10 +212,14 @@ export default function SalesPage() {
               <span className="text-xs font-medium text-muted-foreground">Ventas</span>
               <ShoppingCart className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
             </div>
-            {isLoading
-              ? <Skeleton className="h-6 w-12" />
-              : <p className="text-lg font-bold">{filtered.length}</p>
-            }
+            {isLoading ? <Skeleton className="h-6 w-12" /> : (
+              <div className="flex items-baseline gap-1.5">
+                <p className="text-lg font-bold">{filtered.filter(s => s.status === "COMPLETED").length}</p>
+                {pendingCount > 0 && (
+                  <span className="text-xs text-amber-600">{pendingCount} pend.</span>
+                )}
+              </div>
+            )}
           </CardContent>
         </Card>
         <Card className="pt-2 pb-2">
@@ -139,10 +228,7 @@ export default function SalesPage() {
               <span className="text-xs font-medium text-muted-foreground">Ingresos</span>
               <DollarSign className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
             </div>
-            {isLoading
-              ? <Skeleton className="h-6 w-20" />
-              : <p className="text-base font-bold sm:text-lg truncate">{format(totalRevenue)}</p>
-            }
+            {isLoading ? <Skeleton className="h-6 w-20" /> : <p className="text-base font-bold sm:text-lg truncate">{format(totalRevenue)}</p>}
           </CardContent>
         </Card>
         <Card className="pt-2 pb-2">
@@ -151,19 +237,16 @@ export default function SalesPage() {
               <span className="text-xs font-medium text-muted-foreground">Ganancia</span>
               <TrendingUp className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
             </div>
-            {isLoading
-              ? <Skeleton className="h-6 w-20" />
-              : (
-                <div className="flex items-baseline gap-1.5">
-                  <p className="text-base font-bold text-green-600 sm:text-lg truncate">{format(totalProfit)}</p>
-                  {totalRevenue > 0 && (
-                    <span className="text-xs text-muted-foreground shrink-0">
-                      {((totalProfit / totalRevenue) * 100).toFixed(0)}%
-                    </span>
-                  )}
-                </div>
-              )
-            }
+            {isLoading ? <Skeleton className="h-6 w-20" /> : (
+              <div className="flex items-baseline gap-1.5">
+                <p className="text-base font-bold text-green-600 sm:text-lg truncate">{format(totalProfit)}</p>
+                {totalRevenue > 0 && (
+                  <span className="text-xs text-muted-foreground shrink-0">
+                    {((totalProfit / totalRevenue) * 100).toFixed(0)}%
+                  </span>
+                )}
+              </div>
+            )}
           </CardContent>
         </Card>
       </div>
@@ -172,14 +255,8 @@ export default function SalesPage() {
       <div className="space-y-2">
         <div className="relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input
-            placeholder="Número o cliente..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="pl-9"
-          />
+          <Input placeholder="Número o cliente..." value={search} onChange={(e) => setSearch(e.target.value)} className="pl-9" />
         </div>
-
         <div className="grid grid-cols-2 gap-2">
           <Select value={preset} onValueChange={(v) => onChangePreset(v as Preset)}>
             <SelectTrigger><SelectValue /></SelectTrigger>
@@ -191,7 +268,6 @@ export default function SalesPage() {
               <SelectItem value="all">Todas</SelectItem>
             </SelectContent>
           </Select>
-
           <Select value={accountFilter} onValueChange={setAccountFilter}>
             <SelectTrigger><SelectValue placeholder="Cuenta" /></SelectTrigger>
             <SelectContent>
@@ -202,16 +278,13 @@ export default function SalesPage() {
             </SelectContent>
           </Select>
         </div>
-
         <div className="grid grid-cols-2 gap-2">
           <Input type="date" value={dateFrom} onChange={(e) => onManualFrom(e.target.value)} className="text-sm" />
-          <Input type="date" value={dateTo}   onChange={(e) => onManualTo(e.target.value)}   className="text-sm" />
+          <Input type="date" value={dateTo} onChange={(e) => onManualTo(e.target.value)} className="text-sm" />
         </div>
-
         {hasFilters && (
           <Button variant="ghost" size="sm" className="gap-1.5 text-muted-foreground w-full" onClick={clearAll}>
-            <X className="h-3.5 w-3.5" />
-            Limpiar filtros
+            <X className="h-3.5 w-3.5" /> Limpiar filtros
           </Button>
         )}
       </div>
@@ -232,18 +305,24 @@ export default function SalesPage() {
             const payment = paymentConfig[sale.payment_method] ?? paymentConfig.OTHER;
             const PayIcon = payment.icon;
             const taxRate = getTaxRate(sale.tax_rate);
+            const isPending = sale.status === "PENDING";
             return (
               <Card
                 key={sale.id}
-                className="pt-1 pb-1 cursor-pointer active:scale-[0.99] transition-transform"
+                className={`pt-1 pb-1 cursor-pointer active:scale-[0.99] transition-transform ${isPending ? "border-amber-200 bg-amber-50/30 dark:bg-amber-950/10" : ""}`}
                 onClick={() => router.push(`/sales/${sale.id}`)}
               >
                 <CardContent className="px-4 py-3">
-                  {/* Top */}
-                  <div className="flex items-start justify-between gap-2 mb-2.5">
+                  <div className="flex items-start justify-between gap-2 mb-2">
                     <div className="min-w-0">
-                      <div className="flex items-center gap-1.5">
+                      <div className="flex items-center gap-1.5 flex-wrap">
                         <p className="font-mono text-sm font-semibold">{sale.sale_number}</p>
+                        {isPending && (
+                          <Badge className="text-[10px] px-1.5 py-0 bg-amber-100 text-amber-700 border-amber-200 gap-1" variant="outline">
+                            <Clock className="h-2.5 w-2.5" />
+                            Pendiente
+                          </Badge>
+                        )}
                         {taxRate > 0 && (
                           <Badge className="text-[10px] px-1.5 py-0 bg-amber-100 text-amber-700 border-amber-200" variant="outline">
                             ISV {taxRate}%
@@ -254,14 +333,19 @@ export default function SalesPage() {
                         {sale.customer_name ?? "Anónimo"} · {formatDateOnly(sale.sold_at)}
                       </p>
                     </div>
-                    <Badge variant="outline" className="gap-1 text-xs shrink-0">
-                      <PayIcon className="h-3 w-3" />
-                      {(sale as any).account_name}
-                    </Badge>
+                    {isPending
+                      ? <PendingActions
+                        saleId={sale.id}
+                        onMutate={mutate}
+                      />
+                      : <Badge variant="outline" className="gap-1 text-xs shrink-0">
+                        <PayIcon className="h-3 w-3" />
+                        {(sale as any).account_name}
+                      </Badge>
+                    }
                   </div>
 
-                  {/* Bottom — 3 métricas */}
-                  <div className="grid grid-cols-3 gap-1 pt-2.5 border-t text-center">
+                  <div className={`grid gap-1 pt-2 border-t text-center ${isPending ? "grid-cols-2" : "grid-cols-3"}`}>
                     <div>
                       <p className="text-[10px] text-muted-foreground mb-0.5">Productos</p>
                       <p className="text-sm font-semibold">{sale.items_count}</p>
@@ -270,10 +354,12 @@ export default function SalesPage() {
                       <p className="text-[10px] text-muted-foreground mb-0.5">Total</p>
                       <p className="text-sm font-bold truncate">{format(Number(sale.total))}</p>
                     </div>
-                    <div>
-                      <p className="text-[10px] text-muted-foreground mb-0.5">Ganancia</p>
-                      <p className="text-sm font-bold text-green-600 truncate">{format(Number(sale.net_profit))}</p>
-                    </div>
+                    {!isPending && (
+                      <div>
+                        <p className="text-[10px] text-muted-foreground mb-0.5">Ganancia</p>
+                        <p className="text-sm font-bold text-green-600 truncate">{format(Number(sale.net_profit))}</p>
+                      </div>
+                    )}
                   </div>
                 </CardContent>
               </Card>
@@ -291,26 +377,28 @@ export default function SalesPage() {
                 <TableHead>Número</TableHead>
                 <TableHead>Fecha</TableHead>
                 <TableHead>Cliente</TableHead>
+                <TableHead>Estado</TableHead>
                 <TableHead>Productos</TableHead>
                 <TableHead>Método</TableHead>
                 <TableHead>Cuenta</TableHead>
                 <TableHead className="text-right">ISV</TableHead>
                 <TableHead className="text-right">Total</TableHead>
                 <TableHead className="text-right">Ganancia</TableHead>
+                <TableHead />
               </TableRow>
             </TableHeader>
             <TableBody>
               {isLoading ? (
                 Array.from({ length: 5 }).map((_, i) => (
                   <TableRow key={i}>
-                    {Array.from({ length: 9 }).map((__, j) => (
+                    {Array.from({ length: 11 }).map((__, j) => (
                       <TableCell key={j}><Skeleton className="h-4 w-full" /></TableCell>
                     ))}
                   </TableRow>
                 ))
               ) : filtered.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={9} className="text-center py-12 text-muted-foreground">
+                  <TableCell colSpan={11} className="text-center py-12 text-muted-foreground">
                     Aún no se han registrado ventas en este período
                   </TableCell>
                 </TableRow>
@@ -319,19 +407,31 @@ export default function SalesPage() {
                   const payment = paymentConfig[sale.payment_method] ?? paymentConfig.OTHER;
                   const PayIcon = payment.icon;
                   const taxRate = getTaxRate(sale.tax_rate);
+                  const isPending = sale.status === "PENDING";
                   return (
                     <TableRow
                       key={sale.id}
-                      className="cursor-pointer hover:bg-muted/50"
+                      className={`cursor-pointer hover:bg-muted/50 ${isPending ? "bg-amber-50/30 dark:bg-amber-950/10" : ""}`}
                       onClick={() => router.push(`/sales/${sale.id}`)}
                     >
                       <TableCell className="font-medium font-mono">{sale.sale_number}</TableCell>
                       <TableCell className="text-muted-foreground text-sm">{formatDateOnly(sale.sold_at)}</TableCell>
                       <TableCell>{sale.customer_name ?? <span className="text-muted-foreground">Anónimo</span>}</TableCell>
                       <TableCell>
-                        <Badge variant="secondary">
-                          {sale.items_count} {sale.items_count === 1 ? "producto" : "productos"}
-                        </Badge>
+                        {isPending ? (
+                          <Badge className="bg-amber-100 text-amber-700 border-amber-200 gap-1" variant="outline">
+                            <Clock className="h-3 w-3" />
+                            Pendiente
+                          </Badge>
+                        ) : (
+                          <Badge className="bg-green-100 text-green-700 border-green-200 gap-1" variant="outline">
+                            <CheckCircle className="h-3 w-3" />
+                            Completada
+                          </Badge>
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant="secondary">{sale.items_count} {sale.items_count === 1 ? "producto" : "productos"}</Badge>
                       </TableCell>
                       <TableCell>
                         <Badge variant="outline" className="gap-1">
@@ -339,9 +439,7 @@ export default function SalesPage() {
                           {payment.label}
                         </Badge>
                       </TableCell>
-                      <TableCell className="text-muted-foreground text-sm">
-                        {(sale as any).account_name ?? "—"}
-                      </TableCell>
+                      <TableCell className="text-muted-foreground text-sm">{(sale as any).account_name ?? "—"}</TableCell>
                       <TableCell className="text-right">
                         {taxRate > 0
                           ? <Badge className="bg-amber-100 text-amber-700 border-amber-200" variant="outline">{taxRate}%</Badge>
@@ -349,7 +447,20 @@ export default function SalesPage() {
                         }
                       </TableCell>
                       <TableCell className="text-right font-medium">{format(Number(sale.total))}</TableCell>
-                      <TableCell className="text-right text-green-600 font-medium">{format(Number(sale.net_profit))}</TableCell>
+                      <TableCell className="text-right">
+                        {isPending
+                          ? <span className="text-muted-foreground text-xs">—</span>
+                          : <span className="text-green-600 font-medium">{format(Number(sale.net_profit))}</span>
+                        }
+                      </TableCell>
+                      <TableCell className="text-right">
+                        {isPending && (
+                          <PendingActions
+                            saleId={sale.id}
+                            onMutate={mutate}
+                          />
+                        )}
+                      </TableCell>
                     </TableRow>
                   );
                 })
@@ -359,11 +470,8 @@ export default function SalesPage() {
         </CardContent>
       </Card>
 
-      <Fab
-        actions={[
-          { label: "Nueva venta", icon: ShoppingCart, onClick: () => router.push("/sales/new") },
-        ]}
-      />
+      <Fab actions={[{ label: "Nueva venta", icon: ShoppingCart, onClick: () => router.push("/sales/new") }]} />
+
     </div>
   );
 }

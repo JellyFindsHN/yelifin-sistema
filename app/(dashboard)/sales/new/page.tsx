@@ -7,13 +7,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import {
-  ArrowLeft,
-  Search,
-  AlertTriangle,
-  X,
-  ChevronRight,
-  ShoppingCart,
-  ArrowRight,
+  ArrowLeft, Search, AlertTriangle, X,
+  ChevronRight, ShoppingCart, ArrowRight,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -34,7 +29,35 @@ const ACCOUNT_TYPE_TO_PAYMENT: Record<string, string> = {
   CASH: "CASH", BANK: "TRANSFER", WALLET: "TRANSFER", OTHER: "OTHER",
 };
 
-// ── Inner component — necesita useSearchParams, por eso el Suspense wrapper ──
+
+type SearchBarProps = {
+  search: string;
+  onChange: (value: string) => void;
+};
+
+function SearchBar({ search, onChange }: SearchBarProps) {
+  return (
+    <div className="relative">
+      <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+      <Input
+        placeholder="Buscar producto..."
+        value={search}
+        onChange={(e) => onChange(e.target.value)}
+        className="pl-9 pr-9"
+      />
+      {search && (
+        <button
+          type="button"
+          onClick={() => onChange("")}
+          className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
+        >
+          <X className="h-4 w-4" />
+        </button>
+      )}
+    </div>
+  );
+}
+
 function NewSaleContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -59,18 +82,17 @@ function NewSaleContent() {
   const [discountType, setDiscountType] = useState<DiscountType>("none");
   const [globalDiscount, setGlobalDiscount] = useState(0);
   const [shippingCost, setShippingCost] = useState(0);
-  const [taxRate, setTaxRate] = useState(0);   // ← nuevo
+  const [taxRate, setTaxRate] = useState(0);
+  const [isPending, setIsPending] = useState(false);  // ← nuevo
   const [suppliesOpen, setSuppliesOpen] = useState(false);
   const [suppliesUsed, setSuppliesUsed] = useState<SupplyUsed[]>([]);
   const [cartOpen, setCartOpen] = useState(false);
-
-  // ── Desktop: paso 1 = productos | paso 2 = detalle de venta ───────
   const [desktopStep, setDesktopStep] = useState<1 | 2>(1);
-
-  // ── Confirmación de salida ─────────────────────────────────────────
   const [exitDialog, setExitDialog] = useState(false);
   const [pendingHref, setPendingHref] = useState<string | null>(null);
+
   const hasCart = cart.length > 0;
+  const hasSupplies = supplies.length > 0;
 
   useEffect(() => {
     const handler = (e: BeforeUnloadEvent) => {
@@ -90,8 +112,6 @@ function NewSaleContent() {
 
   const confirmExit = () => { setExitDialog(false); if (pendingHref) router.push(pendingHref); };
   const cancelExit = () => { setExitDialog(false); setPendingHref(null); };
-
-  const hasSupplies = supplies.length > 0;
 
   const availableProducts = useMemo(
     () => products.filter((p) =>
@@ -135,14 +155,12 @@ function NewSaleContent() {
   const updateItemPrice = (id: number, v: number) => setCart((prev) => prev.map((i) => i.product_id === id ? { ...i, unit_price: v } : i));
   const updateDiscount = (id: number, v: number) => setCart((prev) => prev.map((i) => i.product_id === id ? { ...i, discount: v } : i));
 
-  const handleAccountChange = (id: number) => setAccountId(id);
-
   const updateSupplyQty = (id: number, qty: number) =>
     setSuppliesUsed((prev) => prev.map((s) => s.supply_id === id ? { ...s, quantity: qty } : s));
   const removeSupply = (id: number) =>
     setSuppliesUsed((prev) => prev.filter((s) => s.supply_id !== id));
 
-  // ── Cálculos ───────────────────────────────────────────────────────
+  // ── Cálculos TAX-INCLUSIVE ─────────────────────────────────────────
   const subtotal = cart.reduce((acc, i) => acc + i.unit_price * i.quantity, 0);
   const itemDiscounts = cart.reduce((acc, i) => acc + i.discount, 0);
   const appliedGlobal = discountType === "global" ? subtotal * (globalDiscount / 100) : 0;
@@ -151,6 +169,7 @@ function NewSaleContent() {
   const total = subtotal - totalDiscount;
   const taxAmount = taxRate > 0 ? total * taxRate / (100 + taxRate) : 0;
   const grandTotal = total + shippingCost;
+
   // ── Checkout ───────────────────────────────────────────────────────
   const handleCheckout = async () => {
     if (cart.length === 0) return toast.error("El carrito está vacío");
@@ -170,10 +189,11 @@ function NewSaleContent() {
         })),
         discount: appliedGlobal,
         shipping_cost: shippingCost > 0 ? shippingCost : undefined,
-        tax_rate: taxRate > 0 ? taxRate : undefined,  // ← nuevo
+        tax_rate: taxRate > 0 ? taxRate : undefined,
         payment_method: paymentMethod as any,
         account_id: accountId,
         notes: notes || undefined,
+        status: isPending ? "PENDING" : "COMPLETED",  // ← nuevo
         supplies_used: suppliesUsed.length > 0
           ? suppliesUsed.map((s) => ({ supply_id: s.supply_id, quantity: s.quantity, unit_cost: s.unit_cost }))
           : undefined,
@@ -182,7 +202,11 @@ function NewSaleContent() {
 
       if (eventId) await mutateEvents();
 
-      toast.success(`Venta ${result.data.sale_number} registrada`);
+      toast.success(
+        isPending
+          ? `Venta ${result.data.sale_number} guardada como pendiente`
+          : `Venta ${result.data.sale_number} registrada`
+      );
       setCart([]);
       router.push(backHref);
     } catch (err: any) {
@@ -192,87 +216,42 @@ function NewSaleContent() {
 
   // ── Props agrupados ────────────────────────────────────────────────
   const cartProps = {
-    cart,
-    discountType,
-    globalDiscount,
-    subtotal,
-    totalDiscount,
-    total,
-    shippingCost,
-    taxRate,                            // ← nuevo
-    taxAmount,                          // ← nuevo
-    suppliesUsed,
+    cart, discountType, globalDiscount, subtotal, totalDiscount, total,
+    shippingCost, taxRate, taxAmount, suppliesUsed,
     onQuantity: updateQuantity,
     onRemove: removeFromCart,
     onPriceChange: updateItemPrice,
     onDiscountChange: updateDiscount,
     onDiscountTypeChange: setDiscountType,
     onGlobalDiscountChange: setGlobalDiscount,
-    onTaxRateChange: setTaxRate,  // ← nuevo
+    onTaxRateChange: setTaxRate,
     onSupplyQtyChange: updateSupplyQty,
     onSupplyRemove: removeSupply,
   };
 
   const baseOptionsProps = {
-    customers,
-    accounts,
-    hasSupplies,
-    customerId,
-    accountId,
-    notes,
-    grandTotal,
-    shippingCost,
-    isCreating,
+    customers, accounts, hasSupplies,
+    customerId, accountId, notes, grandTotal, shippingCost,
+    isCreating, isPending,
     onCustomerChange: setCustomerId,
-    onAccountChange: handleAccountChange,
+    onAccountChange: setAccountId,
     onNotesChange: setNotes,
     onShippingCostChange: setShippingCost,
+    onIsPendingChange: setIsPending,
     onCheckout: handleCheckout,
     onOpenSupplies: () => setSuppliesOpen(true),
   };
 
-  // Mobile: sin onBack
   const mobileOptionsProps = baseOptionsProps;
-
-  // Desktop: con onBack
-  const desktopOptionsProps = {
-    ...baseOptionsProps,
-    onBack: () => setDesktopStep(1),
-  };
-
-  // ── Buscador ───────────────────────────────────────────────────────
-  const SearchBar = () => (
-    <div className="relative">
-      <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-      <Input
-        placeholder="Buscar producto..."
-        value={search}
-        onChange={(e) => setSearch(e.target.value)}
-        className="pl-9 pr-9"
-      />
-      {search && (
-        <button
-          onClick={() => setSearch("")}
-          className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
-        >
-          <X className="h-4 w-4" />
-        </button>
-      )}
-    </div>
-  );
+  const desktopOptionsProps = { ...baseOptionsProps, onBack: () => setDesktopStep(1) };
 
   return (
     <>
-      {/* ════════════════════════════════════════════════════════════════
-          LAYOUT MÓVIL
-      ════════════════════════════════════════════════════════════════ */}
+      {/* ════════════════════ LAYOUT MÓVIL ════════════════════════════ */}
       <div className="lg:hidden fixed inset-0 top-16 flex flex-col bg-background">
         <div className="shrink-0 px-4 pt-3 pb-3 space-y-3 bg-background z-10 border-b">
           <div className="flex items-center gap-3">
-            <Button
-              variant="ghost" size="icon" className="shrink-0"
-              onClick={() => safeNavigate(backHref)}
-            >
+            <Button variant="ghost" size="icon" className="shrink-0" onClick={() => safeNavigate(backHref)}>
               <ArrowLeft className="h-4 w-4" />
             </Button>
             <h1 className="text-xl font-bold tracking-tight flex-1">Nueva Venta</h1>
@@ -282,13 +261,10 @@ function NewSaleContent() {
               </Badge>
             )}
           </div>
-          <SearchBar />
+          <SearchBar search={search} onChange={setSearch} />
         </div>
 
-        <div
-          className="flex-1 overflow-y-auto px-4 pt-3 pb-4"
-          style={{ scrollbarWidth: "none" } as React.CSSProperties}
-        >
+        <div className="flex-1 overflow-y-auto px-4 pt-3 pb-4" style={{ scrollbarWidth: "none" } as React.CSSProperties}>
           <PosProductGrid products={availableProducts} cart={cart} onAdd={addToCart} search={search} />
         </div>
 
@@ -302,9 +278,7 @@ function NewSaleContent() {
         />
       </div>
 
-      {/* ════════════════════════════════════════════════════════════════
-          LAYOUT DESKTOP — 2 pasos
-      ════════════════════════════════════════════════════════════════ */}
+      {/* ════════════════════ LAYOUT DESKTOP ═════════════════════════ */}
       <div className="hidden lg:flex flex-col h-[calc(100vh-4rem)] pb-4">
         <div className="shrink-0 flex items-center gap-3 py-3">
           <Button variant="ghost" size="icon" onClick={() => safeNavigate(backHref)}>
@@ -315,8 +289,9 @@ function NewSaleContent() {
             <p className="text-muted-foreground text-sm">
               {cart.length} producto{cart.length !== 1 ? "s" : ""}
               {suppliesUsed.length > 0 && ` · ${suppliesUsed.length} suministro${suppliesUsed.length !== 1 ? "s" : ""}`}
-              {taxRate > 0 && ` · ISV ${taxRate}%`}
+              {taxRate > 0 && ` · ISV ${taxRate}% incluido`}
               {shippingCost > 0 && " · envío incluido"}
+              {isPending && " · pendiente"}
             </p>
           </div>
 
@@ -334,10 +309,10 @@ function NewSaleContent() {
               onClick={() => cart.length > 0 && setDesktopStep(2)}
               disabled={cart.length === 0}
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition-colors ${cart.length === 0
-                ? "text-muted-foreground/40 cursor-not-allowed"
-                : desktopStep === 2
-                  ? "bg-primary text-primary-foreground cursor-pointer"
-                  : "text-muted-foreground hover:bg-muted cursor-pointer"
+                  ? "text-muted-foreground/40 cursor-not-allowed"
+                  : desktopStep === 2
+                    ? "bg-primary text-primary-foreground cursor-pointer"
+                    : "text-muted-foreground hover:bg-muted cursor-pointer"
                 }`}
             >
               Detalle
@@ -345,53 +320,39 @@ function NewSaleContent() {
           </div>
         </div>
 
-        {/* ── Paso 1: Productos ── */}
+        {/* Paso 1 */}
         {desktopStep === 1 && (
           <div className="flex-1 min-h-0 grid grid-cols-5 gap-4">
             <div className="col-span-3 flex flex-col min-h-0 gap-3">
-              <SearchBar />
-              <div
-                className="flex-1 overflow-y-auto"
-                style={{ scrollbarWidth: "none" } as React.CSSProperties}
-              >
+             <SearchBar search={search} onChange={setSearch} />
+              <div className="flex-1 overflow-y-auto" style={{ scrollbarWidth: "none" } as React.CSSProperties}>
                 <PosProductGrid products={availableProducts} cart={cart} onAdd={addToCart} search={search} />
               </div>
             </div>
-            <div
-              className="col-span-2 flex flex-col min-h-0 gap-3 overflow-y-auto"
-              style={{ scrollbarWidth: "none" } as React.CSSProperties}
-            >
+            <div className="col-span-2 flex flex-col min-h-0 gap-3 overflow-y-auto" style={{ scrollbarWidth: "none" } as React.CSSProperties}>
               <CartPanel {...cartProps} />
               {cart.length > 0 && (
                 <Button className="w-full gap-2" onClick={() => setDesktopStep(2)}>
-                  Continuar al detalle
-                  <ArrowRight className="h-4 w-4" />
+                  Continuar al detalle <ArrowRight className="h-4 w-4" />
                 </Button>
               )}
             </div>
           </div>
         )}
 
-        {/* ── Paso 2: Detalle de venta ── */}
+        {/* Paso 2 */}
         {desktopStep === 2 && (
           <div className="flex-1 min-h-0 grid grid-cols-5 gap-4">
-            <div
-              className="col-span-3 flex flex-col min-h-0 gap-3 overflow-y-auto"
-              style={{ scrollbarWidth: "none" } as React.CSSProperties}
-            >
+            <div className="col-span-3 flex flex-col min-h-0 gap-3 overflow-y-auto" style={{ scrollbarWidth: "none" } as React.CSSProperties}>
               <CartPanel {...cartProps} />
             </div>
-            <div
-              className="col-span-2 flex flex-col min-h-0 gap-3 overflow-y-auto"
-              style={{ scrollbarWidth: "none" } as React.CSSProperties}
-            >
+            <div className="col-span-2 flex flex-col min-h-0 gap-3 overflow-y-auto" style={{ scrollbarWidth: "none" } as React.CSSProperties}>
               <SaleOptionsPanel {...desktopOptionsProps} />
             </div>
           </div>
         )}
       </div>
 
-      {/* Modal suministros */}
       <SuppliesUsedModal
         open={suppliesOpen}
         onOpenChange={setSuppliesOpen}
@@ -399,16 +360,9 @@ function NewSaleContent() {
         initialSupplies={suppliesUsed}
       />
 
-      {/* ── Modal confirmación de salida ── */}
       {exitDialog && (
-        <div
-          className="fixed inset-0 bg-black/50 z-50 flex items-end sm:items-center justify-center p-4"
-          onClick={cancelExit}
-        >
-          <div
-            className="bg-background rounded-2xl w-full sm:max-w-sm shadow-2xl animate-in slide-in-from-bottom-4 sm:zoom-in-95 duration-200"
-            onClick={(e) => e.stopPropagation()}
-          >
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-end sm:items-center justify-center p-4" onClick={cancelExit}>
+          <div className="bg-background rounded-2xl w-full sm:max-w-sm shadow-2xl animate-in slide-in-from-bottom-4 sm:zoom-in-95 duration-200" onClick={(e) => e.stopPropagation()}>
             <div className="p-6 pb-4">
               <div className="flex items-center gap-3 mb-3">
                 <div className="h-10 w-10 rounded-full bg-yellow-100 flex items-center justify-center shrink-0">
@@ -425,16 +379,10 @@ function NewSaleContent() {
               </p>
             </div>
             <div className="flex flex-col gap-2 px-6 pb-6">
-              <button
-                onClick={confirmExit}
-                className="w-full py-2.5 rounded-xl bg-destructive text-destructive-foreground text-sm font-semibold hover:bg-destructive/90 transition-colors cursor-pointer"
-              >
+              <button onClick={confirmExit} className="w-full py-2.5 rounded-xl bg-destructive text-destructive-foreground text-sm font-semibold hover:bg-destructive/90 transition-colors cursor-pointer">
                 Sí, salir
               </button>
-              <button
-                onClick={cancelExit}
-                className="w-full py-2.5 rounded-xl border border-border text-sm font-medium hover:bg-muted transition-colors cursor-pointer"
-              >
+              <button onClick={cancelExit} className="w-full py-2.5 rounded-xl border border-border text-sm font-medium hover:bg-muted transition-colors cursor-pointer">
                 Seguir en la venta
               </button>
             </div>
@@ -445,7 +393,6 @@ function NewSaleContent() {
   );
 }
 
-// Suspense requerido por useSearchParams en Next.js App Router
 export default function NewSalePage() {
   return (
     <Suspense>

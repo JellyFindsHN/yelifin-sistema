@@ -27,7 +27,7 @@ function resolveRange(params: URLSearchParams) {
   } else {
     switch (preset) {
       case "today":
-        fromDate = startOfDay(now);  toDate = endOfDay(now);  break;
+        fromDate = startOfDay(now); toDate = endOfDay(now); break;
       case "7d": {
         const seven = new Date(now);
         seven.setDate(seven.getDate() - 6);
@@ -45,7 +45,6 @@ function resolveRange(params: URLSearchParams) {
   }
 
   return {
-    preset,
     fromDateISO: fromDate?.toISOString() ?? null,
     toDateISO:   toDate?.toISOString()   ?? null,
     payment:     payment && payment !== "all" ? payment : null,
@@ -78,14 +77,16 @@ export async function GET(request: NextRequest) {
         s.account_id,
         a.name         AS account_name,
         s.event_id,
+        s.status,
         s.sold_at,
         s.notes,
         s.created_at,
         COUNT(si.id)::int AS items_count,
-        -- net_profit = (precio venta - costo) - ISV extraído del precio
-        -- El ISV está dentro del line_total, no es ganancia del vendedor
-        COALESCE(SUM(si.line_total - (si.unit_cost * si.quantity)), 0)
-          - COALESCE(s.tax, 0) AS net_profit
+        -- net_profit solo para ventas COMPLETED (PENDING aún no es dinero real)
+        CASE WHEN s.status = 'COMPLETED'
+          THEN COALESCE(SUM(si.line_total - (si.unit_cost * si.quantity)), 0) - COALESCE(s.tax, 0)
+          ELSE 0
+        END AS net_profit
       FROM sales s
       LEFT JOIN customers  c  ON c.id  = s.customer_id
       LEFT JOIN accounts   a  ON a.id  = s.account_id
@@ -115,26 +116,21 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
 
     const {
-      customer_id,
-      items,
-      discount,
-      shipping_cost,
-      tax_rate,        // porcentaje: 0, 15 o 18
-      payment_method,
-      account_id,
-      notes,
-      sold_at,
-      supplies_used,
-      event_id,
+      customer_id, items, discount, shipping_cost,
+      tax_rate, payment_method, account_id, notes,
+      sold_at, supplies_used, event_id,
+      status = "COMPLETED",   // ← nuevo: PENDING o COMPLETED
     } = body;
 
-    // ── Validaciones básicas ───────────────────────────────────────────
+    // ── Validaciones ────────────────────────────────────────────────────
     if (!items || !Array.isArray(items) || items.length === 0)
       return createErrorResponse("Se requiere al menos un producto", 400);
     if (!payment_method)
       return createErrorResponse("El método de pago es requerido", 400);
     if (!account_id)
       return createErrorResponse("La cuenta de destino es requerida", 400);
+    if (!["PENDING", "COMPLETED"].includes(status))
+      return createErrorResponse("Estado inválido", 400);
 
     const taxRateNum = Number(tax_rate) || 0;
     if (![0, 15, 18].includes(taxRateNum))
@@ -147,14 +143,12 @@ export async function POST(request: NextRequest) {
         return createErrorResponse("El precio unitario es requerido", 400);
     }
 
-    // ── Verificar cuenta activa ────────────────────────────────────────
     const [account] = await sql`
       SELECT id FROM accounts
       WHERE id = ${account_id} AND user_id = ${userId} AND is_active = TRUE
     `;
     if (!account) return createErrorResponse("Cuenta no encontrada", 404);
 
-    // ── Verificar evento si viene ──────────────────────────────────────
     const eventIdNum = event_id ? Number(event_id) : null;
     if (eventIdNum) {
       const [ev] = await sql`
@@ -163,23 +157,18 @@ export async function POST(request: NextRequest) {
       if (!ev) return createErrorResponse("Evento no encontrado", 404);
     }
 
-    // ── Pre-procesar items FIFO ────────────────────────────────────────
+    // ── FIFO ────────────────────────────────────────────────────────────
     const processedItems: any[] = [];
 
     for (const item of items) {
       const batches = await sql`
         SELECT id, qty_available, unit_cost
         FROM inventory_batches
-        WHERE user_id    = ${userId}
-          AND product_id = ${item.product_id}
-          AND qty_available > 0
+        WHERE user_id = ${userId} AND product_id = ${item.product_id} AND qty_available > 0
         ORDER BY received_at ASC
       `;
 
-      const totalAvailable = batches.reduce(
-        (acc: number, b: any) => acc + Number(b.qty_available), 0
-      );
-
+      const totalAvailable = batches.reduce((acc: number, b: any) => acc + Number(b.qty_available), 0);
       if (totalAvailable < item.quantity) {
         const [product] = await sql`SELECT name FROM products WHERE id = ${item.product_id}`;
         return createErrorResponse(
@@ -208,70 +197,39 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    // ── Validar suministros ────────────────────────────────────────────
-    const normalizedSupplies: {
-      supply_id:  number;
-      quantity:   number;
-      unit_cost:  number;
-      line_total: number;
-    }[] = [];
-
+    // ── Suministros ─────────────────────────────────────────────────────
+    const normalizedSupplies: any[] = [];
     if (Array.isArray(supplies_used) && supplies_used.length > 0) {
       for (const s of supplies_used) {
         const supply_id = Number(s.supply_id);
         const quantity  = Number(s.quantity);
         const unit_cost = Number(s.unit_cost);
-
-        if (!supply_id || quantity <= 0)
-          return createErrorResponse("Datos de suministro inválidos", 400);
-
-        const [supply] = await sql`
-          SELECT id FROM supplies WHERE id = ${supply_id} AND user_id = ${userId}
-        `;
-        if (!supply)
-          return createErrorResponse(`Suministro #${supply_id} no encontrado`, 404);
-
+        if (!supply_id || quantity <= 0) return createErrorResponse("Datos de suministro inválidos", 400);
+        const [supply] = await sql`SELECT id FROM supplies WHERE id = ${supply_id} AND user_id = ${userId}`;
+        if (!supply) return createErrorResponse(`Suministro #${supply_id} no encontrado`, 404);
         normalizedSupplies.push({ supply_id, quantity, unit_cost, line_total: quantity * unit_cost });
       }
     }
 
-    // ── Cálculos finales (TAX-INCLUSIVE) ──────────────────────────────
-    //
-    // El precio del producto YA INCLUYE el ISV.
-    // El ISV se EXTRAE del precio, no se suma encima.
-    //
-    // Fórmula:  taxAmount = base × rate / (100 + rate)
-    // Ejemplo con L 2,599 al 15%:
-    //   taxAmount = 2,599 × 15 / 115 = L 338.87  ← se extrae
-    //   total     = 2,599 + 180 envío = L 2,779   ← cliente paga lo mismo
-    //   ganancia  = (2,599 - 338.87) - 811 costos = L 1,449.13
-    //
+    // ── Cálculos TAX-INCLUSIVE ──────────────────────────────────────────
     const subtotal           = processedItems.reduce((acc, i) => acc + i.unit_price * i.quantity, 0);
     const globalDiscount     = Number(discount) || 0;
     const totalItemDiscounts = processedItems.reduce((acc, i) => acc + i.item_discount, 0);
     const totalDiscount      = globalDiscount + totalItemDiscounts;
     const shippingAmount     = Number(shipping_cost) || 0;
     const taxableBase        = subtotal - totalDiscount;
-    // TAX-INCLUSIVE: ISV extraído del precio, no sumado
-    const taxAmount          = taxRateNum > 0
-      ? taxableBase * taxRateNum / (100 + taxRateNum)
-      : 0;
-    // Total = lo que el cliente paga (el ISV ya está adentro)
+    const taxAmount          = taxRateNum > 0 ? taxableBase * taxRateNum / (100 + taxRateNum) : 0;
     const grandTotal         = taxableBase + shippingAmount;
     const suppliesCost       = normalizedSupplies.reduce((acc, s) => acc + s.line_total, 0);
     const occurredAt         = sold_at ?? new Date().toISOString();
 
-    // ── Número de venta ────────────────────────────────────────────────
+    // ── Número de venta ─────────────────────────────────────────────────
     const [lastSale] = await sql`
-      SELECT sale_number FROM sales
-      WHERE user_id = ${userId}
-      ORDER BY created_at DESC
-      LIMIT 1
+      SELECT sale_number FROM sales WHERE user_id = ${userId} ORDER BY created_at DESC LIMIT 1
     `;
     const lastNum    = lastSale ? parseInt(String(lastSale.sale_number).replace(/\D/g, "")) || 0 : 0;
     const saleNumber = `VTA-${String(lastNum + 1).padStart(5, "0")}`;
 
-    // ── Descripción de transacción ─────────────────────────────────────
     const txParts: string[] = [`Venta ${saleNumber}`];
     if (taxRateNum > 0)     txParts.push(`ISV ${taxRateNum}% incluido`);
     if (shippingAmount > 0) txParts.push(`envío L ${shippingAmount.toFixed(2)}`);
@@ -280,29 +238,27 @@ export async function POST(request: NextRequest) {
       : txParts[0];
 
     // ══════════════════════════════════════════════════════════════════
-    // TRANSACCIÓN DB
-    // ══════════════════════════════════════════════════════════════════
     await sql`BEGIN`;
     try {
 
-      // 1. Crear la venta
+      // 1. Crear venta
       const [sale] = await sql`
         INSERT INTO sales (
           user_id, sale_number, customer_id,
           subtotal, discount, tax_rate, tax, shipping_cost, total,
           payment_method, account_id, event_id,
-          sold_at, notes
+          status, sold_at, notes
         ) VALUES (
           ${userId}, ${saleNumber}, ${customer_id ?? null},
           ${subtotal}, ${totalDiscount}, ${taxRateNum}, ${taxAmount}, ${shippingAmount}, ${grandTotal},
           ${payment_method}, ${account_id}, ${eventIdNum},
-          ${occurredAt}::timestamptz, ${notes ?? null}
+          ${status}, ${occurredAt}::timestamptz, ${notes ?? null}
         )
         RETURNING id
       `;
       const saleId = sale.id as number;
 
-      // 2. Items + FIFO de inventario
+      // 2. Items + FIFO (SIEMPRE se descuenta inventario)
       for (const item of processedItems) {
         await sql`
           INSERT INTO sale_items (
@@ -337,87 +293,63 @@ export async function POST(request: NextRequest) {
         `;
       }
 
-      // 3. Suministros usados
+      // 3. Suministros (SIEMPRE)
       for (const s of normalizedSupplies) {
         await sql`
-          INSERT INTO sale_supplies (
-            user_id, sale_id, supply_id,
-            quantity, unit_cost, line_total
-          ) VALUES (
-            ${userId}, ${saleId}, ${s.supply_id},
-            ${s.quantity}, ${s.unit_cost}, ${s.line_total}
-          )
+          INSERT INTO sale_supplies (user_id, sale_id, supply_id, quantity, unit_cost, line_total)
+          VALUES (${userId}, ${saleId}, ${s.supply_id}, ${s.quantity}, ${s.unit_cost}, ${s.line_total})
         `;
-
         await sql`
-          UPDATE supplies
-          SET stock = GREATEST(0, stock - ${s.quantity})
+          UPDATE supplies SET stock = GREATEST(0, stock - ${s.quantity})
           WHERE id = ${s.supply_id} AND user_id = ${userId}
         `;
-
         await sql`
-          INSERT INTO supply_movements (
-            user_id, movement_type, supply_id,
-            quantity, reference_type, reference_id
-          ) VALUES (
-            ${userId}, 'OUT', ${s.supply_id},
-            ${s.quantity}, 'SALE', ${saleId}
-          )
+          INSERT INTO supply_movements (user_id, movement_type, supply_id, quantity, reference_type, reference_id)
+          VALUES (${userId}, 'OUT', ${s.supply_id}, ${s.quantity}, 'SALE', ${saleId})
         `;
       }
 
-      // 4. Transacción INCOME
-      const txRefType = eventIdNum ? "EVENT" : "SALE";
-      const txRefId   = eventIdNum ? eventIdNum : saleId;
+      // 4. Transacción + balance + cliente SOLO si COMPLETED
+      if (status === "COMPLETED") {
+        const txRefType = eventIdNum ? "EVENT" : "SALE";
+        const txRefId   = eventIdNum ? eventIdNum : saleId;
 
-      await sql`
-        INSERT INTO transactions (
-          user_id, type, account_id, amount,
-          category, description, reference_type, reference_id, occurred_at
-        ) VALUES (
-          ${userId}, 'INCOME', ${account_id}, ${grandTotal},
-          'Ventas', ${txDescription},
-          ${txRefType}, ${txRefId}, ${occurredAt}::timestamptz
-        )
-      `;
-
-      // 5. Actualizar balance
-      await sql`
-        UPDATE accounts
-        SET balance = balance + ${grandTotal}
-        WHERE id = ${account_id} AND user_id = ${userId}
-      `;
-
-      // 6. Métricas del cliente
-      if (customer_id) {
         await sql`
-          UPDATE customers
-          SET total_orders = total_orders + 1,
-              total_spent  = total_spent  + ${grandTotal},
-              updated_at   = CURRENT_TIMESTAMP
-          WHERE id = ${customer_id} AND user_id = ${userId}
+          INSERT INTO transactions (
+            user_id, type, account_id, amount,
+            category, description, reference_type, reference_id, occurred_at
+          ) VALUES (
+            ${userId}, 'INCOME', ${account_id}, ${grandTotal},
+            'Ventas', ${txDescription},
+            ${txRefType}, ${txRefId}, ${occurredAt}::timestamptz
+          )
         `;
+
+        await sql`
+          UPDATE accounts SET balance = balance + ${grandTotal}
+          WHERE id = ${account_id} AND user_id = ${userId}
+        `;
+
+        if (customer_id) {
+          await sql`
+            UPDATE customers
+            SET total_orders = total_orders + 1, total_spent = total_spent + ${grandTotal}, updated_at = CURRENT_TIMESTAMP
+            WHERE id = ${customer_id} AND user_id = ${userId}
+          `;
+        }
       }
 
       await sql`COMMIT`;
 
-      return Response.json(
-        {
-          message: "Venta registrada exitosamente",
-          data: {
-            id:            saleId,
-            sale_number:   saleNumber,
-            subtotal,
-            discount:      totalDiscount,
-            tax_rate:      taxRateNum,
-            tax:           taxAmount,
-            shipping_cost: shippingAmount,
-            supplies_cost: suppliesCost,
-            total:         grandTotal,
-          },
+      return Response.json({
+        message: status === "PENDING" ? "Venta pendiente registrada" : "Venta registrada exitosamente",
+        data: {
+          id: saleId, sale_number: saleNumber, status,
+          subtotal, discount: totalDiscount, tax_rate: taxRateNum,
+          tax: taxAmount, shipping_cost: shippingAmount,
+          supplies_cost: suppliesCost, total: grandTotal,
         },
-        { status: 201 }
-      );
+      }, { status: 201 });
 
     } catch (innerError) {
       await sql`ROLLBACK`;
@@ -425,7 +357,7 @@ export async function POST(request: NextRequest) {
     }
 
   } catch (error) {
-    console.error("❌ POST /api/sales:", error);
+    console.error("POST /api/sales:", error);
     return createErrorResponse("Error al registrar la venta", 500);
   }
 }

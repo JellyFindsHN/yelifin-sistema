@@ -1,8 +1,11 @@
+-- =========================================================
+-- EXTENSIONES
+-- =========================================================
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
--- =========================
+-- =========================================================
 -- USUARIOS (FIREBASE AUTH)
--- =========================
+-- =========================================================
 
 CREATE TABLE users (
   id BIGSERIAL PRIMARY KEY,
@@ -25,13 +28,14 @@ CREATE TABLE user_profile (
   timezone VARCHAR(64) NOT NULL DEFAULT 'America/Tegucigalpa',
   currency VARCHAR(3) NOT NULL DEFAULT 'HNL',
   locale VARCHAR(16) NOT NULL DEFAULT 'es-HN',
+  onboarding_completed BOOLEAN NOT NULL DEFAULT FALSE,
   created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
--- =========================
+-- =========================================================
 -- PLANES / FEATURES (SaaS)
--- =========================
+-- =========================================================
 
 CREATE TABLE subscription_plans (
   id BIGSERIAL PRIMARY KEY,
@@ -67,7 +71,7 @@ CREATE TABLE plan_features (
   is_enabled BOOLEAN NOT NULL DEFAULT TRUE,
   limit_value INT,
   created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  UNIQUE(plan_id, feature_id)
+  UNIQUE (plan_id, feature_id)
 );
 
 CREATE INDEX idx_plan_features_plan ON plan_features(plan_id);
@@ -113,9 +117,9 @@ CREATE INDEX idx_subscription_payments_user ON subscription_payments(user_id);
 CREATE INDEX idx_subscription_payments_subscription ON subscription_payments(subscription_id);
 CREATE INDEX idx_subscription_payments_status ON subscription_payments(status);
 
--- =========================
+-- =========================================================
 -- CLIENTES
--- =========================
+-- =========================================================
 
 CREATE TABLE customers (
   id BIGSERIAL PRIMARY KEY,
@@ -133,9 +137,45 @@ CREATE TABLE customers (
 CREATE INDEX idx_customers_user ON customers(user_id);
 CREATE INDEX idx_customers_user_name ON customers(user_id, name);
 
--- =========================
+-- =========================================================
+-- CUENTAS / FINANZAS
+-- =========================================================
+
+CREATE TABLE accounts (
+  id BIGSERIAL PRIMARY KEY,
+  user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  name VARCHAR(120) NOT NULL,
+  type VARCHAR(20) NOT NULL CHECK (type IN ('CASH','BANK','WALLET','OTHER')),
+  balance NUMERIC(14,2) NOT NULL DEFAULT 0,
+  is_active BOOLEAN NOT NULL DEFAULT TRUE,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE (user_id, name)
+);
+
+CREATE INDEX idx_accounts_user ON accounts(user_id);
+
+CREATE TABLE transactions (
+  id BIGSERIAL PRIMARY KEY,
+  user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  type VARCHAR(15) NOT NULL CHECK (type IN ('INCOME','EXPENSE','TRANSFER')),
+  account_id BIGINT NOT NULL REFERENCES accounts(id) ON DELETE RESTRICT,
+  to_account_id BIGINT REFERENCES accounts(id) ON DELETE RESTRICT,
+  amount NUMERIC(14,2) NOT NULL CHECK (amount >= 0),
+  category VARCHAR(80),
+  description TEXT,
+  reference_type VARCHAR(20) CHECK (reference_type IN ('SALE','PURCHASE','SUPPLY_PURCHASE','EVENT','OTHER')),
+  reference_id BIGINT,
+  occurred_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX idx_transactions_user ON transactions(user_id);
+CREATE INDEX idx_transactions_user_date ON transactions(user_id, occurred_at);
+CREATE INDEX idx_transactions_user_type ON transactions(user_id, type);
+
+-- =========================================================
 -- PRODUCTOS
--- =========================
+-- =========================================================
 
 CREATE TABLE products (
   id BIGSERIAL PRIMARY KEY,
@@ -145,10 +185,11 @@ CREATE TABLE products (
   sku VARCHAR(80),
   barcode VARCHAR(80),
   price NUMERIC(12,2) NOT NULL DEFAULT 0 CHECK (price >= 0),
+  image_url TEXT,
   is_active BOOLEAN NOT NULL DEFAULT TRUE,
   created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  UNIQUE(user_id, sku)
+  UNIQUE (user_id, sku)
 );
 
 CREATE INDEX idx_products_user ON products(user_id);
@@ -165,15 +206,15 @@ CREATE TABLE product_variants (
   is_active BOOLEAN NOT NULL DEFAULT TRUE,
   created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  UNIQUE(user_id, sku)
+  UNIQUE (user_id, sku)
 );
 
 CREATE INDEX idx_variants_user ON product_variants(user_id);
 CREATE INDEX idx_variants_product ON product_variants(product_id);
 
--- =========================
--- PROVEEDORES (opcional, útil para compras)
--- =========================
+-- =========================================================
+-- PROVEEDORES
+-- =========================================================
 
 CREATE TABLE suppliers (
   id BIGSERIAL PRIMARY KEY,
@@ -183,20 +224,21 @@ CREATE TABLE suppliers (
   email VARCHAR(255),
   notes TEXT,
   created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  UNIQUE(user_id, name)
+  UNIQUE (user_id, name)
 );
 
 CREATE INDEX idx_suppliers_user ON suppliers(user_id);
 
--- =========================
--- COMPRAS (LOTES) + INVENTARIO POR CAPAS
--- =========================
+-- =========================================================
+-- COMPRAS / INVENTARIO (LOTES)
+-- =========================================================
 
 CREATE TABLE purchase_batches (
   id BIGSERIAL PRIMARY KEY,
   user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   supplier_id BIGINT REFERENCES suppliers(id) ON DELETE SET NULL,
   supplier_name VARCHAR(255),
+  account_id INTEGER REFERENCES accounts(id),
   currency VARCHAR(3) NOT NULL DEFAULT 'HNL',
   exchange_rate NUMERIC(12,6) DEFAULT 1 CHECK (exchange_rate >= 0),
   subtotal NUMERIC(12,2) NOT NULL DEFAULT 0 CHECK (subtotal >= 0),
@@ -220,6 +262,7 @@ CREATE TABLE purchase_batch_items (
   variant_id BIGINT REFERENCES product_variants(id) ON DELETE RESTRICT,
   quantity INT NOT NULL CHECK (quantity > 0),
   unit_cost NUMERIC(12,4) NOT NULL CHECK (unit_cost >= 0),
+  unit_cost_usd NUMERIC(10,4) DEFAULT 0,
   total_cost NUMERIC(12,2) NOT NULL CHECK (total_cost >= 0),
   created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
@@ -251,7 +294,14 @@ CREATE TABLE inventory_movements (
   product_id BIGINT NOT NULL REFERENCES products(id) ON DELETE RESTRICT,
   variant_id BIGINT REFERENCES product_variants(id) ON DELETE RESTRICT,
   quantity INT NOT NULL CHECK (quantity > 0),
-  reference_type VARCHAR(20) CHECK (reference_type IN ('PURCHASE','SALE','ADJUSTMENT')),
+  reference_type VARCHAR(20) CHECK (reference_type IN (
+    'PURCHASE',
+    'SALE',
+    'ADJUSTMENT',
+    'INITIAL',
+    'SALE_CANCELLED',
+    'SALE_EDITED'
+  )),
   reference_id BIGINT,
   notes TEXT,
   created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
@@ -261,87 +311,9 @@ CREATE INDEX idx_inventory_movements_user ON inventory_movements(user_id);
 CREATE INDEX idx_inventory_movements_user_date ON inventory_movements(user_id, created_at);
 CREATE INDEX idx_inventory_movements_product ON inventory_movements(user_id, product_id);
 
--- =========================
--- FINANZAS (CUENTAS / TRANSACCIONES)
--- =========================
-
-CREATE TABLE accounts (
-  id BIGSERIAL PRIMARY KEY,
-  user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-  name VARCHAR(120) NOT NULL,
-  type VARCHAR(20) NOT NULL CHECK (type IN ('CASH','BANK','WALLET','OTHER')),
-  balance NUMERIC(14,2) NOT NULL DEFAULT 0,
-  is_active BOOLEAN NOT NULL DEFAULT TRUE,
-  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  UNIQUE(user_id, name)
-);
-
-CREATE INDEX idx_accounts_user ON accounts(user_id);
-
-CREATE TABLE transactions (
-  id BIGSERIAL PRIMARY KEY,
-  user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-  type VARCHAR(15) NOT NULL CHECK (type IN ('INCOME','EXPENSE','TRANSFER')),
-  account_id BIGINT NOT NULL REFERENCES accounts(id) ON DELETE RESTRICT,
-  to_account_id BIGINT REFERENCES accounts(id) ON DELETE RESTRICT,
-  amount NUMERIC(14,2) NOT NULL CHECK (amount >= 0),
-  category VARCHAR(80),
-  description TEXT,
-  reference_type VARCHAR(20) CHECK (reference_type IN ('SALE','PURCHASE','SUPPLY_PURCHASE','EVENT','OTHER')),
-  reference_id BIGINT,
-  occurred_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
-);
-
-CREATE INDEX idx_transactions_user ON transactions(user_id);
-CREATE INDEX idx_transactions_user_date ON transactions(user_id, occurred_at);
-CREATE INDEX idx_transactions_user_type ON transactions(user_id, type);
-
--- =========================
--- VENTAS
--- =========================
-
-CREATE TABLE sales (
-  id BIGSERIAL PRIMARY KEY,
-  user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-  sale_number VARCHAR(60) NOT NULL,
-  customer_id BIGINT REFERENCES customers(id) ON DELETE SET NULL,
-  subtotal NUMERIC(12,2) NOT NULL DEFAULT 0 CHECK (subtotal >= 0),
-  discount NUMERIC(12,2) NOT NULL DEFAULT 0 CHECK (discount >= 0),
-  tax NUMERIC(12,2) NOT NULL DEFAULT 0 CHECK (tax >= 0),
-  total NUMERIC(12,2) NOT NULL DEFAULT 0 CHECK (total >= 0),
-  payment_method VARCHAR(20) CHECK (payment_method IN ('CASH','CARD','TRANSFER','MIXED','OTHER')),
-  account_id BIGINT REFERENCES accounts(id) ON DELETE SET NULL,
-  sold_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  notes TEXT,
-  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  UNIQUE(user_id, sale_number)
-);
-
-CREATE INDEX idx_sales_user ON sales(user_id);
-CREATE INDEX idx_sales_user_date ON sales(user_id, sold_at);
-CREATE INDEX idx_sales_customer ON sales(user_id, customer_id);
-
-CREATE TABLE sale_items (
-  id BIGSERIAL PRIMARY KEY,
-  user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-  sale_id BIGINT NOT NULL REFERENCES sales(id) ON DELETE CASCADE,
-  product_id BIGINT NOT NULL REFERENCES products(id) ON DELETE RESTRICT,
-  variant_id BIGINT REFERENCES product_variants(id) ON DELETE RESTRICT,
-  quantity INT NOT NULL CHECK (quantity > 0),
-  unit_price NUMERIC(12,2) NOT NULL CHECK (unit_price >= 0),
-  unit_cost NUMERIC(12,4) NOT NULL DEFAULT 0 CHECK (unit_cost >= 0),
-  line_total NUMERIC(12,2) NOT NULL CHECK (line_total >= 0),
-  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
-);
-
-CREATE INDEX idx_sale_items_user ON sale_items(user_id);
-CREATE INDEX idx_sale_items_sale ON sale_items(sale_id);
-CREATE INDEX idx_sale_items_product ON sale_items(product_id);
-
--- =========================
--- INSUMOS (opcional)
--- =========================
+-- =========================================================
+-- INSUMOS
+-- =========================================================
 
 CREATE TABLE supplies (
   id BIGSERIAL PRIMARY KEY,
@@ -352,7 +324,7 @@ CREATE TABLE supplies (
   min_stock INT NOT NULL DEFAULT 0 CHECK (min_stock >= 0),
   unit_cost NUMERIC(12,4) NOT NULL DEFAULT 0 CHECK (unit_cost >= 0),
   created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  UNIQUE(user_id, name)
+  UNIQUE (user_id, name)
 );
 
 CREATE INDEX idx_supplies_user ON supplies(user_id);
@@ -361,6 +333,7 @@ CREATE TABLE supply_purchases (
   id BIGSERIAL PRIMARY KEY,
   user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   supplier_id BIGINT REFERENCES suppliers(id) ON DELETE SET NULL,
+  account_id INTEGER REFERENCES accounts(id),
   subtotal NUMERIC(12,2) NOT NULL DEFAULT 0 CHECK (subtotal >= 0),
   tax NUMERIC(12,2) NOT NULL DEFAULT 0 CHECK (tax >= 0),
   total NUMERIC(12,2) NOT NULL DEFAULT 0 CHECK (total >= 0),
@@ -390,7 +363,7 @@ CREATE TABLE supply_movements (
   user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   movement_type VARCHAR(10) NOT NULL CHECK (movement_type IN ('IN','OUT','ADJUST')),
   supply_id BIGINT NOT NULL REFERENCES supplies(id) ON DELETE RESTRICT,
-  quantity INT NOT NULL CHECK (quantity > 0),
+  quantity NUMERIC(12,4) NOT NULL CHECK (quantity > 0),
   reference_type VARCHAR(20) CHECK (reference_type IN ('SUPPLY_PURCHASE','SALE','ADJUSTMENT')),
   reference_id BIGINT,
   created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
@@ -403,7 +376,7 @@ CREATE TABLE sale_supplies (
   user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   sale_id BIGINT NOT NULL REFERENCES sales(id) ON DELETE CASCADE,
   supply_id BIGINT NOT NULL REFERENCES supplies(id) ON DELETE RESTRICT,
-  quantity INT NOT NULL CHECK (quantity > 0),
+  quantity NUMERIC(12,4) NOT NULL CHECK (quantity > 0),
   unit_cost NUMERIC(12,4) NOT NULL DEFAULT 0 CHECK (unit_cost >= 0),
   line_total NUMERIC(12,2) NOT NULL DEFAULT 0 CHECK (line_total >= 0),
   created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
@@ -412,9 +385,9 @@ CREATE TABLE sale_supplies (
 CREATE INDEX idx_sale_supplies_user ON sale_supplies(user_id);
 CREATE INDEX idx_sale_supplies_sale ON sale_supplies(sale_id);
 
--- =========================
--- EVENTOS (opcional)
--- =========================
+-- =========================================================
+-- EVENTOS
+-- =========================================================
 
 CREATE TABLE events (
   id BIGSERIAL PRIMARY KEY,
@@ -441,80 +414,73 @@ CREATE TABLE event_inventory (
   sold_qty INT NOT NULL DEFAULT 0 CHECK (sold_qty >= 0),
   returned_qty INT NOT NULL DEFAULT 0 CHECK (returned_qty >= 0),
   created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  UNIQUE(user_id, event_id, product_id, variant_id)
+  UNIQUE (user_id, event_id, product_id, variant_id)
 );
 
 CREATE INDEX idx_event_inventory_user ON event_inventory(user_id);
 CREATE INDEX idx_event_inventory_event ON event_inventory(event_id);
-ALTER TABLE products ADD COLUMN image_url TEXT;
-ALTER TABLE purchase_batch_items ADD COLUMN unit_cost_usd NUMERIC(10,4) DEFAULT 0;
-ALTER TABLE purchase_batches ADD COLUMN IF NOT EXISTS account_id INTEGER REFERENCES accounts(id);
--- Opcional pero recomendado:
-ALTER TABLE transactions ADD COLUMN IF NOT EXISTS reference_type VARCHAR(20) 
-  CHECK (reference_type IN ('SALE','PURCHASE','SUPPLY_PURCHASE','EVENT','OTHER'));
 
-ALTER TABLE supply_purchases ADD COLUMN IF NOT EXISTS account_id INTEGER REFERENCES accounts(id);
+-- =========================================================
+-- VENTAS
+-- =========================================================
 
--- Agregar shipping_cost a sales
-ALTER TABLE sales ADD COLUMN IF NOT EXISTS shipping_cost NUMERIC(12,2) NOT NULL DEFAULT 0 CHECK (shipping_cost >= 0);
+CREATE TABLE sales (
+  id BIGSERIAL PRIMARY KEY,
+  user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  sale_number VARCHAR(60) NOT NULL,
+  customer_id BIGINT REFERENCES customers(id) ON DELETE SET NULL,
+  event_id BIGINT REFERENCES events(id) ON DELETE SET NULL,
+  subtotal NUMERIC(12,2) NOT NULL DEFAULT 0 CHECK (subtotal >= 0),
+  discount NUMERIC(12,2) NOT NULL DEFAULT 0 CHECK (discount >= 0),
+  tax_rate NUMERIC(5,2) NOT NULL DEFAULT 0 CHECK (tax_rate >= 0 AND tax_rate <= 100),
+  tax NUMERIC(12,2) NOT NULL DEFAULT 0 CHECK (tax >= 0),
+  shipping_cost NUMERIC(12,2) NOT NULL DEFAULT 0 CHECK (shipping_cost >= 0),
+  total NUMERIC(12,2) NOT NULL DEFAULT 0 CHECK (total >= 0),
+  payment_method VARCHAR(20) CHECK (payment_method IN ('CASH','CARD','TRANSFER','MIXED','OTHER')),
+  account_id BIGINT REFERENCES accounts(id) ON DELETE SET NULL,
+  status TEXT NOT NULL DEFAULT 'COMPLETED'
+    CHECK (status IN ('PENDING', 'COMPLETED', 'CANCELLED')),
+  sold_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  notes TEXT,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at timestamptz,
+  UNIQUE (user_id, sale_number)
+);
 
--- sale_supplies ya soporta decimales en quantity? No, es INT
--- Hay que cambiarlo para soportar kg, litros, etc.
-ALTER TABLE sale_supplies ALTER COLUMN quantity TYPE NUMERIC(12,4);
-ALTER TABLE supply_movements ALTER COLUMN quantity TYPE NUMERIC(12,4);
--- Agregar flag de onboarding a user_profile
-ALTER TABLE user_profile
-  ADD COLUMN IF NOT EXISTS onboarding_completed BOOLEAN NOT NULL DEFAULT FALSE;
+CREATE INDEX idx_sales_user ON sales(user_id);
+CREATE INDEX idx_sales_user_date ON sales(user_id, sold_at);
+CREATE INDEX idx_sales_customer ON sales(user_id, customer_id);
+CREATE INDEX idx_sales_status ON sales(user_id, status);
 
-ALTER TABLE inventory_movements 
-DROP CONSTRAINT inventory_movements_reference_type_check;
+CREATE TABLE sale_items (
+  id BIGSERIAL PRIMARY KEY,
+  user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  sale_id BIGINT NOT NULL REFERENCES sales(id) ON DELETE CASCADE,
+  product_id BIGINT NOT NULL REFERENCES products(id) ON DELETE RESTRICT,
+  variant_id BIGINT REFERENCES product_variants(id) ON DELETE RESTRICT,
+  quantity INT NOT NULL CHECK (quantity > 0),
+  unit_price NUMERIC(12,2) NOT NULL CHECK (unit_price >= 0),
+  unit_cost NUMERIC(12,4) NOT NULL DEFAULT 0 CHECK (unit_cost >= 0),
+  line_total NUMERIC(12,2) NOT NULL CHECK (line_total >= 0),
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
 
-ALTER TABLE inventory_movements 
-ADD CONSTRAINT inventory_movements_reference_type_check 
-CHECK (reference_type IN ('PURCHASE', 'SALE', 'ADJUSTMENT', 'INITIAL'));
+CREATE INDEX idx_sale_items_user ON sale_items(user_id);
+CREATE INDEX idx_sale_items_sale ON sale_items(sale_id);
+CREATE INDEX idx_sale_items_product ON sale_items(product_id);
 
-ALTER TABLE sales ADD COLUMN IF NOT EXISTS event_id BIGINT REFERENCES events(id) ON DELETE SET NULL;
+-- =========================================================
+-- FUNCIONES Y TRIGGERS
+-- =========================================================
 
-ALTER TABLE sales 
-  ADD COLUMN IF NOT EXISTS tax_rate NUMERIC(5,2) NOT NULL DEFAULT 0 
-  CHECK (tax_rate >= 0 AND tax_rate <= 100);
-
-  -- Migration: agregar status a sales
-ALTER TABLE sales
-  ADD COLUMN IF NOT EXISTS status TEXT NOT NULL DEFAULT 'COMPLETED'
-  CHECK (status IN ('PENDING', 'COMPLETED', 'CANCELLED'));
-
--- Índice para filtrar por status frecuentemente
-CREATE INDEX IF NOT EXISTS idx_sales_status ON sales(user_id, status);
-
-ALTER TABLE inventory_movements
-  DROP CONSTRAINT inventory_movements_reference_type_check;
-
-ALTER TABLE inventory_movements
-  ADD CONSTRAINT inventory_movements_reference_type_check
-  CHECK (
-    reference_type IN (
-      'PURCHASE',
-      'SALE',
-      'ADJUSTMENT',
-      'INITIAL',
-      'SALE_CANCELLED',
-      'SALE_EDITED'
-    )
-  );
-
-
-  ALTER TABLE sales
-  ADD COLUMN updated_at timestamptz;
-
-  CREATE OR REPLACE FUNCTION set_updated_at()
+-- Actualización automática de updated_at en sales
+CREATE OR REPLACE FUNCTION set_updated_at()
 RETURNS trigger AS $$
 BEGIN
   NEW.updated_at = NOW();
   RETURN NEW;
 END;
 $$ LANGUAGE plpgsql;
-
 
 CREATE TRIGGER set_updated_at_on_sales
 BEFORE UPDATE ON sales

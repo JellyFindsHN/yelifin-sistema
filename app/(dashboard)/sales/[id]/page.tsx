@@ -1,21 +1,34 @@
 // app/(dashboard)/sales/[id]/page.tsx
 "use client";
 
-import { use } from "react";
+import { use, useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
+import Image from "next/image";
+import { toast } from "sonner";
+
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
 import {
-  ArrowLeft, Receipt, User, Package,
-  TrendingUp, Tag, Building2, Truck, FlaskConical,
+  ArrowLeft,
+  Receipt,
+  User,
+  Package,
+  TrendingUp,
+  Tag,
+  Building2,
+  Truck,
+  FlaskConical,
+  Clock,
+  CheckCircle,
 } from "lucide-react";
-import Image from "next/image";
-import { useSale } from "@/hooks/swr/use-sales";
+
+import { useSale, usePatchSale } from "@/hooks/swr/use-sales";
 import { useCurrency } from "@/hooks/swr/use-currency";
-import Link from "next/link";
+import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 
 type Props = { params: Promise<{ id: string }> };
 
@@ -23,9 +36,14 @@ const getTaxRate = (v: any): number => Number(v) || 0;
 
 export default function SaleDetailPage({ params }: Props) {
   const { id }              = use(params);
-  const { sale, isLoading } = useSale(Number(id));
+  const numericId           = Number(id);
+  const { sale, isLoading } = useSale(numericId);
+  const { confirmSale, cancelSale, isPatching } = usePatchSale(numericId);
   const router              = useRouter();
   const { format }          = useCurrency();
+
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [cancelOpen,  setCancelOpen]  = useState(false);
 
   if (isLoading) return <SaleDetailSkeleton />;
 
@@ -42,16 +60,48 @@ export default function SaleDetailPage({ params }: Props) {
 
   const taxRate        = getTaxRate(sale.tax_rate);
   const taxAmount      = Number(sale.tax ?? 0);
-  const productsCost   = sale.items.reduce((acc, i) => acc + Number(i.unit_cost) * i.quantity, 0);
-  const suppliesCost   = (sale.supplies ?? []).reduce((acc, s) => acc + Number(s.line_total), 0);
+  const productsCost   = sale.items.reduce(
+    (acc, i) => acc + Number(i.unit_cost) * i.quantity,
+    0,
+  );
+  const suppliesCost   = (sale.supplies ?? []).reduce(
+    (acc, s) => acc + Number(s.line_total),
+    0,
+  );
   const shippingAmount = Number(sale.shipping_cost ?? 0);
 
+  const isPending   = sale.status === "PENDING";
+  const isCompleted = sale.status === "COMPLETED";
+
   // TAX-INCLUSIVE: el ISV está dentro del precio, no es ganancia del vendedor
-  // Ganancia = (precio venta - descuento) - ISV extraído - costos
   const taxableBase = Number(sale.subtotal) - Number(sale.discount ?? 0);
   const totalProfit = taxableBase - taxAmount - productsCost - suppliesCost;
   const netBase     = taxableBase - taxAmount; // lo que realmente queda después del ISV
   const margin      = netBase > 0 ? (totalProfit / netBase) * 100 : 0;
+
+  const profitLabel = isPending ? "Ganancia estimada" : "Ganancia neta";
+
+  const handleConfirmPayment = async () => {
+    try {
+      await confirmSale();
+      toast.success("Venta confirmada");
+      setConfirmOpen(false);
+      router.refresh();
+    } catch (err: any) {
+      toast.error(err.message || "Error al confirmar la venta");
+    }
+  };
+
+  const handleCancelSale = async () => {
+    try {
+      await cancelSale();
+      toast.success("Venta cancelada · stock devuelto");
+      setCancelOpen(false);
+      router.refresh();
+    } catch (err: any) {
+      toast.error(err.message || "Error al cancelar la venta");
+    }
+  };
 
   return (
     <div className="space-y-6 max-w-3xl mx-auto">
@@ -62,23 +112,92 @@ export default function SaleDetailPage({ params }: Props) {
           <ArrowLeft className="h-4 w-4" />
         </Button>
         <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
             <h1 className="text-2xl font-bold tracking-tight font-mono">
               {sale.sale_number}
             </h1>
+
+            {isCompleted && (
+              <Badge
+                className="bg-green-100 text-green-700 border-green-200 gap-1"
+                variant="outline"
+              >
+                <CheckCircle className="h-3 w-3" />
+                Completada
+              </Badge>
+            )}
+
+            {isPending && (
+              <Badge
+                className="bg-amber-100 text-amber-700 border-amber-200 gap-1"
+                variant="outline"
+              >
+                <Clock className="h-3 w-3" />
+                Pendiente de pago
+              </Badge>
+            )}
+
             {taxRate > 0 && (
-              <Badge className="bg-amber-100 text-amber-700 border-amber-200" variant="outline">
+              <Badge
+                className="bg-amber-100 text-amber-700 border-amber-200"
+                variant="outline"
+              >
                 ISV {taxRate}% incluido
               </Badge>
             )}
           </div>
           <p className="text-muted-foreground text-sm">
             {new Date(sale.sold_at).toLocaleDateString("es-HN", {
-              day: "numeric", month: "short", year: "numeric",
+              day: "numeric",
+              month: "short",
+              year: "numeric",
             })}
           </p>
         </div>
       </div>
+
+   
+      {/* Aviso si está pendiente + acciones */}
+      {isPending && (
+        <Card className="border-amber-200 bg-amber-50/70 dark:bg-amber-950/20">
+          <CardContent className="py-3 px-3.5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="text-xs text-amber-800 space-y-0.5">
+              <p className="font-semibold">Esta venta está registrada como pendiente.</p>
+              <p className="text-[11px]">
+                El inventario ya se descontó, pero el pago aún no se ha confirmado.
+              </p>
+            </div>
+            <div className="flex flex-col sm:flex-row flex-wrap gap-2 justify-end w-full sm:w-auto">
+              <Button
+                variant="outline"
+                size="sm"
+                className="w-full sm:w-auto"
+                onClick={() => router.push(`/sales/${sale.id}/edit`)}
+              >
+                Editar venta
+              </Button>
+              <Button
+                size="sm"
+                className="w-full sm:w-auto bg-amber-500 hover:bg-amber-600 text-white"
+                onClick={() => setConfirmOpen(true)}
+                disabled={isPatching}
+              >
+                Confirmar pago
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                className="w-full sm:w-auto text-destructive border-destructive/60"
+                onClick={() => setCancelOpen(true)}
+                disabled={isPatching}
+              >
+                Cancelar venta
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
 
       {/* Cliente + Cuenta */}
       <div className="grid grid-cols-2 gap-3">
@@ -132,13 +251,20 @@ export default function SaleDetailPage({ params }: Props) {
           </CardContent>
         </Card>
 
-        <Card className="border-green-200 bg-green-50 dark:bg-green-950/20">
+        <Card className={isPending
+          ? "border-amber-200 bg-amber-50 dark:bg-amber-950/20"
+          : "border-green-200 bg-green-50 dark:bg-green-950/20"}
+        >
           <CardContent className="pl-3.5 text-center">
-            <p className="text-xs text-muted-foreground">Ganancia neta</p>
-            <p className="text-lg md:text-xl font-bold mt-0.5 text-green-600">
+            <p className="text-xs text-muted-foreground">{profitLabel}</p>
+            <p className={`text-lg md:text-xl font-bold mt-0.5 ${
+              isPending ? "text-amber-700" : "text-green-600"
+            }`}>
               {format(totalProfit)}
             </p>
-            <p className="text-xs text-green-600">
+            <p className={`text-xs ${
+              isPending ? "text-amber-700" : "text-green-600"
+            }`}>
               {margin.toFixed(1)}% margen
             </p>
           </CardContent>
@@ -158,13 +284,19 @@ export default function SaleDetailPage({ params }: Props) {
             const itemCost   = Number(item.unit_cost) * item.quantity;
             const itemProfit = Number(item.line_total) - itemCost;
             const itemMargin = Number(item.line_total) > 0
-              ? (itemProfit / Number(item.line_total)) * 100 : 0;
+              ? (itemProfit / Number(item.line_total)) * 100
+              : 0;
 
             return (
               <div key={item.id} className="flex gap-3 p-3 rounded-lg border">
                 <div className="relative h-12 w-12 rounded-lg overflow-hidden bg-muted shrink-0 flex items-center justify-center">
                   {item.image_url ? (
-                    <Image src={item.image_url} alt={item.product_name} fill className="object-cover" />
+                    <Image
+                      src={item.image_url}
+                      alt={item.product_name}
+                      fill
+                      className="object-cover"
+                    />
                   ) : (
                     <Package className="h-5 w-5 text-muted-foreground/40" />
                   )}
@@ -172,14 +304,22 @@ export default function SaleDetailPage({ params }: Props) {
                 <div className="flex-1 min-w-0">
                   <p className="font-medium truncate">{item.product_name}</p>
                   <div className="flex flex-wrap gap-x-3 gap-y-0.5 mt-1 text-xs text-muted-foreground">
-                    <span>{item.quantity} × {format(Number(item.unit_price))}</span>
+                    <span>
+                      {item.quantity} × {format(Number(item.unit_price))}
+                    </span>
                     <span>Costo: {format(Number(item.unit_cost))}/u</span>
                   </div>
                 </div>
                 <div className="text-right shrink-0">
-                  <p className="font-bold text-sm">{format(Number(item.line_total))}</p>
-                  <p className="text-xs text-green-600 font-medium">+{format(itemProfit)}</p>
-                  <p className="text-xs text-muted-foreground">{itemMargin.toFixed(1)}%</p>
+                  <p className="font-bold text-sm">
+                    {format(Number(item.line_total))}
+                  </p>
+                  <p className="text-xs text-green-600 font-medium">
+                    +{format(itemProfit)}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    {itemMargin.toFixed(1)}%
+                  </p>
                 </div>
               </div>
             );
@@ -198,9 +338,14 @@ export default function SaleDetailPage({ params }: Props) {
           </CardHeader>
           <CardContent className="space-y-2 pt-0">
             {sale.supplies.map((s) => (
-              <div key={s.id} className="flex items-center gap-3 p-2.5 rounded-lg border bg-orange-50/50 dark:bg-orange-950/20">
+              <div
+                key={s.id}
+                className="flex items-center gap-3 p-2.5 rounded-lg border bg-orange-50/50 dark:bg-orange-950/20"
+              >
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium truncate">{s.supply_name}</p>
+                  <p className="text-sm font-medium truncate">
+                    {s.supply_name}
+                  </p>
                   <p className="text-xs text-muted-foreground">
                     {s.quantity} × {format(Number(s.unit_cost))}
                   </p>
@@ -229,7 +374,6 @@ export default function SaleDetailPage({ params }: Props) {
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-2 pt-0 text-sm">
-
           <div className="flex justify-between">
             <span className="text-muted-foreground">Subtotal productos</span>
             <span>{format(Number(sale.subtotal))}</span>
@@ -286,14 +430,15 @@ export default function SaleDetailPage({ params }: Props) {
 
           <Separator />
 
-          <div className="flex justify-between font-bold text-green-600">
+          <div className={`flex justify-between font-bold ${
+            isPending ? "text-amber-700" : "text-green-600"
+          }`}>
             <span className="flex items-center gap-1.5">
               <TrendingUp className="h-4 w-4" />
-              Ganancia neta
+              {profitLabel}
             </span>
             <span>{format(totalProfit)}</span>
           </div>
-
         </CardContent>
       </Card>
 
@@ -307,6 +452,30 @@ export default function SaleDetailPage({ params }: Props) {
         </Card>
       )}
 
+      {/* Dialogs de confirmación */}
+      <ConfirmDialog
+        open={confirmOpen}
+        onOpenChange={setConfirmOpen}
+        title="Confirmar pago de esta venta"
+        description="Se registrará el pago y la venta pasará a estado Completada."
+        confirmLabel="Confirmar pago"
+        cancelLabel="Volver"
+        variant="warning"
+        isLoading={isPatching}
+        onConfirm={handleConfirmPayment}
+      />
+
+      <ConfirmDialog
+        open={cancelOpen}
+        onOpenChange={setCancelOpen}
+        title="Cancelar esta venta"
+        description="Se devolverá el stock al inventario y la venta ya no aparecerá como pendiente."
+        confirmLabel="Sí, cancelar venta"
+        cancelLabel="Volver"
+        variant="danger"
+        isLoading={isPatching}
+        onConfirm={handleCancelSale}
+      />
     </div>
   );
 }
