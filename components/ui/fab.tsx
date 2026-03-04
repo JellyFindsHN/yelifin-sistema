@@ -1,25 +1,27 @@
 // components/ui/fab.tsx
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Plus } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 export type FabAction = {
-  label: string;
-  icon: React.ElementType;
-  onClick: () => void;
+  label:    string;
+  icon:     React.ElementType;
+  onClick:  () => void;
   variant?: "default" | "destructive";
 };
 
-type Props = {
-  actions: FabAction[];
-};
+type Props = { actions: FabAction[] };
 
 export function Fab({ actions }: Props) {
   const [open, setOpen] = useState(false);
 
-  // Si solo hay una acción, ejecutar directo
+  useEffect(() => {
+    document.body.style.overflow = open ? "hidden" : "";
+    return () => { document.body.style.overflow = ""; };
+  }, [open]);
+
   if (actions.length === 1) {
     const Icon = actions[0].icon;
     return (
@@ -36,42 +38,50 @@ export function Fab({ actions }: Props) {
 
   return (
     <>
-      {open && (
-        <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
-      )}
+      {/* Backdrop con desenfoque */}
+      <div
+        className={cn(
+          "fixed inset-0 z-40 transition-all duration-500",
+          open
+            ? "backdrop-blur-[2px] bg-black/10 pointer-events-auto"
+            : "backdrop-blur-none bg-transparent pointer-events-none"
+        )}
+        style={{ top: 0, left: 0, right: 0, bottom: 0 }}
+        onClick={() => setOpen(false)}
+      />
 
-      <div className="fixed bottom-6 right-6 z-50 flex flex-col items-end gap-3">
+      <div className="fixed bottom-6 right-6 z-50 flex flex-col items-end gap-4">
 
         {/* Acciones */}
-        <div className="flex flex-col items-end gap-2.5">
+        <div className="flex flex-col items-end gap-3">
           {actions.map((action, i) => {
             const Icon = action.icon;
             return (
               <div
                 key={action.label}
                 className={cn(
-                  "flex items-center gap-2 transition-all duration-200",
+                  "flex items-center gap-3 transition-all duration-200",
                   open
                     ? "opacity-100 translate-y-0 pointer-events-auto"
-                    : "opacity-0 translate-y-3 pointer-events-none"
+                    : "opacity-0 translate-y-4 pointer-events-none"
                 )}
                 style={{
-                  transitionDelay: open ? `${(actions.length - 1 - i) * 50}ms` : "0ms",
+                  transitionDelay: open ? `${(actions.length - 1 - i) * 55}ms` : "0ms",
                 }}
               >
-                <span className="bg-popover text-popover-foreground text-xs font-medium px-2.5 py-1.5 rounded-lg shadow-md border whitespace-nowrap">
+                <span className="bg-popover text-popover-foreground text-sm font-semibold px-4 py-2 rounded-xl shadow-lg border whitespace-nowrap">
                   {action.label}
                 </span>
                 <button
                   onClick={() => { action.onClick(); setOpen(false); }}
                   className={cn(
-                    "h-10 w-10 rounded-full shadow-lg flex items-center justify-center transition-colors shrink-0",
+                    "h-12 w-12 rounded-full shadow-lg flex items-center justify-center transition-colors shrink-0",
                     action.variant === "destructive"
                       ? "bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                      : "bg-background border text-foreground hover:bg-muted"
+                      : "bg-background border-2 text-foreground hover:bg-muted"
                   )}
                 >
-                  <Icon className="h-4 w-4" />
+                  <Icon className="h-5 w-5" />
                 </button>
               </div>
             );

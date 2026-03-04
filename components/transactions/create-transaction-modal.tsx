@@ -2,6 +2,7 @@
 "use client";
 
 import { useState } from "react";
+import { useSWRConfig } from "swr";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle,
 } from "@/components/ui/dialog";
@@ -21,16 +22,16 @@ import { useCurrency } from "@/hooks/swr/use-currency";
 type TxType = "INCOME" | "EXPENSE" | "TRANSFER";
 
 const TYPE_CONFIG: Record<TxType, { label: string; icon: React.ElementType }> = {
-  INCOME:   { label: "Ingreso",        icon: ArrowDownCircle },
-  EXPENSE:  { label: "Egreso",         icon: ArrowUpCircle },
-  TRANSFER: { label: "Transferencia",  icon: ArrowLeftRight },
+  INCOME:   { label: "Ingreso",       icon: ArrowDownCircle },
+  EXPENSE:  { label: "Egreso",        icon: ArrowUpCircle },
+  TRANSFER: { label: "Transferencia", icon: ArrowLeftRight },
 };
 
 type Props = {
   open:         boolean;
   onOpenChange: (v: boolean) => void;
   accounts:     { id: number; name: string; balance: number }[];
-  onSuccess:    () => void;
+  onSuccess?:   () => void;
   defaultType?: TxType;
 };
 
@@ -39,6 +40,7 @@ export function CreateTransactionModal({
 }: Props) {
   const { createTransaction, isCreating } = useCreateTransaction();
   const { format, symbol }                = useCurrency();
+  const { mutate }                        = useSWRConfig();
 
   const [type,        setType]        = useState<TxType>(defaultType);
   const [accountId,   setAccountId]   = useState("");
@@ -63,11 +65,24 @@ export function CreateTransactionModal({
     onOpenChange(false);
   };
 
+  // Invalida todas las claves relevantes de SWR
+  const mutateAll = () =>
+    mutate(
+      (key) =>
+        typeof key === "string" && (
+          key.startsWith("/api/transactions") ||
+          key.startsWith("/api/accounts")     ||
+          key.startsWith("/api/finances")
+        ),
+      undefined,
+      { revalidate: true }
+    );
+
   const onSubmit = async () => {
-    if (!accountId)                                                return toast.error("Selecciona una cuenta");
-    if (!amount || Number(amount) <= 0)                           return toast.error("El monto debe ser mayor a 0");
-    if (type === "TRANSFER" && !toAccountId)                      return toast.error("Selecciona cuenta destino");
-    if (type === "TRANSFER" && accountId === toAccountId)         return toast.error("Las cuentas deben ser diferentes");
+    if (!accountId)                                        return toast.error("Selecciona una cuenta");
+    if (!amount || Number(amount) <= 0)                   return toast.error("El monto debe ser mayor a 0");
+    if (type === "TRANSFER" && !toAccountId)               return toast.error("Selecciona cuenta destino");
+    if (type === "TRANSFER" && accountId === toAccountId)  return toast.error("Las cuentas deben ser diferentes");
 
     try {
       await createTransaction({
@@ -79,9 +94,11 @@ export function CreateTransactionModal({
         description:   description || undefined,
         occurred_at:   new Date(occurredAt).toISOString(),
       });
+
       toast.success("Transacción registrada exitosamente");
+      mutateAll();   // ← invalida transactions + accounts + finances
       handleClose();
-      onSuccess();
+      onSuccess?.();
     } catch (error: any) {
       toast.error(error.message || "Error al registrar");
     }

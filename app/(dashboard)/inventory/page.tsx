@@ -22,27 +22,31 @@ import {
   Search, Package, Warehouse, AlertTriangle, DollarSign,
   Plus, MoreVertical, Pencil, Trash2, PackagePlus,
   ShoppingCart, SlidersHorizontal,
+  ArrowLeftRight,
 } from "lucide-react";
 import Image from "next/image";
 
 import { useInventory } from "@/hooks/swr/use-inventory";
-import { useProducts }  from "@/hooks/swr/use-products";
-import { Fab }          from "@/components/ui/fab";
-import { Product }      from "@/types";
+import { useProducts } from "@/hooks/swr/use-products";
+import { Fab } from "@/components/ui/fab";
+import { Product } from "@/types";
 
-import { CreateProductDialog }     from "@/components/products/create-product-dialog";
-import { EditProductDialog }       from "@/components/products/edit-product-dialog";
-import { DeleteProductDialog }     from "@/components/products/delete-product-dialog";
-import { AddInventoryDialog }      from "@/components/products/add-inventory-dialog";
-import { AdjustInventoryDialog }   from "@/components/products/adjust-inventory-dialog";
+import { CreateProductDialog } from "@/components/products/create-product-dialog";
+import { EditProductDialog } from "@/components/products/edit-product-dialog";
+import { DeleteProductDialog } from "@/components/products/delete-product-dialog";
+import { AddInventoryDialog } from "@/components/products/add-inventory-dialog";
+import { AdjustInventoryDialog } from "@/components/products/adjust-inventory-dialog";
 import { useCurrency } from "@/hooks/swr/use-currency";
+import { CreateTransactionModal } from "@/components/transactions/create-transaction-modal";
+import { useAccounts } from "@/hooks/swr/use-accounts";
+import { useFinances } from "@/hooks/swr/use-finances";
 
 // ── Helpers ────────────────────────────────────────────────────────────
 const getStockBadge = (stock: number) => {
   if (stock === 0) return <Badge variant="destructive">Agotado</Badge>;
-  if (stock < 5)   return <Badge variant="destructive">{stock} uds</Badge>;
-  if (stock < 10)  return <Badge className="bg-yellow-100 text-yellow-700 border-yellow-200">{stock} uds</Badge>;
-  return                  <Badge className="bg-green-100 text-green-700 border-green-200">{stock} uds</Badge>;
+  if (stock < 5) return <Badge variant="destructive">{stock} uds</Badge>;
+  if (stock < 10) return <Badge className="bg-yellow-100 text-yellow-700 border-yellow-200">{stock} uds</Badge>;
+  return <Badge className="bg-green-100 text-green-700 border-green-200">{stock} uds</Badge>;
 };
 
 // ── Page ───────────────────────────────────────────────────────────────
@@ -51,17 +55,22 @@ export default function InventoryPage() {
   const { inventory, stats, isLoading: loadingInventory, mutate: mutateInventory } = useInventory();
   const { products, mutate: mutateProducts } = useProducts();
 
-  const [search,      setSearch]      = useState("");
+  const [search, setSearch] = useState("");
   const [stockFilter, setStockFilter] = useState("all");
 
   // Diálogos
-  const [createOpen,       setCreateOpen]       = useState(false);
-  const [editProduct,      setEditProduct]      = useState<Product | null>(null);
-  const [deleteProduct,    setDeleteProduct]    = useState<Product | null>(null);
-  const [inventoryProduct, setInventoryProduct] = useState<Product | null>(null);
-  const [adjustProduct,    setAdjustProduct]    = useState<Product | null>(null);
+  const [createOpen, setCreateOpen] = useState(false);
 
-  const { format }  = useCurrency();
+  const [selectedMonth] = useState<number | undefined>();
+  const [selectedYear] = useState<number | undefined>();
+  const [transactionOpen, setTransactionOpen] = useState(false);
+  const [editProduct, setEditProduct] = useState<Product | null>(null);
+  const [deleteProduct, setDeleteProduct] = useState<Product | null>(null);
+  const [inventoryProduct, setInventoryProduct] = useState<Product | null>(null);
+  const [adjustProduct, setAdjustProduct] = useState<Product | null>(null);
+
+  const { accounts} = useAccounts();
+  const { format } = useCurrency();
   const isLoading = loadingInventory;
 
   const findProduct = (productId: number): Product | null =>
@@ -74,9 +83,9 @@ export default function InventoryPage() {
 
     const matchesStock =
       stockFilter === "all" ? true :
-      stockFilter === "out" ? item.stock === 0 :
-      stockFilter === "low" ? item.stock > 0 && item.stock < 10 :
-      item.stock >= 10;
+        stockFilter === "out" ? item.stock === 0 :
+          stockFilter === "low" ? item.stock > 0 && item.stock < 10 :
+            item.stock >= 10;
 
     return matchesSearch && matchesStock;
   });
@@ -154,10 +163,10 @@ export default function InventoryPage() {
       {/* Stats */}
       <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
         {[
-          { title: "Unidades",   value: stats.total_stock,                sub: `${stats.total_products} productos`, icon: Warehouse },
-          { title: "Valor",      value: format(stats.total_value), sub: "costo adquisición",               icon: DollarSign },
-          { title: "Stock bajo", value: stats.low_stock,                  sub: "menos de 10 uds",                  icon: AlertTriangle, cls: "text-yellow-600" },
-          { title: "Agotados",   value: stats.out_of_stock,               sub: "sin stock",                        icon: Package,       cls: "text-destructive" },
+          { title: "Unidades", value: stats.total_stock, sub: `${stats.total_products} productos`, icon: Warehouse },
+          { title: "Valor", value: format(stats.total_value), sub: "costo adquisición", icon: DollarSign },
+          { title: "Stock bajo", value: stats.low_stock, sub: "menos de 10 uds", icon: AlertTriangle, cls: "text-yellow-600" },
+          { title: "Agotados", value: stats.out_of_stock, sub: "sin stock", icon: Package, cls: "text-destructive" },
         ].map((stat) => (
           <Card key={stat.title}>
             <CardContent className="pl-3">
@@ -323,8 +332,10 @@ export default function InventoryPage() {
       {/* FAB */}
       <Fab
         actions={[
-          { label: "Nuevo producto", icon: Plus,         onClick: () => setCreateOpen(true) },
-          { label: "Nueva venta",    icon: ShoppingCart, onClick: () => router.push("/sales/new") },
+          { label: "Nueva transacción", icon: ArrowLeftRight, onClick: () => setTransactionOpen(true) },
+
+          { label: "Nueva venta", icon: ShoppingCart, onClick: () => router.push("/sales/new") },
+          { label: "Nuevo producto", icon: Plus, onClick: () => setCreateOpen(true) },
         ]}
       />
 
@@ -357,6 +368,12 @@ export default function InventoryPage() {
         open={!!adjustProduct}
         onOpenChange={(open) => !open && setAdjustProduct(null)}
         onSuccess={handleSuccess}
+      />
+      <CreateTransactionModal
+        open={transactionOpen}
+        onOpenChange={setTransactionOpen}
+        accounts={accounts}
+        onSuccess={() => setTransactionOpen(false)}
       />
     </div>
   );

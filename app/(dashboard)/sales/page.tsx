@@ -357,7 +357,7 @@ export default function SalesPage() {
                     {!isPending && (
                       <div>
                         <p className="text-[10px] text-muted-foreground mb-0.5">Ganancia</p>
-                        <p className="text-sm font-bold text-green-600 truncate">{format(Number(sale.net_profit))}</p>
+                        <p className="text-sm font-bold text-green-600 truncate">{format(Number(sale.net_profit - sale.discount))}</p>
                       </div>
                     )}
                   </div>
@@ -450,7 +450,7 @@ export default function SalesPage() {
                       <TableCell className="text-right">
                         {isPending
                           ? <span className="text-muted-foreground text-xs">—</span>
-                          : <span className="text-green-600 font-medium">{format(Number(sale.net_profit))}</span>
+                          : <span className="text-green-600 font-medium">{format(Number(sale.net_profit - sale.discount))}</span>
                         }
                       </TableCell>
                       <TableCell className="text-right">

@@ -1,6 +1,7 @@
 // components/products/inventory-section/purchase-form.tsx
 "use client";
 
+import { useState } from "react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
@@ -13,7 +14,15 @@ import { useCurrency } from "@/hooks/swr/use-currency";
 
 const TASA_DEFAULT = 24.89;
 
-// ── Tipos ──────────────────────────────────────────────────────────────
+const CURRENCY_NAMES: Record<string, string> = {
+  HNL: "Lempiras",
+  USD: "Dólares",
+  MXN: "Pesos mexicanos",
+  GTQ: "Quetzales",
+  CRC: "Colones",
+  EUR: "Euros",
+};
+
 export type PurchaseFormValue = {
   account_id:    number | null;
   currency:      "USD" | "HNL";
@@ -42,31 +51,47 @@ type Props = {
   disabled?: boolean;
 };
 
-// ── Componente ─────────────────────────────────────────────────────────
+type CostMode = "unit" | "total";
+
 export function PurchaseForm({ value, onChange, disabled }: Props) {
-  const { accounts }   = useAccounts();
-  const { format, symbol } = useCurrency();
+  const { accounts }       = useAccounts();
+  const { format, symbol, currency: businessCurrency } = useCurrency();
+  const [costMode, setCostMode] = useState<CostMode>("total");
 
   const set = (patch: Partial<PurchaseFormValue>) =>
     onChange({ ...value, ...patch });
 
-  // ── Cálculos ─────────────────────────────────────────────────────
-  const qty       = Number(value.quantity)  || 0;
-  const cost      = Number(value.unit_cost)     || 0;
-  const rate      = Number(value.exchange_rate) || TASA_DEFAULT;
-  const ship      = Number(value.shipping)      || 0;
-  const isUSD     = value.currency === "USD";
-  const costHnl   = isUSD ? cost * rate : cost;
-  const shipUnit  = qty > 0 ? ship / qty : 0;
+  // ── Cálculos ────────────────────────────────────────────────────────
+  const qty      = Number(value.quantity)      || 0;
+  const cost     = Number(value.unit_cost)     || 0;
+  const rate     = Number(value.exchange_rate) || TASA_DEFAULT;
+  const ship     = Number(value.shipping)      || 0;
+  const isUSD    = value.currency === "USD";
+  const costHnl  = isUSD ? cost * rate : cost;
+  const shipUnit = qty > 0 ? ship / qty : 0;
   const finalUnit = costHnl + shipUnit;
   const totalCost = finalUnit * qty;
 
   const showSummary = qty > 0 && cost > 0;
 
+  // Cuando el usuario escribe en "total", derivar unit_cost
+  const handleTotalInput = (rawTotal: number) => {
+    if (qty <= 0) return;
+    const totalHnl    = isUSD ? rawTotal * rate : rawTotal;
+    const unitNoShip  = (totalHnl / qty) - shipUnit;
+    const unitOriginal = isUSD ? unitNoShip / rate : unitNoShip;
+    set({ unit_cost: Math.max(0, unitOriginal) });
+  };
+
+  // Valor a mostrar en el input de total (en la moneda seleccionada)
+  const displayTotal = isUSD
+    ? cost * qty                      // total en USD
+    : (costHnl + shipUnit) * qty;     // total en HNL con envío
+
   return (
     <div className="space-y-4">
 
-      {/* Cuenta */}
+      {/* Cuenta — ancho completo */}
       <div className="space-y-1.5">
         <Label className="text-sm font-medium flex items-center gap-1.5">
           <Wallet className="h-3.5 w-3.5 text-muted-foreground" />
@@ -77,13 +102,13 @@ export function PurchaseForm({ value, onChange, disabled }: Props) {
           onValueChange={(v) => set({ account_id: Number(v) })}
           disabled={disabled}
         >
-          <SelectTrigger className="h-11">
+          <SelectTrigger className="h-11 w-full">
             <SelectValue placeholder="Selecciona una cuenta" />
           </SelectTrigger>
-          <SelectContent>
+          <SelectContent className="w-full">
             {accounts.map((a) => (
               <SelectItem key={a.id} value={String(a.id)}>
-                <div className="flex items-center justify-between gap-4 w-full">
+                <div className="flex items-center justify-between gap-8 w-full">
                   <span>{a.name}</span>
                   <span className="text-xs text-muted-foreground font-mono">
                     {format(Number(a.balance))}
@@ -126,9 +151,13 @@ export function PurchaseForm({ value, onChange, disabled }: Props) {
             <SelectTrigger className="h-11">
               <SelectValue />
             </SelectTrigger>
-            <SelectContent>
+            <SelectContent position="popper" className="w-[--radix-select-trigger-width] min-w-0">
               <SelectItem value="USD">USD — Dólares</SelectItem>
-              <SelectItem value="HNL">HNL — Lempiras</SelectItem>
+              {businessCurrency !== "USD" && (
+                <SelectItem value={businessCurrency}>
+                  {businessCurrency} — {CURRENCY_NAMES[businessCurrency] ?? businessCurrency}
+                </SelectItem>
+              )}
             </SelectContent>
           </Select>
         </div>
@@ -149,26 +178,70 @@ export function PurchaseForm({ value, onChange, disabled }: Props) {
         )}
       </div>
 
-      {/* Costo unitario */}
+      {/* Toggle unitario / total */}
       <div className="space-y-1.5">
-        <Label className="text-sm font-medium">
-          Costo unitario ({isUSD ? "USD" : symbol}) <span className="text-destructive text-xs">*</span>
-        </Label>
+        <div className="flex items-center justify-between">
+          <Label className="text-sm font-medium">
+            Costo ({symbol}) <span className="text-destructive text-xs">*</span>
+          </Label>
+          {/* Toggle */}
+          <div className="flex rounded-lg border overflow-hidden text-xs">
+            {(["unit", "total"] as CostMode[]).map((mode, i) => (
+              <button
+                key={mode}
+                type="button"
+                disabled={disabled}
+                onClick={() => setCostMode(mode)}
+                className={`px-3 py-1 font-medium transition-colors ${i > 0 ? "border-l" : ""} ${
+                  costMode === mode
+                    ? "bg-primary text-primary-foreground"
+                    : "text-muted-foreground hover:bg-muted"
+                }`}
+              >
+                {mode === "unit" ? "Por unidad" : "Total"}
+              </button>
+            ))}
+          </div>
+        </div>
+
         <div className="relative">
           <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm font-medium">
-            {isUSD ? "$" : symbol}
+            {symbol}
           </span>
-          <Input
-            type="number"
-            step="0.01"
-            min="0"
-            placeholder="0.00"
-            value={value.unit_cost || ""}
-            onChange={(e) => set({ unit_cost: Number(e.target.value) || 0 })}
-            className="h-11 pl-8 text-base"
-            disabled={disabled}
-          />
+          {costMode === "unit" ? (
+            <Input
+              type="number"
+              step="0.01"
+              min="0"
+              placeholder="0.00"
+              value={value.unit_cost || ""}
+              onChange={(e) => set({ unit_cost: Number(e.target.value) || 0 })}
+              className="h-11 pl-8 text-base"
+              disabled={disabled}
+            />
+          ) : (
+            <Input
+              type="number"
+              step="0.01"
+              min="0"
+              placeholder="0.00"
+              value={displayTotal || ""}
+              onChange={(e) => handleTotalInput(Number(e.target.value) || 0)}
+              className="h-11 pl-8 text-base"
+              disabled={disabled || qty <= 0}
+            />
+          )}
         </div>
+
+        {/* Derivado: muestra el valor contrario */}
+        {cost > 0 && qty > 0 && (
+          <p className="text-xs text-muted-foreground text-right">
+            {costMode === "unit"
+              ? <>Total ({qty} uds): <span className="font-medium text-foreground">{format(cost * qty)}</span></>
+              : <>Por unidad: <span className="font-medium text-foreground">{format(cost)}</span></>
+            }
+          </p>
+        )}
       </div>
 
       {/* Envío */}
@@ -206,7 +279,7 @@ export function PurchaseForm({ value, onChange, disabled }: Props) {
           {isUSD && (
             <div className="flex justify-between text-xs text-muted-foreground">
               <span>Costo (USD → {symbol})</span>
-              <span>${cost.toFixed(2)} × {rate} = {format(costHnl)}</span>
+              <span>{format(cost)} × {rate} = {format(costHnl)}</span>
             </div>
           )}
           {ship > 0 && (

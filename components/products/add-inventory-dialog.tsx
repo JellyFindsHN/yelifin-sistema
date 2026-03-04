@@ -1,7 +1,7 @@
 // components/products/add-inventory-dialog.tsx
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
@@ -24,6 +24,17 @@ import { useCurrency } from "@/hooks/swr/use-currency";
 import { Product } from "@/types";
 
 const TASA_DEFAULT = 24.89;
+
+const CURRENCY_NAMES: Record<string, string> = {
+  HNL: "Lempiras",
+  USD: "Dólares",
+  MXN: "Pesos mexicanos",
+  GTQ: "Quetzales",
+  CRC: "Colones",
+  EUR: "Euros",
+};
+
+type CostMode = "unit" | "total";
 
 const schema = z.object({
   account_id:    z.coerce.number().min(1, "Selecciona una cuenta"),
@@ -48,10 +59,12 @@ type Props = {
 export function AddInventoryDialog({ product, open, onOpenChange, onSuccess }: Props) {
   const { createPurchase, isCreating } = useCreatePurchase();
   const { accounts }                   = useAccounts();
-  const { format, symbol }             = useCurrency();
+  const { format, symbol, currency: businessCurrency } = useCurrency();
+  const [costMode, setCostMode]        = useState<CostMode>("total");
+  const [totalInput, setTotalInput]    = useState<string>("");
 
   const {
-    register, handleSubmit, reset, control, setValue,
+    register, handleSubmit, reset, control, setValue, getValues,
     formState: { errors },
   } = useForm<FormData>({
     resolver: zodResolver(schema),
@@ -81,8 +94,24 @@ export function AddInventoryDialog({ product, open, onOpenChange, onSuccess }: P
   const finalUnitCost   = unitCostHnl + shippingPerUnit;
   const totalCost       = finalUnitCost * qty;
 
+  // Sync totalInput when switching to total mode or qty changes
+  useEffect(() => {
+    if (costMode === "total" && cost > 0 && qty > 0) {
+      setTotalInput(String(+(cost * qty).toFixed(4)));
+    }
+  }, [costMode, qty]);
+
+  const handleTotalInput = (raw: string) => {
+    setTotalInput(raw);
+    const rawTotal = Number(raw) || 0;
+    if (qty <= 0) return;
+    const unitOriginal = rawTotal / qty;
+    setValue("unit_cost_usd", Math.max(0, unitOriginal));
+  };
+
   useEffect(() => {
     if (open) {
+      setCostMode("total");
       reset({
         currency:      "USD",
         exchange_rate: TASA_DEFAULT,
@@ -104,7 +133,7 @@ export function AddInventoryDialog({ product, open, onOpenChange, onSuccess }: P
         shipping:      data.shipping,
         notes:         data.notes,
         purchased_at:  data.purchased_at
-          ? new Date(data.purchased_at).toISOString()
+          ? new Date(data.purchased_at + "T00:00:00-06:00").toISOString()
           : new Date().toISOString(),
         items: [{ product_id: product.id, quantity: data.quantity, unit_cost_usd: data.unit_cost_usd }],
       });
@@ -172,13 +201,13 @@ export function AddInventoryDialog({ product, open, onOpenChange, onSuccess }: P
               onValueChange={(val) => setValue("account_id", Number(val))}
               disabled={isCreating}
             >
-              <SelectTrigger className={cn("h-11", errors.account_id && "border-destructive")}>
+              <SelectTrigger className={cn("h-11 w-full", errors.account_id && "border-destructive")}>
                 <SelectValue placeholder="Selecciona una cuenta" />
               </SelectTrigger>
-              <SelectContent>
+              <SelectContent className="w-full">
                 {accounts.map((a) => (
                   <SelectItem key={a.id} value={String(a.id)}>
-                    <div className="flex items-center justify-between gap-4 w-full">
+                    <div className="flex items-center justify-between gap-8 w-full">
                       <span>{a.name}</span>
                       <span className="text-xs text-muted-foreground font-mono">
                         {format(Number(a.balance))}
@@ -210,7 +239,7 @@ export function AddInventoryDialog({ product, open, onOpenChange, onSuccess }: P
           </div>
 
           {/* Moneda + Tasa */}
-          <div className="grid grid-cols-2 gap-3">
+          <div className={`grid gap-3 ${isUSD ? "grid-cols-2" : "grid-cols-1"}`}>
             <div className="space-y-1.5">
               <Label className="text-sm font-medium">
                 Moneda <span className="text-destructive text-xs">*</span>
@@ -221,16 +250,20 @@ export function AddInventoryDialog({ product, open, onOpenChange, onSuccess }: P
                 disabled={isCreating}
               >
                 <SelectTrigger className="h-11"><SelectValue /></SelectTrigger>
-                <SelectContent>
+                <SelectContent position="popper" className="w-[--radix-select-trigger-width] min-w-0">
                   <SelectItem value="USD">USD — Dólares</SelectItem>
-                  <SelectItem value="HNL">HNL — Lempiras</SelectItem>
+                  {businessCurrency !== "USD" && (
+                    <SelectItem value={businessCurrency}>
+                      {businessCurrency} — {CURRENCY_NAMES[businessCurrency] ?? businessCurrency}
+                    </SelectItem>
+                  )}
                 </SelectContent>
               </Select>
             </div>
             {isUSD && (
               <div className="space-y-1.5">
                 <Label className="text-sm font-medium">
-                  Tasa de cambio <span className="text-destructive text-xs">*</span>
+                  USD → {symbol} <span className="text-destructive text-xs">*</span>
                 </Label>
                 <Input
                   type="number" step="0.01"
@@ -246,22 +279,63 @@ export function AddInventoryDialog({ product, open, onOpenChange, onSuccess }: P
             )}
           </div>
 
-          {/* Costo unitario */}
+          {/* Costo — toggle unitario / total */}
           <div className="space-y-1.5">
-            <Label className="text-sm font-medium">
-              Costo unitario ({isUSD ? "USD" : symbol}) <span className="text-destructive text-xs">*</span>
-            </Label>
+            <div className="flex items-center justify-between">
+              <Label className="text-sm font-medium">
+                Costo ({isUSD ? "USD" : symbol}) <span className="text-destructive text-xs">*</span>
+              </Label>
+              <div className="flex rounded-lg border overflow-hidden text-xs">
+                {(["unit", "total"] as CostMode[]).map((mode, i) => (
+                  <button
+                    key={mode}
+                    type="button"
+                    disabled={isCreating}
+                    onClick={() => setCostMode(mode)}
+                    className={`px-3 py-1 font-medium transition-colors ${i > 0 ? "border-l" : ""} ${
+                      costMode === mode
+                        ? "bg-primary text-primary-foreground"
+                        : "text-muted-foreground hover:bg-muted"
+                    }`}
+                  >
+                    {mode === "unit" ? "Por unidad" : "Total"}
+                  </button>
+                ))}
+              </div>
+            </div>
+
             <div className="relative">
               <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm font-medium">
                 {isUSD ? "$" : symbol}
               </span>
-              <Input
-                type="number" step="0.01" min="0" placeholder="0.00"
-                {...register("unit_cost_usd")}
-                disabled={isCreating}
-                className="h-11 pl-8 text-base"
-              />
+              {costMode === "unit" ? (
+                <Input
+                  type="number" step="0.01" min="0" placeholder="0.00"
+                  {...register("unit_cost_usd")}
+                  disabled={isCreating}
+                  className="h-11 pl-8 text-base"
+                />
+              ) : (
+                <Input
+                  type="number" step="0.01" min="0" placeholder="0.00"
+                  value={totalInput}
+                  onChange={(e) => handleTotalInput(e.target.value)}
+                  disabled={isCreating || qty <= 0}
+                  className="h-11 pl-8 text-base"
+                />
+              )}
             </div>
+
+            {/* Valor derivado */}
+            {cost > 0 && qty > 0 && (
+              <p className="text-xs text-muted-foreground text-right">
+                {costMode === "unit"
+                  ? <>Total ({qty} uds): <span className="font-medium text-foreground">{isUSD ? `$${(cost * qty).toFixed(2)}` : format(cost * qty)}</span></>
+                  : <>Por unidad: <span className="font-medium text-foreground">{isUSD ? `$${cost.toFixed(2)}` : format(cost)}</span></>
+                }
+              </p>
+            )}
+
             {errors.unit_cost_usd && (
               <p className="text-xs text-destructive">{errors.unit_cost_usd.message}</p>
             )}
@@ -349,8 +423,7 @@ export function AddInventoryDialog({ product, open, onOpenChange, onSuccess }: P
         {/* Footer fijo */}
         <div className="shrink-0 px-5 py-4 border-t bg-background flex gap-3">
           <Button
-            type="button"
-            variant="outline"
+            type="button" variant="outline"
             onClick={() => onOpenChange(false)}
             disabled={isCreating}
             className="flex-1 h-11"
@@ -358,8 +431,7 @@ export function AddInventoryDialog({ product, open, onOpenChange, onSuccess }: P
             Cancelar
           </Button>
           <Button
-            type="submit"
-            form="add-inventory-form"
+            type="submit" form="add-inventory-form"
             disabled={isCreating}
             className="flex-1 h-11 gap-2"
           >

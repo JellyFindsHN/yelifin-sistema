@@ -8,7 +8,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Loader2, X, TrendingUp, TrendingDown } from "lucide-react";
+import { Loader2, TrendingUp, TrendingDown } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/use-auth";
@@ -107,7 +107,7 @@ export function AdjustInventoryDialog({ product, open, onOpenChange, onSuccess }
           <div className="flex items-center justify-between">
             <div>
               <DialogTitle className="text-lg font-bold">Ajuste de inventario</DialogTitle>
-              <p className="text-sm text-muted-foreground truncate max-w-[260px]">{product.name}</p>
+              <p className="text-sm text-muted-foreground truncate max-w-65">{product.name}</p>
             </div>
           </div>
         </DialogHeader>

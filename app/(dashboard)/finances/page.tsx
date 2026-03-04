@@ -28,57 +28,52 @@ import { EditAccountDialog } from "@/components/accounts/edit-account-dialog";
 import { DeleteAccountDialog } from "@/components/accounts/delete-account-dialog";
 import { Fab } from "@/components/ui/fab";
 
-// ── Constants ──────────────────────────────────────────────────────────
 const MONTH_NAMES = [
   "", "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
   "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre",
 ];
 
 const ACCOUNT_ICONS: Record<string, React.ElementType> = {
-  CASH: Banknote,
-  BANK: Building2,
-  WALLET: CreditCard,
-  OTHER: Wallet,
+  CASH: Banknote, BANK: Building2, WALLET: CreditCard, OTHER: Wallet,
 };
 
 const ACCOUNT_TYPE_CONFIG: Record<string, { label: string; color: string }> = {
-  CASH: { label: "Efectivo", color: "bg-green-100 text-green-700 border-green-200" },
-  BANK: { label: "Banco", color: "bg-blue-100 text-blue-700 border-blue-200" },
+  CASH:   { label: "Efectivo",          color: "bg-green-100 text-green-700 border-green-200" },
+  BANK:   { label: "Banco",             color: "bg-blue-100 text-blue-700 border-blue-200" },
   WALLET: { label: "Billetera digital", color: "bg-purple-100 text-purple-700 border-purple-200" },
-  OTHER: { label: "Otro", color: "bg-gray-100 text-gray-700 border-gray-200" },
+  OTHER:  { label: "Otro",              color: "bg-gray-100 text-gray-700 border-gray-200" },
 };
 
 const TYPE_CONFIG = {
-  INCOME: { icon: ArrowDownCircle, color: "text-green-600", sign: "+" },
-  EXPENSE: { icon: ArrowUpCircle, color: "text-destructive", sign: "-" },
-  TRANSFER: { icon: ArrowLeftRight, color: "text-blue-600", sign: "" },
+  INCOME:   { icon: ArrowDownCircle, color: "text-green-600",   sign: "+" },
+  EXPENSE:  { icon: ArrowUpCircle,   color: "text-destructive", sign: "-" },
+  TRANSFER: { icon: ArrowLeftRight,  color: "text-blue-600",    sign: "" },
 };
 
 const REF_LABELS: Record<string, string> = {
-  SALE: "Venta",
-  PURCHASE: "Compra inventario",
+  SALE:            "Venta",
+  PURCHASE:        "Compra inventario",
   SUPPLY_PURCHASE: "Compra suministros",
-  OTHER: "Manual",
+  OTHER:           "Manual",
 };
 
-// ── Page ───────────────────────────────────────────────────────────────
 export default function FinancesPage() {
   const now = new Date();
 
-  const [selectedMonth, setSelectedMonth] = useState<number | undefined>();
-  const [selectedYear, setSelectedYear] = useState<number | undefined>();
-  const [transactionOpen, setTransactionOpen] = useState(false);
+  const [selectedMonth,     setSelectedMonth]     = useState<number | undefined>();
+  const [selectedYear,      setSelectedYear]      = useState<number | undefined>();
+  const [transactionOpen,   setTransactionOpen]   = useState(false);
   const [createAccountOpen, setCreateAccountOpen] = useState(false);
-  const [editAccount, setEditAccount] = useState<Account | null>(null);
-  const [deleteAccount, setDeleteAccount] = useState<Account | null>(null);
+  const [editAccount,       setEditAccount]       = useState<Account | null>(null);
+  const [deleteAccount,     setDeleteAccount]     = useState<Account | null>(null);
 
   const { summary, isLoading, mutate: mutateSummary } = useFinances({ month: selectedMonth, year: selectedYear });
-  const { periods } = useFinancePeriods();
-  const { accounts, mutate: mutateAccounts } = useAccounts();
-  const { format } = useCurrency();
+  const { periods }                                    = useFinancePeriods();
+  const { accounts, mutate: mutateAccounts }           = useAccounts();
+  const { format }                                     = useCurrency();
 
   const availableYears = [...new Set(periods.map((p) => p.year))].sort((a, b) => b - a);
-  const monthsForYear = (y: number) =>
+  const monthsForYear  = (y: number) =>
     periods.filter((p) => p.year === y).map((p) => p.month).sort((a, b) => b - a);
 
   const totalBalance = (summary?.accounts ?? []).reduce((acc, a) => acc + Number(a.balance), 0);
@@ -90,31 +85,28 @@ export default function FinancesPage() {
       : `${MONTH_NAMES[now.getMonth() + 1]} ${now.getFullYear()}`;
 
   const cashFlow = (summary?.cash_flow ?? []).map((d) => ({
-    date: new Date(d.date + "T00:00:00").toLocaleDateString("es-HN", { day: "numeric", month: "short" }),
-    income: Number(d.income),
+    date:    new Date(d.date + "T00:00:00").toLocaleDateString("es-HN", { day: "numeric", month: "short" }),
+    income:  Number(d.income),
     expense: Number(d.expense),
   }));
 
+  // Solo para operaciones de cuentas (crear/editar/eliminar)
   const onAccountSuccess = () => { mutateAccounts(); mutateSummary(); };
 
   return (
     <div className="space-y-4 pb-24">
 
-      {/* Header */}
       <div>
         <h1 className="text-2xl font-bold tracking-tight">Finanzas</h1>
         <p className="text-muted-foreground text-sm">{periodLabel}</p>
       </div>
 
-      {/* Filtros período */}
       <div className="grid grid-cols-2 gap-2">
         <Select
           value={selectedMonth ? String(selectedMonth) : "all"}
           onValueChange={(v) => setSelectedMonth(v === "all" ? undefined : Number(v))}
         >
-          <SelectTrigger className="w-full">
-            <SelectValue placeholder="Mes" />
-          </SelectTrigger>
+          <SelectTrigger className="w-full"><SelectValue placeholder="Mes" /></SelectTrigger>
           <SelectContent>
             <SelectItem value="all">Todo el año</SelectItem>
             {(selectedYear ? monthsForYear(selectedYear) : monthsForYear(now.getFullYear())).map((m) => (
@@ -132,9 +124,7 @@ export default function FinancesPage() {
             if (selectedMonth && !months.includes(selectedMonth)) setSelectedMonth(undefined);
           }}
         >
-          <SelectTrigger className="w-full">
-            <SelectValue />
-          </SelectTrigger>
+          <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
           <SelectContent>
             {availableYears.length === 0 && (
               <SelectItem value={String(now.getFullYear())}>{now.getFullYear()}</SelectItem>
@@ -146,7 +136,6 @@ export default function FinancesPage() {
         </Select>
       </div>
 
-      {/* Balance total */}
       <Card className="bg-primary text-primary-foreground pb-1 pt-1">
         <CardContent className="p-4">
           <div className="flex items-center justify-between mb-1">
@@ -163,7 +152,6 @@ export default function FinancesPage() {
         </CardContent>
       </Card>
 
-      {/* Stats período */}
       <div className="grid grid-cols-2 gap-2">
         <Card className="pt-1 pb-1">
           <CardContent className="p-3">
@@ -172,10 +160,7 @@ export default function FinancesPage() {
               <TrendingUp className="h-3 w-3 text-green-600" />
             </div>
             <div className="text-base font-bold text-green-600">
-              {isLoading
-                ? <Skeleton className="h-5 w-20" />
-                : format(summary?.period.income ?? 0)
-              }
+              {isLoading ? <Skeleton className="h-5 w-20" /> : format(summary?.period.income ?? 0)}
             </div>
             <p className="text-[11px] text-muted-foreground mt-0.5">{periodLabel}</p>
           </CardContent>
@@ -187,17 +172,13 @@ export default function FinancesPage() {
               <TrendingDown className="h-3 w-3 text-destructive" />
             </div>
             <div className="text-base font-bold text-destructive">
-              {isLoading
-                ? <Skeleton className="h-5 w-20" />
-                : format(summary?.period.expense ?? 0)
-              }
+              {isLoading ? <Skeleton className="h-5 w-20" /> : format(summary?.period.expense ?? 0)}
             </div>
             <p className="text-[11px] text-muted-foreground mt-0.5">{periodLabel}</p>
           </CardContent>
         </Card>
       </div>
 
-      {/* Cuentas */}
       <div>
         <p className="text-sm font-semibold mb-2.5">Cuentas</p>
         <Card className="pt-1 pb-1">
@@ -223,8 +204,8 @@ export default function FinancesPage() {
             ) : (
               <div className="divide-y">
                 {(summary?.accounts ?? []).map((account) => {
-                  const Icon = ACCOUNT_ICONS[account.type] ?? Wallet;
-                  const typeConfig = ACCOUNT_TYPE_CONFIG[account.type] ?? ACCOUNT_TYPE_CONFIG.OTHER;
+                  const Icon        = ACCOUNT_ICONS[account.type] ?? Wallet;
+                  const typeConfig  = ACCOUNT_TYPE_CONFIG[account.type] ?? ACCOUNT_TYPE_CONFIG.OTHER;
                   const fullAccount = accounts.find((a) => a.id === account.id);
                   return (
                     <div key={account.id} className="flex items-center gap-3 p-3.5">
@@ -261,7 +242,6 @@ export default function FinancesPage() {
         </Card>
       </div>
 
-      {/* Flujo de efectivo */}
       <Card className="pt-1 pb-1">
         <CardContent className="p-4">
           <div className="flex items-center justify-between mb-4">
@@ -290,7 +270,7 @@ export default function FinancesPage() {
                     fontSize: 12,
                   }}
                 />
-                <Area type="monotone" dataKey="income" stroke="#10B981" fill="#10B981" fillOpacity={0.15} strokeWidth={2} name="Ingresos" />
+                <Area type="monotone" dataKey="income"  stroke="#10B981" fill="#10B981" fillOpacity={0.15} strokeWidth={2} name="Ingresos" />
                 <Area type="monotone" dataKey="expense" stroke="#EF4444" fill="#EF4444" fillOpacity={0.15} strokeWidth={2} name="Egresos" />
               </AreaChart>
             </ResponsiveContainer>
@@ -298,7 +278,6 @@ export default function FinancesPage() {
         </CardContent>
       </Card>
 
-      {/* Movimientos de hoy */}
       <div className="pt-3">
         <div className="flex items-center justify-between mb-2.5">
           <div>
@@ -319,9 +298,7 @@ export default function FinancesPage() {
 
         <div className="space-y-2">
           {isLoading ? (
-            Array.from({ length: 3 }).map((_, i) => (
-              <Skeleton key={i} className="h-16 w-full rounded-xl" />
-            ))
+            Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-16 w-full rounded-xl" />)
           ) : !summary?.today_transactions.length ? (
             <Card className="pt-1 pb-1">
               <CardContent className="py-8 flex flex-col items-center justify-center">
@@ -331,7 +308,7 @@ export default function FinancesPage() {
             </Card>
           ) : (
             summary.today_transactions.map((t) => {
-              const cfg = TYPE_CONFIG[t.type];
+              const cfg  = TYPE_CONFIG[t.type];
               const Icon = cfg.icon;
               return (
                 <Card className="pt-1 pb-1" key={t.id}>
@@ -363,20 +340,18 @@ export default function FinancesPage() {
         </div>
       </div>
 
-      {/* FAB */}
       <Fab
         actions={[
-          { label: "Nueva cuenta", icon: Wallet, onClick: () => setCreateAccountOpen(true) },
+          { label: "Nueva cuenta",      icon: Wallet,         onClick: () => setCreateAccountOpen(true) },
           { label: "Nueva transacción", icon: ArrowLeftRight, onClick: () => setTransactionOpen(true) },
         ]}
       />
 
-      {/* Modales */}
+      {/* CreateTransactionModal mutea internamente: transactions + accounts + finances */}
       <CreateTransactionModal
         open={transactionOpen}
         onOpenChange={setTransactionOpen}
         accounts={accounts}
-        onSuccess={() => { mutateSummary(); setTransactionOpen(false); }}
       />
       <CreateAccountDialog
         open={createAccountOpen}

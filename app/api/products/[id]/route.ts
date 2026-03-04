@@ -117,15 +117,29 @@ export async function DELETE(request: NextRequest, { params }: Params) {
 
     if (!existing) return createErrorResponse("Producto no encontrado", 404);
 
+    // Verificar si tiene historial asociado
+    const [usage] = await sql`
+      SELECT
+        (SELECT COUNT(*) FROM inventory_movements WHERE product_id = ${productId}) +
+        (SELECT COUNT(*) FROM sale_items          WHERE product_id = ${productId})
+      AS total
+    `;
+
+    if (Number(usage.total) === 0) {
+      // Sin historial → borrar de verdad
+      await sql`DELETE FROM products WHERE id = ${productId} AND user_id = ${userId}`;
+      return Response.json({ message: "Producto eliminado permanentemente" });
+    }
+
+    // Con historial → soft delete
     await sql`
       UPDATE products SET
         is_active  = FALSE,
         updated_at = CURRENT_TIMESTAMP
-      WHERE id = ${productId}
-        AND user_id = ${userId}
+      WHERE id = ${productId} AND user_id = ${userId}
     `;
 
-    return Response.json({ message: "Producto eliminado correctamente" });
+    return Response.json({ message: "Producto desactivado correctamente" });
 
   } catch (error) {
     console.error("❌ DELETE /api/products/[id]:", error);
