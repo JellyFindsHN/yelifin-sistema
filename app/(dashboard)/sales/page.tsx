@@ -5,7 +5,6 @@ import { useMemo, useState } from "react";
 import { useCurrency } from "@/hooks/swr/use-currency";
 import { useRouter } from "next/navigation";
 
-
 import { Fab } from "@/components/ui/fab";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -40,33 +39,28 @@ const formatDateOnly = (dateString: string) =>
 
 type Preset = "today" | "7d" | "this_month" | "last_month" | "all";
 type PaymentFilter = "all" | "CASH" | "CARD" | "TRANSFER" | "MIXED" | "OTHER";
+type StatusFilter  = "all" | "COMPLETED" | "PENDING";
 
 const paymentConfig: Record<string, { label: string; icon: any }> = {
-  CASH: { label: "Efectivo", icon: Banknote },
-  CARD: { label: "Tarjeta", icon: CreditCard },
-  TRANSFER: { label: "Transferencia", icon: ArrowLeftRight },
-  MIXED: { label: "Mixto", icon: HelpCircle },
-  OTHER: { label: "Otro", icon: HelpCircle },
+  CASH:     { label: "Efectivo",       icon: Banknote },
+  CARD:     { label: "Tarjeta",        icon: CreditCard },
+  TRANSFER: { label: "Transferencia",  icon: ArrowLeftRight },
+  MIXED:    { label: "Mixto",          icon: HelpCircle },
+  OTHER:    { label: "Otro",           icon: HelpCircle },
 };
 
 const PRESET_LABELS: Record<Preset, string> = {
-  today: "Hoy",
-  "7d": "Últimos 7 días",
+  today:      "Hoy",
+  "7d":       "Últimos 7 días",
   this_month: "Este mes",
   last_month: "Mes pasado",
-  all: "Todas",
+  all:        "Todas",
 };
 
 const getTaxRate = (v: any): number => Number(v) || 0;
 
 // ── Dropdown de acciones para venta pendiente ─────────────────────────
-function PendingActions({
-  saleId,
-  onMutate,
-}: {
-  saleId: number;
-  onMutate: () => void;
-}) {
+function PendingActions({ saleId, onMutate }: { saleId: number; onMutate: () => void }) {
   const router = useRouter();
   const { confirmSale, cancelSale, isPatching } = usePatchSale(saleId);
 
@@ -101,31 +95,22 @@ function PendingActions({
             }
           </Button>
         </DropdownMenuTrigger>
-
         <DropdownMenuContent align="end" className="w-44">
-          <DropdownMenuItem
-            onClick={() => router.push(`/sales/${saleId}/edit`)}
-          >
-            <Pencil className="h-4 w-4 mr-2" />
-            Editar
+          <DropdownMenuItem onClick={() => router.push(`/sales/${saleId}/edit`)}>
+            <Pencil className="h-4 w-4 mr-2" /> Editar
           </DropdownMenuItem>
-
           <DropdownMenuItem
             className="text-green-600 focus:text-green-700 focus:bg-green-50"
             onClick={handleConfirm}
           >
-            <CheckCircle className="h-4 w-4 mr-2" />
-            Confirmar pago
+            <CheckCircle className="h-4 w-4 mr-2" /> Confirmar pago
           </DropdownMenuItem>
-
           <DropdownMenuSeparator />
-
           <DropdownMenuItem
             className="text-destructive focus:text-destructive focus:bg-destructive/10"
             onClick={handleCancel}
           >
-            <XCircle className="h-4 w-4 mr-2" />
-            Cancelar venta
+            <XCircle className="h-4 w-4 mr-2" /> Cancelar venta
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
@@ -137,48 +122,54 @@ export default function SalesPage() {
   const router = useRouter();
   const { format } = useCurrency();
 
-  const [preset, setPreset] = useState<Preset>("this_month");
-  const [dateFrom, setDateFrom] = useState("");
-  const [dateTo, setDateTo] = useState("");
+  const [preset, setPreset]               = useState<Preset>("this_month");
+  const [dateFrom, setDateFrom]           = useState("");
+  const [dateTo, setDateTo]               = useState("");
   const [paymentFilter, setPaymentFilter] = useState<PaymentFilter>("all");
   const [accountFilter, setAccountFilter] = useState<string>("all");
-  const [search, setSearch] = useState("");
-  const [editSaleId, setEditSaleId] = useState<number | null>(null);
+  const [search, setSearch]               = useState("");
+  const [statusFilter, setStatusFilter]   = useState<StatusFilter>("all");
 
   const { sales, isLoading, mutate } = useSales({
     preset,
-    from: dateFrom || undefined,
-    to: dateTo || undefined,
+    from:    dateFrom || undefined,
+    to:      dateTo   || undefined,
     payment: paymentFilter,
   });
 
   const { accounts } = useAccounts();
 
-  const filtered = useMemo(() => {
+  // Para stats — sin filtro de estado
+  const filteredForStats = useMemo(() => {
     const q = search.trim().toLowerCase();
     return sales.filter((s) => {
-      const matchSearch = !q || s.sale_number.toLowerCase().includes(q) || (s.customer_name?.toLowerCase().includes(q) ?? false);
+      const matchSearch  = !q ||
+        s.sale_number.toLowerCase().includes(q) ||
+        (s.customer_name?.toLowerCase().includes(q) ?? false) ||
+        ((s as any).notes?.toLowerCase().includes(q) ?? false);
       const matchAccount = accountFilter === "all" || String(s.account_id) === accountFilter;
       return matchSearch && matchAccount;
     });
   }, [sales, search, accountFilter]);
 
-  // Solo COMPLETED para revenue/profit real
-  const totalRevenue = useMemo(() =>
-    filtered.filter(s => s.status === "COMPLETED").reduce((acc, s) => acc + Number(s.total), 0),
-    [filtered]
-  );
-  const totalProfit = useMemo(() =>
-    filtered.filter(s => s.status === "COMPLETED").reduce((acc, s) => acc + Number(s.net_profit), 0),
-    [filtered]
-  );
-  const pendingCount = useMemo(() => filtered.filter(s => s.status === "PENDING").length, [filtered]);
+  // Para la lista — con filtro de estado
+  const filtered = useMemo(() =>
+    statusFilter === "all"
+      ? filteredForStats
+      : filteredForStats.filter(s => s.status === statusFilter),
+  [filteredForStats, statusFilter]);
 
-  const hasFilters = dateFrom || dateTo || paymentFilter !== "all" || accountFilter !== "all" || search;
-  const clearAll = () => { setDateFrom(""); setDateTo(""); setSearch(""); setPaymentFilter("all"); setAccountFilter("all"); setPreset("this_month"); };
+  const totalRevenue = useMemo(() =>
+    filteredForStats.filter(s => s.status === "COMPLETED").reduce((acc, s) => acc + Number(s.total), 0), [filteredForStats]);
+  const totalProfit = useMemo(() =>
+    filteredForStats.filter(s => s.status === "COMPLETED").reduce((acc, s) => acc + Number(s.net_profit), 0), [filteredForStats]);
+  const pendingCount = useMemo(() => filteredForStats.filter(s => s.status === "PENDING").length, [filteredForStats]);
+
+  const hasFilters = dateFrom || dateTo || paymentFilter !== "all" || accountFilter !== "all" || statusFilter !== "all" || search;
+  const clearAll = () => { setDateFrom(""); setDateTo(""); setSearch(""); setPaymentFilter("all"); setAccountFilter("all"); setStatusFilter("all"); setPreset("this_month"); };
   const onChangePreset = (v: Preset) => { setPreset(v); setDateFrom(""); setDateTo(""); };
-  const onManualFrom = (v: string) => { setDateFrom(v); setPreset("all"); };
-  const onManualTo = (v: string) => { setDateTo(v); setPreset("all"); };
+  const onManualFrom   = (v: string) => { setDateFrom(v); setPreset("all"); };
+  const onManualTo     = (v: string) => { setDateTo(v);   setPreset("all"); };
 
   const activePeriodLabel = dateFrom || dateTo
     ? [dateFrom && `Desde ${formatDateOnly(dateFrom)}`, dateTo && `Hasta ${formatDateOnly(dateTo)}`].filter(Boolean).join(" · ")
@@ -187,7 +178,7 @@ export default function SalesPage() {
   return (
     <div className="space-y-4 pb-24">
 
-      {/* ── Header ── */}
+      {/* Header */}
       <div className="flex items-center justify-between gap-3">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Ventas</h1>
@@ -204,7 +195,7 @@ export default function SalesPage() {
         </div>
       </div>
 
-      {/* ── Stats ── */}
+      {/* Stats */}
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 sm:gap-3">
         <Card className="hidden sm:block pt-1 pb-1">
           <CardContent className="pl-3.5 py-3">
@@ -215,9 +206,7 @@ export default function SalesPage() {
             {isLoading ? <Skeleton className="h-6 w-12" /> : (
               <div className="flex items-baseline gap-1.5">
                 <p className="text-lg font-bold">{filtered.filter(s => s.status === "COMPLETED").length}</p>
-                {pendingCount > 0 && (
-                  <span className="text-xs text-amber-600">{pendingCount} pend.</span>
-                )}
+                {pendingCount > 0 && <span className="text-xs text-amber-600">{pendingCount} pend.</span>}
               </div>
             )}
           </CardContent>
@@ -251,16 +240,48 @@ export default function SalesPage() {
         </Card>
       </div>
 
-      {/* ── Filtros ── */}
+      {/* Filtros */}
       <div className="space-y-2">
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input placeholder="Número o cliente..." value={search} onChange={(e) => setSearch(e.target.value)} className="pl-9" />
+
+        {/* Buscador + Estado */}
+        <div className="flex gap-2">
+          <div className="relative flex-1">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder="Número, cliente o nota..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="pl-9 pr-9"
+            />
+            {search && (
+              <button
+                type="button"
+                onClick={() => setSearch("")}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            )}
+          </div>
+          <div className="w-[38%] shrink-0">
+            <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v as StatusFilter)}>
+              <SelectTrigger className="w-full h-9">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent position="popper" className="w-[--radix-select-trigger-width] min-w-0">
+                <SelectItem value="all">Todas</SelectItem>
+                <SelectItem value="COMPLETED">Completadas</SelectItem>
+                <SelectItem value="PENDING">Pendientes</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
         </div>
+
+        {/* Período + Cuenta — 50/50 */}
         <div className="grid grid-cols-2 gap-2">
           <Select value={preset} onValueChange={(v) => onChangePreset(v as Preset)}>
-            <SelectTrigger><SelectValue /></SelectTrigger>
-            <SelectContent>
+            <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
+            <SelectContent position="popper" className="w-[--radix-select-trigger-width] min-w-0">
               <SelectItem value="today">Hoy</SelectItem>
               <SelectItem value="7d">Últimos 7 días</SelectItem>
               <SelectItem value="this_month">Este mes</SelectItem>
@@ -269,8 +290,8 @@ export default function SalesPage() {
             </SelectContent>
           </Select>
           <Select value={accountFilter} onValueChange={setAccountFilter}>
-            <SelectTrigger><SelectValue placeholder="Cuenta" /></SelectTrigger>
-            <SelectContent>
+            <SelectTrigger className="w-full"><SelectValue placeholder="Cuenta" /></SelectTrigger>
+            <SelectContent position="popper" className="w-[--radix-select-trigger-width] min-w-0">
               <SelectItem value="all">Todas las cuentas</SelectItem>
               {accounts.map((a) => (
                 <SelectItem key={a.id} value={String(a.id)}>{a.name}</SelectItem>
@@ -278,10 +299,15 @@ export default function SalesPage() {
             </SelectContent>
           </Select>
         </div>
+
+
+
+        {/* Fechas */}
         <div className="grid grid-cols-2 gap-2">
           <Input type="date" value={dateFrom} onChange={(e) => onManualFrom(e.target.value)} className="text-sm" />
-          <Input type="date" value={dateTo} onChange={(e) => onManualTo(e.target.value)} className="text-sm" />
+          <Input type="date" value={dateTo}   onChange={(e) => onManualTo(e.target.value)}   className="text-sm" />
         </div>
+
         {hasFilters && (
           <Button variant="ghost" size="sm" className="gap-1.5 text-muted-foreground w-full" onClick={clearAll}>
             <X className="h-3.5 w-3.5" /> Limpiar filtros
@@ -289,7 +315,7 @@ export default function SalesPage() {
         )}
       </div>
 
-      {/* ── Cards móvil ── */}
+      {/* Cards móvil */}
       <div className="space-y-2 lg:hidden">
         {isLoading ? (
           Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-24 w-full rounded-xl" />)
@@ -302,9 +328,9 @@ export default function SalesPage() {
           </Card>
         ) : (
           filtered.map((sale) => {
-            const payment = paymentConfig[sale.payment_method] ?? paymentConfig.OTHER;
-            const PayIcon = payment.icon;
-            const taxRate = getTaxRate(sale.tax_rate);
+            const payment   = paymentConfig[sale.payment_method] ?? paymentConfig.OTHER;
+            const PayIcon   = payment.icon;
+            const taxRate   = getTaxRate(sale.tax_rate);
             const isPending = sale.status === "PENDING";
             return (
               <Card
@@ -319,8 +345,7 @@ export default function SalesPage() {
                         <p className="font-mono text-sm font-semibold">{sale.sale_number}</p>
                         {isPending && (
                           <Badge className="text-[10px] px-1.5 py-0 bg-amber-100 text-amber-700 border-amber-200 gap-1" variant="outline">
-                            <Clock className="h-2.5 w-2.5" />
-                            Pendiente
+                            <Clock className="h-2.5 w-2.5" /> Pendiente
                           </Badge>
                         )}
                         {taxRate > 0 && (
@@ -334,17 +359,12 @@ export default function SalesPage() {
                       </p>
                     </div>
                     {isPending
-                      ? <PendingActions
-                        saleId={sale.id}
-                        onMutate={mutate}
-                      />
+                      ? <PendingActions saleId={sale.id} onMutate={mutate} />
                       : <Badge variant="outline" className="gap-1 text-xs shrink-0">
-                        <PayIcon className="h-3 w-3" />
-                        {(sale as any).account_name}
-                      </Badge>
+                          <PayIcon className="h-3 w-3" /> {(sale as any).account_name}
+                        </Badge>
                     }
                   </div>
-
                   <div className={`grid gap-1 pt-2 border-t text-center ${isPending ? "grid-cols-2" : "grid-cols-3"}`}>
                     <div>
                       <p className="text-[10px] text-muted-foreground mb-0.5">Productos</p>
@@ -368,7 +388,7 @@ export default function SalesPage() {
         )}
       </div>
 
-      {/* ── Tabla desktop ── */}
+      {/* Tabla desktop */}
       <Card className="hidden lg:block">
         <CardContent className="p-0">
           <Table>
@@ -404,9 +424,9 @@ export default function SalesPage() {
                 </TableRow>
               ) : (
                 filtered.map((sale) => {
-                  const payment = paymentConfig[sale.payment_method] ?? paymentConfig.OTHER;
-                  const PayIcon = payment.icon;
-                  const taxRate = getTaxRate(sale.tax_rate);
+                  const payment   = paymentConfig[sale.payment_method] ?? paymentConfig.OTHER;
+                  const PayIcon   = payment.icon;
+                  const taxRate   = getTaxRate(sale.tax_rate);
                   const isPending = sale.status === "PENDING";
                   return (
                     <TableRow
@@ -420,13 +440,11 @@ export default function SalesPage() {
                       <TableCell>
                         {isPending ? (
                           <Badge className="bg-amber-100 text-amber-700 border-amber-200 gap-1" variant="outline">
-                            <Clock className="h-3 w-3" />
-                            Pendiente
+                            <Clock className="h-3 w-3" /> Pendiente
                           </Badge>
                         ) : (
                           <Badge className="bg-green-100 text-green-700 border-green-200 gap-1" variant="outline">
-                            <CheckCircle className="h-3 w-3" />
-                            Completada
+                            <CheckCircle className="h-3 w-3" /> Completada
                           </Badge>
                         )}
                       </TableCell>
@@ -435,8 +453,7 @@ export default function SalesPage() {
                       </TableCell>
                       <TableCell>
                         <Badge variant="outline" className="gap-1">
-                          <PayIcon className="h-3 w-3" />
-                          {payment.label}
+                          <PayIcon className="h-3 w-3" /> {payment.label}
                         </Badge>
                       </TableCell>
                       <TableCell className="text-muted-foreground text-sm">{(sale as any).account_name ?? "—"}</TableCell>
@@ -454,12 +471,7 @@ export default function SalesPage() {
                         }
                       </TableCell>
                       <TableCell className="text-right">
-                        {isPending && (
-                          <PendingActions
-                            saleId={sale.id}
-                            onMutate={mutate}
-                          />
-                        )}
+                        {isPending && <PendingActions saleId={sale.id} onMutate={mutate} />}
                       </TableCell>
                     </TableRow>
                   );

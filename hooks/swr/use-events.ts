@@ -113,7 +113,10 @@ export function useEvent(id: number | null) {
       const token = await firebaseUser!.getIdToken();
       return authFetch(`/api/events/${id}`, token);
     },
-    { revalidateOnFocus: false }
+    {
+      revalidateOnFocus:    false,
+      dedupingInterval:     5 * 60_000,
+    }
   );
 
   return {

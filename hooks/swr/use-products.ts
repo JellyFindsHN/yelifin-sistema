@@ -63,8 +63,12 @@ export function useProducts() {
   const authFetch = useAuthFetch();
 
   const { data, error, isLoading, mutate } = useSWR<ProductsResponse>(
-    firebaseUser ? KEY : null, // no fetch hasta tener usuario
+    firebaseUser ? KEY : null,
     (url:string) => authFetch(url),
+     {
+      revalidateOnFocus:    false,
+      dedupingInterval:     5 * 60_000,
+    }
   );
 
   return {

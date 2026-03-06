@@ -105,6 +105,7 @@ export function AppSidebar() {
   const handleLogout = async () => {
     try {
       await signOut(auth)
+      document.cookie = "token=; Max-Age=0; path=/"
       toast.success("Sesión cerrada exitosamente")
       closeOnMobile()
       router.push("/")

@@ -50,10 +50,10 @@ export function Fab({ actions }: Props) {
         onClick={() => setOpen(false)}
       />
 
-      <div className="fixed bottom-6 right-6 z-50 flex flex-col items-end gap-4">
+      <div className="fixed bottom-6 right-6 z-50 flex flex-col items-end gap-4 pointer-events-none">
 
         {/* Acciones */}
-        <div className="flex flex-col items-end gap-3">
+        <div className={cn("flex flex-col items-end gap-3", !open && "pointer-events-none h-0 overflow-hidden")}>
           {actions.map((action, i) => {
             const Icon = action.icon;
             return (
@@ -69,13 +69,13 @@ export function Fab({ actions }: Props) {
                   transitionDelay: open ? `${(actions.length - 1 - i) * 55}ms` : "0ms",
                 }}
               >
-                <span className="bg-popover text-popover-foreground text-sm font-semibold px-4 py-2 rounded-xl shadow-lg border whitespace-nowrap">
+                <span className="pointer-events-auto bg-popover text-popover-foreground text-sm font-semibold px-4 py-2 rounded-xl shadow-lg border whitespace-nowrap">
                   {action.label}
                 </span>
                 <button
                   onClick={() => { action.onClick(); setOpen(false); }}
                   className={cn(
-                    "h-12 w-12 rounded-full shadow-lg flex items-center justify-center transition-colors shrink-0",
+                    "pointer-events-auto h-12 w-12 rounded-full shadow-lg flex items-center justify-center transition-colors shrink-0",
                     action.variant === "destructive"
                       ? "bg-destructive text-destructive-foreground hover:bg-destructive/90"
                       : "bg-background border-2 text-foreground hover:bg-muted"
@@ -91,7 +91,7 @@ export function Fab({ actions }: Props) {
         {/* Botón principal */}
         <button
           onClick={() => setOpen((prev) => !prev)}
-          className="h-14 w-14 rounded-full bg-primary text-primary-foreground shadow-xl flex items-center justify-center hover:bg-primary/90 transition-colors"
+          className="pointer-events-auto h-14 w-14 rounded-full bg-primary text-primary-foreground shadow-xl flex items-center justify-center hover:bg-primary/90 transition-colors"
           style={{
             transform:  open ? "rotate(405deg)" : "rotate(0deg)",
             transition: "transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1)",

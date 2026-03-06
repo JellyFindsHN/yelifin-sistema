@@ -68,7 +68,10 @@ export function useMovements(filters?: MovementFilters) {
   const { data, isLoading, error, mutate } = useSWR(
     firebaseUser ? url : null,
     (u: string) => authFetch(u),
-    { revalidateOnFocus: false }
+     {
+      revalidateOnFocus:    false,
+      dedupingInterval:     5 * 60_000,
+    }
   );
 
   return {

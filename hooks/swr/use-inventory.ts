@@ -53,6 +53,9 @@ export function useInventory() {
   const { data, error, isLoading, mutate } = useSWR<InventoryResponse>(
     firebaseUser ? KEY : null,
     (url: string) => authFetch(url),
+     {
+      dedupingInterval:     5 * 60_000,
+    }
   );
 
   return {

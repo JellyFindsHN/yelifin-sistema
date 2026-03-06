@@ -50,13 +50,17 @@ export function useAccounts() {
   const { data, isLoading, error, mutate } = useSWR(
     firebaseUser ? KEY : null,
     (url: string) => authFetch(url),
+    {
+      revalidateOnFocus:    false,
+      dedupingInterval:     5 * 60_000,
+    }
   );
 
   return {
     accounts: (data?.data ?? []) as Account[],
-    total: data?.total ?? 0,
+    total:    data?.total ?? 0,
     isLoading,
-    error: error?.message ?? null,
+    error:    error?.message ?? null,
     mutate,
   };
 }

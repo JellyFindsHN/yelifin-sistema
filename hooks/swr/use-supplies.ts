@@ -77,7 +77,10 @@ export function useSupplies(params?: { search?: string }) {
   const { data, error, isLoading, mutate } = useSWR(
     swrKey,
     (url: string) => authFetch(url),
-    { revalidateOnFocus: false, dedupingInterval: 30_000 }
+     {
+      revalidateOnFocus:    false,
+      dedupingInterval:     5 * 60_000,
+    }
   );
 
   return {

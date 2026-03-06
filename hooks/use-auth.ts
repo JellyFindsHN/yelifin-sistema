@@ -18,6 +18,7 @@ export function useAuth() {
       setFirebaseUser(fbUser);
       if (fbUser) {
         const idToken = await fbUser.getIdToken();
+        document.cookie = `token=${idToken}; path=/; max-age=3600; SameSite=Strict`
         setToken(idToken);
       } else {
         setToken(null);

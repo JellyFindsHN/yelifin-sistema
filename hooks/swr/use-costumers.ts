@@ -53,6 +53,10 @@ export function useCustomers() {
   const { data, isLoading, error, mutate } = useSWR(
     firebaseUser ? KEY : null,
     (url: string) => authFetch(url),
+     {
+      revalidateOnFocus:    false,
+      dedupingInterval:     5 * 60_000,
+    }
   );
 
   return {

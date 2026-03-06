@@ -43,37 +43,39 @@ export async function GET(request: NextRequest) {
       prevEndISO   = startISO;
     }
 
-    // ── Revenue ────────────────────────────────────────────────────────
+    // ── Revenue (solo COMPLETED) ───────────────────────────────────────
     const [revenueThis] = await sql`
       SELECT COALESCE(SUM(total), 0) AS revenue FROM sales
-      WHERE user_id = ${userId} AND sold_at >= ${startISO} AND sold_at < ${endISO}
+      WHERE user_id = ${userId} AND status = 'COMPLETED'
+        AND sold_at >= ${startISO} AND sold_at < ${endISO}
     `;
     const [revenueLast] = await sql`
       SELECT COALESCE(SUM(total), 0) AS revenue FROM sales
-      WHERE user_id = ${userId} AND sold_at >= ${prevStartISO} AND sold_at < ${prevEndISO}
+      WHERE user_id = ${userId} AND status = 'COMPLETED'
+        AND sold_at >= ${prevStartISO} AND sold_at < ${prevEndISO}
     `;
     const [countThis] = await sql`
       SELECT COUNT(*)::int AS count FROM sales
-      WHERE user_id = ${userId} AND sold_at >= ${startISO} AND sold_at < ${endISO}
+      WHERE user_id = ${userId} AND status = 'COMPLETED'
+        AND sold_at >= ${startISO} AND sold_at < ${endISO}
     `;
 
-    // ── Profit (TAX-INCLUSIVE: se resta el ISV de la venta) ────────────
-    // profit = (line_total - costo) - ISV
-    // El ISV está dentro del precio, no es ganancia del vendedor.
-    // COALESCE(s.tax, 0) ya fue calculado server-side al crear la venta.
+    // ── Profit (solo COMPLETED, tax-inclusive) ────────────────────────
     const [profitThis] = await sql`
       SELECT COALESCE(SUM(si.line_total - (si.unit_cost * si.quantity)), 0)
            - COALESCE(SUM(s.tax), 0) AS profit
       FROM sale_items si
       JOIN sales s ON s.id = si.sale_id
-      WHERE si.user_id = ${userId} AND s.sold_at >= ${startISO} AND s.sold_at < ${endISO}
+      WHERE si.user_id = ${userId} AND s.status = 'COMPLETED'
+        AND s.sold_at >= ${startISO} AND s.sold_at < ${endISO}
     `;
     const [profitLast] = await sql`
       SELECT COALESCE(SUM(si.line_total - (si.unit_cost * si.quantity)), 0)
            - COALESCE(SUM(s.tax), 0) AS profit
       FROM sale_items si
       JOIN sales s ON s.id = si.sale_id
-      WHERE si.user_id = ${userId} AND s.sold_at >= ${prevStartISO} AND s.sold_at < ${prevEndISO}
+      WHERE si.user_id = ${userId} AND s.status = 'COMPLETED'
+        AND s.sold_at >= ${prevStartISO} AND s.sold_at < ${prevEndISO}
     `;
 
     // ── Customers ──────────────────────────────────────────────────────
@@ -108,7 +110,7 @@ export async function GET(request: NextRequest) {
       FROM accounts WHERE user_id = ${userId} AND is_active = TRUE
     `;
 
-    // ── Sales chart ────────────────────────────────────────────────────
+    // ── Sales chart (solo COMPLETED) ───────────────────────────────────
     const salesChart = await sql`
       SELECT
         DATE(s.sold_at)::text AS date,
@@ -117,25 +119,25 @@ export async function GET(request: NextRequest) {
           - COALESCE(SUM(s.tax), 0) AS profit
       FROM sales s
       LEFT JOIN sale_items si ON si.sale_id = s.id AND si.user_id = s.user_id
-      WHERE s.user_id = ${userId} AND s.sold_at >= ${startISO} AND s.sold_at < ${endISO}
+      WHERE s.user_id = ${userId} AND s.status = 'COMPLETED'
+        AND s.sold_at >= ${startISO} AND s.sold_at < ${endISO}
       GROUP BY DATE(s.sold_at)
       ORDER BY DATE(s.sold_at) ASC
     `;
 
-    // ── Payment methods ────────────────────────────────────────────────
+    // ── Payment methods (solo COMPLETED) ──────────────────────────────
     const paymentMethods = await sql`
       SELECT
         COALESCE(payment_method, 'OTHER') AS method,
         COALESCE(SUM(total), 0)           AS amount
       FROM sales
-      WHERE user_id = ${userId} AND sold_at >= ${startISO} AND sold_at < ${endISO}
+      WHERE user_id = ${userId} AND status = 'COMPLETED'
+        AND sold_at >= ${startISO} AND sold_at < ${endISO}
       GROUP BY COALESCE(payment_method, 'OTHER')
       ORDER BY amount DESC
     `;
 
-    // ── Top 5 productos ────────────────────────────────────────────────
-    // Profit por producto: proporcional al ISV de la venta
-    // ISV se distribuye en proporción al line_total de cada item
+    // ── Top 5 productos (solo COMPLETED) ──────────────────────────────
     const topProducts = await sql`
       SELECT
         p.id, p.name, p.image_url,
@@ -148,13 +150,14 @@ export async function GET(request: NextRequest) {
       FROM sale_items si
       JOIN sales s ON s.id = si.sale_id AND s.user_id = si.user_id
       JOIN products p ON p.id = si.product_id
-      WHERE si.user_id = ${userId} AND s.sold_at >= ${startISO} AND s.sold_at < ${endISO}
+      WHERE si.user_id = ${userId} AND s.status = 'COMPLETED'
+        AND s.sold_at >= ${startISO} AND s.sold_at < ${endISO}
       GROUP BY p.id
       ORDER BY units_sold DESC
       LIMIT 5
     `;
 
-    // ── Últimas 5 ventas ───────────────────────────────────────────────
+    // ── Últimas 5 ventas (solo COMPLETED) ─────────────────────────────
     const recentSales = await sql`
       SELECT
         s.id, s.sale_number, s.total, s.payment_method, s.sold_at,
@@ -165,7 +168,8 @@ export async function GET(request: NextRequest) {
       FROM sales s
       LEFT JOIN customers c ON c.id = s.customer_id
       LEFT JOIN sale_items si ON si.sale_id = s.id AND si.user_id = s.user_id
-      WHERE s.user_id = ${userId} AND s.sold_at >= ${startISO} AND s.sold_at < ${endISO}
+      WHERE s.user_id = ${userId} AND s.status = 'COMPLETED'
+        AND s.sold_at >= ${startISO} AND s.sold_at < ${endISO}
       GROUP BY s.id, c.name
       ORDER BY s.sold_at DESC
       LIMIT 5

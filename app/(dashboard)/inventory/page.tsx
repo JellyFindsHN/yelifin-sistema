@@ -60,9 +60,6 @@ export default function InventoryPage() {
 
   // Diálogos
   const [createOpen, setCreateOpen] = useState(false);
-
-  const [selectedMonth] = useState<number | undefined>();
-  const [selectedYear] = useState<number | undefined>();
   const [transactionOpen, setTransactionOpen] = useState(false);
   const [editProduct, setEditProduct] = useState<Product | null>(null);
   const [deleteProduct, setDeleteProduct] = useState<Product | null>(null);

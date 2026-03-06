@@ -1,50 +1,111 @@
 // proxy.ts
 import { NextRequest, NextResponse } from "next/server"
 
-const PUBLIC_PATHS = ["", "/login", "/register", "/forgot-password"]
+const PUBLIC_PATHS    = ["", "/login", "/register", "/forgot-password"]
 const AUTH_ONLY_PATHS = ["/verify-email", "/onboarding"]
 
+// ── Verificación JWT manual (Edge-compatible) ──────────────────────────
+// Firebase ID tokens son JWTs firmados con RS256 por Google
+async function verifyFirebaseToken(token: string): Promise<boolean> {
+  try {
+    // 1. Decodificar header para obtener el kid
+    const [headerB64, payloadB64] = token.split(".")
+    const header  = JSON.parse(atob(headerB64.replace(/-/g, "+").replace(/_/g, "/")))
+    const payload = JSON.parse(atob(payloadB64.replace(/-/g, "+").replace(/_/g, "/")))
+
+    // 2. Validar claims básicos
+    const now = Math.floor(Date.now() / 1000)
+    if (payload.exp < now) return false                                    // expirado
+    if (payload.aud !== process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID) return false // proyecto incorrecto
+
+    // 3. Obtener clave pública de Google (cacheada por el CDN de Google)
+    const keysRes = await fetch(
+      "https://www.googleapis.com/robot/v1/metadata/x509/securetoken@system.gserviceaccount.com",
+      { next: { revalidate: 3600 } } // cachear 1h
+    )
+    if (!keysRes.ok) return false
+    const keys = await keysRes.json()
+    const certPem = keys[header.kid]
+    if (!certPem) return false
+
+    // 4. Importar la clave pública y verificar la firma
+    const certDer = pemToDer(certPem)
+    const cryptoKey = await crypto.subtle.importKey(
+      "spki",
+      certDer,
+      { name: "RSASSA-PKCS1-v1_5", hash: "SHA-256" },
+      false,
+      ["verify"]
+    )
+
+    const data      = new TextEncoder().encode(`${headerB64}.${payloadB64}`)
+    const signature = base64UrlDecode(token.split(".")[2])
+
+    return await crypto.subtle.verify("RSASSA-PKCS1-v1_5", cryptoKey, signature, data)
+
+  } catch {
+    return false
+  }
+}
+
+function pemToDer(pem: string): ArrayBuffer {
+  const base64 = pem
+    .replace(/-----BEGIN CERTIFICATE-----/, "")
+    .replace(/-----END CERTIFICATE-----/, "")
+    .replace(/\s/g, "")
+  const binary = atob(base64)
+  const bytes  = new Uint8Array(binary.length)
+  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i)
+  return bytes.buffer
+}
+
+function base64UrlDecode(str: string): ArrayBuffer {
+  const base64   = str.replace(/-/g, "+").replace(/_/g, "/")
+  const padded   = base64.padEnd(base64.length + (4 - base64.length % 4) % 4, "=")
+  const binary   = atob(padded)
+  const bytes    = new Uint8Array(binary.length)
+  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i)
+  return bytes.buffer
+}
+
+// ── Middleware ─────────────────────────────────────────────────────────
 export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl
 
   if (
     pathname.startsWith("/_next") ||
-    pathname.startsWith("/api") ||
+    pathname.startsWith("/api")   ||
     pathname.includes(".")
   ) {
     return NextResponse.next()
   }
 
-  // OJO: esto solo mira cookies, no el estado de Firebase en el cliente
-  const token =
-    request.cookies.get("__session")?.value ??
-    request.cookies.get("token")?.value
-
-  const isPublic = PUBLIC_PATHS.some((p) =>
+  const token      = request.cookies.get("token")?.value
+  const isPublic   = PUBLIC_PATHS.some((p) =>
     p === "" ? pathname === "/" : pathname.startsWith(p)
   )
   const isAuthOnly = AUTH_ONLY_PATHS.some((p) => pathname.startsWith(p))
 
-  // 1) Si NO hay token, ya no redirigimos a /login.
-  // Dejamos que el front decida (useAuth ya hace redirect en el cliente).
-  if (!token) {
-    // Solo evitamos que un usuario logueado vuelva a /login
-    if (isPublic || isAuthOnly) return NextResponse.next()
-    return NextResponse.next()
-  }
+  // Sin cookie → dejar pasar (useAuth redirige en cliente)
+  if (!token) return NextResponse.next()
 
-  // 2) Si HAY token y está en páginas públicas → mandamos al dashboard
-  if (token && isPublic) {
+  // Verificar token con clave pública de Google
+  const isValid = await verifyFirebaseToken(token)
+
+  // Token inválido o expirado → tratar como sin sesión
+  if (!isValid) return NextResponse.next()
+
+  // Token válido en página pública → ir al dashboard
+  if (isPublic) {
     return NextResponse.redirect(new URL("/dashboard", request.url))
   }
 
-  // 3) Check de onboarding solo si hay token
-  if (!isPublic && !isAuthOnly) {
+  // Token válido en dashboard → verificar onboarding
+  if (!isAuthOnly) {
     try {
       const res = await fetch(new URL("/api/onboarding", request.url), {
         headers: { Authorization: `Bearer ${token}` },
       })
-
       if (res.ok) {
         const data = await res.json()
         if (!data?.data?.onboarding_completed) {
@@ -52,7 +113,7 @@ export async function proxy(request: NextRequest) {
         }
       }
     } catch {
-      // Si falla, dejamos pasar igual
+      // Si falla el fetch, dejamos pasar
     }
   }
 

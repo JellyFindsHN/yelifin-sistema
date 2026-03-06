@@ -61,7 +61,6 @@ export function EditSaleOptionsPanel({
     onAccountChange,
     onNotesChange,
     onShippingCostChange,
-    onIsPendingChange,
     onOpenSupplies,
     onSavePending,
     onCompleteRequest,

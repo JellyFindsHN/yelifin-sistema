@@ -1,6 +1,6 @@
 'use client';
 
-import useSWR from 'swr';
+import useSWR, { useSWRConfig } from 'swr';
 import { useState } from 'react';
 import { useAuth } from '@/hooks/use-auth';
 
@@ -28,12 +28,10 @@ export type CreateSaleInput = {
   tax_rate?:       number;
   supplies_used?:  { supply_id: number; quantity: number; unit_cost: number }[];
   event_id?:       number;
-  status?:         SaleStatus;   // ← nuevo: default "COMPLETED" en el backend
+  status?:         SaleStatus;
 };
 
-// ── Tipos de acción para PATCH ─────────────────────────────────────────
 export type ConfirmSaleInput = { action: 'confirm' };
-
 export type CancelSaleInput  = { action: 'cancel' };
 
 export type EditSaleInput = {
@@ -44,6 +42,9 @@ export type EditSaleInput = {
   tax_rate?:       number;
   notes?:          string;
   customer_id?:    number | null;
+  account_id?:     number | null;   // ← fix: faltaba este campo
+  status?:         SaleStatus;
+  supplies_used?:  { supply_id: number; quantity: number; unit_cost: number }[];
 };
 
 export type PatchSaleInput = ConfirmSaleInput | CancelSaleInput | EditSaleInput;
@@ -63,7 +64,7 @@ export type Sale = {
   account_id:     number;
   account_name:   string;
   event_id:       number | null;
-  status:         SaleStatus;    // ← nuevo
+  status:         SaleStatus;
   sold_at:        string;
   notes:          string | null;
   items_count:    number;
@@ -140,7 +141,6 @@ function useAuthFetch() {
   };
 }
 
-// ── useSales ───────────────────────────────────────────────────────────
 export function useSales(filters?: SalesFilters) {
   const { firebaseUser } = useAuth();
   const authFetch        = useAuthFetch();
@@ -161,7 +161,6 @@ export function useSales(filters?: SalesFilters) {
   };
 }
 
-// ── useSale ────────────────────────────────────────────────────────────
 export function useSale(id: number | null) {
   const { firebaseUser } = useAuth();
   const authFetch        = useAuthFetch();
@@ -179,7 +178,6 @@ export function useSale(id: number | null) {
   };
 }
 
-// ── useCreateSale ──────────────────────────────────────────────────────
 export function useCreateSale() {
   const authFetch              = useAuthFetch();
   const [isCreating, setIsCreating] = useState(false);
@@ -199,11 +197,10 @@ export function useCreateSale() {
   return { createSale, isCreating };
 }
 
-// ── usePatchSale ───────────────────────────────────────────────────────
-// Maneja confirm, cancel y edit de ventas PENDING
 export function usePatchSale(id: number | null) {
   const authFetch                     = useAuthFetch();
   const { mutate: mutateSales }       = useSales();
+  const { mutate: globalMutate }      = useSWRConfig();
   const [isPatching, setIsPatching]   = useState(false);
 
   const patchSale = async (input: PatchSaleInput) => {
@@ -214,8 +211,20 @@ export function usePatchSale(id: number | null) {
         method: 'PATCH',
         body:   JSON.stringify(input),
       });
-      // Revalidar lista de ventas
-      await mutateSales();
+
+      // Invalidar todo lo relacionado
+      await globalMutate(
+        (key) =>
+          typeof key === 'string' && (
+            key.startsWith('/api/sales') ||
+            key.startsWith('/api/accounts') ||
+            key.startsWith('/api/finances') ||
+            key.startsWith('/api/dashboard')
+          ),
+        undefined,
+        { revalidate: true }
+      );
+
       return result;
     } finally {
       setIsPatching(false);

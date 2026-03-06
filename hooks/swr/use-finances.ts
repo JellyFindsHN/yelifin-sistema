@@ -84,7 +84,10 @@ export function useFinancePeriods() {
   const { data, isLoading } = useSWR(
     firebaseUser ? "/api/finances/periods" : null,
     (u: string) => authFetch(u),
-    { revalidateOnFocus: false, dedupingInterval: 300_000 }
+     {
+      revalidateOnFocus:    false,
+      dedupingInterval:     5 * 60_000,
+    }
   );
 
   return {
