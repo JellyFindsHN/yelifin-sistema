@@ -82,7 +82,7 @@ export function DeleteEventDialog({ event, open, onOpenChange, onSuccess }: Prop
           </div>
         </div>
 
-        <div className="shrink-0 px-5 py-4 border-t bg-background flex gap-3">
+         <div className="shrink-0 px-5 py-4 border-t bg-transparent xl:bg-transparent md:bg-transparent sm:bg-background flex gap-3">
           <Button
             type="button" variant="outline"
             onClick={handleClose} disabled={isDeleting}

@@ -73,13 +73,17 @@ export function EditAccountDialog({ account, open, onOpenChange, onSuccess }: Pr
   return (
     <Dialog open={open} onOpenChange={(v) => !v && handleClose()}>
       <DialogContent
-        className={cn(
+          className={cn(
           "fixed bottom-0 left-0 right-0 top-auto translate-x-0 translate-y-0",
           "w-full max-w-full rounded-t-2xl rounded-b-none border-t border-x-0 border-b-0",
           "max-h-[92dvh] flex flex-col p-0",
           "sm:bottom-auto sm:left-1/2 sm:right-auto sm:top-1/2",
           "sm:-translate-x-1/2 sm:-translate-y-1/2",
-          "sm:w-full sm:max-w-sm sm:rounded-2xl sm:border",
+          "sm:w-full sm:max-w-md",
+          "lg:max-w-xl",
+          "xl:max-w-xl",
+          "sm:rounded-2xl sm:border",
+          "sm:max-h-[88vh]",
           "data-[state=open]:animate-in data-[state=closed]:animate-out",
           "data-[state=open]:slide-in-from-bottom sm:data-[state=open]:slide-in-from-bottom-[48%]",
           "data-[state=closed]:slide-out-to-bottom sm:data-[state=closed]:slide-out-to-bottom-[48%]",
@@ -133,7 +137,7 @@ export function EditAccountDialog({ account, open, onOpenChange, onSuccess }: Pr
               onValueChange={(v) => setValue("type", v as FormData["type"])}
               disabled={isUpdating}
             >
-              <SelectTrigger className="h-11">
+              <SelectTrigger className="w-full h-11 text-left">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -147,7 +151,7 @@ export function EditAccountDialog({ account, open, onOpenChange, onSuccess }: Pr
         </form>
 
         {/* Footer fijo */}
-        <div className="shrink-0 px-5 py-4 border-t bg-background flex gap-3">
+        <div className="shrink-0 px-5 py-4 border-t bg-transparent xl:bg-transparent md:bg-transparent sm:bg-background flex gap-3">
           <Button
             type="button" variant="outline"
             onClick={handleClose} disabled={isUpdating}

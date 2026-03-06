@@ -88,7 +88,11 @@ export function AdjustInventoryDialog({ product, open, onOpenChange, onSuccess }
           "max-h-[92dvh] flex flex-col p-0",
           "sm:bottom-auto sm:left-1/2 sm:right-auto sm:top-1/2",
           "sm:-translate-x-1/2 sm:-translate-y-1/2",
-          "sm:w-full sm:max-w-md sm:rounded-2xl sm:border",
+          "sm:w-full sm:max-w-md",
+          "lg:max-w-xl",
+          "xl:max-w-xl",
+          "sm:rounded-2xl sm:border",
+          "sm:max-h-[88vh]",
           "data-[state=open]:animate-in data-[state=closed]:animate-out",
           "data-[state=open]:slide-in-from-bottom sm:data-[state=open]:slide-in-from-bottom-[48%]",
           "data-[state=closed]:slide-out-to-bottom sm:data-[state=closed]:slide-out-to-bottom-[48%]",
@@ -192,7 +196,7 @@ export function AdjustInventoryDialog({ product, open, onOpenChange, onSuccess }
           </div>
 
           {/* Footer */}
-          <div className="shrink-0 px-5 py-4 border-t bg-background flex gap-3">
+          <div className="shrink-0 px-5 py-4 border-t bg-transparent xl:bg-transparent md:bg-transparent sm:bg-background flex gap-3">
             <Button
               type="button"
               variant="outline"

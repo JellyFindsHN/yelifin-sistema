@@ -8,11 +8,11 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
-  DialogFooter,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { cn } from "@/lib/utils";
 import {
   Select,
   SelectContent,
@@ -76,7 +76,6 @@ export function CreateSupplyDialog({
 
   const onSubmit = async (data: FormData) => {
     try {
-      // Normalizamos vacíos a 0 para el backend
       const payload = {
         ...data,
         stock: Number(data.stock ?? 0),
@@ -86,7 +85,13 @@ export function CreateSupplyDialog({
 
       await createSupply(payload);
       toast.success("Suministro creado");
-      reset({ unit: "unit", stock: undefined, min_stock: undefined, unit_cost: undefined, name: "" });
+      reset({
+        unit: "unit",
+        stock: undefined,
+        min_stock: undefined,
+        unit_cost: undefined,
+        name: "",
+      });
       onOpenChange(false);
       onSuccess();
     } catch (e: any) {
@@ -95,33 +100,79 @@ export function CreateSupplyDialog({
   };
 
   const handleClose = () => {
-    reset({ unit: "unit", stock: undefined, min_stock: undefined, unit_cost: undefined, name: "" });
+    reset({
+      unit: "unit",
+      stock: undefined,
+      min_stock: undefined,
+      unit_cost: undefined,
+      name: "",
+    });
     onOpenChange(false);
   };
 
   return (
-    <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent className="sm:max-w-[520px]">
-        <DialogHeader>
-          <DialogTitle>Nuevo suministro</DialogTitle>
+    <Dialog open={open} onOpenChange={(v) => !v && handleClose()}>
+      <DialogContent
+        className={cn(
+          "fixed bottom-0 left-0 right-0 top-auto translate-x-0 translate-y-0",
+          "w-full max-w-full rounded-t-2xl rounded-b-none border-t border-x-0 border-b-0",
+          "max-h-[92dvh] flex flex-col p-0",
+          "sm:bottom-auto sm:left-1/2 sm:right-auto sm:top-1/2",
+          "sm:-translate-x-1/2 sm:-translate-y-1/2",
+          "sm:w-full sm:max-w-md",
+          "lg:max-w-xl",
+          "xl:max-w-xl",
+          "sm:rounded-2xl sm:border",
+          "sm:max-h-[88vh]",
+          "data-[state=open]:animate-in data-[state=closed]:animate-out",
+          "data-[state=open]:slide-in-from-bottom sm:data-[state=open]:slide-in-from-bottom-[48%]",
+          "data-[state=closed]:slide-out-to-bottom sm:data-[state=closed]:slide-out-to-bottom-[48%]",
+          "duration-300",
+        )}
+        onInteractOutside={(e) => e.preventDefault()}
+        onEscapeKeyDown={handleClose}
+      >
+        {/* Handle móvil */}
+        <div className="sm:hidden flex justify-center pt-3 pb-1 shrink-0">
+          <div className="w-10 h-1 rounded-full bg-muted-foreground/30" />
+        </div>
+
+        {/* Header */}
+        <DialogHeader className="shrink-0 px-5 pt-2 pb-3 sm:pt-5 border-b">
+          <DialogTitle className="text-lg font-bold">
+            Nuevo suministro
+          </DialogTitle>
         </DialogHeader>
 
-        <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-          <div className="space-y-2">
-            <Label>Nombre *</Label>
+        {/* Form */}
+        <form
+          id="create-supply-form"
+          onSubmit={handleSubmit(onSubmit)}
+          className="flex-1 overflow-y-auto px-5 py-4 space-y-4"
+          style={{ scrollbarWidth: "none" } as React.CSSProperties}
+          autoComplete="off"
+        >
+          <div className="space-y-1.5">
+            <Label className="text-sm font-medium">
+              Nombre <span className="text-destructive text-xs">*</span>
+            </Label>
             <Input
               placeholder="Ej: Bolsas de manila"
               {...register("name")}
               disabled={isCreating}
+              className="h-11 text-base"
+              autoComplete="off"
             />
             {errors.name && (
-              <p className="text-sm text-destructive">{errors.name.message}</p>
+              <p className="text-xs text-destructive">{errors.name.message}</p>
             )}
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-2">
-              <Label>Unidad *</Label>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="space-y-1.5">
+              <Label className="text-sm font-medium">
+                Unidad <span className="text-destructive text-xs">*</span>
+              </Label>
 
               <Controller
                 control={control}
@@ -132,7 +183,7 @@ export function CreateSupplyDialog({
                     onValueChange={field.onChange}
                     disabled={isCreating}
                   >
-                    <SelectTrigger>
+                    <SelectTrigger className="w-full h-11 text-left">
                       <SelectValue placeholder="Seleccionar unidad" />
                     </SelectTrigger>
                     <SelectContent>
@@ -147,12 +198,14 @@ export function CreateSupplyDialog({
               />
 
               {errors.unit && (
-                <p className="text-sm text-destructive">{errors.unit.message}</p>
+                <p className="text-xs text-destructive">{errors.unit.message}</p>
               )}
             </div>
 
-            <div className="space-y-2">
-              <Label>Costo unitario (L)</Label>
+            <div className="space-y-1.5">
+              <Label className="text-sm font-medium">
+                Costo unitario (L)
+              </Label>
               <Input
                 type="number"
                 step="0.0001"
@@ -160,59 +213,82 @@ export function CreateSupplyDialog({
                 placeholder="Ej: 1.50"
                 {...register("unit_cost")}
                 disabled={isCreating}
+                className="h-11 text-base"
+                autoComplete="off"
               />
               {errors.unit_cost && (
-                <p className="text-sm text-destructive">{errors.unit_cost.message}</p>
+                <p className="text-xs text-destructive">
+                  {errors.unit_cost.message}
+                </p>
               )}
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-2">
-              <Label>Stock inicial</Label>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="space-y-1.5">
+              <Label className="text-sm font-medium">Stock inicial</Label>
               <Input
                 type="number"
                 min="0"
                 placeholder="Ej: 20"
                 {...register("stock")}
                 disabled={isCreating}
+                className="h-11 text-base"
+                autoComplete="off"
               />
               {errors.stock && (
-                <p className="text-sm text-destructive">{errors.stock.message}</p>
+                <p className="text-xs text-destructive">{errors.stock.message}</p>
               )}
             </div>
 
-            <div className="space-y-2">
-              <Label>Stock mínimo</Label>
+            <div className="space-y-1.5">
+              <Label className="text-sm font-medium">Stock mínimo</Label>
               <Input
                 type="number"
                 min="0"
                 placeholder="Ej: 10"
                 {...register("min_stock")}
                 disabled={isCreating}
+                className="h-11 text-base"
+                autoComplete="off"
               />
               {errors.min_stock && (
-                <p className="text-sm text-destructive">{errors.min_stock.message}</p>
+                <p className="text-xs text-destructive">
+                  {errors.min_stock.message}
+                </p>
               )}
             </div>
           </div>
-
-          <DialogFooter className="pt-2">
-            <Button type="button" variant="outline" onClick={handleClose} disabled={isCreating}>
-              Cancelar
-            </Button>
-            <Button type="submit" disabled={isCreating}>
-              {isCreating ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Creando...
-                </>
-              ) : (
-                "Crear"
-              )}
-            </Button>
-          </DialogFooter>
         </form>
+
+        {/* Footer fijo */}
+        <div className="shrink-0 px-5 py-4 border-t bg-transparent xl:bg-transparent md:bg-transparent sm:bg-background flex gap-3">
+          <Button
+            type="button"
+            variant="outline"
+            onClick={handleClose}
+            disabled={isCreating}
+            className="flex-1 h-11"
+          >
+            Cancelar
+          </Button>
+
+          <Button
+            type="submit"
+            form="create-supply-form"
+            disabled={isCreating}
+            className="flex-1 h-11 gap-2"
+          >
+            {isCreating ? (
+              <>
+                <Loader2 className="h-4 w-4 animate-spin" />
+                Creando...
+              </>
+            ) : (
+              "Crear"
+            )}
+          </Button>
+        </div>
       </DialogContent>
     </Dialog>
   );
