@@ -1,4 +1,3 @@
-// components/transactions/create-transaction-modal.tsx
 "use client";
 
 import { useState } from "react";
@@ -33,12 +32,36 @@ import { useCurrency } from "@/hooks/swr/use-currency";
 
 type TxType = "INCOME" | "EXPENSE" | "TRANSFER";
 
-const TYPE_CONFIG: Record<TxType, { label: string; icon: React.ElementType }> =
-  {
-    INCOME: { label: "Ingreso", icon: ArrowDownCircle },
-    EXPENSE: { label: "Egreso", icon: ArrowUpCircle },
-    TRANSFER: { label: "Transferencia", icon: ArrowLeftRight },
-  };
+const TYPE_CONFIG: Record<TxType, { label: string; icon: React.ElementType }> = {
+  INCOME: { label: "Ingreso", icon: ArrowDownCircle },
+  EXPENSE: { label: "Egreso", icon: ArrowUpCircle },
+  TRANSFER: { label: "Transferencia", icon: ArrowLeftRight },
+};
+
+const CATEGORIES = {
+  INCOME: [
+    "Ventas",
+    "Servicios",
+    "Inversiones",
+    "Comisiones",
+    "Reembolsos",
+    "Otros ingresos",
+  ],
+  EXPENSE: [
+    "Nómina",
+    "Servicios",
+    "Inventario",
+    "Marketing",
+    "Renta",
+    "Mantenimiento",
+    "Impuestos",
+    "Transporte",
+    "Equipamiento",
+    "Seguros",
+    "Otros gastos",
+  ],
+  TRANSFER: ["Transferencia"],
+};
 
 type Props = {
   open: boolean;
@@ -84,7 +107,6 @@ export function CreateTransactionModal({
     onOpenChange(false);
   };
 
-  // Invalida todas las claves relevantes de SWR
   const mutateAll = () =>
     mutate(
       (key) =>
@@ -117,7 +139,7 @@ export function CreateTransactionModal({
       });
 
       toast.success("Transacción registrada exitosamente");
-      mutateAll(); // ← invalida transactions + accounts + finances
+      mutateAll();
       handleClose();
       onSuccess?.();
     } catch (error: any) {
@@ -147,24 +169,20 @@ export function CreateTransactionModal({
         onInteractOutside={(e) => e.preventDefault()}
         onEscapeKeyDown={handleClose}
       >
-        {/* Handle móvil */}
         <div className="sm:hidden flex justify-center pt-3 pb-1 shrink-0">
           <div className="w-10 h-1 rounded-full bg-muted-foreground/30" />
         </div>
 
-        {/* Header */}
         <DialogHeader className="shrink-0 px-5 pt-2 pb-3 sm:pt-5 border-b">
           <DialogTitle className="text-lg font-bold">
             Nueva transacción
           </DialogTitle>
         </DialogHeader>
 
-        {/* Scroll */}
         <div
           className="flex-1 overflow-y-auto px-5 py-4 space-y-4"
           style={{ scrollbarWidth: "none" } as React.CSSProperties}
         >
-          {/* Tipo */}
           <div className="space-y-2">
             <Label className="text-sm font-medium">Tipo</Label>
             <div className="grid grid-cols-3 rounded-xl border overflow-hidden">
@@ -192,58 +210,54 @@ export function CreateTransactionModal({
           </div>
 
           <div className="grid-gap-4 flex flex-col md:grid xl:grid-cols-2 md:grid-cols-2">
-          {/* Cuenta origen */}
-          <div className="space-y-1.5">
-            <Label className="text-sm font-medium">
-              {type === "TRANSFER" ? "Cuenta origen" : "Cuenta"}{" "}
-              <span className="text-destructive text-xs">*</span>
-            </Label>
-            <Select value={accountId} onValueChange={setAccountId}>
-              <SelectTrigger className="w-7/8 md:w-7/8 sm:w-full h-11 text-left">
-                <SelectValue placeholder="Selecciona una cuenta" />
-              </SelectTrigger>
-              <SelectContent>
-                {accounts.map((a) => (
-                  <SelectItem key={a.id} value={String(a.id)}>
-                    <div className="flex items-center justify-between gap-4 w-full">
-                      <span>{a.name}</span>
-                      <span className="text-xs text-muted-foreground font-mono">
-                        {format(Number(a.balance))}
-                      </span>
-                    </div>
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          {/* Cuenta destino — solo transferencias */}
-          {type === "TRANSFER" && (
             <div className="space-y-1.5">
               <Label className="text-sm font-medium">
-                Cuenta destino{" "}
+                {type === "TRANSFER" ? "Cuenta origen" : "Cuenta"}{" "}
                 <span className="text-destructive text-xs">*</span>
               </Label>
-              <Select value={toAccountId} onValueChange={setToAccountId}>
-                <SelectTrigger className="w-7/8 md:w-7/8 sm:w-full h-11 text-left">
-                  <SelectValue placeholder="Selecciona cuenta destino" />
+              <Select value={accountId} onValueChange={setAccountId}>
+                <SelectTrigger className="w-full h-11 text-left">
+                  <SelectValue placeholder="Selecciona una cuenta" />
                 </SelectTrigger>
                 <SelectContent>
-                  {accounts
-                    .filter((a) => String(a.id) !== accountId)
-                    .map((a) => (
-                      <SelectItem key={a.id} value={String(a.id)}>
-                        {a.name}
-                      </SelectItem>
-                    ))}
+                  {accounts.map((a) => (
+                    <SelectItem key={a.id} value={String(a.id)}>
+                      <div className="flex items-center justify-between gap-4 w-full">
+                        <span>{a.name}</span>
+                        <span className="text-xs text-muted-foreground font-mono">
+                          {format(Number(a.balance))}
+                        </span>
+                      </div>
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
-          )}
-          
+
+            {type === "TRANSFER" && (
+              <div className="space-y-1.5 sm:mt-3">
+                <Label className="text-sm font-medium">
+                  Cuenta destino{" "}
+                  <span className="text-destructive text-xs">*</span>
+                </Label>
+                <Select value={toAccountId} onValueChange={setToAccountId}>
+                  <SelectTrigger className="w-full h-11 text-left sm:mt-2">
+                    <SelectValue placeholder="Selecciona cuenta destino" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {accounts
+                      .filter((a) => String(a.id) !== accountId)
+                      .map((a) => (
+                        <SelectItem key={a.id} value={String(a.id)}>
+                          {a.name}
+                        </SelectItem>
+                      ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
           </div>
 
-          {/* Monto */}
           <div className="space-y-1.5">
             <Label className="text-sm font-medium">
               Monto ({symbol}){" "}
@@ -265,7 +279,6 @@ export function CreateTransactionModal({
             </div>
           </div>
 
-          {/* Fecha */}
           <div className="space-y-1.5">
             <Label className="text-sm font-medium">
               Fecha <span className="text-destructive text-xs">*</span>
@@ -278,7 +291,6 @@ export function CreateTransactionModal({
             />
           </div>
 
-          {/* Categoría */}
           <div className="space-y-1.5">
             <Label className="text-sm font-medium">
               Categoría{" "}
@@ -286,15 +298,20 @@ export function CreateTransactionModal({
                 opcional
               </span>
             </Label>
-            <Input
-              placeholder="Ej: Servicios, Nómina, Ventas..."
-              value={category}
-              onChange={(e) => setCategory(e.target.value)}
-              className="h-11 text-base"
-            />
+            <Select value={category} onValueChange={setCategory}>
+              <SelectTrigger className="h-11 w-full">
+                <SelectValue placeholder="Sin categoría" />  {/* ← Placeholder indica "sin categoría" */}
+              </SelectTrigger>
+              <SelectContent>
+                {CATEGORIES[type].map((cat) => (
+                  <SelectItem key={cat} value={cat}>
+                    {cat}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
 
-          {/* Descripción */}
           <div className="space-y-1.5">
             <Label className="text-sm font-medium">
               Descripción{" "}
@@ -312,7 +329,6 @@ export function CreateTransactionModal({
           </div>
         </div>
 
-        {/* Footer fijo */}
         <div className="shrink-0 px-5 py-4 border-t bg-transparent xl:bg-transparent md:bg-transparent sm:bg-background flex gap-3">
           <Button
             type="button"

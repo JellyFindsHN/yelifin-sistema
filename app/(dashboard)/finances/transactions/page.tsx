@@ -2,6 +2,7 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -60,38 +61,39 @@ const TYPE_CONFIG = {
 };
 
 const REF_LABELS: Record<string, string> = {
-  SALE:            "Venta",
-  PURCHASE:        "Compra inventario",
+  SALE: "Venta",
+  PURCHASE: "Compra inventario",
   SUPPLY_PURCHASE: "Compra suministros",
-  EVENT:           "Evento",
-  OTHER:           "Manual",
+  EVENT: "Evento",
+  OTHER: "Manual",
 };
 
 // ── Page ───────────────────────────────────────────────────────────────
 export default function TransactionsPage() {
+  const router = useRouter();
   const now = new Date();
 
-  const [filterMode,    setFilterMode]    = useState<"month" | "date">("month");
-  const [selectedYear,  setSelectedYear]  = useState(now.getFullYear());
+  const [filterMode, setFilterMode] = useState<"month" | "date">("month");
+  const [selectedYear, setSelectedYear] = useState(now.getFullYear());
   const [selectedMonth, setSelectedMonth] = useState(now.getMonth() + 1);
-  const [specificDate,  setSpecificDate]  = useState("");
+  const [specificDate, setSpecificDate] = useState("");
   const [accountFilter, setAccountFilter] = useState("all");
-  const [typeFilter,    setTypeFilter]    = useState("all");
-  const [modalOpen,     setModalOpen]     = useState(false);
+  const [typeFilter, setTypeFilter] = useState("all");
+  const [modalOpen, setModalOpen] = useState(false);
 
   const { transactions, totals, isLoading, mutate } = useTransactions({
     account_id: accountFilter !== "all" ? Number(accountFilter) : undefined,
-    month:      filterMode === "month" ? selectedMonth : undefined,
-    year:       filterMode === "month" ? selectedYear  : undefined,
-    date:       filterMode === "date" && specificDate ? specificDate : undefined,
+    month: filterMode === "month" ? selectedMonth : undefined,
+    year: filterMode === "month" ? selectedYear : undefined,
+    date: filterMode === "date" && specificDate ? specificDate : undefined,
   });
 
-  const { periods }  = useTransactionPeriods();
+  const { periods } = useTransactionPeriods();
   const { accounts } = useAccounts();
-  const { format }   = useCurrency();
+  const { format } = useCurrency();
 
   const availableYears = [...new Set(periods.map((p) => p.year))].sort((a, b) => b - a);
-  const monthsForYear  = (y: number) =>
+  const monthsForYear = (y: number) =>
     periods.filter((p) => p.year === y).map((p) => p.month).sort((a, b) => b - a);
 
   const filtered = transactions.filter((t) =>
@@ -103,6 +105,12 @@ export default function TransactionsPage() {
   const periodLabel = filterMode === "date" && specificDate
     ? formatDate(specificDate)
     : `${MONTH_NAMES[selectedMonth]} ${selectedYear}`;
+
+  const handleTransactionClick = (t: typeof filtered[0]) => {
+    if (t.reference_type === "SALE" && t.reference_id) {
+      router.push(`/sales/${t.reference_id}`);
+    }
+  };
 
   return (
     <div className="space-y-4 pb-8">
@@ -116,13 +124,13 @@ export default function TransactionsPage() {
       </div>
 
       {/* Stats */}
-      <div className="grid grid-cols-3 gap-2">
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
         {[
-          { label: "Ingresos", value: totals.income,  color: "text-green-600",    icon: TrendingUp },
-          { label: "Egresos",  value: totals.expense, color: "text-destructive",   icon: TrendingDown },
-          { label: "Neto",     value: neto,            color: neto >= 0 ? "text-green-600" : "text-destructive", icon: ArrowLeftRight },
-        ].map((s) => (
-          <Card key={s.label}>
+          { label: "Ingresos", value: totals.income, color: "text-green-600", icon: TrendingUp },
+          { label: "Egresos", value: totals.expense, color: "text-destructive", icon: TrendingDown },
+          { label: "Neto", value: neto, color: neto >= 0 ? "text-green-600" : "text-destructive", icon: ArrowLeftRight },
+        ].map((s, index) => (
+          <Card key={s.label} className={index === 2 ? "col-span-2 sm:col-span-1" : ""}>
             <CardContent className="pl-3">
               <div className="flex items-center justify-between mb-1.5">
                 <span className="text-[11px] font-medium text-muted-foreground">{s.label}</span>
@@ -145,11 +153,10 @@ export default function TransactionsPage() {
             <button
               key={mode}
               onClick={() => setFilterMode(mode)}
-              className={`py-2 text-xs font-medium transition-colors ${i > 0 ? "border-l" : ""} ${
-                filterMode === mode
-                  ? "bg-primary text-primary-foreground"
-                  : "text-muted-foreground hover:bg-muted"
-              }`}
+              className={`py-2 text-xs font-medium transition-colors ${i > 0 ? "border-l" : ""} ${filterMode === mode
+                ? "bg-primary text-primary-foreground"
+                : "text-muted-foreground hover:bg-muted"
+                }`}
             >
               {mode === "month" ? "Por mes" : "Fecha exacta"}
             </button>
@@ -246,10 +253,15 @@ export default function TransactionsPage() {
           </Card>
         ) : (
           filtered.map((t) => {
-            const cfg  = TYPE_CONFIG[t.type];
+            const cfg = TYPE_CONFIG[t.type];
             const Icon = cfg.icon;
+            const isClickable = t.reference_type === "SALE" && t.reference_id;
             return (
-              <Card className="pt-3 pb-2.5" key={t.id}>
+              <Card 
+                className={`pt-3 pb-2.5 ${isClickable ? "cursor-pointer hover:bg-muted/50 transition-colors" : ""}`}
+                key={t.id}
+                onClick={() => handleTransactionClick(t)}
+              >
                 <CardContent className="pl-3.5">
                   <div className="flex items-start gap-3">
                     <div className="h-8 w-8 rounded-full bg-muted flex items-center justify-center shrink-0">
@@ -320,10 +332,15 @@ export default function TransactionsPage() {
                 </TableRow>
               ) : (
                 filtered.map((t) => {
-                  const cfg  = TYPE_CONFIG[t.type];
+                  const cfg = TYPE_CONFIG[t.type];
                   const Icon = cfg.icon;
+                  const isClickable = t.reference_type === "SALE" && t.reference_id;
                   return (
-                    <TableRow key={t.id}>
+                    <TableRow 
+                      key={t.id}
+                      className={isClickable ? "cursor-pointer hover:bg-muted/50" : ""}
+                      onClick={() => handleTransactionClick(t)}
+                    >
                       <TableCell>
                         <Badge className={`gap-1 ${cfg.badge}`} variant="outline">
                           <Icon className="h-3 w-3" />
@@ -359,9 +376,8 @@ export default function TransactionsPage() {
         </CardContent>
       </Card>
 
-        <Fab
+      <Fab
         actions={[
-         
           {
             label: "Nueva transacción",
             icon: ArrowLeftRight,
@@ -369,7 +385,7 @@ export default function TransactionsPage() {
           },
         ]}
       />
-      {/* Modal */}
+      
       <CreateTransactionModal
         open={modalOpen}
         onOpenChange={setModalOpen}
