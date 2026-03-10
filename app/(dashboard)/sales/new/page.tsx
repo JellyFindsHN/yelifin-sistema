@@ -11,6 +11,7 @@ import {
   ChevronRight, ShoppingCart, ArrowRight,
 } from "lucide-react";
 import { toast } from "sonner";
+import { SearchBar } from "@/components/shared/search-bar";
 
 import { useProducts } from "@/hooks/swr/use-products";
 import { useCreateSale, CartItem } from "@/hooks/swr/use-sales";
@@ -35,28 +36,6 @@ type SearchBarProps = {
   onChange: (value: string) => void;
 };
 
-function SearchBar({ search, onChange }: SearchBarProps) {
-  return (
-    <div className="relative">
-      <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-      <Input
-        placeholder="Buscar producto..."
-        value={search}
-        onChange={(e) => onChange(e.target.value)}
-        className="pl-9 pr-9"
-      />
-      {search && (
-        <button
-          type="button"
-          onClick={() => onChange("")}
-          className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
-        >
-          <X className="h-4 w-4" />
-        </button>
-      )}
-    </div>
-  );
-}
 
 function NewSaleContent() {
   const router = useRouter();
@@ -261,7 +240,7 @@ function NewSaleContent() {
               </Badge>
             )}
           </div>
-          <SearchBar search={search} onChange={setSearch} />
+          <SearchBar value={search} onChange={setSearch} />
         </div>
 
         <div className="flex-1 overflow-y-auto px-4 pt-3 pb-4" style={{ scrollbarWidth: "none" } as React.CSSProperties}>
@@ -324,7 +303,7 @@ function NewSaleContent() {
         {desktopStep === 1 && (
           <div className="flex-1 min-h-0 grid grid-cols-5 gap-4">
             <div className="col-span-3 flex flex-col min-h-0 gap-3">
-             <SearchBar search={search} onChange={setSearch} />
+             <SearchBar value={search} onChange={setSearch} placeholder="Buscar Producto" />
               <div className="flex-1 overflow-y-auto" style={{ scrollbarWidth: "none" } as React.CSSProperties}>
                 <PosProductGrid products={availableProducts} cart={cart} onAdd={addToCart} search={search} />
               </div>

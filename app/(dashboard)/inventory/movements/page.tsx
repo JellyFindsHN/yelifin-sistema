@@ -21,10 +21,12 @@ import {
 } from "lucide-react";
 import Image from "next/image";
 import { useMovements, Movement } from "@/hooks/swr/use-movements";
-import { useProducts }            from "@/hooks/swr/use-products";
-import { useMovementPeriods }     from "@/hooks/swr/use-movements";
-import { useCurrency }            from "@/hooks/swr/use-currency";
-import { Fab }                    from "@/components/ui/fab";
+import { useProducts } from "@/hooks/swr/use-products";
+import { useMovementPeriods } from "@/hooks/swr/use-movements";
+import { useCurrency } from "@/hooks/swr/use-currency";
+import { Fab } from "@/components/ui/fab";
+import { SearchBar } from "@/components/shared/search-bar";
+import { SearchableSelect } from "@/components/shared/SearchableSelect";
 
 // ── Helpers ────────────────────────────────────────────────────────────
 const formatUSD = (value: number | null) => {
@@ -44,7 +46,7 @@ const MONTH_NAMES = [
   "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre",
 ];
 
-const currentYear  = new Date().getFullYear();
+const currentYear = new Date().getFullYear();
 const currentMonth = new Date().getMonth() + 1;
 
 // ── Tipo badge ─────────────────────────────────────────────────────────
@@ -206,25 +208,26 @@ function MobileDetail({ m, format }: { m: Movement; format: FormatFn }) {
 
 // ── Page ───────────────────────────────────────────────────────────────
 export default function MovementsPage() {
-  const now    = new Date();
+  const now = new Date();
   const router = useRouter();
 
-  const [filterMode,    setFilterMode]    = useState<"month" | "date">("month");
-  const [selectedYear,  setSelectedYear]  = useState<number>(now.getFullYear());
+  const [search, setSearch] = useState("");
+  const [filterMode, setFilterMode] = useState<"month" | "date">("month");
+  const [selectedYear, setSelectedYear] = useState<number>(now.getFullYear());
   const [selectedMonth, setSelectedMonth] = useState<number>(now.getMonth() + 1);
-  const [specificDate,  setSpecificDate]  = useState("");
-  const [productId,     setProductId]     = useState<number | undefined>();
-  const [typeFilter,    setTypeFilter]    = useState("all");
+  const [specificDate, setSpecificDate] = useState("");
+  const [productId, setProductId] = useState<number | undefined>();
+  const [typeFilter, setTypeFilter] = useState("all");
 
   const { movements, isLoading } = useMovements({
-    date:       filterMode === "date" ? specificDate || undefined : undefined,
-    month:      filterMode === "month" ? selectedMonth : undefined,
-    year:       filterMode === "month" ? selectedYear : undefined,
+    date: filterMode === "date" ? specificDate || undefined : undefined,
+    month: filterMode === "month" ? selectedMonth : undefined,
+    year: filterMode === "month" ? selectedYear : undefined,
     product_id: productId,
   });
 
   const { products } = useProducts();
-  const { periods }  = useMovementPeriods();
+  const { periods } = useMovementPeriods();
   const { format: formatCurrency } = useCurrency();
 
   // Wrapper para aceptar null igual que el helper original
@@ -234,12 +237,24 @@ export default function MovementsPage() {
   };
 
   const filtered = movements.filter((m) => {
-    if (typeFilter === "all")        return true;
-    if (typeFilter === "IN")         return m.movement_type === "IN";
-    if (typeFilter === "OUT")        return m.movement_type === "OUT";
-    if (typeFilter === "ADJUSTMENT") return m.reference_type === "ADJUSTMENT";
-    if (typeFilter === "INITIAL")    return m.reference_type === "INITIAL";
-    return true;
+    // Filtro de búsqueda
+    const matchesSearch = !search ||
+      m.product_name.toLowerCase().includes(search.toLowerCase()) ||
+      (m.sku?.toLowerCase().includes(search.toLowerCase()) ?? false) ||
+      (m.customer_name?.toLowerCase().includes(search.toLowerCase()) ?? false) ||
+      (m.sale_number?.toLowerCase().includes(search.toLowerCase()) ?? false) ||
+      (m.notes?.toLowerCase().includes(search.toLowerCase()) ?? false);
+
+    // Filtro de tipo
+    const matchesType =
+      typeFilter === "all" ? true :
+        typeFilter === "IN" ? m.movement_type === "IN" :
+          typeFilter === "OUT" ? m.movement_type === "OUT" :
+            typeFilter === "ADJUSTMENT" ? m.reference_type === "ADJUSTMENT" :
+              typeFilter === "INITIAL" ? m.reference_type === "INITIAL" :
+                true;
+
+    return matchesSearch && matchesType;
   });
 
   const availableYears = [...new Set(periods.map((p) => p.year))].sort((a, b) => b - a);
@@ -248,12 +263,14 @@ export default function MovementsPage() {
     periods.filter((p) => p.year === year).map((p) => p.month).sort((a, b) => b - a);
 
   const hasFilters =
+    search ||
     productId !== undefined ||
     typeFilter !== "all" ||
     (filterMode === "date" && specificDate) ||
     (filterMode === "month" && (selectedYear !== currentYear || selectedMonth !== currentMonth));
 
   const clearAll = () => {
+    setSearch("");
     setFilterMode("month");
     setSelectedYear(now.getFullYear());
     setSelectedMonth(now.getMonth() + 1);
@@ -268,7 +285,7 @@ export default function MovementsPage() {
       : `${MONTH_NAMES[selectedMonth]} ${selectedYear}`;
 
   return (
-    <div className="space-y-5 pb-24">
+    <div className="space-y-4 pb-24">
       {/* Header */}
       <div>
         <h1 className="text-2xl font-bold tracking-tight">Movimientos</h1>
@@ -277,37 +294,61 @@ export default function MovementsPage() {
 
       {/* Filtros */}
       <div className="space-y-3">
-        <div className="space-y-2">
-          <div className="grid grid-cols-2 rounded-lg border overflow-hidden">
-            <button
-              onClick={() => setFilterMode("month")}
-              className={`py-2 text-xs font-medium transition-colors ${
-                filterMode === "month"
-                  ? "bg-primary text-primary-foreground"
-                  : "text-muted-foreground hover:bg-muted"
-              }`}
-            >
-              Por mes
-            </button>
-            <button
-              onClick={() => setFilterMode("date")}
-              className={`py-2 text-xs font-medium transition-colors border-l ${
-                filterMode === "date"
-                  ? "bg-primary text-primary-foreground"
-                  : "text-muted-foreground hover:bg-muted"
-              }`}
-            >
-              Fecha exacta
-            </button>
-          </div>
+        {/* Fila 1: SearchBar + Modo (desktop: select, mobile: oculto) */}
+        <div className="flex flex-col gap-3 sm:flex-row">
+          <SearchBar
+            value={search}
+            onChange={setSearch}
+            size="full"
+            placeholder="Buscar producto, SKU, cliente, venta..."
+          />
 
+          {/* Select de modo - solo desktop */}
+          <Select value={filterMode} onValueChange={(v) => setFilterMode(v as "month" | "date")}>
+            <SelectTrigger className="hidden sm:flex w-full sm:w-40">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="month">Por mes</SelectItem>
+              <SelectItem value="date">Fecha exacta</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+
+        {/* Toggle de modo - solo móvil */}
+        <div className="grid grid-cols-2 rounded-lg border overflow-hidden sm:hidden">
+          <button
+            onClick={() => setFilterMode("month")}
+            className={`py-2 text-xs font-medium transition-colors ${filterMode === "month"
+              ? "bg-primary text-primary-foreground"
+              : "text-muted-foreground hover:bg-muted"
+              }`}
+          >
+            Por mes
+          </button>
+          <button
+            onClick={() => setFilterMode("date")}
+            className={`py-2 text-xs font-medium transition-colors border-l ${filterMode === "date"
+              ? "bg-primary text-primary-foreground"
+              : "text-muted-foreground hover:bg-muted"
+              }`}
+          >
+            Fecha exacta
+          </button>
+        </div>
+
+        {/* Fila 2: Período + Producto + Tipo + Limpiar */}
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+          {/* Selectores de período */}
           {filterMode === "month" ? (
-            <div className="grid grid-cols-2 gap-2">
+            <>
               <Select
                 value={String(selectedMonth)}
                 onValueChange={(v) => setSelectedMonth(Number(v))}
               >
-                <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
+                <SelectTrigger className="w-full sm:w-36">
+                  <SelectValue />
+                </SelectTrigger>
                 <SelectContent>
                   {monthsForYear(selectedYear).map((m) => (
                     <SelectItem key={m} value={String(m)}>{MONTH_NAMES[m]}</SelectItem>
@@ -323,42 +364,38 @@ export default function MovementsPage() {
                   if (months.length && !months.includes(selectedMonth)) setSelectedMonth(months[0]);
                 }}
               >
-                <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
+                <SelectTrigger className="w-full sm:w-28">
+                  <SelectValue />
+                </SelectTrigger>
                 <SelectContent>
                   {availableYears.map((y) => (
                     <SelectItem key={y} value={String(y)}>{y}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
-            </div>
+            </>
           ) : (
             <Input
               type="date"
               value={specificDate}
               onChange={(e) => setSpecificDate(e.target.value)}
-              className="w-full"
+              className="w-full sm:w-44"
             />
           )}
-        </div>
 
-        <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-          <Select
+          <SearchableSelect
             value={productId?.toString() ?? "all"}
             onValueChange={(v) => setProductId(v === "all" ? undefined : Number(v))}
-          >
-            <SelectTrigger className="w-full sm:w-52">
-              <SelectValue placeholder="Todos los productos" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Todos los productos</SelectItem>
-              {products.map((p) => (
-                <SelectItem key={p.id} value={p.id.toString()}>{p.name}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+            items={products.map(p => ({
+              value: p.id.toString(),
+              label: p.name
+            }))}
+            defaultOption={{ value: "all", label: "Todos los productos" }}
+            className="w-full sm:w-48"
+          />
 
           <Select value={typeFilter} onValueChange={setTypeFilter}>
-            <SelectTrigger className="w-full sm:w-44">
+            <SelectTrigger className="w-full sm:w-40">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -455,7 +492,7 @@ export default function MovementsPage() {
           <Card>
             <CardContent className="flex flex-col items-center justify-center py-12">
               <SlidersHorizontal className="h-10 w-10 text-muted-foreground/40" />
-              <p className="mt-3 text-sm text-muted-foreground">No hay movimientos en este período</p>
+              <p className="mt-3 text-sm text-muted-foreground">No hay movimientos</p>
             </CardContent>
           </Card>
         ) : (
@@ -488,9 +525,9 @@ export default function MovementsPage() {
       {/* FAB */}
       <Fab
         actions={[
-          { label: "Nuevo producto",    icon: Plus,         onClick: () => router.push("/inventory") },
-          { label: "Registrar venta",   icon: ShoppingCart, onClick: () => router.push("/sales/new") },
-          { label: "Agregar stock",     icon: PackagePlus,  onClick: () => router.push("/inventory") },
+          { label: "Nuevo producto", icon: Plus, onClick: () => router.push("/inventory") },
+          { label: "Registrar venta", icon: ShoppingCart, onClick: () => router.push("/sales/new") },
+          { label: "Agregar stock", icon: PackagePlus, onClick: () => router.push("/inventory") },
         ]}
       />
     </div>

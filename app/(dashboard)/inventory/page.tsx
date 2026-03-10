@@ -4,7 +4,6 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Card, CardContent } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
@@ -19,12 +18,13 @@ import {
   DropdownMenuSeparator, DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import {
-  Search, Package, Warehouse, AlertTriangle, DollarSign,
+  Package, Warehouse, AlertTriangle, DollarSign,
   Plus, MoreVertical, Pencil, Trash2, PackagePlus,
   ShoppingCart, SlidersHorizontal,
   ArrowLeftRight,
 } from "lucide-react";
 import Image from "next/image";
+import { SearchBar } from "@/components/shared/search-bar";
 
 import { useInventory } from "@/hooks/swr/use-inventory";
 import { useProducts } from "@/hooks/swr/use-products";
@@ -39,7 +39,6 @@ import { AdjustInventoryDialog } from "@/components/products/adjust-inventory-di
 import { useCurrency } from "@/hooks/swr/use-currency";
 import { CreateTransactionModal } from "@/components/transactions/create-transaction-modal";
 import { useAccounts } from "@/hooks/swr/use-accounts";
-import { useFinances } from "@/hooks/swr/use-finances";
 
 // ── Helpers ────────────────────────────────────────────────────────────
 const getStockBadge = (stock: number) => {
@@ -184,13 +183,12 @@ export default function InventoryPage() {
       {/* Filtros */}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
         <div className="relative flex-1 sm:max-w-sm">
-          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-          <Input
-            placeholder="Buscar por nombre o SKU..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="pl-9"
-          />
+            <SearchBar
+              value={search}
+              onChange={setSearch}
+              size="full"
+              placeholder="Buscar por nombre o SKU..."
+            />
         </div>
         <Select value={stockFilter} onValueChange={setStockFilter}>
           <SelectTrigger className="w-full sm:w-48">

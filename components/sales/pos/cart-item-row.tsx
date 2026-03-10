@@ -82,7 +82,7 @@ export function CartItemRow({
       </div>
 
       <div className="flex items-center justify-between gap-2">
-        {/* Cantidad */}
+        {/* Cantidad - Ahora editable */}
         <div className="flex items-center gap-1">
           <Button
             variant="outline"
@@ -92,9 +92,28 @@ export function CartItemRow({
           >
             <Minus className="h-3 w-3" />
           </Button>
-          <span className="text-sm font-medium w-6 text-center">
-            {item.quantity}
-          </span>
+          <Input
+            type="number"
+            value={item.quantity}
+            onChange={(e) => {
+              const raw = e.target.value.replace(/\D/g, ""); // Solo dígitos
+              const n = parseInt(raw, 10);
+              if (!isNaN(n) && n > 0) {
+                const delta = n - item.quantity;
+                onQuantity(item.product_id, delta);
+              }
+            }}
+            onBlur={(e) => {
+              const n = parseInt(e.target.value, 10);
+              if (isNaN(n) || n < 1) {
+                // Si es 0 o inválido, poner 1
+                onQuantity(item.product_id, 1 - item.quantity);
+              }
+            }}
+            className="h-6 w-12 text-sm font-medium text-center px-1"
+            min="1"
+            step="1"
+          />
           <Button
             variant="outline"
             size="icon"

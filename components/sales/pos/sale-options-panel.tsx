@@ -27,6 +27,7 @@ import {
 } from "lucide-react";
 import { useCurrency } from "@/hooks/swr/use-currency";
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
+import { SearchableSelect } from "@/components/shared/SearchableSelect";
 
 type Props = {
   customers: any[];
@@ -107,24 +108,18 @@ export function SaleOptionsPanel({
               Cliente
               <span className="text-muted-foreground ml-1">(opcional)</span>
             </Label>
-            <Select
+            <SearchableSelect
               value={customerId?.toString() ?? "anonymous"}
-              onValueChange={(v) =>
-                onCustomerChange(v === "anonymous" ? null : Number(v))
-              }
-            >
-              <SelectTrigger className="h-8 text-sm w-full">
-                <SelectValue placeholder="Venta anónima" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="anonymous">Venta anónima</SelectItem>
-                {customers.map((c) => (
-                  <SelectItem key={c.id} value={c.id.toString()}>
-                    {c.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+              onValueChange={(v) => onCustomerChange(v === "anonymous" ? null : Number(v))}
+              items={customers.map((c) => ({
+                value: c.id.toString(),
+                label: c.name
+              }))}
+              defaultOption={{ value: "anonymous", label: "Venta anónima" }}
+              placeholder="Venta anónima"
+              searchPlaceholder="Buscar cliente..."
+              className="h-8 text-sm w-full"
+            />
           </div>
 
           {/* Cuenta destino */}

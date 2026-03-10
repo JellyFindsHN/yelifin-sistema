@@ -18,7 +18,7 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import {
-  Plus, Search, Receipt, Banknote, CreditCard, ArrowLeftRight,
+   Search, Receipt, Banknote, CreditCard, ArrowLeftRight,
   TrendingUp, DollarSign, ShoppingCart, HelpCircle, X,
   CheckCircle, XCircle, Clock, Pencil, MoreVertical,
 } from "lucide-react";
@@ -27,6 +27,7 @@ import {
   DropdownMenuSeparator, DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { toast } from "sonner";
+import { SearchBar } from "@/components/shared/search-bar";
 
 import { useSales, usePatchSale } from "@/hooks/swr/use-sales";
 import { useAccounts } from "@/hooks/swr/use-accounts";
@@ -242,26 +243,16 @@ export default function SalesPage() {
 
       {/* Filtros */}
       <div className="space-y-2">
-
+      
         {/* Buscador + Estado */}
         <div className="flex gap-2">
           <div className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input
-              placeholder="Número, cliente o nota..."
+            <SearchBar
               value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="pl-9 pr-9"
+              onChange={setSearch}
+              size="full"
+              placeholder="Buscar por número, cliente o notas..."
             />
-            {search && (
-              <button
-                type="button"
-                onClick={() => setSearch("")}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
-              >
-                <X className="h-4 w-4" />
-              </button>
-            )}
           </div>
           <div className="w-[38%] shrink-0">
             <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v as StatusFilter)}>

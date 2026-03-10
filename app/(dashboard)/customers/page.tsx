@@ -17,6 +17,7 @@ import { CreateCustomerDialog } from "@/components/customers/create-customer-dia
 import { EditCustomerDialog }   from "@/components/customers/edit-customer-dialog";
 import { DeleteCustomerDialog } from "@/components/customers/delete-customer-dialog";
 import { Fab } from "@/components/ui/fab";
+import { SearchBar } from "@/components/shared/search-bar";
 
 export default function CustomersPage() {
   const { customers, isLoading, mutate } = useCustomers();
@@ -71,13 +72,7 @@ export default function CustomersPage() {
 
       {/* Búsqueda */}
       <div className="relative">
-        <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-        <Input
-          placeholder="Buscar por nombre, email o teléfono..."
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          className="pl-9"
-        />
+        <SearchBar value={search} onChange={setSearch} placeholder="Buscar por nombre, email o teléfono..."/>
       </div>
 
       {/* Tabla — desktop */}

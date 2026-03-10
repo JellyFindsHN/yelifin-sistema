@@ -2,9 +2,8 @@
 "use client";
 
 import { useState } from "react";
-import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Plus, Search, Box } from "lucide-react";
+import { Search, Box } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Card, CardContent } from "@/components/ui/card";
 
@@ -15,6 +14,7 @@ import { EditSupplyDialog } from "@/components/supplies/edit-supply-dialog";
 import { DeleteSupplyDialog } from "@/components/supplies/delete-supply-dialog";
 import { AddSupplyPurchaseDialog } from "@/components/supplies/add-supply-purchase-dialog";
 import { Fab } from "@/components/ui/fab";
+import { SearchBar } from "@/components/shared/search-bar";
 
 export default function SuppliesPage() {
   const [search, setSearch] = useState("");
@@ -39,13 +39,7 @@ export default function SuppliesPage() {
 
       {/* Search */}
       <div className="relative max-w-sm">
-        <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-        <Input
-          placeholder="Buscar por nombre..."
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          className="pl-9"
-        />
+        <SearchBar value={search} onChange={setSearch} placeholder="Buscar por nombre..." />
       </div>
 
       {/* Content */}

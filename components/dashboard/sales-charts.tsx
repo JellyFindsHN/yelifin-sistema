@@ -8,6 +8,7 @@ import {
   ResponsiveContainer, PieChart, Pie, Cell,
 } from "recharts";
 import { useCurrency } from "@/hooks/swr/use-currency";
+
 function formatAxisMoney(v: number) {
   if (v >= 1_000_000) return `L${Math.round(v / 1_000_000)}M`;
   if (v >= 1_000)     return `L${Math.round(v / 1_000)}k`;
@@ -27,45 +28,88 @@ export function SalesCharts({ salesChart, paymentMethods, periodLabel, isLoading
   const { format: formatCurrency } = useCurrency();
   
   return (
-    <div className="hidden lg:grid gap-4 grid-cols-7">
-      <Card className="col-span-4">
-        <CardHeader className="pb-2 pt-4 px-4">
-          <CardTitle className="text-base">Ventas vs Ganancias</CardTitle>
-          <CardDescription>{periodLabel}</CardDescription>
+    <div className="grid gap-4 lg:grid-cols-7">
+      {/* Ventas vs Ganancias - Solo desktop */}
+      <Card className="hidden lg:block lg:col-span-4">
+        <CardHeader className="pb-3 pt-5 px-5">
+          <CardTitle className="text-lg font-bold tracking-tight">Ventas vs Ganancias</CardTitle>
+          <CardDescription className="text-sm font-medium">{periodLabel}</CardDescription>
         </CardHeader>
-        <CardContent className="px-4 pb-4">
+        <CardContent className="px-5 pb-5">
           {isLoading ? <Skeleton className="h-64 w-full" /> : (
             <ResponsiveContainer width="100%" height={260}>
               <LineChart data={salesChart}>
                 <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-                <XAxis dataKey="label" tick={{ fontSize: 11 }} tickLine={false} axisLine={false} />
-                <YAxis tick={{ fontSize: 11 }} tickLine={false} axisLine={false} tickFormatter={formatAxisMoney} />
+                <XAxis 
+                  dataKey="label" 
+                  tick={{ fontSize: 12, fontWeight: 500 }} 
+                  tickLine={false} 
+                  axisLine={false} 
+                />
+                <YAxis 
+                  tick={{ fontSize: 12, fontWeight: 500 }} 
+                  tickLine={false} 
+                  axisLine={false} 
+                  tickFormatter={formatAxisMoney} 
+                />
                 <Tooltip
                   formatter={(v: number) => formatCurrency(v)}
-                  contentStyle={{ backgroundColor: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: "8px" }}
+                  contentStyle={{ 
+                    backgroundColor: "hsl(var(--card))", 
+                    border: "1px solid hsl(var(--border))", 
+                    borderRadius: "8px",
+                    fontWeight: 500
+                  }}
                 />
-                <Line type="monotone" dataKey="revenue" stroke="#3B82F6" strokeWidth={2} dot={false} name="Ventas" />
-                <Line type="monotone" dataKey="profit"  stroke="#10B981" strokeWidth={2} dot={false} name="Ganancia" />
+                <Line 
+                  type="monotone" 
+                  dataKey="revenue" 
+                  stroke="#3B82F6" 
+                  strokeWidth={2.5} 
+                  dot={false} 
+                  name="Ventas" 
+                />
+                <Line 
+                  type="monotone" 
+                  dataKey="profit"  
+                  stroke="#10B981" 
+                  strokeWidth={2.5} 
+                  dot={false} 
+                  name="Ganancia" 
+                />
               </LineChart>
             </ResponsiveContainer>
           )}
         </CardContent>
       </Card>
 
-      <Card className="col-span-3">
-        <CardHeader className="pb-2 pt-4 px-4">
-          <CardTitle className="text-base">Métodos de pago</CardTitle>
-          <CardDescription>Distribución del período</CardDescription>
+      {/* Métodos de pago - Móvil y desktop */}
+      <Card className="lg:col-span-3">
+        <CardHeader className="pb-3 pt-5 px-5">
+          <CardTitle className="text-lg font-bold tracking-tight">Métodos de Pago</CardTitle>
+          <CardDescription className="text-sm font-medium">Distribución del período</CardDescription>
         </CardHeader>
-        <CardContent className="px-4 pb-4">
+        <CardContent className="px-5 pb-5">
           {isLoading ? <Skeleton className="h-64 w-full" /> : !paymentMethods.length ? (
-            <p className="text-sm text-muted-foreground text-center py-10">Sin datos</p>
+            <div className="flex items-center justify-center py-16">
+              <p className="text-sm text-muted-foreground font-medium">Sin datos disponibles</p>
+            </div>
           ) : (
-            <ResponsiveContainer width="100%" height={260}>
+            <ResponsiveContainer width="100%" height={200}>
               <PieChart>
-                <Pie data={paymentMethods} cx="50%" cy="50%" innerRadius={55} outerRadius={95}
-                  paddingAngle={5} dataKey="value"
+                <Pie 
+                  data={paymentMethods} 
+                  cx="50%" 
+                  cy="50%" 
+                  innerRadius={55} 
+                  outerRadius={95}
+                  paddingAngle={5} 
+                  dataKey="value"
                   label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+                  style={{ 
+                    fontSize: "13px", 
+                    fontWeight: 600
+                  }}
                 >
                   {paymentMethods.map((_: any, i: number) => (
                     <Cell key={i} fill={CHART_COLORS[i % CHART_COLORS.length]} />
@@ -73,7 +117,13 @@ export function SalesCharts({ salesChart, paymentMethods, periodLabel, isLoading
                 </Pie>
                 <Tooltip
                   formatter={(v: number) => formatCurrency(v)}
-                  contentStyle={{ backgroundColor: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: "8px" }}
+                  contentStyle={{ 
+                    backgroundColor: "hsl(var(--card))", 
+                    border: "1px solid hsl(var(--border))", 
+                    borderRadius: "8px",
+                    fontWeight: 500,
+                    fontSize: "13px"
+                  }}
                 />
               </PieChart>
             </ResponsiveContainer>
