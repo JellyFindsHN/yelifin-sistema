@@ -2,6 +2,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { adminAuth } from "@/lib/firebase-admin";
 import { neon } from "@neondatabase/serverless";
+import { seedDefaultCategories } from "@/lib/seed-default-categories";
 
 const sql = neon(process.env.DATABASE_URL!);
 
@@ -84,7 +85,16 @@ export async function POST(req: NextRequest) {
       RETURNING id, status, created_at
     `;
 
-    // ── 4. Respuesta ───────────────────────────────────────────────
+    // ── 4. 🆕 Crear categorías por defecto ─────────────────────────
+    await seedDefaultCategories(newUser.id);
+
+    // ── 5. 🆕 Crear cuenta "Efectivo" por defecto ──────────────────
+    await sql`
+      INSERT INTO accounts (user_id, name, type, balance, currency)
+      VALUES (${newUser.id}, 'Efectivo', 'CASH', 0, 'HNL')
+    `;
+
+    // ── 6. Respuesta ───────────────────────────────────────────────
     return NextResponse.json(
       {
         message: "Cuenta creada exitosamente",

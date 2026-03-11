@@ -19,7 +19,6 @@ import {
   SlidersHorizontal, X, TrendingUp, TrendingDown, BoxIcon,
   Plus, ShoppingCart, PackagePlus,
 } from "lucide-react";
-import Image from "next/image";
 import { useMovements, Movement } from "@/hooks/swr/use-movements";
 import { useProducts } from "@/hooks/swr/use-products";
 import { useMovementPeriods } from "@/hooks/swr/use-movements";
@@ -455,10 +454,17 @@ export default function MovementsPage() {
                     <TableCell>
                       <div className="flex items-center gap-2">
                         <div className="relative h-8 w-8 rounded-md overflow-hidden bg-muted shrink-0 flex items-center justify-center">
-                          {m.image_url
-                            ? <Image src={m.image_url} alt={m.product_name} fill className="object-cover" />
-                            : <Package className="h-4 w-4 text-muted-foreground/40" />
-                          }
+                          <Package className="h-4 w-4 text-muted-foreground/40" />
+                          {m.image_url && (
+                            <img 
+                              src={m.image_url} 
+                              alt={m.product_name}
+                              className="absolute inset-0 w-full h-full object-cover"
+                              onError={(e) => {
+                                e.currentTarget.style.display = 'none';
+                              }}
+                            />
+                          )}
                         </div>
                         <div className="min-w-0">
                           <p className="text-sm font-medium truncate max-w-36">{m.product_name}</p>
@@ -501,10 +507,17 @@ export default function MovementsPage() {
               <CardContent className="pl-3.5">
                 <div className="flex items-center gap-3 mb-3">
                   <div className="relative h-10 w-10 rounded-lg overflow-hidden bg-muted shrink-0 flex items-center justify-center">
-                    {m.image_url
-                      ? <Image src={m.image_url} alt={m.product_name} fill className="object-cover" />
-                      : <Package className="h-5 w-5 text-muted-foreground/40" />
-                    }
+                    <Package className="h-5 w-5 text-muted-foreground/40" />
+                    {m.image_url && (
+                      <img 
+                        src={m.image_url} 
+                        alt={m.product_name}
+                        className="absolute inset-0 w-full h-full object-cover"
+                        onError={(e) => {
+                          e.currentTarget.style.display = 'none';
+                        }}
+                      />
+                    )}
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className="font-medium truncate">{m.product_name}</p>

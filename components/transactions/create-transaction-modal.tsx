@@ -1,3 +1,4 @@
+// components/transactions/create-transaction-modal.tsx
 "use client";
 
 import { useState } from "react";
@@ -29,6 +30,7 @@ import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { useCreateTransaction } from "@/hooks/swr/use-transactions";
 import { useCurrency } from "@/hooks/swr/use-currency";
+import { useTransactionCategories } from "@/hooks/swr/use-transaction-categories";
 
 type TxType = "INCOME" | "EXPENSE" | "TRANSFER";
 
@@ -36,31 +38,6 @@ const TYPE_CONFIG: Record<TxType, { label: string; icon: React.ElementType }> = 
   INCOME: { label: "Ingreso", icon: ArrowDownCircle },
   EXPENSE: { label: "Egreso", icon: ArrowUpCircle },
   TRANSFER: { label: "Transferencia", icon: ArrowLeftRight },
-};
-
-const CATEGORIES = {
-  INCOME: [
-    "Ventas",
-    "Servicios",
-    "Inversiones",
-    "Comisiones",
-    "Reembolsos",
-    "Otros ingresos",
-  ],
-  EXPENSE: [
-    "Nómina",
-    "Servicios",
-    "Inventario",
-    "Marketing",
-    "Renta",
-    "Mantenimiento",
-    "Impuestos",
-    "Transporte",
-    "Equipamiento",
-    "Seguros",
-    "Otros gastos",
-  ],
-  TRANSFER: ["Transferencia"],
 };
 
 type Props = {
@@ -91,6 +68,10 @@ export function CreateTransactionModal({
   const [occurredAt, setOccurredAt] = useState(
     new Date().toISOString().split("T")[0],
   );
+
+  // Obtener categorías dinámicas filtradas por tipo
+  const { categories } = useTransactionCategories(type);
+  const activeCategories = categories.filter((c) => c.is_active);
 
   const resetForm = () => {
     setType(defaultType);
@@ -209,7 +190,7 @@ export function CreateTransactionModal({
             </div>
           </div>
 
-          <div className="grid-gap-4 flex flex-col md:grid xl:grid-cols-2 md:grid-cols-2">
+          <div className="grid-gap-4 flex flex-col ">
             <div className="space-y-1.5">
               <Label className="text-sm font-medium">
                 {type === "TRANSFER" ? "Cuenta origen" : "Cuenta"}{" "}
@@ -300,12 +281,12 @@ export function CreateTransactionModal({
             </Label>
             <Select value={category} onValueChange={setCategory}>
               <SelectTrigger className="h-11 w-full">
-                <SelectValue placeholder="Sin categoría" />  {/* ← Placeholder indica "sin categoría" */}
+                <SelectValue placeholder="Sin categoría" />
               </SelectTrigger>
               <SelectContent>
-                {CATEGORIES[type].map((cat) => (
-                  <SelectItem key={cat} value={cat}>
-                    {cat}
+                {activeCategories.map((cat) => (
+                  <SelectItem key={cat.id} value={cat.name}>
+                    {cat.name}
                   </SelectItem>
                 ))}
               </SelectContent>

@@ -3,9 +3,9 @@
 
 import {
   BarChart3, Box, Calendar, ChevronDown, CreditCard,
-  Home, Package, ShoppingCart, Users, Warehouse, Settings,
+  Home, ShoppingCart, Users, Warehouse, Settings,
   LogOut, Sparkles, User, Building2, Crown, Receipt,
-  UserPlus, Shield,
+  UserPlus, Shield, Tags
 } from "lucide-react"
 import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
@@ -80,9 +80,11 @@ const settingsNav = [
     submenu: [
       { title: "Mi Perfil",           url: "/settings/profile",       icon: User },
       { title: "Mi Negocio",          url: "/settings/organization",  icon: Building2 },
-      { title: "Programa de Lealtad", url: "/settings/loyalty",       icon: Crown },
+      { title: "Categorías",          url: "/settings/categories",    icon: Tags },
       { title: "Suscripción",         url: "/settings/billing",       icon: Receipt },
-      { title: "Usuarios",            url: "/settings/users",         icon: UserPlus },
+
+      //debe de ser para el panel Admin, no para todos los usuarios
+  //  { title: "Usuarios",            url: "/settings/users",         icon: UserPlus },
     ],
   },
 ]
@@ -245,14 +247,13 @@ export function AppSidebar() {
             </SidebarGroup>
           )}
 
-          {isAdmin && (
             <SidebarGroup>
               {!isCollapsed && <SidebarGroupLabel>Sistema</SidebarGroupLabel>}
               <SidebarGroupContent>
                 <SidebarMenu>{renderNav(settingsNav)}</SidebarMenu>
               </SidebarGroupContent>
             </SidebarGroup>
-          )}
+
         </SidebarContent>
 
         {/* ── Footer ── */}

@@ -520,3 +520,18 @@ CREATE TRIGGER set_updated_at_on_sales
 BEFORE UPDATE ON sales
 FOR EACH ROW
 EXECUTE FUNCTION set_updated_at();
+
+-- migration: create_transaction_categories_table.sql
+CREATE TABLE transaction_categories (
+  id SERIAL PRIMARY KEY,
+  user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  name VARCHAR(100) NOT NULL,
+  type VARCHAR(20) NOT NULL CHECK (type IN ('INCOME', 'EXPENSE', 'TRANSFER')),
+  is_active BOOLEAN DEFAULT TRUE,
+  created_at TIMESTAMP DEFAULT NOW(),
+  updated_at TIMESTAMP DEFAULT NOW(),
+  UNIQUE(user_id, name, type)
+);
+
+CREATE INDEX idx_transaction_categories_user ON transaction_categories(user_id);
+CREATE INDEX idx_transaction_categories_type ON transaction_categories(user_id, type, is_active);
