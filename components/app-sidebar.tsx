@@ -4,8 +4,8 @@
 import {
   BarChart3, Box, Calendar, ChevronDown, CreditCard,
   Home, ShoppingCart, Users, Warehouse, Settings,
-  LogOut, Sparkles, User, Building2, Crown, Receipt,
-  UserPlus, Shield, Tags
+  LogOut, User, Zap, Building2, Crown, Receipt,
+  Shield, Tags
 } from "lucide-react"
 import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
@@ -221,7 +221,7 @@ export function AppSidebar() {
             className={`flex items-center gap-2 ${isCollapsed ? "justify-center" : ""}`}
           >
             <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary">
-              <Sparkles className="h-5 w-5 text-primary-foreground" />
+              <Zap className="h-5 w-5 text-primary-foreground" />
             </div>
             {!isCollapsed && (
               <span className="text-lg font-semibold text-sidebar-foreground">Nexly</span>

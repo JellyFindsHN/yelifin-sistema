@@ -29,13 +29,13 @@ export function SalesCharts({ salesChart, paymentMethods, periodLabel, isLoading
   
   return (
     <div className="grid gap-4 lg:grid-cols-7">
-      {/* Ventas vs Ganancias - Solo desktop */}
-      <Card className="hidden lg:block lg:col-span-4">
+      {/* Ventas vs Ganancias */}
+      <Card className="lg:col-span-4">
         <CardHeader className="pb-3 pt-5 px-5">
           <CardTitle className="text-lg font-bold tracking-tight">Ventas vs Ganancias</CardTitle>
           <CardDescription className="text-sm font-medium">{periodLabel}</CardDescription>
         </CardHeader>
-        <CardContent className="px-5 pb-5">
+        <CardContent className="px-2 pb-1">
           {isLoading ? <Skeleton className="h-64 w-full" /> : (
             <ResponsiveContainer width="100%" height={260}>
               <LineChart data={salesChart}>
@@ -83,13 +83,13 @@ export function SalesCharts({ salesChart, paymentMethods, periodLabel, isLoading
         </CardContent>
       </Card>
 
-      {/* Métodos de pago - Móvil y desktop */}
+      {/* Métodos de pago */}
       <Card className="lg:col-span-3">
         <CardHeader className="pb-3 pt-5 px-5">
           <CardTitle className="text-lg font-bold tracking-tight">Métodos de Pago</CardTitle>
           <CardDescription className="text-sm font-medium">Distribución del período</CardDescription>
         </CardHeader>
-        <CardContent className="px-5 pb-5">
+        <CardContent className="px-5 pb-0">
           {isLoading ? <Skeleton className="h-64 w-full" /> : !paymentMethods.length ? (
             <div className="flex items-center justify-center py-16">
               <p className="text-sm text-muted-foreground font-medium">Sin datos disponibles</p>

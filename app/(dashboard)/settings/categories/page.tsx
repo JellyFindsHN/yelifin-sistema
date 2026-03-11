@@ -1,8 +1,7 @@
 // app/(dashboard)/settings/categories/page.tsx
 "use client";
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useState, useEffect } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -70,7 +69,6 @@ const TYPE_CONFIG = {
 };
 
 export default function CategoriesPage() {
-  const router = useRouter();
   const { categories, isLoading, mutate } = useTransactionCategories();
   const { create } = useCreateCategory();
   const { update } = useUpdateCategory();
@@ -88,6 +86,16 @@ export default function CategoriesPage() {
   const filtered = Array.isArray(categories)
     ? categories.filter((c) => c.type === selectedType && c.is_active)
     : [];
+
+  // Prevenir autofocus al abrir modales
+  useEffect(() => {
+    if (createOpen || editCategory) {
+      // Quitar focus de cualquier elemento activo
+      if (document.activeElement instanceof HTMLElement) {
+        document.activeElement.blur();
+      }
+    }
+  }, [createOpen, editCategory]);
 
   const handleCreate = async () => {
     if (!formName.trim()) {
@@ -393,10 +401,20 @@ export default function CategoriesPage() {
                 Nombre <span className="text-destructive text-xs">*</span>
               </Label>
               <Input
+                autoFocus={false}
                 placeholder="Ej: Publicidad"
                 value={formName}
                 onChange={(e) => setFormName(e.target.value)}
                 onKeyDown={(e) => e.key === "Enter" && handleCreate()}
+                onFocus={(e) => {
+                  setTimeout(() => {
+                    e.target.scrollIntoView({ 
+                      behavior: 'smooth', 
+                      block: 'center',
+                      inline: 'nearest'
+                    });
+                  }, 300);
+                }}
                 className="h-11 text-base"
               />
             </div>
@@ -471,10 +489,20 @@ export default function CategoriesPage() {
                 Nombre <span className="text-destructive text-xs">*</span>
               </Label>
               <Input
+                autoFocus={false}
                 placeholder="Nombre de la categoría"
                 value={formName}
                 onChange={(e) => setFormName(e.target.value)}
                 onKeyDown={(e) => e.key === "Enter" && handleUpdate()}
+                onFocus={(e) => {
+                  setTimeout(() => {
+                    e.target.scrollIntoView({ 
+                      behavior: 'smooth', 
+                      block: 'center',
+                      inline: 'nearest'
+                    });
+                  }, 300);
+                }}
                 className="h-11 text-base"
               />
             </div>
