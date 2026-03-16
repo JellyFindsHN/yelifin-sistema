@@ -6,16 +6,21 @@ import { useRouter } from "next/navigation";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 
 import {
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+
+import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
 import {
-  ArrowDownCircle, ArrowUpCircle, ArrowLeftRight, SlidersHorizontal, TrendingUp, TrendingDown
+  ArrowDownCircle, ArrowUpCircle, ArrowLeftRight, SlidersHorizontal, TrendingUp, TrendingDown, MoreVertical, Pencil, Trash2
 } from "lucide-react";
 import {
   useTransactions, useTransactionPeriods
@@ -112,6 +117,31 @@ export default function TransactionsPage() {
     }
   };
 
+
+  // ── Actions menu ────────────────────────────────────────────────────
+  const ActionsMenu = () => (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0">
+          <MoreVertical className="h-4 w-4" />
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end">
+        <DropdownMenuItem
+
+        >
+          <Pencil className="h-4 w-4 mr-2" />
+          Editar
+        </DropdownMenuItem>
+        <DropdownMenuItem
+          className="text-destructive focus:text-destructive"
+        >
+          <Trash2 className="h-4 w-4 mr-2" />
+          Eliminar
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
   return (
     <div className="space-y-4 pb-8">
 
@@ -257,7 +287,7 @@ export default function TransactionsPage() {
             const Icon = cfg.icon;
             const isClickable = t.reference_type === "SALE" && t.reference_id;
             return (
-              <Card 
+              <Card
                 className={`pt-3 pb-2.5 ${isClickable ? "cursor-pointer hover:bg-muted/50 transition-colors" : ""}`}
                 key={t.id}
                 onClick={() => handleTransactionClick(t)}
@@ -283,14 +313,16 @@ export default function TransactionsPage() {
                             {formatDate(t.occurred_at)}
                           </p>
                         </div>
-                        <div className="text-right shrink-0">
-                          <p className={`text-sm font-bold ${cfg.color}`}>
-                            {cfg.sign}{format(Number(t.amount))}
-                          </p>
-                          <Badge className={`text-[10px] mt-0.5 ${cfg.badge}`} variant="outline">
-                            {cfg.label}
-                          </Badge>
+                          <div className="text-right shrink-0">
+                            <p className={`text-sm font-bold ${cfg.color}`}>
+                              {cfg.sign}{format(Number(t.amount))}
+                            </p>
+                            <Badge className={`text-[10px] mt-0.5 ${cfg.badge}`} variant="outline">
+                              {cfg.label}
+                            </Badge>
                         </div>
+
+
                       </div>
                     </div>
                   </div>
@@ -313,6 +345,7 @@ export default function TransactionsPage() {
                 <TableHead>Origen</TableHead>
                 <TableHead>Fecha</TableHead>
                 <TableHead className="text-right">Monto</TableHead>
+                <TableHead className="w-10" />
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -336,7 +369,7 @@ export default function TransactionsPage() {
                   const Icon = cfg.icon;
                   const isClickable = t.reference_type === "SALE" && t.reference_id;
                   return (
-                    <TableRow 
+                    <TableRow
                       key={t.id}
                       className={isClickable ? "cursor-pointer hover:bg-muted/50" : ""}
                       onClick={() => handleTransactionClick(t)}
@@ -367,6 +400,11 @@ export default function TransactionsPage() {
                       <TableCell className={`text-right font-bold ${cfg.color}`}>
                         {cfg.sign}{format(Number(t.amount))}
                       </TableCell>
+                      {t.reference_type == 'OTHER' && (
+                        <TableCell>
+                          <ActionsMenu />
+                        </TableCell>
+                      )}
                     </TableRow>
                   );
                 })
@@ -385,7 +423,7 @@ export default function TransactionsPage() {
           },
         ]}
       />
-      
+
       <CreateTransactionModal
         open={modalOpen}
         onOpenChange={setModalOpen}
