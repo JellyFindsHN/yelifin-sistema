@@ -70,7 +70,7 @@ export async function GET(request: NextRequest) {
     return Response.json({ data: events, total: events.length });
 
   } catch (error) {
-    console.error("❌ GET /api/events:", error);
+    console.error(" GET /api/events:", error);
     return createErrorResponse("Error al obtener eventos", 500);
   }
 }
@@ -110,7 +110,7 @@ export async function POST(request: NextRequest) {
     return Response.json({ data: event }, { status: 201 });
 
   } catch (error) {
-    console.error("❌ POST /api/events:", error);
+    console.error(" POST /api/events:", error);
     return createErrorResponse("Error al crear evento", 500);
   }
 }

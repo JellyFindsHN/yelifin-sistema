@@ -9,6 +9,7 @@ const KEY = '/api/purchases';
 
 export type PurchaseItem = {
   product_id: number;
+  product_name?: string; // ← nuevo, opcional para mostrar en el resumen
   quantity: number;
   unit_cost_usd: number;
   unit_cost: number;

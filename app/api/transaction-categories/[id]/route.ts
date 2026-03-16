@@ -47,7 +47,7 @@ export async function PATCH(
 
     return Response.json(category);
   } catch (error: any) {
-    console.error("❌ PATCH /api/transaction-categories/[id]:", error);
+    console.error(" PATCH /api/transaction-categories/[id]:", error);
     return createErrorResponse("Error al actualizar categoría", 500);
   }
 }
@@ -76,7 +76,7 @@ export async function DELETE(
 
     return Response.json({ success: true });
   } catch (error: any) {
-    console.error("❌ DELETE /api/transaction-categories/[id]:", error);
+    console.error(" DELETE /api/transaction-categories/[id]:", error);
     return createErrorResponse("Error al eliminar categoría", 500);
   }
 }

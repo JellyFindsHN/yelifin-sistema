@@ -115,7 +115,7 @@ export async function POST(req: NextRequest) {
     );
 
   } catch (error: any) {
-    console.error("❌ Error en registro:", error);
+    console.error(" Error en registro:", error);
 
     // Rollback: si Firebase se creó pero PostgreSQL falló, eliminar de Firebase
     if (firebaseUid) {
@@ -123,7 +123,7 @@ export async function POST(req: NextRequest) {
         await adminAuth.deleteUser(firebaseUid);
         console.log("🔄 Rollback Firebase: usuario eliminado");
       } catch (rollbackError) {
-        console.error("❌ Error en rollback Firebase:", rollbackError);
+        console.error(" Error en rollback Firebase:", rollbackError);
       }
     }
 

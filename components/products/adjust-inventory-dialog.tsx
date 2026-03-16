@@ -30,11 +30,13 @@ export function AdjustInventoryDialog({ product, open, onOpenChange, onSuccess }
   const [quantity,   setQuantity]   = useState<string>("1");
   const [notes,      setNotes]      = useState("");
   const [isLoading,  setIsLoading]  = useState(false);
+  const [unitCost,   setUnitCost]   = useState< string>('0');
 
   const handleClose = () => {
     setType("in");
     setQuantity("1");
     setNotes("");
+    setUnitCost('0');
     onOpenChange(false);
   };
 
@@ -56,6 +58,7 @@ export function AdjustInventoryDialog({ product, open, onOpenChange, onSuccess }
           type,
           quantity:   qty,
           notes:      notes.trim(),
+          unit_cost:  type === "in" ? unitCost : 0,
         }),
       });
 
@@ -172,6 +175,22 @@ export function AdjustInventoryDialog({ product, open, onOpenChange, onSuccess }
                 disabled={isLoading}
               />
             </div>
+            {type === "in" && (
+              <div className="space-y-2">
+                <Label className="text-sm font-medium">
+                  Costo unitario <span className="text-destructive text-xs">*</span>
+                </Label>
+                <Input
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={unitCost}
+                  onChange={(e) => setUnitCost((e.target.value === "" ? "" : e.target.value))}
+                  className="h-11 text-base"
+                  disabled={isLoading}
+                />
+              </div>
+            )}
 
             {/* Motivo — requerido */}
             <div className="space-y-2">
@@ -189,7 +208,10 @@ export function AdjustInventoryDialog({ product, open, onOpenChange, onSuccess }
                 disabled={isLoading}
               />
               <p className="text-xs text-muted-foreground">
-                Este ajuste no genera ningún movimiento financiero.
+                Este ajuste no genera ningún movimiento financiero, solo afecta el inventario. <br/>
+                {type === "in"
+                  && "Al agregar el costo unitario recalculará el costo promedio y el valor del inventario."
+                }
               </p>
             </div>
 

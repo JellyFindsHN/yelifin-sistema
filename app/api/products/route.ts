@@ -42,7 +42,7 @@ export async function GET(request: NextRequest) {
       total: products.length,
     });
   } catch (error) {
-    console.error("❌ GET /api/products:", error);
+    console.error(" GET /api/products:", error);
     return createErrorResponse("Error al obtener productos", 500);
   }
 }
@@ -131,7 +131,7 @@ export async function POST(request: NextRequest) {
 
     return Response.json({ data: product }, { status: 201 });
   } catch (error) {
-    console.error("❌ POST /api/products:", error);
+    console.error(" POST /api/products:", error);
     return createErrorResponse("Error al crear producto", 500);
   }
 }

@@ -10,7 +10,7 @@ export async function POST(request: NextRequest) {
   if (!isAuthSuccess(auth)) return createErrorResponse(auth.error, auth.status);
 
   try {
-    const { userId } = auth.data;
+    const { userId } = auth.data; 
     const body = await request.json();
 
     const { account_id, currency, exchange_rate, shipping, notes, purchased_at, items } = body;
@@ -44,8 +44,10 @@ export async function POST(request: NextRequest) {
       const shippingPerUnit = totalUnits > 0 ? shippingTotal / totalUnits : 0;
       const finalUnitCost  = unitCostHnl + shippingPerUnit;
       const totalCost      = finalUnitCost * Number(item.quantity);
+      const productName     = item.product_name || "Producto " + item.product_id;
       return {
         product_id:    item.product_id,
+        product_name:  productName,
         variant_id:    item.variant_id ?? null,
         quantity:      Number(item.quantity),
         unit_cost_usd: unitCostUsd,
@@ -117,7 +119,7 @@ export async function POST(request: NextRequest) {
         description, reference_type, reference_id, occurred_at
         ) VALUES (
         ${userId}, ${account_id}, 'EXPENSE', ${total},
-        ${'Compra de inventario #' + purchaseBatchId}, 'PURCHASE', ${purchaseBatchId},
+        ${'Compra de ' + processedItems[0].product_name }, 'PURCHASE', ${purchaseBatchId},
         ${purchased_at ?? new Date().toISOString()}
         )
         RETURNING id
@@ -143,7 +145,7 @@ export async function POST(request: NextRequest) {
     }
 
   } catch (error) {
-    console.error("❌ POST /api/purchases:", error);
+    console.error(" POST /api/purchases:", error);
     return createErrorResponse("Error al registrar la compra", 500);
   }
 }
@@ -170,7 +172,7 @@ export async function GET(request: NextRequest) {
     `;
     return Response.json({ data: purchases, total: purchases.length });
   } catch (error) {
-    console.error("❌ GET /api/purchases:", error);
+    console.error(" GET /api/purchases:", error);
     return createErrorResponse("Error al obtener compras", 500);
   }
 }

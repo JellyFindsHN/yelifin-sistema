@@ -34,7 +34,7 @@ export async function PUT(request: NextRequest, { params }: Params) {
   } catch (error: any) {
     if (String(error?.message ?? "").toLowerCase().includes("unique"))
       return createErrorResponse("Ya existe un suministro con ese nombre", 400);
-    console.error("❌ PUT /api/supplies/[id]:", error);
+    console.error(" PUT /api/supplies/[id]:", error);
     return createErrorResponse("Error al actualizar suministro", 500);
   }
 }
@@ -53,7 +53,7 @@ export async function DELETE(request: NextRequest, { params }: Params) {
 
     return Response.json({ message: "Suministro eliminado" });
   } catch (error) {
-    console.error("❌ DELETE /api/supplies/[id]:", error);
+    console.error(" DELETE /api/supplies/[id]:", error);
     return createErrorResponse("Error al eliminar suministro", 500);
   }
 }

@@ -33,7 +33,7 @@ export async function GET(request: NextRequest) {
 
     return Response.json({ data: supplies, total: supplies.length });
   } catch (error) {
-    console.error("❌ GET /api/supplies:", error);
+    console.error(" GET /api/supplies:", error);
     return createErrorResponse("Error al obtener suministros", 500);
   }
 }
@@ -69,7 +69,7 @@ export async function POST(request: NextRequest) {
       { status: 201 }
     );
   } catch (error: any) {
-    console.error("❌ POST /api/supplies:", error);
+    console.error(" POST /api/supplies:", error);
     // Si el UNIQUE(user_id, name) falla:
     if (String(error?.message ?? "").toLowerCase().includes("unique")) {
       return createErrorResponse("Ya existe un suministro con ese nombre", 400);

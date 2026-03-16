@@ -115,7 +115,7 @@ export async function GET(request: NextRequest) {
       today_transactions: todayTransactions,
     });
   } catch (error) {
-    console.error("❌ GET /api/finances/summary:", error);
+    console.error(" GET /api/finances/summary:", error);
     return createErrorResponse("Error al obtener resumen financiero", 500);
   }
 }

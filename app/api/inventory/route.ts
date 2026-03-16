@@ -60,7 +60,7 @@ export async function GET(request: NextRequest) {
     });
 
   } catch (error) {
-    console.error("❌ GET /api/inventory:", error);
+    console.error(" GET /api/inventory:", error);
     return createErrorResponse("Error al obtener inventario", 500);
   }
 }

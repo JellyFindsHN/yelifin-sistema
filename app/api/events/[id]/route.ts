@@ -121,7 +121,7 @@ export async function GET(
     });
 
   } catch (error) {
-    console.error("❌ GET /api/events/[id]:", error);
+    console.error(" GET /api/events/[id]:", error);
     return createErrorResponse("Error al obtener evento", 500);
   }
 }

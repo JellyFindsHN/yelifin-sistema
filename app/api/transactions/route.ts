@@ -14,28 +14,28 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
 
     const accountId = searchParams.get("account_id");
-    const month     = searchParams.get("month");
-    const year      = searchParams.get("year");
-    const date      = searchParams.get("date");
+    const month = searchParams.get("month");
+    const year = searchParams.get("year");
+    const date = searchParams.get("date");
 
     const now = new Date();
     let startISO: string;
-    let endISO:   string;
+    let endISO: string;
 
     if (date) {
       startISO = `${date}T00:00:00.000Z`;
-      endISO   = `${date}T23:59:59.999Z`;
+      endISO = `${date}T23:59:59.999Z`;
     } else if (year && month) {
       const y = Number(year), m = Number(month);
       startISO = new Date(y, m - 1, 1).toISOString();
-      endISO   = new Date(y, m, 1).toISOString();
+      endISO = new Date(y, m, 1).toISOString();
     } else if (year && !month) {
       const y = Number(year);
       startISO = new Date(y, 0, 1).toISOString();
-      endISO   = new Date(y + 1, 0, 1).toISOString();
+      endISO = new Date(y + 1, 0, 1).toISOString();
     } else {
       startISO = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
-      endISO   = new Date(now.getFullYear(), now.getMonth() + 1, 1).toISOString();
+      endISO = new Date(now.getFullYear(), now.getMonth() + 1, 1).toISOString();
     }
 
     const transactions = await sql`
@@ -79,16 +79,16 @@ export async function GET(request: NextRequest) {
     `;
 
     return Response.json({
-      data:   transactions,
+      data: transactions,
       totals: {
-        income:   Number(totals.total_income),
-        expense:  Number(totals.total_expense),
+        income: Number(totals.total_income),
+        expense: Number(totals.total_expense),
         transfer: Number(totals.total_transfer),
-        count:    Number(totals.total_count),
+        count: Number(totals.total_count),
       },
     });
   } catch (error) {
-    console.error("❌ GET /api/transactions:", error);
+    console.error(" GET /api/transactions:", error);
     return createErrorResponse("Error al obtener transacciones", 500);
   }
 }
@@ -130,7 +130,7 @@ export async function POST(request: NextRequest) {
     `;
     if (!account) return createErrorResponse("Cuenta no encontrada", 404);
 
-    const amt        = Number(amount);
+    const amt = Number(amount);
     const occurredAt = occurred_at ?? new Date().toISOString();
 
     const [transaction] = await sql`
@@ -165,7 +165,7 @@ export async function POST(request: NextRequest) {
       { status: 201 }
     );
   } catch (error) {
-    console.error("❌ POST /api/transactions:", error);
+    console.error(" POST /api/transactions:", error);
     return createErrorResponse("Error al registrar transacción", 500);
   }
 }

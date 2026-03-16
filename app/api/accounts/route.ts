@@ -22,7 +22,7 @@ export async function GET(request: NextRequest) {
     return Response.json({ data: accounts, total: accounts.length });
 
   } catch (error) {
-    console.error("❌ GET /api/accounts:", error);
+    console.error(" GET /api/accounts:", error);
     return createErrorResponse("Error al obtener cuentas", 500);
   }
 }
@@ -49,7 +49,7 @@ export async function POST(request: NextRequest) {
   } catch (error: any) {
     if (error.code === "23505")
       return createErrorResponse("Ya existe una cuenta con ese nombre", 409);
-    console.error("❌ POST /api/accounts:", error);
+    console.error(" POST /api/accounts:", error);
     return createErrorResponse("Error al crear cuenta", 500);
   }
 }

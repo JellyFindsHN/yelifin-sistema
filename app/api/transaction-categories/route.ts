@@ -30,7 +30,7 @@ export async function GET(request: NextRequest) {
     console.log("Categorías obtenidas:", categories);
     return Response.json(categories);
   } catch (error: any) {
-    console.error("❌ GET /api/transaction-categories:", error);
+    console.error(" GET /api/transaction-categories:", error);
     return createErrorResponse("Error al obtener categorías", 500);
   }
 }
@@ -61,7 +61,7 @@ export async function POST(request: NextRequest) {
         409
       );
     }
-    console.error("❌ POST /api/transaction-categories:", error);
+    console.error(" POST /api/transaction-categories:", error);
     return createErrorResponse("Error al crear categoría", 500);
   }
 }

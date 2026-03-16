@@ -50,7 +50,7 @@ export async function GET(request: NextRequest, { params }: Params) {
     return Response.json({ data: { ...sale, items, supplies } });
 
   } catch (error) {
-    console.error("❌ GET /api/sales/[id]:", error);
+    console.error(" GET /api/sales/[id]:", error);
     return createErrorResponse("Error al obtener venta", 500);
   }
 }
@@ -419,7 +419,7 @@ export async function PATCH(request: NextRequest, { params }: Params) {
     }
 
   } catch (error) {
-    console.error("❌ PATCH /api/sales/[id]:", error);
+    console.error(" PATCH /api/sales/[id]:", error);
     return createErrorResponse("Error al procesar la acción", 500);
   }
 }

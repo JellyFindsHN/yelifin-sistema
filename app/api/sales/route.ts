@@ -101,7 +101,7 @@ export async function GET(request: NextRequest) {
 
     return Response.json({ data: sales, total: sales.length });
   } catch (error) {
-    console.error("❌ GET /api/sales:", error);
+    console.error(" GET /api/sales:", error);
     return createErrorResponse("Error al obtener ventas", 500);
   }
 }

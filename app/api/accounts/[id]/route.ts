@@ -34,7 +34,7 @@ export async function PATCH(request: NextRequest, { params }: Params) {
     return Response.json({ data: updated });
 
   } catch (error) {
-    console.error("❌ PATCH /api/accounts/[id]:", error);
+    console.error(" PATCH /api/accounts/[id]:", error);
     return createErrorResponse("Error al actualizar cuenta", 500);
   }
 }
@@ -58,7 +58,7 @@ export async function DELETE(request: NextRequest, { params }: Params) {
     return Response.json({ message: "Cuenta eliminada correctamente" });
 
   } catch (error) {
-    console.error("❌ DELETE /api/accounts/[id]:", error);
+    console.error(" DELETE /api/accounts/[id]:", error);
     return createErrorResponse("Error al eliminar cuenta", 500);
   }
 }

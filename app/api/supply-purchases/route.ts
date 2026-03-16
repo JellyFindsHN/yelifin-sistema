@@ -49,7 +49,7 @@ export async function GET(request: NextRequest) {
 
     return Response.json({ data: purchases, total: purchases.length });
   } catch (error) {
-    console.error("❌ GET /api/supply-purchases:", error);
+    console.error(" GET /api/supply-purchases:", error);
     return createErrorResponse("Error al obtener compras de suministros", 500);
   }
 }
@@ -179,7 +179,7 @@ export async function POST(request: NextRequest) {
       throw inner;
     }
   } catch (error) {
-    console.error("❌ POST /api/supply-purchases:", error);
+    console.error(" POST /api/supply-purchases:", error);
     return createErrorResponse("Error al registrar compra de suministros", 500);
   }
 } 

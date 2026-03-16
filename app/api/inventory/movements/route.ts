@@ -111,7 +111,7 @@ export async function GET(request: NextRequest) {
     return Response.json({ data: movements, total: movements.length });
 
   } catch (error) {
-    console.error("❌ GET /api/inventory/movements:", error);
+    console.error(" GET /api/inventory/movements:", error);
     return createErrorResponse("Error al obtener movimientos", 500);
   }
 }

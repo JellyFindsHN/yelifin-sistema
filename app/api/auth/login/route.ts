@@ -104,7 +104,7 @@ export async function POST(req: NextRequest) {
 
     return response;
   } catch (error: any) {
-    console.error("❌ Error en login:", error);
+    console.error(" Error en login:", error);
     return NextResponse.json(
       { error: "Error al iniciar sesión. Por favor intenta de nuevo." },
       { status: 500 }

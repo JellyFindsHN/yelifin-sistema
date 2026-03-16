@@ -22,7 +22,7 @@ export async function GET(request: NextRequest) {
     return Response.json({ data: customers, total: customers.length });
 
   } catch (error) {
-    console.error("❌ GET /api/customers:", error);
+    console.error(" GET /api/customers:", error);
     return createErrorResponse("Error al obtener clientes", 500);
   }
 }
@@ -46,7 +46,7 @@ export async function POST(request: NextRequest) {
     return Response.json({ data: customer }, { status: 201 });
 
   } catch (error) {
-    console.error("❌ POST /api/customers:", error);
+    console.error(" POST /api/customers:", error);
     return createErrorResponse("Error al crear cliente", 500);
   }
 }

@@ -135,7 +135,8 @@ export function AddInventoryDialog({ product, open, onOpenChange, onSuccess }: P
         purchased_at:  data.purchased_at
           ? new Date(data.purchased_at + "T00:00:00-06:00").toISOString()
           : new Date().toISOString(),
-        items: [{ product_id: product.id, quantity: data.quantity, unit_cost_usd: data.unit_cost_usd }],
+        items: [{ product_id: product.id, product_name: product.name, quantity: data.quantity, unit_cost_usd: data.unit_cost_usd }],
+
       });
       toast.success(`${data.quantity} unidades de ${product.name} registradas`);
       onOpenChange(false);

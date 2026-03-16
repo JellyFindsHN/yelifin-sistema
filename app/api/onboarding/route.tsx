@@ -25,7 +25,7 @@ export async function GET(request: NextRequest) {
       },
     });
   } catch (error) {
-    console.error("❌ GET /api/onboarding:", error);
+    console.error(" GET /api/onboarding:", error);
     return createErrorResponse("Error al verificar onboarding", 500);
   }
 }
@@ -98,7 +98,7 @@ export async function POST(request: NextRequest) {
       throw inner;
     }
   } catch (error) {
-    console.error("❌ POST /api/onboarding:", error);
+    console.error(" POST /api/onboarding:", error);
     return createErrorResponse("Error al completar onboarding", 500);
   }
 }

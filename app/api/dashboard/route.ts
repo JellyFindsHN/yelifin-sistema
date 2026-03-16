@@ -297,7 +297,7 @@ export async function GET(request: NextRequest) {
       },
     });
   } catch (error) {
-    console.error("❌ GET /api/dashboard:", error);
+    console.error(" GET /api/dashboard:", error);
     return createErrorResponse("Error al obtener datos del dashboard", 500);
   }
 }

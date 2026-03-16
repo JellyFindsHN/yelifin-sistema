@@ -36,7 +36,7 @@ export async function GET(request: NextRequest, { params }: Params) {
     return Response.json({ data: product });
 
   } catch (error) {
-    console.error("❌ GET /api/products/[id]:", error);
+    console.error(" GET /api/products/[id]:", error);
     return createErrorResponse("Error al obtener producto", 500);
   }
 }
@@ -92,7 +92,7 @@ export async function PATCH(request: NextRequest, { params }: Params) {
     return Response.json({ data: updated });
 
   } catch (error) {
-    console.error("❌ PATCH /api/products/[id]:", error);
+    console.error(" PATCH /api/products/[id]:", error);
     return createErrorResponse("Error al actualizar producto", 500);
   }
 }
@@ -142,7 +142,7 @@ export async function DELETE(request: NextRequest, { params }: Params) {
     return Response.json({ message: "Producto desactivado correctamente" });
 
   } catch (error) {
-    console.error("❌ DELETE /api/products/[id]:", error);
+    console.error(" DELETE /api/products/[id]:", error);
     return createErrorResponse("Error al eliminar producto", 500);
   }
 }

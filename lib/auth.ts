@@ -85,7 +85,7 @@ export async function verifyAuth(request: NextRequest): Promise<AuthResult> {
       },
     };
   } catch (error) {
-    console.error("❌ Error en verifyAuth:", error);
+    console.error(" Error en verifyAuth:", error);
     return { error: "Error interno del servidor", status: 500, data: null };
   }
 }
@@ -126,7 +126,7 @@ export async function verifySubscription(userId: number): Promise<AuthResult & {
       planSlug: subscription.plan_slug,
     };
   } catch (error) {
-    console.error("❌ Error en verifySubscription:", error);
+    console.error(" Error en verifySubscription:", error);
     return { error: "Error al verificar suscripción", status: 500, data: null };
   }
 }
@@ -158,7 +158,7 @@ export async function verifyFeatureAccess(userId: number, featureKey: string) {
 
     return { error: null, status: 200, hasAccess: true };
   } catch (error) {
-    console.error("❌ Error en verifyFeatureAccess:", error);
+    console.error(" Error en verifyFeatureAccess:", error);
     return { error: "Error al verificar permisos", status: 500, hasAccess: false };
   }
 }
@@ -229,7 +229,7 @@ export async function verifyResourceLimit(
 
     return { error: null, status: 200, withinLimit: true };
   } catch (error) {
-    console.error("❌ Error en verifyResourceLimit:", error);
+    console.error(" Error en verifyResourceLimit:", error);
     return { error: "Error al verificar límites", status: 500, withinLimit: false };
   }
 }

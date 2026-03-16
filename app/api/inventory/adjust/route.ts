@@ -13,7 +13,7 @@ export async function POST(request: NextRequest) {
     const { userId } = auth.data;
     const body = await request.json();
 
-    const { product_id, type, quantity, notes } = body;
+    const { product_id, type, quantity, notes, unit_cost } = body;
 
     // ── Validaciones ───────────────────────────────────────────────
     if (!product_id)               return createErrorResponse("El producto es requerido", 400);
@@ -21,6 +21,11 @@ export async function POST(request: NextRequest) {
                                    return createErrorResponse("El tipo debe ser 'in' o 'out'", 400);
     if (!quantity || quantity < 1) return createErrorResponse("La cantidad debe ser al menos 1", 400);
     if (!notes?.trim())            return createErrorResponse("El motivo del ajuste es requerido", 400);
+
+    let unitCost = Number(unit_cost) || 0;
+    if (type === "in" && unitCost < 0) {
+      return createErrorResponse("El costo unitario no puede ser negativo", 400);
+    }
 
     // Verificar que el producto pertenece al usuario
     const [product] = await sql`
@@ -50,14 +55,14 @@ export async function POST(request: NextRequest) {
     try {
 
       if (type === "in") {
-        // ── Ajuste positivo: crear batch sin costo ─────────────────
+        // ── Ajuste positivo: crear batch con o sin costo ─────────────────
         const [batch] = await sql`
           INSERT INTO inventory_batches (
             user_id, product_id, variant_id, purchase_batch_item_id,
             qty_in, qty_available, unit_cost, received_at
           ) VALUES (
             ${userId}, ${product_id}, ${null}, ${null},
-            ${quantity}, ${quantity}, 0, NOW()
+            ${quantity}, ${quantity}, ${unitCost}, NOW()
           )
           RETURNING id
         `;
@@ -128,7 +133,7 @@ export async function POST(request: NextRequest) {
     }
 
   } catch (error) {
-    console.error("❌ POST /api/inventory/adjust:", error);
+    console.error(" POST /api/inventory/adjust:", error);
     return createErrorResponse("Error al registrar el ajuste", 500);
   }
 }

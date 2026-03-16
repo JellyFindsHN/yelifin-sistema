@@ -21,7 +21,7 @@ export async function GET(request: NextRequest) {
     `;
     return Response.json({ data: periods });
   } catch (error) {
-    console.error("❌ GET /api/finances/periods:", error);
+    console.error(" GET /api/finances/periods:", error);
     return createErrorResponse("Error al obtener períodos", 500);
   }
 }

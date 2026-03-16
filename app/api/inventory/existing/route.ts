@@ -78,7 +78,7 @@ export async function POST(request: NextRequest) {
     }
 
   } catch (error) {
-    console.error("❌ POST /api/inventory/existing:", error);
+    console.error(" POST /api/inventory/existing:", error);
     return createErrorResponse("Error al registrar inventario inicial", 500);
   }
 }
