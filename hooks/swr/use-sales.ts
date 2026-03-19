@@ -10,7 +10,7 @@ export type CartItem = {
   product_id:   number;
   product_name: string;
   image_url:    string | null;
-  quantity:     number;
+  quantity:     number; 
   unit_price:   number;
   discount:     number;
 };
@@ -42,7 +42,7 @@ export type EditSaleInput = {
   tax_rate?:       number;
   notes?:          string;
   customer_id?:    number | null;
-  account_id?:     number | null;   // ← fix: faltaba este campo
+  account_id:      number;
   status?:         SaleStatus;
   supplies_used?:  { supply_id: number; quantity: number; unit_cost: number }[];
 };
