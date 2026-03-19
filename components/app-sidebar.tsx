@@ -214,7 +214,7 @@ export function AppSidebar() {
       <Sidebar collapsible="icon" className="sticky top-0 h-svh">
 
         {/* ── Header ── */}
-        <SidebarHeader className="border-b border-sidebar-border px-4 py-4">
+        <SidebarHeader className="border-b border-sidebar-border px-4 py-3">
           <Link
             href="/dashboard"
             onClick={closeOnMobile}

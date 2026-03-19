@@ -1,4 +1,3 @@
-// app/(dashboard)/sales/[id]/edit/page.tsx
 "use client";
 
 import {
@@ -35,6 +34,7 @@ import {
 import { useAccounts } from "@/hooks/swr/use-accounts";
 import { useCustomers } from "@/hooks/swr/use-costumers";
 import { useSupplies } from "@/hooks/swr/use-supplies";
+
 
 import { PosProductGrid } from "@/components/sales/pos/product-grid";
 import {
@@ -95,7 +95,7 @@ function EditSaleContent() {
   const { accounts } = useAccounts();
   const { customers } = useCustomers();
   const { supplies } = useSupplies();
-  const { editSale, isPatching } = usePatchSale(saleId);
+  const { editSale, confirmSale, isPatching } = usePatchSale(saleId);
 
   const [cart, setCart] = useState<CartItem[]>([]);
   const [discountType, setDiscountType] =
@@ -396,55 +396,47 @@ function EditSaleContent() {
     }
   };
 
-  // Confirmar completar (modal → acción)
-  const handleConfirmComplete = async () => {
-    if (!sale) return;
-    setConfirmCompleteOpen(false);
-    if (cart.length === 0)
-      return toast.error("El carrito está vacío");
-    if (!accountId)
-      return toast.error(
-        "Selecciona una cuenta de destino"
-      );
+const handleConfirmComplete = async () => {
+  if (!sale) return;
+  setConfirmCompleteOpen(false);
+  if (cart.length === 0) return toast.error("El carrito está vacío");
+  if (!accountId) return toast.error("Selecciona una cuenta de destino");
 
-    try {
-      const payload: any = {
-        items: cart.map((i) => ({
-          product_id: i.product_id,
-          quantity: i.quantity,
-          unit_price: i.unit_price,
-          discount:
-            discountType === "per_item"
-              ? i.discount
-              : 0,
-        })),
-        discount: appliedGlobal,
-        shipping_cost:
-          shippingCost > 0 ? shippingCost : undefined,
-        tax_rate: taxRate > 0 ? taxRate : undefined,
-        notes: notes || undefined,
-        customer_id: customerId,
-        account_id: accountId,
-        status: "COMPLETED",
-        supplies_used:
-          suppliesUsed.length > 0
-            ? suppliesUsed.map((s) => ({
-                supply_id: s.supply_id,
-                quantity: s.quantity,
-                unit_cost: s.unit_cost,
-              }))
-            : undefined,
-      };
+  try {
+    // 1. Primero guardar todos los cambios (SIN cambiar status)
+    await editSale({
+      items: cart.map((i) => ({
+        product_id: i.product_id,
+        quantity: i.quantity,
+        unit_price: i.unit_price,
+        discount: discountType === "per_item" ? i.discount : 0,
+      })),
+      discount: appliedGlobal,
+      shipping_cost: shippingCost > 0 ? shippingCost : undefined,
+      tax_rate: taxRate > 0 ? taxRate : undefined,
+      notes: notes || undefined,
+      customer_id: customerId,
+      account_id: accountId,
+      // ⚠️ NO enviar status aquí
+      supplies_used: suppliesUsed.length > 0
+        ? suppliesUsed.map((s) => ({
+            supply_id: s.supply_id,
+            quantity: s.quantity,
+            unit_cost: s.unit_cost,
+          }))
+        : undefined,
+    });
 
-      await editSale(payload);
-      toast.success("Venta completada");
-      router.push("/sales");
-    } catch (err: any) {
-      toast.error(
-        err.message || "Error al completar la venta"
-      );
-    }
-  };
+    // 2. Luego completar la venta (cambiar status)
+    await confirmSale();
+    
+    toast.success("Venta completada");
+    router.push("/sales");
+  } catch (err: any) {
+    console.error("Error:", err);
+    toast.error(err.message || "Error al completar la venta");
+  }
+};
 
   // Confirmar cancelar (modal → acción simple)
   const handleConfirmCancel = async () => {
