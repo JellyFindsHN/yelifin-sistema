@@ -38,42 +38,42 @@ const ACCOUNT_ICONS: Record<string, React.ElementType> = {
 };
 
 const ACCOUNT_TYPE_CONFIG: Record<string, { label: string; color: string }> = {
-  CASH:   { label: "Efectivo",          color: "bg-green-100 text-green-700 border-green-200" },
-  BANK:   { label: "Banco",             color: "bg-blue-100 text-blue-700 border-blue-200" },
+  CASH: { label: "Efectivo", color: "bg-green-100 text-green-700 border-green-200" },
+  BANK: { label: "Banco", color: "bg-blue-100 text-blue-700 border-blue-200" },
   WALLET: { label: "Billetera digital", color: "bg-purple-100 text-purple-700 border-purple-200" },
-  OTHER:  { label: "Otro",              color: "bg-gray-100 text-gray-700 border-gray-200" },
+  OTHER: { label: "Otro", color: "bg-gray-100 text-gray-700 border-gray-200" },
 };
 
 const TYPE_CONFIG = {
-  INCOME:   { icon: ArrowDownCircle, color: "text-green-600",   sign: "+" },
-  EXPENSE:  { icon: ArrowUpCircle,   color: "text-destructive", sign: "-" },
-  TRANSFER: { icon: ArrowLeftRight,  color: "text-blue-600",    sign: "" },
+  INCOME: { icon: ArrowDownCircle, color: "text-green-600", sign: "+" },
+  EXPENSE: { icon: ArrowUpCircle, color: "text-destructive", sign: "-" },
+  TRANSFER: { icon: ArrowLeftRight, color: "text-blue-600", sign: "" },
 };
 
 const REF_LABELS: Record<string, string> = {
-  SALE:            "Venta",
-  PURCHASE:        "Compra inventario",
+  SALE: "Venta",
+  PURCHASE: "Compra inventario",
   SUPPLY_PURCHASE: "Compra suministros",
-  OTHER:           "Manual",
+  OTHER: "Manual",
 };
 
 export default function FinancesPage() {
   const now = new Date();
 
-  const [selectedMonth,     setSelectedMonth]     = useState<number | undefined>();
-  const [selectedYear,      setSelectedYear]      = useState<number | undefined>();
-  const [transactionOpen,   setTransactionOpen]   = useState(false);
+  const [selectedMonth, setSelectedMonth] = useState<number | undefined>(now.getMonth() + 1);
+  const [selectedYear, setSelectedYear] = useState<number | undefined>(now.getFullYear());
+  const [transactionOpen, setTransactionOpen] = useState(false);
   const [createAccountOpen, setCreateAccountOpen] = useState(false);
-  const [editAccount,       setEditAccount]       = useState<Account | null>(null);
-  const [deleteAccount,     setDeleteAccount]     = useState<Account | null>(null);
+  const [editAccount, setEditAccount] = useState<Account | null>(null);
+  const [deleteAccount, setDeleteAccount] = useState<Account | null>(null);
 
   const { summary, isLoading, mutate: mutateSummary } = useFinances({ month: selectedMonth, year: selectedYear });
-  const { periods }                                    = useFinancePeriods();
-  const { accounts, mutate: mutateAccounts }           = useAccounts();
-  const { format }                                     = useCurrency();
+  const { periods } = useFinancePeriods();
+  const { accounts, mutate: mutateAccounts } = useAccounts();
+  const { format } = useCurrency();
 
   const availableYears = [...new Set(periods.map((p) => p.year))].sort((a, b) => b - a);
-  const monthsForYear  = (y: number) =>
+  const monthsForYear = (y: number) =>
     periods.filter((p) => p.year === y).map((p) => p.month).sort((a, b) => b - a);
 
   const totalBalance = (summary?.accounts ?? []).reduce((acc, a) => acc + Number(a.balance), 0);
@@ -85,8 +85,8 @@ export default function FinancesPage() {
       : `${MONTH_NAMES[now.getMonth() + 1]} ${now.getFullYear()}`;
 
   const cashFlow = (summary?.cash_flow ?? []).map((d) => ({
-    date:    new Date(d.date + "T00:00:00").toLocaleDateString("es-HN", { day: "numeric", month: "short" }),
-    income:  Number(d.income),
+    date: new Date(d.date + "T00:00:00").toLocaleDateString("es-HN", { day: "numeric", month: "short" }),
+    income: Number(d.income),
     expense: Number(d.expense),
   }));
 
@@ -204,8 +204,8 @@ export default function FinancesPage() {
             ) : (
               <div className="divide-y">
                 {(summary?.accounts ?? []).map((account) => {
-                  const Icon        = ACCOUNT_ICONS[account.type] ?? Wallet;
-                  const typeConfig  = ACCOUNT_TYPE_CONFIG[account.type] ?? ACCOUNT_TYPE_CONFIG.OTHER;
+                  const Icon = ACCOUNT_ICONS[account.type] ?? Wallet;
+                  const typeConfig = ACCOUNT_TYPE_CONFIG[account.type] ?? ACCOUNT_TYPE_CONFIG.OTHER;
                   const fullAccount = accounts.find((a) => a.id === account.id);
                   return (
                     <div key={account.id} className="flex items-center gap-3 p-3.5">
@@ -270,7 +270,7 @@ export default function FinancesPage() {
                     fontSize: 12,
                   }}
                 />
-                <Area type="monotone" dataKey="income"  stroke="#10B981" fill="#10B981" fillOpacity={0.15} strokeWidth={2} name="Ingresos" />
+                <Area type="monotone" dataKey="income" stroke="#10B981" fill="#10B981" fillOpacity={0.15} strokeWidth={2} name="Ingresos" />
                 <Area type="monotone" dataKey="expense" stroke="#EF4444" fill="#EF4444" fillOpacity={0.15} strokeWidth={2} name="Egresos" />
               </AreaChart>
             </ResponsiveContainer>
@@ -308,7 +308,7 @@ export default function FinancesPage() {
             </Card>
           ) : (
             summary.today_transactions.map((t) => {
-              const cfg  = TYPE_CONFIG[t.type];
+              const cfg = TYPE_CONFIG[t.type];
               const Icon = cfg.icon;
               return (
                 <Card className="pt-1 pb-1" key={t.id}>
@@ -342,7 +342,7 @@ export default function FinancesPage() {
 
       <Fab
         actions={[
-          { label: "Nueva cuenta",      icon: Wallet,         onClick: () => setCreateAccountOpen(true) },
+          { label: "Nueva cuenta", icon: Wallet, onClick: () => setCreateAccountOpen(true) },
           { label: "Nueva transacción", icon: ArrowLeftRight, onClick: () => setTransactionOpen(true) },
         ]}
       />
