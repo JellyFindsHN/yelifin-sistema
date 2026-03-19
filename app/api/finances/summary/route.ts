@@ -38,12 +38,32 @@ export async function GET(request: NextRequest) {
     const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString();
     const todayEnd   = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1).toISOString();
 
-    // Cuentas
+    // Cuentas con balance histórico al final del período
     const accounts = await sql`
-      SELECT id, name, type, balance
-      FROM accounts
-      WHERE user_id = ${userId} AND is_active = TRUE
-      ORDER BY created_at ASC
+      SELECT 
+        a.id,
+        a.name,
+        a.type,
+        a.balance - COALESCE(
+          (
+            SELECT 
+              SUM(CASE 
+                WHEN t.type = 'INCOME' AND t.account_id = a.id THEN t.amount
+                WHEN t.type = 'EXPENSE' AND t.account_id = a.id THEN -t.amount
+                WHEN t.type = 'TRANSFER' AND t.account_id = a.id THEN -t.amount
+                WHEN t.type = 'TRANSFER' AND t.to_account_id = a.id THEN t.amount
+                ELSE 0
+              END)
+            FROM transactions t
+            WHERE t.user_id = ${userId}
+              AND t.occurred_at >= ${endISO}::timestamptz
+              AND (t.account_id = a.id OR t.to_account_id = a.id)
+          ), 
+          0
+        ) AS balance
+      FROM accounts a
+      WHERE a.user_id = ${userId} AND a.is_active = TRUE
+      ORDER BY a.created_at ASC
     `;
 
     // Totales del período
