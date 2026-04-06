@@ -163,7 +163,7 @@ export function EditSaleOptionsPanel({
 
                             <Input
                                 type="number"
-                                value={shippingCost === 0 ? "" : shippingCost}
+                                value={shippingCost === 0 ? "0" : shippingCost}
                                 onChange={(e) => {
                                     const raw = e.target.value.replace(/^0+(\d)/, "$1");
                                     const n = parseFloat(raw);

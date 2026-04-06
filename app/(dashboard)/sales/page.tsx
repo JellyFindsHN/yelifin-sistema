@@ -123,7 +123,7 @@ export default function SalesPage() {
   const router = useRouter();
   const { format } = useCurrency();
 
-  const [preset, setPreset]               = useState<Preset>("this_month");
+  const [preset, setPreset]               = useState<Preset>("7d");
   const [dateFrom, setDateFrom]           = useState("");
   const [dateTo, setDateTo]               = useState("");
   const [paymentFilter, setPaymentFilter] = useState<PaymentFilter>("all");

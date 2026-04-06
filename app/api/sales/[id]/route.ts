@@ -198,8 +198,12 @@ export async function PATCH(request: NextRequest, { params }: Params) {
         tax_rate,
         notes,
         customer_id,
-        account_id,   // ← ahora se lee del body
+        account_id,
       } = body;
+
+      console.log("Editando venta", {
+        newItems, discount, shipping_cost, tax_rate, notes, customer_id, account_id
+      });
 
       if (!newItems || !Array.isArray(newItems) || newItems.length === 0)
         return createErrorResponse("Se requiere al menos un producto", 400);
@@ -296,7 +300,9 @@ export async function PATCH(request: NextRequest, { params }: Params) {
       const globalDiscount = Number(discount ?? sale.discount) || 0;
       const itemDiscounts = processedItems.reduce((acc, i) => acc + i.discount, 0);
       const totalDiscount = globalDiscount + itemDiscounts;
-      const shippingAmount = Number(shipping_cost ?? sale.shipping_cost) || 0;
+      const shippingAmount = (shipping_cost !== undefined && shipping_cost !== null)
+        ? Number(shipping_cost)
+        : Number(sale.shipping_cost);
       const taxableBase = newSubtotal - totalDiscount;
       const taxAmount = taxRateNum > 0 ? taxableBase * taxRateNum / (100 + taxRateNum) : 0;
       const grandTotal = taxableBase + shippingAmount;
