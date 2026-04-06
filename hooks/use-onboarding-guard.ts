@@ -1,4 +1,3 @@
-// hooks/use-onboarding-guard.ts
 "use client";
 
 import { useEffect, useState } from "react";
@@ -12,29 +11,43 @@ export function useOnboardingGuard() {
 
   useEffect(() => {
     if (loading) return;
-    if (!firebaseUser) { setChecking(false); return; }
+
+    if (!firebaseUser) {
+      setChecking(false);
+      return;
+    }
 
     const check = async () => {
       try {
-        const token = await firebaseUser.getIdToken();
-        const res   = await fetch("/api/onboarding", {
+        await firebaseUser.reload();
+
+        if (!firebaseUser.emailVerified) {
+          router.replace("/verify-email");
+          return;
+        }
+
+        const token = await firebaseUser.getIdToken(true);
+        const res = await fetch("/api/onboarding", {
           headers: { Authorization: `Bearer ${token}` },
         });
-        if (!res.ok) { setChecking(false); return; }
+
+        if (!res.ok) return;
 
         const data = await res.json();
+
         if (!data?.data?.onboarding_completed) {
           router.replace("/onboarding");
+          return;
         }
       } catch {
-        // fail-open: si el check falla, dejar pasar
+        // fail-open
       } finally {
         setChecking(false);
       }
     };
 
     check();
-  }, [firebaseUser, loading]);
+  }, [firebaseUser, loading, router]);
 
   return { checking };
 }

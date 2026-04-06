@@ -21,7 +21,6 @@ export default function VerifyEmailPage() {
 
   useEffect(() => {
     if (loading) return;
-    // ✅ Redirige a onboarding (no a dashboard) después de verificar
     if (emailVerified) { router.push('/onboarding'); return; }
     if (!firebaseUser) { router.push('/login'); return; }
   }, [firebaseUser, loading, emailVerified, router]);
