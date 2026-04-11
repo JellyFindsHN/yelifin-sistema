@@ -132,6 +132,7 @@ export interface Product {
   created_at: string;
   updated_at: string;
   stock?: number;
+  is_service: boolean;
 }
 
 export interface ProductVariant {

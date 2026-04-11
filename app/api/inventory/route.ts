@@ -13,12 +13,12 @@ export async function GET(request: NextRequest) {
   try {
     const { userId } = auth.data;
 
-    // Inventario agrupado por producto con stock total y costo promedio ponderado
     const inventory = await sql`
       SELECT
         p.id             AS product_id,
         p.name           AS product_name,
         p.sku,
+        p.is_service,
         p.image_url,
         p.price,
         COALESCE(SUM(ib.qty_available), 0)::int                          AS stock,
@@ -42,7 +42,6 @@ export async function GET(request: NextRequest) {
       ORDER BY p.name ASC
     `;
 
-    // Estadísticas globales
     const totalStock = inventory.reduce((acc: number, i: any) => acc + Number(i.stock), 0);
     const totalValue = inventory.reduce((acc: number, i: any) => acc + Number(i.total_value), 0);
     const lowStock = inventory.filter((i: any) => Number(i.stock) > 0 && Number(i.stock) < 10).length;

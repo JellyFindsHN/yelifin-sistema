@@ -97,7 +97,7 @@ export default function SaleDetailPage({ params }: Props) {
       await cancelSale();
       toast.success("Venta cancelada · stock devuelto");
       setCancelOpen(false);
-      router.refresh();
+      router.push("/sales");
     } catch (err: any) {
       toast.error(err.message || "Error al cancelar la venta");
     }

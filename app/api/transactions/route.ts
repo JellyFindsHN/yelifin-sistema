@@ -103,7 +103,7 @@ export async function POST(request: NextRequest) {
     const {
       type, account_id, to_account_id, amount,
       category, description, occurred_at,
-      reference_type, reference_id,       // ← nuevos
+      reference_type, reference_id, 
     } = body;
 
     if (!type || !["INCOME", "EXPENSE", "TRANSFER"].includes(type))

@@ -31,7 +31,7 @@ export default function LoginPage() {
             <div className="w-10 h-10 bg-primary rounded-lg flex items-center justify-center shadow-lg shadow-primary/50">
               <Zap className="w-6 h-6 text-primary-foreground" />
             </div>
-            <span className="text-2xl font-bold text-primary">Nexly</span>
+            <span className="text-2xl font-bold text-primary">Konta</span>
           </Link>
 
           {/* Header */}

@@ -15,6 +15,7 @@ type InventoryItem = {
   stock: number;
   avg_unit_cost: number;
   total_value: number;
+  is_service: boolean;
 };
 
 type InventoryStats = {

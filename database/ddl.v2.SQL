@@ -1,24 +1,24 @@
 -- ============================================
--- NEXLY - SISTEMA DE GESTIÓN PARA EMPRENDEDORES
--- Base de datos: nexly_db
+--  - SISTEMA DE GESTIÓN PARA EMPRENDEDORES
+-- Base de datos: _db
 -- Versión: 1.0.0
 -- Fecha: 2026-01-30
 -- ============================================
 
--- Conectar a la base de datos por defecto para poder eliminar nexly_db
+-- Conectar a la base de datos por defecto para poder eliminar _db
 \c postgres
 
 -- Terminar todas las conexiones activas a la base de datos
 SELECT pg_terminate_backend(pg_stat_activity.pid)
 FROM pg_stat_activity
-WHERE pg_stat_activity.datname = 'nexly_db'
+WHERE pg_stat_activity.datname = '_db'
 AND pid <> pg_backend_pid();
 
 -- Eliminar la base de datos si existe
-DROP DATABASE IF EXISTS nexly_db;
+DROP DATABASE IF EXISTS _db;
 
 -- Crear la base de datos
-CREATE DATABASE nexly_db
+CREATE DATABASE _db
     WITH 
     ENCODING = 'UTF8'
     LC_COLLATE = 'en_US.UTF-8'
@@ -26,7 +26,7 @@ CREATE DATABASE nexly_db
     TEMPLATE = template0;
 
 -- Conectar a la nueva base de datos
-\c nexly_db
+\c _db
 
 -- Configurar timezone
 SET timezone = 'America/Tegucigalpa';

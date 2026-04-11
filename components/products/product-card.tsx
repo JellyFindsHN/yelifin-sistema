@@ -21,7 +21,10 @@ const formatCurrency = (value: number) =>
     minimumFractionDigits: 0,
   }).format(value);
 
-const getStockBadge = (stock: number = 0) => {
+const getStockBadge = (stock: number = 0, is_service: boolean) => {
+  if (is_service) {
+    return <Badge className="bg-blue-100 text-blue-700 border-blue-200 text-[10px] px-1.5 py-0">Servicio</Badge>;
+  }
   if (stock > 10)
     return <Badge className="bg-green-100 text-green-700 border-green-200 text-[10px] px-1.5 py-0">{stock} uds</Badge>;
   if (stock >= 5)
@@ -78,7 +81,7 @@ export function ProductCard({ product, onEdit, onDelete, onAddInventory }: Props
                   <p className="text-[11px] text-muted-foreground font-mono mt-0.5">{product.sku}</p>
                 )}
               </div>
-              {getStockBadge(product.stock)}
+              {getStockBadge(product.stock, product.is_service)}
             </div>
 
             <div className="flex items-center justify-between mt-2">

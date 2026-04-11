@@ -78,7 +78,7 @@ export function RegisterForm() {
       }
 
       toast.success(
-        "¡Bienvenido a Nexly! Tu prueba gratuita de 30 días ha comenzado.",
+        "¡Bienvenido a ! Tu prueba gratuita de 30 días ha comenzado.",
         { duration: 5000 }
       );
 

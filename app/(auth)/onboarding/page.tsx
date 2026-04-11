@@ -131,7 +131,7 @@ export default function OnboardingPage() {
             const data = await res.json().catch(() => ({}));
             if (!res.ok) throw new Error(data?.error || "Error al guardar");
 
-            toast.success("¡Todo listo! Bienvenido a Nexly 🎉");
+            toast.success("¡Todo listo! Bienvenido a Konta 🎉");
             await mutate(() => true, undefined, { revalidate: true });
             router.push("/dashboard");
         } catch (err: any) {
@@ -157,7 +157,7 @@ export default function OnboardingPage() {
                             <div className="w-9 h-9 sm:w-10 sm:h-10 bg-primary rounded-lg flex items-center justify-center shadow-lg shadow-primary/50">
                                 <Zap className="w-5 h-5 sm:w-6 sm:h-6 text-primary-foreground" />
                             </div>
-                            <span className="text-xl sm:text-2xl font-bold text-primary">Nexly</span>
+                            <span className="text-xl sm:text-2xl font-bold text-primary">Konta</span>
                         </div>
 
                         {/* Progress */}

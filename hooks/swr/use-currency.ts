@@ -4,7 +4,7 @@
 import { useEffect, useState } from "react";
 import { useAuth } from "@/hooks/use-auth";
 
-const CACHE_KEY = "nexly_currency";
+const CACHE_KEY = "_currency";
 const DEFAULT   = "HNL";
 
 // Símbolo por código

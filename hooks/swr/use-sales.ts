@@ -199,7 +199,6 @@ export function useCreateSale() {
 
 export function usePatchSale(id: number | null) {
   const authFetch                     = useAuthFetch();
-  const { mutate: mutateSales }       = useSales();
   const { mutate: globalMutate }      = useSWRConfig();
   const [isPatching, setIsPatching]   = useState(false);
 
@@ -237,4 +236,41 @@ export function usePatchSale(id: number | null) {
     patchSale({ action: 'edit', ...data });
 
   return { confirmSale, cancelSale, editSale, isPatching };
+}
+
+
+export function useDeleteSale() {
+  const authFetch                   = useAuthFetch();
+  const { mutate: globalMutate }    = useSWRConfig();
+  const [isDeleting, setIsDeleting] = useState(false);
+
+  const deleteSale = async (id: number) => {
+    setIsDeleting(true);
+    try {
+      const result = await authFetch(`${KEY}/${id}`, {
+        method: "DELETE",
+      });
+
+      await globalMutate(
+        (key) =>
+          typeof key === "string" && (
+            key.startsWith("/api/sales") ||
+            key.startsWith("/api/accounts") ||
+            key.startsWith("/api/finances") ||
+            key.startsWith("/api/dashboard") ||
+            key.startsWith("/api/transactions") ||
+            key.startsWith("/api/customers") ||
+            key.startsWith("/api/inventory")
+          ),
+        undefined,
+        { revalidate: true }
+      );
+
+      return result;
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
+  return { deleteSale, isDeleting };
 }

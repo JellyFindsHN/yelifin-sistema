@@ -119,7 +119,7 @@ export async function POST(request: NextRequest) {
       customer_id, items, discount, shipping_cost,
       tax_rate, payment_method, account_id, notes,
       sold_at, supplies_used, event_id,
-      status = "COMPLETED",   // ← nuevo: PENDING o COMPLETED
+      status = "COMPLETED",
     } = body;
 
     // ── Validaciones ────────────────────────────────────────────────────
@@ -157,10 +157,33 @@ export async function POST(request: NextRequest) {
       if (!ev) return createErrorResponse("Evento no encontrado", 404);
     }
 
-    // ── FIFO ────────────────────────────────────────────────────────────
+    // ── FIFO (solo para productos, servicios se saltan) ─────────────────
     const processedItems: any[] = [];
 
     for (const item of items) {
+      const [product] = await sql`
+        SELECT id, name, is_service FROM products
+        WHERE id = ${item.product_id} AND user_id = ${userId}
+      `;
+      if (!product) return createErrorResponse(`Producto #${item.product_id} no encontrado`, 404);
+
+      if (product.is_service) {
+        // Servicio: sin inventario, costo = 0
+        processedItems.push({
+          product_id:    item.product_id,
+          variant_id:    item.variant_id ?? null,
+          quantity:      item.quantity,
+          unit_price:    item.unit_price,
+          unit_cost:     0,
+          item_discount: item.discount ?? 0,
+          line_total:    item.unit_price * item.quantity - (item.discount ?? 0),
+          batches:       [],
+          is_service:    true,
+        });
+        continue;
+      }
+
+      // Producto físico: FIFO normal
       const batches = await sql`
         SELECT id, qty_available, unit_cost
         FROM inventory_batches
@@ -170,9 +193,8 @@ export async function POST(request: NextRequest) {
 
       const totalAvailable = batches.reduce((acc: number, b: any) => acc + Number(b.qty_available), 0);
       if (totalAvailable < item.quantity) {
-        const [product] = await sql`SELECT name FROM products WHERE id = ${item.product_id}`;
         return createErrorResponse(
-          `Stock insuficiente para "${product?.name}". Disponible: ${totalAvailable}`, 400
+          `Stock insuficiente para "${product.name}". Disponible: ${totalAvailable}`, 400
         );
       }
 
@@ -194,6 +216,7 @@ export async function POST(request: NextRequest) {
         item_discount: item.discount ?? 0,
         line_total:    item.unit_price * item.quantity - (item.discount ?? 0),
         batches,
+        is_service:    false,
       });
     }
 
@@ -258,7 +281,7 @@ export async function POST(request: NextRequest) {
       `;
       const saleId = sale.id as number;
 
-      // 2. Items + FIFO (SIEMPRE se descuenta inventario)
+      // 2. Items + FIFO solo para productos físicos
       for (const item of processedItems) {
         await sql`
           INSERT INTO sale_items (
@@ -270,30 +293,32 @@ export async function POST(request: NextRequest) {
           )
         `;
 
-        let remaining = item.quantity;
-        for (const batch of item.batches) {
-          if (remaining <= 0) break;
-          const take = Math.min(remaining, Number(batch.qty_available));
-          await sql`
-            UPDATE inventory_batches
-            SET qty_available = qty_available - ${take}
-            WHERE id = ${batch.id} AND user_id = ${userId}
-          `;
-          remaining -= take;
-        }
+        if (!item.is_service) {
+          let remaining = item.quantity;
+          for (const batch of item.batches) {
+            if (remaining <= 0) break;
+            const take = Math.min(remaining, Number(batch.qty_available));
+            await sql`
+              UPDATE inventory_batches
+              SET qty_available = qty_available - ${take}
+              WHERE id = ${batch.id} AND user_id = ${userId}
+            `;
+            remaining -= take;
+          }
 
-        await sql`
-          INSERT INTO inventory_movements (
-            user_id, movement_type, product_id, variant_id,
-            quantity, reference_type, reference_id
-          ) VALUES (
-            ${userId}, 'OUT', ${item.product_id}, ${item.variant_id},
-            ${item.quantity}, 'SALE', ${saleId}
-          )
-        `;
+          await sql`
+            INSERT INTO inventory_movements (
+              user_id, movement_type, product_id, variant_id,
+              quantity, reference_type, reference_id
+            ) VALUES (
+              ${userId}, 'OUT', ${item.product_id}, ${item.variant_id},
+              ${item.quantity}, 'SALE', ${saleId}
+            )
+          `;
+        }
       }
 
-      // 3. Suministros (SIEMPRE)
+      // 3. Suministros
       for (const s of normalizedSupplies) {
         await sql`
           INSERT INTO sale_supplies (user_id, sale_id, supply_id, quantity, unit_cost, line_total)
@@ -333,7 +358,9 @@ export async function POST(request: NextRequest) {
         if (customer_id) {
           await sql`
             UPDATE customers
-            SET total_orders = total_orders + 1, total_spent = total_spent + ${grandTotal}, updated_at = CURRENT_TIMESTAMP
+            SET total_orders = total_orders + 1,
+                total_spent  = total_spent + ${grandTotal},
+                updated_at   = CURRENT_TIMESTAMP
             WHERE id = ${customer_id} AND user_id = ${userId}
           `;
         }

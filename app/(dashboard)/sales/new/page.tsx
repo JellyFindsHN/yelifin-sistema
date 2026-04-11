@@ -4,10 +4,9 @@
 import { useState, useMemo, useEffect, useCallback, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import {
-  ArrowLeft, Search, AlertTriangle, X,
+  ArrowLeft, AlertTriangle, 
   ChevronRight, ShoppingCart, ArrowRight,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -93,13 +92,13 @@ function NewSaleContent() {
   const cancelExit = () => { setExitDialog(false); setPendingHref(null); };
 
   const availableProducts = useMemo(
-    () => products.filter((p) =>
-      (p.stock ?? 0) > 0 &&
-      (p.name.toLowerCase().includes(search.toLowerCase()) ||
-        (p.sku?.toLowerCase().includes(search.toLowerCase()) ?? false))
-    ),
-    [products, search]
-  );
+  () => products.filter((p) =>
+    (p.is_service || (p.stock ?? 0) > 0) &&
+    (p.name.toLowerCase().includes(search.toLowerCase()) ||
+      (p.sku?.toLowerCase().includes(search.toLowerCase()) ?? false))
+  ),
+  [products, search]
+);
 
   // ── Carrito ────────────────────────────────────────────────────────
   const addToCart = (product: any) => {
@@ -172,7 +171,7 @@ function NewSaleContent() {
         payment_method: paymentMethod as any,
         account_id: accountId,
         notes: notes || undefined,
-        status: isPending ? "PENDING" : "COMPLETED",  // ← nuevo
+        status: isPending ? "PENDING" : "COMPLETED",
         supplies_used: suppliesUsed.length > 0
           ? suppliesUsed.map((s) => ({ supply_id: s.supply_id, quantity: s.quantity, unit_cost: s.unit_cost }))
           : undefined,
@@ -243,7 +242,7 @@ function NewSaleContent() {
           <SearchBar value={search} onChange={setSearch} />
         </div>
 
-        <div className="flex-1 overflow-y-auto px-4 pt-3 pb-4" style={{ scrollbarWidth: "none" } as React.CSSProperties}>
+        <div className="flex-1 overflow-y-auto px-4 pt-3 pb-15" style={{ scrollbarWidth: "none" } as React.CSSProperties}>
           <PosProductGrid products={availableProducts} cart={cart} onAdd={addToCart} search={search} />
         </div>
 

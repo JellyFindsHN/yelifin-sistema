@@ -7,7 +7,6 @@ const sql = neon(process.env.DATABASE_URL!);
 
 type Params = { params: Promise<{ id: string }> };
 
-// ── GET /api/sales/[id] ────────────────────────────────────────────────
 export async function GET(request: NextRequest, { params }: Params) {
   const auth = await verifyAuth(request);
   if (!isAuthSuccess(auth)) return createErrorResponse(auth.error, auth.status);
@@ -55,7 +54,6 @@ export async function GET(request: NextRequest, { params }: Params) {
   }
 }
 
-// ── PATCH /api/sales/[id] ──────────────────────────────────────────────
 export async function PATCH(request: NextRequest, { params }: Params) {
   const auth = await verifyAuth(request);
   if (!isAuthSuccess(auth)) return createErrorResponse(auth.error, auth.status);
@@ -91,7 +89,7 @@ export async function PATCH(request: NextRequest, { params }: Params) {
         : txParts[0];
 
       const refType = sale.event_id ? "EVENT" : "SALE";
-      const refId = sale.event_id ? sale.event_id : saleId;
+      const refId   = sale.event_id ? sale.event_id : saleId;
 
       await sql`BEGIN`;
       try {
@@ -132,13 +130,18 @@ export async function PATCH(request: NextRequest, { params }: Params) {
     // ── CANCEL ───────────────────────────────────────────────────────
     if (action === "cancel") {
       const items = await sql`
-        SELECT product_id, variant_id, quantity FROM sale_items
-        WHERE sale_id = ${saleId} AND user_id = ${userId}
+        SELECT si.product_id, si.variant_id, si.quantity, p.is_service
+        FROM sale_items si
+        JOIN products p ON p.id = si.product_id
+        WHERE si.sale_id = ${saleId} AND si.user_id = ${userId}
       `;
 
       await sql`BEGIN`;
       try {
         for (const item of items) {
+          // Servicios no tocan inventario
+          if (item.is_service) continue;
+
           const [lastBatch] = await sql`
             SELECT id FROM inventory_batches
             WHERE user_id = ${userId} AND product_id = ${item.product_id}
@@ -172,8 +175,11 @@ export async function PATCH(request: NextRequest, { params }: Params) {
             WHERE id = ${s.supply_id} AND user_id = ${userId}
           `;
           await sql`
-            INSERT INTO supply_movements (user_id, movement_type, supply_id, quantity, reference_type, reference_id)
-            VALUES (${userId}, 'IN', ${s.supply_id}, ${s.quantity}, 'SALE_CANCELLED', ${saleId})
+            INSERT INTO supply_movements (
+              user_id, movement_type, supply_id, quantity, reference_type, reference_id
+            ) VALUES (
+              ${userId}, 'IN', ${s.supply_id}, ${s.quantity}, 'SALE_CANCELLED', ${saleId}
+            )
           `;
         }
 
@@ -182,7 +188,10 @@ export async function PATCH(request: NextRequest, { params }: Params) {
         await sql`DELETE FROM sales         WHERE id      = ${saleId} AND user_id = ${userId}`;
 
         await sql`COMMIT`;
-        return Response.json({ message: "Venta cancelada y stock devuelto", data: { id: saleId, status: "CANCELLED" } });
+        return Response.json({
+          message: "Venta cancelada y stock devuelto",
+          data: { id: saleId, status: "CANCELLED" },
+        });
       } catch (e) {
         await sql`ROLLBACK`;
         throw e;
@@ -201,10 +210,6 @@ export async function PATCH(request: NextRequest, { params }: Params) {
         account_id,
       } = body;
 
-      console.log("Editando venta", {
-        newItems, discount, shipping_cost, tax_rate, notes, customer_id, account_id
-      });
-
       if (!newItems || !Array.isArray(newItems) || newItems.length === 0)
         return createErrorResponse("Se requiere al menos un producto", 400);
 
@@ -212,7 +217,6 @@ export async function PATCH(request: NextRequest, { params }: Params) {
       if (![0, 15, 18].includes(taxRateNum))
         return createErrorResponse("El porcentaje de impuesto debe ser 0, 15 o 18", 400);
 
-      // Validar cuenta si se está cambiando
       if (account_id && account_id !== sale.account_id) {
         const [account] = await sql`
           SELECT id FROM accounts WHERE id = ${account_id} AND user_id = ${userId} AND is_active = TRUE
@@ -220,100 +224,128 @@ export async function PATCH(request: NextRequest, { params }: Params) {
         if (!account) return createErrorResponse("Cuenta de destino no encontrada", 404);
       }
 
+      // Traer items actuales con is_service
       const currentItems = await sql`
-        SELECT product_id, variant_id, quantity FROM sale_items
-        WHERE sale_id = ${saleId} AND user_id = ${userId}
+        SELECT si.product_id, si.variant_id, si.quantity, p.is_service
+        FROM sale_items si
+        JOIN products p ON p.id = si.product_id
+        WHERE si.sale_id = ${saleId} AND si.user_id = ${userId}
       `;
 
-      const currentMap = new Map<number, number>();
-      for (const i of currentItems) currentMap.set(Number(i.product_id), Number(i.quantity));
+      const currentMap = new Map<number, { quantity: number; is_service: boolean }>();
+      for (const i of currentItems) {
+        currentMap.set(Number(i.product_id), {
+          quantity: Number(i.quantity),
+          is_service: Boolean(i.is_service),
+        });
+      }
 
       const newMap = new Map<number, { quantity: number; unit_price: number; discount: number }>();
-      for (const i of newItems) newMap.set(Number(i.product_id), {
-        quantity: Number(i.quantity),
-        unit_price: Number(i.unit_price),
-        discount: Number(i.discount ?? 0),
-      });
+      for (const i of newItems) {
+        newMap.set(Number(i.product_id), {
+          quantity:   Number(i.quantity),
+          unit_price: Number(i.unit_price),
+          discount:   Number(i.discount ?? 0),
+        });
+      }
 
-      // Validar stock para aumentos
+      // Validar stock solo para productos físicos con aumento de cantidad
       for (const [productId, newData] of newMap.entries()) {
-        const currentQty = currentMap.get(productId) ?? 0;
-        const delta = newData.quantity - currentQty;
-        if (delta > 0) {
-          const batches = await sql`
-            SELECT COALESCE(SUM(qty_available), 0)::int AS available
-            FROM inventory_batches
-            WHERE user_id = ${userId} AND product_id = ${productId}
-          `;
-          const available = Number(batches[0]?.available ?? 0);
-          if (available < delta) {
-            const [product] = await sql`SELECT name FROM products WHERE id = ${productId}`;
-            return createErrorResponse(
-              `Stock insuficiente para "${product?.name}". Disponible: ${available}`, 400
-            );
-          }
+        const current    = currentMap.get(productId);
+        const currentQty = current?.quantity ?? 0;
+        const isService  = current?.is_service ?? false;
+        const delta      = newData.quantity - currentQty;
+
+        if (isService || delta <= 0) continue;
+
+        // Verificar si el nuevo producto es servicio
+        const [product] = await sql`
+          SELECT name, is_service FROM products WHERE id = ${productId} AND user_id = ${userId}
+        `;
+        if (product?.is_service) continue;
+
+        const [batches] = await sql`
+          SELECT COALESCE(SUM(qty_available), 0)::int AS available
+          FROM inventory_batches
+          WHERE user_id = ${userId} AND product_id = ${productId}
+        `;
+        const available = Number(batches?.available ?? 0);
+        if (available < delta) {
+          return createErrorResponse(
+            `Stock insuficiente para "${product?.name}". Disponible: ${available}`, 400
+          );
         }
       }
 
-      // Recalcular costos FIFO
+      // Recalcular costos FIFO (servicios siempre unit_cost = 0)
       const processedItems: any[] = [];
       for (const [productId, data] of newMap.entries()) {
-        const currentQty = currentMap.get(productId) ?? 0;
-        const delta = data.quantity - currentQty;
+        const [product] = await sql`
+          SELECT is_service FROM products WHERE id = ${productId} AND user_id = ${userId}
+        `;
+        const isService = Boolean(product?.is_service);
+
+        const current    = currentMap.get(productId);
+        const currentQty = current?.quantity ?? 0;
+        const delta      = data.quantity - currentQty;
 
         let unitCost = 0;
-        if (delta === 0) {
-          const [existing] = await sql`
-            SELECT unit_cost FROM sale_items
-            WHERE sale_id = ${saleId} AND product_id = ${productId} AND user_id = ${userId}
-          `;
-          unitCost = Number(existing?.unit_cost ?? 0);
-        } else {
-          const batches = await sql`
-            SELECT id, qty_available, unit_cost FROM inventory_batches
-            WHERE user_id = ${userId} AND product_id = ${productId} AND qty_available > 0
-            ORDER BY received_at ASC
-          `;
-          let remaining = data.quantity;
-          let totalCost = 0;
-          for (const batch of batches) {
-            if (remaining <= 0) break;
-            const take = Math.min(remaining, Number(batch.qty_available));
-            totalCost += take * Number(batch.unit_cost);
-            remaining -= take;
+
+        if (!isService) {
+          if (delta === 0) {
+            const [existing] = await sql`
+              SELECT unit_cost FROM sale_items
+              WHERE sale_id = ${saleId} AND product_id = ${productId} AND user_id = ${userId}
+            `;
+            unitCost = Number(existing?.unit_cost ?? 0);
+          } else {
+            const batches = await sql`
+              SELECT id, qty_available, unit_cost FROM inventory_batches
+              WHERE user_id = ${userId} AND product_id = ${productId} AND qty_available > 0
+              ORDER BY received_at ASC
+            `;
+            let remaining = data.quantity;
+            let totalCost = 0;
+            for (const batch of batches) {
+              if (remaining <= 0) break;
+              const take  = Math.min(remaining, Number(batch.qty_available));
+              totalCost  += take * Number(batch.unit_cost);
+              remaining  -= take;
+            }
+            unitCost = data.quantity > 0 ? totalCost / data.quantity : 0;
           }
-          unitCost = data.quantity > 0 ? totalCost / data.quantity : 0;
         }
 
         processedItems.push({
           product_id: productId,
-          quantity: data.quantity,
+          quantity:   data.quantity,
           unit_price: data.unit_price,
-          unit_cost: unitCost,
-          discount: data.discount,
+          unit_cost:  unitCost,
+          discount:   data.discount,
           line_total: data.unit_price * data.quantity - data.discount,
           delta,
+          is_service: isService,
         });
       }
 
-      const newSubtotal = processedItems.reduce((acc, i) => acc + i.unit_price * i.quantity, 0);
+      const newSubtotal    = processedItems.reduce((acc, i) => acc + i.unit_price * i.quantity, 0);
       const globalDiscount = Number(discount ?? sale.discount) || 0;
-      const itemDiscounts = processedItems.reduce((acc, i) => acc + i.discount, 0);
-      const totalDiscount = globalDiscount + itemDiscounts;
+      const itemDiscounts  = processedItems.reduce((acc, i) => acc + i.discount, 0);
+      const totalDiscount  = globalDiscount + itemDiscounts;
       const shippingAmount = (shipping_cost !== undefined && shipping_cost !== null)
         ? Number(shipping_cost)
         : Number(sale.shipping_cost);
       const taxableBase = newSubtotal - totalDiscount;
-      const taxAmount = taxRateNum > 0 ? taxableBase * taxRateNum / (100 + taxRateNum) : 0;
-      const grandTotal = taxableBase + shippingAmount;
-
-      // Cuenta final a usar
+      const taxAmount   = taxRateNum > 0 ? taxableBase * taxRateNum / (100 + taxRateNum) : 0;
+      const grandTotal  = taxableBase + shippingAmount;
       const finalAccountId = account_id ?? sale.account_id;
 
       await sql`BEGIN`;
       try {
-        // Ajustar inventario
+        // Ajustar inventario solo para productos físicos
         for (const item of processedItems) {
+          if (item.is_service) continue;
+
           if (item.delta > 0) {
             const batches = await sql`
               SELECT id, qty_available FROM inventory_batches
@@ -331,8 +363,11 @@ export async function PATCH(request: NextRequest, { params }: Params) {
               remaining -= take;
             }
             await sql`
-              INSERT INTO inventory_movements (user_id, movement_type, product_id, quantity, reference_type, reference_id)
-              VALUES (${userId}, 'OUT', ${item.product_id}, ${item.delta}, 'SALE', ${saleId})
+              INSERT INTO inventory_movements (
+                user_id, movement_type, product_id, quantity, reference_type, reference_id
+              ) VALUES (
+                ${userId}, 'OUT', ${item.product_id}, ${item.delta}, 'SALE', ${saleId}
+              )
             `;
           } else if (item.delta < 0) {
             const [lastBatch] = await sql`
@@ -342,20 +377,24 @@ export async function PATCH(request: NextRequest, { params }: Params) {
             `;
             if (lastBatch) {
               await sql`
-                UPDATE inventory_batches SET qty_available = qty_available + ${Math.abs(item.delta)}
+                UPDATE inventory_batches
+                SET qty_available = qty_available + ${Math.abs(item.delta)}
                 WHERE id = ${lastBatch.id} AND user_id = ${userId}
               `;
             }
             await sql`
-              INSERT INTO inventory_movements (user_id, movement_type, product_id, quantity, reference_type, reference_id)
-              VALUES (${userId}, 'IN', ${item.product_id}, ${Math.abs(item.delta)}, 'SALE_EDITED', ${saleId})
+              INSERT INTO inventory_movements (
+                user_id, movement_type, product_id, quantity, reference_type, reference_id
+              ) VALUES (
+                ${userId}, 'IN', ${item.product_id}, ${Math.abs(item.delta)}, 'SALE_EDITED', ${saleId}
+              )
             `;
           }
         }
 
-        // Devolver stock de productos eliminados
-        for (const [productId, currentQty] of currentMap.entries()) {
-          if (!newMap.has(productId)) {
+        // Devolver stock de productos eliminados (solo físicos)
+        for (const [productId, current] of currentMap.entries()) {
+          if (!newMap.has(productId) && !current.is_service) {
             const [lastBatch] = await sql`
               SELECT id FROM inventory_batches
               WHERE user_id = ${userId} AND product_id = ${productId}
@@ -363,13 +402,17 @@ export async function PATCH(request: NextRequest, { params }: Params) {
             `;
             if (lastBatch) {
               await sql`
-                UPDATE inventory_batches SET qty_available = qty_available + ${currentQty}
+                UPDATE inventory_batches
+                SET qty_available = qty_available + ${current.quantity}
                 WHERE id = ${lastBatch.id} AND user_id = ${userId}
               `;
             }
             await sql`
-              INSERT INTO inventory_movements (user_id, movement_type, product_id, quantity, reference_type, reference_id)
-              VALUES (${userId}, 'IN', ${productId}, ${currentQty}, 'SALE_EDITED', ${saleId})
+              INSERT INTO inventory_movements (
+                user_id, movement_type, product_id, quantity, reference_type, reference_id
+              ) VALUES (
+                ${userId}, 'IN', ${productId}, ${current.quantity}, 'SALE_EDITED', ${saleId}
+              )
             `;
           }
         }
@@ -378,15 +421,19 @@ export async function PATCH(request: NextRequest, { params }: Params) {
         await sql`DELETE FROM sale_items WHERE sale_id = ${saleId} AND user_id = ${userId}`;
         for (const item of processedItems) {
           await sql`
-            INSERT INTO sale_items (user_id, sale_id, product_id, quantity, unit_price, unit_cost, line_total)
-            VALUES (${userId}, ${saleId}, ${item.product_id}, ${item.quantity}, ${item.unit_price}, ${item.unit_cost}, ${item.line_total})
+            INSERT INTO sale_items (
+              user_id, sale_id, product_id, quantity, unit_price, unit_cost, line_total
+            ) VALUES (
+              ${userId}, ${saleId}, ${item.product_id}, ${item.quantity},
+              ${item.unit_price}, ${item.unit_cost}, ${item.line_total}
+            )
           `;
         }
 
-        // Actualizar cabecera — ahora incluye account_id
+        // Actualizar cabecera
         await sql`
           UPDATE sales SET
-            customer_id   = ${customer_id ?? sale.customer_id},
+            customer_id    = ${customer_id ?? sale.customer_id},
             payment_method = (
               SELECT CASE type
                 WHEN 'CASH'   THEN 'CASH'
@@ -394,7 +441,8 @@ export async function PATCH(request: NextRequest, { params }: Params) {
                 WHEN 'WALLET' THEN 'TRANSFER'
                 ELSE 'OTHER'
               END
-              FROM accounts WHERE id = ${finalAccountId} AND user_id = ${userId}),
+              FROM accounts WHERE id = ${finalAccountId} AND user_id = ${userId}
+            ),
             account_id    = ${finalAccountId},
             subtotal      = ${newSubtotal},
             discount      = ${totalDiscount},
@@ -427,5 +475,135 @@ export async function PATCH(request: NextRequest, { params }: Params) {
   } catch (error) {
     console.error(" PATCH /api/sales/[id]:", error);
     return createErrorResponse("Error al procesar la acción", 500);
+  }
+}
+
+export async function DELETE(request: NextRequest, { params }: Params) {
+  const auth = await verifyAuth(request);
+  if (!isAuthSuccess(auth)) return createErrorResponse(auth.error, auth.status);
+
+  try {
+    const { userId } = auth.data;
+    const { id } = await params;
+    const saleId = Number(id);
+
+    if (isNaN(saleId)) return createErrorResponse("ID inválido", 400);
+
+    const [sale] = await sql`
+      SELECT * FROM sales WHERE id = ${saleId} AND user_id = ${userId}
+    `;
+    if (!sale) return createErrorResponse("Venta no encontrada", 404);
+
+    if (sale.status === "CANCELLED")
+      return createErrorResponse("Esta venta ya fue cancelada", 400);
+
+    const items = await sql`
+      SELECT product_id, variant_id, quantity
+      FROM sale_items
+      WHERE sale_id = ${saleId} AND user_id = ${userId}
+    `;
+
+    const supplies = await sql`
+      SELECT supply_id, quantity
+      FROM sale_supplies
+      WHERE sale_id = ${saleId} AND user_id = ${userId}
+    `;
+
+    await sql`BEGIN`;
+    try {
+
+      // 1. Devolver stock de productos (FIFO inverso → último batch)
+      for (const item of items) {
+        const [lastBatch] = await sql`
+          SELECT id FROM inventory_batches
+          WHERE user_id = ${userId} AND product_id = ${item.product_id}
+          ORDER BY received_at DESC LIMIT 1
+        `;
+        if (lastBatch) {
+          await sql`
+            UPDATE inventory_batches
+            SET qty_available = qty_available + ${item.quantity}
+            WHERE id = ${lastBatch.id} AND user_id = ${userId}
+          `;
+        }
+        await sql`
+          INSERT INTO inventory_movements (
+            user_id, movement_type, product_id, variant_id,
+            quantity, reference_type, reference_id
+          ) VALUES (
+            ${userId}, 'IN', ${item.product_id}, ${item.variant_id},
+            ${item.quantity}, 'SALE_CANCELLED', ${saleId}
+          )
+        `;
+      }
+
+      // 2. Devolver stock de insumos
+      for (const s of supplies) {
+        await sql`
+          UPDATE supplies SET stock = stock + ${s.quantity}
+          WHERE id = ${s.supply_id} AND user_id = ${userId}
+        `;
+        await sql`
+          INSERT INTO supply_movements (
+            user_id, movement_type, supply_id,
+            quantity, reference_type, reference_id
+          ) VALUES (
+            ${userId}, 'IN', ${s.supply_id},
+            ${s.quantity}, 'SALE_CANCELLED', ${saleId}
+          )
+        `;
+      }
+
+      // 3. Si estaba COMPLETED: revertir transacción financiera y balance
+      if (sale.status === "COMPLETED") {
+        const [linkedTx] = await sql`
+          SELECT id, amount FROM transactions
+          WHERE user_id = ${userId}
+            AND reference_type = 'SALE'
+            AND reference_id   = ${saleId}
+        `;
+        if (linkedTx) {
+          await sql`
+            DELETE FROM transactions
+            WHERE id = ${linkedTx.id} AND user_id = ${userId}
+          `;
+          await sql`
+            UPDATE accounts
+            SET balance = balance - ${linkedTx.amount}
+            WHERE id = ${sale.account_id} AND user_id = ${userId}
+          `;
+        }
+
+        // 4. Revertir stats del cliente
+        if (sale.customer_id) {
+          await sql`
+            UPDATE customers
+            SET total_orders = GREATEST(total_orders - 1, 0),
+                total_spent  = GREATEST(total_spent - ${sale.total}, 0),
+                updated_at   = CURRENT_TIMESTAMP
+            WHERE id = ${sale.customer_id} AND user_id = ${userId}
+          `;
+        }
+      }
+
+      // 5. Eliminar items y la venta
+      await sql`DELETE FROM sale_supplies WHERE sale_id = ${saleId} AND user_id = ${userId}`;
+      await sql`DELETE FROM sale_items    WHERE sale_id = ${saleId} AND user_id = ${userId}`;
+      await sql`DELETE FROM sales         WHERE id      = ${saleId} AND user_id = ${userId}`;
+
+      await sql`COMMIT`;
+      return Response.json({
+        message: "Venta eliminada, inventario y balance revertidos",
+        data: { id: saleId },
+      });
+
+    } catch (e) {
+      await sql`ROLLBACK`;
+      throw e;
+    }
+
+  } catch (error) {
+    console.error("DELETE /api/sales/[id]:", error);
+    return createErrorResponse("Error al cancelar la venta", 500);
   }
 }

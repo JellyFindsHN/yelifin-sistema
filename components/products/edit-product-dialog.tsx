@@ -22,6 +22,7 @@ import { storage } from "@/lib/firebase";
 import { ref, uploadBytes, getDownloadURL, deleteObject } from "firebase/storage";
 import { Product } from "@/types";
 import Image from "next/image";
+import { is } from "date-fns/locale";
 
 const schema = z.object({
   name:        z.string().min(1, "El nombre es requerido"),
@@ -35,6 +36,7 @@ type FormData = z.infer<typeof schema>;
 type Props = {
   product:      Product | null;
   open:         boolean;
+  is_service:   boolean;
   onOpenChange: (open: boolean) => void;
   onSuccess:    () => void;
 };
@@ -73,7 +75,7 @@ async function deleteOldImage(imageUrl: string) {
 }
 
 // ── Componente ─────────────────────────────────────────────────────────
-export function EditProductDialog({ product, open, onOpenChange, onSuccess }: Props) {
+export function EditProductDialog({ product, open, onOpenChange, onSuccess, is_service }: Props) {
   const { firebaseUser }              = useAuth();
   const { updateProduct, isUpdating } = useUpdateProduct(product?.id ?? null);
   const { symbol }                    = useCurrency();
@@ -142,12 +144,12 @@ export function EditProductDialog({ product, open, onOpenChange, onSuccess }: Pr
       }
 
       await updateProduct({ ...data, image_url });
-      toast.success("Producto actualizado exitosamente");
+      toast.success(`${is_service ? "Servicio" : "Producto"} actualizado exitosamente`);
       onOpenChange(false);
       onSuccess();
     } catch (error: any) {
       setIsUploadingImage(false);
-      toast.error(error.message || "Error al actualizar el producto");
+      toast.error(error.message || "Error al actualizar el " + (is_service ? "servicio" : "producto"));
     }
   };
 
@@ -191,7 +193,7 @@ export function EditProductDialog({ product, open, onOpenChange, onSuccess }: Pr
         <DialogHeader className="shrink-0 px-5 pt-2 pb-3 sm:pt-5 border-b">
           <DialogTitle className="flex items-center gap-2 text-lg font-bold">
             <Pencil className="h-4 w-4 text-primary" />
-            Editar producto
+            Editar { is_service ? "servicio" : "producto" }
           </DialogTitle>
         </DialogHeader>
 

@@ -41,7 +41,10 @@ import { CreateTransactionModal } from "@/components/transactions/create-transac
 import { useAccounts } from "@/hooks/swr/use-accounts";
 
 // ── Helpers ────────────────────────────────────────────────────────────
-const getStockBadge = (stock: number) => {
+const getStockBadge = (stock: number, is_service: boolean) => {
+  if (is_service) {
+    return <Badge className="bg-blue-100 text-blue-700 border-blue-200">Servicio</Badge>;
+  }
   if (stock === 0) return <Badge variant="destructive">Agotado</Badge>;
   if (stock < 5) return <Badge variant="destructive">{stock} uds</Badge>;
   if (stock < 10) return <Badge className="bg-yellow-100 text-yellow-700 border-yellow-200">{stock} uds</Badge>;
@@ -55,7 +58,7 @@ export default function InventoryPage() {
   const { products, mutate: mutateProducts } = useProducts();
 
   const [search, setSearch] = useState("");
-  const [stockFilter, setStockFilter] = useState("all");
+  const [stockFilter, setStockFilter] = useState("in_stock");
 
   // Diálogos
   const [createOpen, setCreateOpen] = useState(false);
@@ -78,8 +81,10 @@ export default function InventoryPage() {
       (item.sku?.toLowerCase().includes(search.toLowerCase()) ?? false);
 
     const matchesStock =
+      stockFilter === "services" ? item.is_service :
+      stockFilter === "in_stock" ? item.stock > 0 || item.is_service :
       stockFilter === "all" ? true :
-        stockFilter === "out" ? item.stock === 0 :
+        stockFilter === "out" ? item.stock === 0 && !item.is_service :
           stockFilter === "low" ? item.stock > 0 && item.stock < 10 :
             item.stock >= 10;
 
@@ -91,6 +96,8 @@ export default function InventoryPage() {
     mutateInventory();
   };
 
+  console.log(inventory);
+
   // ── Actions menu ────────────────────────────────────────────────────
   const ActionsMenu = ({ item }: { item: typeof inventory[0] }) => (
     <DropdownMenu>
@@ -100,7 +107,9 @@ export default function InventoryPage() {
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end">
-        <DropdownMenuItem
+        {!item.is_service && (
+          <>
+           <DropdownMenuItem
           onClick={() => {
             const p = findProduct(item.product_id);
             if (p) setInventoryProduct(p);
@@ -119,6 +128,9 @@ export default function InventoryPage() {
           Ajuste de inventario
         </DropdownMenuItem>
         <DropdownMenuSeparator />
+          </>
+        )}
+       
         <DropdownMenuItem
           onClick={() => {
             const p = findProduct(item.product_id);
@@ -126,7 +138,7 @@ export default function InventoryPage() {
           }}
         >
           <Pencil className="h-4 w-4 mr-2" />
-          Editar producto
+          Editar {item.is_service ? "servicio" : "producto"}
         </DropdownMenuItem>
         <DropdownMenuItem
           className="text-destructive focus:text-destructive"
@@ -196,8 +208,10 @@ export default function InventoryPage() {
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">Todo el inventario</SelectItem>
+            <SelectItem value="in_stock">Con existencia</SelectItem>
             <SelectItem value="ok">Stock suficiente</SelectItem>
             <SelectItem value="low">Stock bajo</SelectItem>
+            <SelectItem value="services">Servicios</SelectItem>
             <SelectItem value="out">Agotados</SelectItem>
           </SelectContent>
         </Select>
@@ -250,11 +264,11 @@ export default function InventoryPage() {
                     <TableCell className="font-mono text-sm text-muted-foreground">
                       {item.sku ?? "—"}
                     </TableCell>
-                    <TableCell>{getStockBadge(item.stock)}</TableCell>
-                    <TableCell>{format(item.avg_unit_cost)}</TableCell>
+                    <TableCell>{getStockBadge(item.stock, item.is_service)}</TableCell>
+                    <TableCell>{item.is_service ? "—" : format(item.avg_unit_cost)}</TableCell>
                     <TableCell>{format(item.price)}</TableCell>
                     <TableCell className="text-right font-medium">
-                      {format(item.total_value)}
+                      {item.is_service ? format(item.price) : format(item.total_value)}
                     </TableCell>
                     <TableCell>
                       <ActionsMenu item={item} />
@@ -295,7 +309,7 @@ export default function InventoryPage() {
                     <div className="flex items-center justify-between gap-2">
                       <p className="font-medium truncate">{item.product_name}</p>
                       <div className="flex items-center gap-1 shrink-0">
-                        {getStockBadge(item.stock)}
+                        {getStockBadge(item.stock, item.is_service)}
                         <ActionsMenu item={item} />
                       </div>
                     </div>
@@ -307,7 +321,7 @@ export default function InventoryPage() {
                 <div className="grid grid-cols-3 gap-2 mt-3 pt-3 border-t text-center">
                   <div>
                     <p className="text-xs text-muted-foreground">Costo prom.</p>
-                    <p className="text-sm font-medium">{format(item.avg_unit_cost)}</p>
+                    <p className="text-sm font-medium">{ item.is_service ? "—" : format(item.avg_unit_cost)}</p>
                   </div>
                   <div>
                     <p className="text-xs text-muted-foreground">Precio venta</p>
@@ -315,7 +329,7 @@ export default function InventoryPage() {
                   </div>
                   <div>
                     <p className="text-xs text-muted-foreground">Valor total</p>
-                    <p className="text-sm font-bold text-primary">{format(item.total_value)}</p>
+                    <p className="text-sm font-bold text-primary">{ item.is_service ? format(item.price) : format(item.total_value)}</p>
                   </div>
                 </div>
               </CardContent>
@@ -341,6 +355,7 @@ export default function InventoryPage() {
         onSuccess={handleSuccess}
       />
       <EditProductDialog
+        is_service={editProduct?.is_service || false}
         product={editProduct}
         open={!!editProduct}
         onOpenChange={(open) => !open && setEditProduct(null)}

@@ -34,7 +34,7 @@ export function PosProductGrid({ products, cart, onAdd, search }: Props) {
   }
 
   return (
-    <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
+    <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5 mb-5">
       {products.map((product) => {
         const inCart = cart.find((i) => i.product_id === product.id);
         return (
@@ -60,9 +60,18 @@ export function PosProductGrid({ products, cart, onAdd, search }: Props) {
                 </div>
               )}
               <div className="absolute bottom-1.5 left-1.5">
-                <Badge className="text-[10px] bg-background/90 text-foreground border px-1.5">
-                  {product.stock} uds
-                </Badge>
+                {
+                  product.is_service ? (
+                    <Badge variant="outline" className="bg-blue-100 text-blue-700 border-blue-200text-xs">
+                      Servicio
+                    </Badge>
+                  ) : (
+                    <Badge className="bg-green-100 text-green-700 border-green-200 text-xs" variant="outline">
+                      Stock: {product.stock ?? 0}
+                    </Badge>
+                  )
+                }
+               
               </div>
             </div>
             <CardContent className="p-2.5 pt-0">

@@ -1,4 +1,3 @@
-// app/(dashboard)/sales/page.tsx
 "use client";
 
 import { useMemo, useState } from "react";
@@ -18,9 +17,9 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import {
-   Search, Receipt, Banknote, CreditCard, ArrowLeftRight,
+  Search, Receipt, Banknote, CreditCard, ArrowLeftRight,
   TrendingUp, DollarSign, ShoppingCart, HelpCircle, X,
-  CheckCircle, XCircle, Clock, Pencil, MoreVertical,
+  CheckCircle, XCircle, Clock, Pencil, MoreVertical, Trash2,
 } from "lucide-react";
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem,
@@ -28,8 +27,9 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { toast } from "sonner";
 import { SearchBar } from "@/components/shared/search-bar";
+import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 
-import { useSales, usePatchSale } from "@/hooks/swr/use-sales";
+import { useSales, usePatchSale, useDeleteSale, Sale } from "@/hooks/swr/use-sales";
 import { useAccounts } from "@/hooks/swr/use-accounts";
 
 // ── Utils ──────────────────────────────────────────────────────────────
@@ -38,16 +38,16 @@ const formatDateOnly = (dateString: string) =>
     year: "numeric", month: "short", day: "numeric",
   });
 
-type Preset = "today" | "7d" | "this_month" | "last_month" | "all";
+type Preset        = "today" | "7d" | "this_month" | "last_month" | "all";
 type PaymentFilter = "all" | "CASH" | "CARD" | "TRANSFER" | "MIXED" | "OTHER";
 type StatusFilter  = "all" | "COMPLETED" | "PENDING";
 
 const paymentConfig: Record<string, { label: string; icon: any }> = {
-  CASH:     { label: "Efectivo",       icon: Banknote },
-  CARD:     { label: "Tarjeta",        icon: CreditCard },
-  TRANSFER: { label: "Transferencia",  icon: ArrowLeftRight },
-  MIXED:    { label: "Mixto",          icon: HelpCircle },
-  OTHER:    { label: "Otro",           icon: HelpCircle },
+  CASH:     { label: "Efectivo",      icon: Banknote      },
+  CARD:     { label: "Tarjeta",       icon: CreditCard    },
+  TRANSFER: { label: "Transferencia", icon: ArrowLeftRight },
+  MIXED:    { label: "Mixto",         icon: HelpCircle    },
+  OTHER:    { label: "Otro",          icon: HelpCircle    },
 };
 
 const PRESET_LABELS: Record<Preset, string> = {
@@ -60,7 +60,7 @@ const PRESET_LABELS: Record<Preset, string> = {
 
 const getTaxRate = (v: any): number => Number(v) || 0;
 
-// ── Dropdown de acciones para venta pendiente ─────────────────────────
+// ── Acciones para venta PENDIENTE ─────────────────────────────────────
 function PendingActions({ saleId, onMutate }: { saleId: number; onMutate: () => void }) {
   const router = useRouter();
   const { confirmSale, cancelSale, isPatching } = usePatchSale(saleId);
@@ -119,17 +119,56 @@ function PendingActions({ saleId, onMutate }: { saleId: number; onMutate: () => 
   );
 }
 
-export default function SalesPage() {
+// ── Acciones para venta COMPLETADA ────────────────────────────────────
+function CompletedActions({
+  sale,
+  onDeleteRequest,
+}: {
+  sale: Sale;
+  onDeleteRequest: (sale: Sale) => void;
+}) {
   const router = useRouter();
+  return (
+    <div onClick={(e) => e.stopPropagation()}>
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button variant="ghost" size="icon" className="h-8 w-8">
+            <MoreVertical className="h-4 w-4" />
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end" className="w-44">
+          <DropdownMenuItem onClick={() => router.push(`/sales/${sale.id}`)}>
+            <Search className="h-4 w-4 mr-2" /> Ver detalle
+          </DropdownMenuItem>
+          <DropdownMenuSeparator />
+          <DropdownMenuItem
+            className="text-destructive focus:text-destructive focus:bg-destructive/10"
+            onClick={() => onDeleteRequest(sale)}
+          >
+            <Trash2 className="h-4 w-4 mr-2" /> Anular venta
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
+    </div>
+  );
+}
+
+// ── Page ──────────────────────────────────────────────────────────────
+export default function SalesPage() {
+  const router     = useRouter();
   const { format } = useCurrency();
 
-  const [preset, setPreset]               = useState<Preset>("7d");
-  const [dateFrom, setDateFrom]           = useState("");
-  const [dateTo, setDateTo]               = useState("");
-  const [paymentFilter, setPaymentFilter] = useState<PaymentFilter>("all");
-  const [accountFilter, setAccountFilter] = useState<string>("all");
-  const [search, setSearch]               = useState("");
-  const [statusFilter, setStatusFilter]   = useState<StatusFilter>("all");
+  const [preset,         setPreset]         = useState<Preset>("7d");
+  const [dateFrom,       setDateFrom]       = useState("");
+  const [dateTo,         setDateTo]         = useState("");
+  const [paymentFilter,  setPaymentFilter]  = useState<PaymentFilter>("all");
+  const [accountFilter,  setAccountFilter]  = useState<string>("all");
+  const [search,         setSearch]         = useState("");
+  const [statusFilter,   setStatusFilter]   = useState<StatusFilter>("all");
+
+  // Delete
+  const [deletingSale,   setDeletingSale]   = useState<Sale | null>(null);
+  const { deleteSale,    isDeleting }       = useDeleteSale();
 
   const { sales, isLoading, mutate } = useSales({
     preset,
@@ -140,7 +179,6 @@ export default function SalesPage() {
 
   const { accounts } = useAccounts();
 
-  // Para stats — sin filtro de estado
   const filteredForStats = useMemo(() => {
     const q = search.trim().toLowerCase();
     return sales.filter((s) => {
@@ -153,28 +191,46 @@ export default function SalesPage() {
     });
   }, [sales, search, accountFilter]);
 
-  // Para la lista — con filtro de estado
   const filtered = useMemo(() =>
     statusFilter === "all"
       ? filteredForStats
-      : filteredForStats.filter(s => s.status === statusFilter),
+      : filteredForStats.filter((s) => s.status === statusFilter),
   [filteredForStats, statusFilter]);
 
   const totalRevenue = useMemo(() =>
-    filteredForStats.filter(s => s.status === "COMPLETED").reduce((acc, s) => acc + Number(s.total), 0), [filteredForStats]);
-  const totalProfit = useMemo(() =>
-    filteredForStats.filter(s => s.status === "COMPLETED").reduce((acc, s) => acc + Number(s.net_profit), 0), [filteredForStats]);
-  const pendingCount = useMemo(() => filteredForStats.filter(s => s.status === "PENDING").length, [filteredForStats]);
+    filteredForStats.filter((s) => s.status === "COMPLETED")
+      .reduce((acc, s) => acc + Number(s.total), 0),
+  [filteredForStats]);
 
-  const hasFilters = dateFrom || dateTo || paymentFilter !== "all" || accountFilter !== "all" || statusFilter !== "all" || search;
-  const clearAll = () => { setDateFrom(""); setDateTo(""); setSearch(""); setPaymentFilter("all"); setAccountFilter("all"); setStatusFilter("all"); setPreset("this_month"); };
+  const totalProfit = useMemo(() =>
+    filteredForStats.filter((s) => s.status === "COMPLETED")
+      .reduce((acc, s) => acc + Number(s.net_profit), 0),
+  [filteredForStats]);
+
+  const pendingCount = useMemo(() =>
+    filteredForStats.filter((s) => s.status === "PENDING").length,
+  [filteredForStats]);
+
+  const hasFilters   = dateFrom || dateTo || paymentFilter !== "all" || accountFilter !== "all" || statusFilter !== "all" || search;
+  const clearAll     = () => { setDateFrom(""); setDateTo(""); setSearch(""); setPaymentFilter("all"); setAccountFilter("all"); setStatusFilter("all"); setPreset("this_month"); };
   const onChangePreset = (v: Preset) => { setPreset(v); setDateFrom(""); setDateTo(""); };
-  const onManualFrom   = (v: string) => { setDateFrom(v); setPreset("all"); };
-  const onManualTo     = (v: string) => { setDateTo(v);   setPreset("all"); };
+  const onManualFrom   = (v: string)  => { setDateFrom(v); setPreset("all"); };
+  const onManualTo     = (v: string)  => { setDateTo(v);   setPreset("all"); };
 
   const activePeriodLabel = dateFrom || dateTo
     ? [dateFrom && `Desde ${formatDateOnly(dateFrom)}`, dateTo && `Hasta ${formatDateOnly(dateTo)}`].filter(Boolean).join(" · ")
     : PRESET_LABELS[preset];
+
+  const handleDeleteConfirm = async () => {
+    if (!deletingSale) return;
+    try {
+      await deleteSale(deletingSale.id);
+      toast.success("Venta anulada · inventario y balance revertidos");
+      setDeletingSale(null);
+    } catch (err: any) {
+      toast.error(err.message || "Error al anular la venta");
+    }
+  };
 
   return (
     <div className="space-y-4 pb-24">
@@ -186,12 +242,17 @@ export default function SalesPage() {
           <p className="text-muted-foreground text-sm">
             {activePeriodLabel}
             {pendingCount > 0 && (
-              <span className="ml-1.5 text-amber-600 font-medium">· {pendingCount} pendiente{pendingCount !== 1 ? "s" : ""}</span>
+              <span className="ml-1.5 text-amber-600 font-medium">
+                · {pendingCount} pendiente{pendingCount !== 1 ? "s" : ""}
+              </span>
             )}
           </p>
         </div>
         <div className="text-right shrink-0 sm:hidden">
-          {isLoading ? <Skeleton className="h-8 w-10 ml-auto" /> : <p className="text-3xl font-bold">{filtered.length}</p>}
+          {isLoading
+            ? <Skeleton className="h-8 w-10 ml-auto" />
+            : <p className="text-3xl font-bold">{filtered.length}</p>
+          }
           <p className="text-xs text-muted-foreground">registros</p>
         </div>
       </div>
@@ -206,7 +267,7 @@ export default function SalesPage() {
             </div>
             {isLoading ? <Skeleton className="h-6 w-12" /> : (
               <div className="flex items-baseline gap-1.5">
-                <p className="text-lg font-bold">{filtered.filter(s => s.status === "COMPLETED").length}</p>
+                <p className="text-lg font-bold">{filtered.filter((s) => s.status === "COMPLETED").length}</p>
                 {pendingCount > 0 && <span className="text-xs text-amber-600">{pendingCount} pend.</span>}
               </div>
             )}
@@ -218,7 +279,10 @@ export default function SalesPage() {
               <span className="text-xs font-medium text-muted-foreground">Ingresos</span>
               <DollarSign className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
             </div>
-            {isLoading ? <Skeleton className="h-6 w-20" /> : <p className="text-base font-bold sm:text-lg truncate">{format(totalRevenue)}</p>}
+            {isLoading
+              ? <Skeleton className="h-6 w-20" />
+              : <p className="text-base font-bold sm:text-lg truncate">{format(totalRevenue)}</p>
+            }
           </CardContent>
         </Card>
         <Card className="pt-2 pb-2">
@@ -243,8 +307,6 @@ export default function SalesPage() {
 
       {/* Filtros */}
       <div className="space-y-2">
-      
-        {/* Buscador + Estado */}
         <div className="flex gap-2">
           <div className="relative flex-1">
             <SearchBar
@@ -256,9 +318,7 @@ export default function SalesPage() {
           </div>
           <div className="w-[38%] shrink-0">
             <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v as StatusFilter)}>
-              <SelectTrigger className="w-full h-9">
-                <SelectValue />
-              </SelectTrigger>
+              <SelectTrigger className="w-full h-9"><SelectValue /></SelectTrigger>
               <SelectContent position="popper" className="w-[--radix-select-trigger-width] min-w-0">
                 <SelectItem value="all">Todas</SelectItem>
                 <SelectItem value="COMPLETED">Completadas</SelectItem>
@@ -268,7 +328,6 @@ export default function SalesPage() {
           </div>
         </div>
 
-        {/* Período + Cuenta — 50/50 */}
         <div className="grid grid-cols-2 gap-2">
           <Select value={preset} onValueChange={(v) => onChangePreset(v as Preset)}>
             <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
@@ -291,9 +350,6 @@ export default function SalesPage() {
           </Select>
         </div>
 
-
-
-        {/* Fechas */}
         <div className="grid grid-cols-2 gap-2">
           <Input type="date" value={dateFrom} onChange={(e) => onManualFrom(e.target.value)} className="text-sm" />
           <Input type="date" value={dateTo}   onChange={(e) => onManualTo(e.target.value)}   className="text-sm" />
@@ -351,9 +407,14 @@ export default function SalesPage() {
                     </div>
                     {isPending
                       ? <PendingActions saleId={sale.id} onMutate={mutate} />
-                      : <Badge variant="outline" className="gap-1 text-xs shrink-0">
-                          <PayIcon className="h-3 w-3" /> {(sale as any).account_name}
-                        </Badge>
+                      : (
+                        <div className="flex items-center gap-1 shrink-0">
+                          <Badge variant="outline" className="gap-1 text-xs">
+                            <PayIcon className="h-3 w-3" /> {(sale as any).account_name}
+                          </Badge>
+                          <CompletedActions sale={sale} onDeleteRequest={setDeletingSale} />
+                        </div>
+                      )
                     }
                   </div>
                   <div className={`grid gap-1 pt-2 border-t text-center ${isPending ? "grid-cols-2" : "grid-cols-3"}`}>
@@ -368,7 +429,9 @@ export default function SalesPage() {
                     {!isPending && (
                       <div>
                         <p className="text-[10px] text-muted-foreground mb-0.5">Ganancia</p>
-                        <p className="text-sm font-bold text-green-600 truncate">{format(Number(sale.net_profit - sale.discount))}</p>
+                        <p className="text-sm font-bold text-green-600 truncate">
+                          {format(Number(sale.net_profit - sale.discount))}
+                        </p>
                       </div>
                     )}
                   </div>
@@ -440,14 +503,18 @@ export default function SalesPage() {
                         )}
                       </TableCell>
                       <TableCell>
-                        <Badge variant="secondary">{sale.items_count} {sale.items_count === 1 ? "producto" : "productos"}</Badge>
+                        <Badge variant="secondary">
+                          {sale.items_count} {sale.items_count === 1 ? "producto" : "productos"}
+                        </Badge>
                       </TableCell>
                       <TableCell>
                         <Badge variant="outline" className="gap-1">
                           <PayIcon className="h-3 w-3" /> {payment.label}
                         </Badge>
                       </TableCell>
-                      <TableCell className="text-muted-foreground text-sm">{(sale as any).account_name ?? "—"}</TableCell>
+                      <TableCell className="text-muted-foreground text-sm">
+                        {(sale as any).account_name ?? "—"}
+                      </TableCell>
                       <TableCell className="text-right">
                         {taxRate > 0
                           ? <Badge className="bg-amber-100 text-amber-700 border-amber-200" variant="outline">{taxRate}%</Badge>
@@ -461,8 +528,11 @@ export default function SalesPage() {
                           : <span className="text-green-600 font-medium">{format(Number(sale.net_profit - sale.discount))}</span>
                         }
                       </TableCell>
-                      <TableCell className="text-right">
-                        {isPending && <PendingActions saleId={sale.id} onMutate={mutate} />}
+                      <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
+                        {isPending
+                          ? <PendingActions saleId={sale.id} onMutate={mutate} />
+                          : <CompletedActions sale={sale} onDeleteRequest={setDeletingSale} />
+                        }
                       </TableCell>
                     </TableRow>
                   );
@@ -474,6 +544,18 @@ export default function SalesPage() {
       </Card>
 
       <Fab actions={[{ label: "Nueva venta", icon: ShoppingCart, onClick: () => router.push("/sales/new") }]} />
+
+      {/* Confirm anular venta completada */}
+      <ConfirmDialog
+        open={!!deletingSale}
+        onOpenChange={(v) => { if (!v) setDeletingSale(null); }}
+        title={`¿Anular ${deletingSale?.sale_number ?? "esta venta"}?`}
+        description="Se revertirá el inventario, el balance de la cuenta y los totales del cliente. Esta acción no se puede deshacer."
+        confirmLabel={isDeleting ? "Anulando..." : "Anular venta"}
+        variant="danger"
+        isLoading={isDeleting}
+        onConfirm={handleDeleteConfirm}
+      />
 
     </div>
   );

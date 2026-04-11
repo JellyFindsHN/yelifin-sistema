@@ -14,7 +14,7 @@ export default function PrivacyPage() {
             <ArrowLeft className="h-4 w-4" />
             Volver al inicio
           </Link>
-          <span className="text-lg font-semibold">Nexly</span>
+          <span className="text-lg font-semibold"></span>
         </div>
       </header>
 
@@ -30,7 +30,7 @@ export default function PrivacyPage() {
 
         <section className="space-y-4 text-sm leading-relaxed md:text-base">
           <p>
-            Esta Política de privacidad explica cómo Nexly recopila, utiliza y
+            Esta Política de privacidad explica cómo  recopila, utiliza y
             protege la información asociada a tu cuenta y al uso de la
             plataforma.
           </p>
@@ -85,7 +85,7 @@ export default function PrivacyPage() {
 
           <h2 className="text-lg font-semibold mt-6">7. Contacto</h2>
           <p>
-            Si tienes preguntas sobre la privacidad de tus datos en Nexly,
+            Si tienes preguntas sobre la privacidad de tus datos en ,
             puedes escribirnos a través del canal de soporte disponible en la
             plataforma.
           </p>

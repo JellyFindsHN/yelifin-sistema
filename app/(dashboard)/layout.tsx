@@ -37,13 +37,13 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             <Breadcrumb>
               <BreadcrumbList>
                 <BreadcrumbItem>
-                  <BreadcrumbPage className="text-sm font-medium">Nexly</BreadcrumbPage>
+                  <BreadcrumbPage className="text-sm font-medium">Konta</BreadcrumbPage>
                 </BreadcrumbItem>
               </BreadcrumbList>
             </Breadcrumb>
           </header>
 
-          <main className="flex-1 overflow-auto p-4 lg:p-6">
+          <main className="flex-1 overflow-auto pb-0 p-4 lg:p-6 h-full">
             {children}
           </main>
         </SidebarInset>
