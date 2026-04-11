@@ -22,7 +22,7 @@ export function LandingHeader() {
           <div className="w-8 h-8 sm:w-10 sm:h-10 bg-primary rounded-lg flex items-center justify-center shadow-lg shadow-primary/50">
             <Zap className="w-5 h-5 sm:w-6 sm:h-6 text-primary-foreground" />
           </div>
-          <span className="text-xl sm:text-2xl font-bold text-primary"></span>
+          <span className="text-xl sm:text-2xl font-bold text-primary"> Konta</span>
         </Link>
 
         {loading ? (
