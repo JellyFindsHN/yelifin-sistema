@@ -77,12 +77,7 @@ export async function POST(request: NextRequest) {
   try {
     const { userId } = auth.data;
     const body = await request.json();
-<<<<<<< Updated upstream
-
-    const { name, description, sku, price, image_url } = body;
-=======
     const { name, description, sku, price, image_url, is_service } = body;
->>>>>>> Stashed changes
 
     if (!name || typeof name !== "string" || name.trim().length < 1) {
       return createErrorResponse("El nombre del producto es requerido", 400);
@@ -95,11 +90,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-<<<<<<< Updated upstream
-    // Verificar límite del plan (sin GROUP BY para evitar error)
-=======
     // Verificar límite del plan
->>>>>>> Stashed changes
     const [limitCheck] = await sql`
       SELECT
         sp.max_products,

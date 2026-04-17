@@ -4,10 +4,9 @@
 import { useState, useMemo, useEffect, useCallback, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import {
-  ArrowLeft, Search, AlertTriangle, X,
+  ArrowLeft, AlertTriangle,
   ChevronRight, ShoppingCart, ArrowRight,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -98,16 +97,6 @@ function NewSaleContent() {
   const confirmExit = () => { setExitDialog(false); if (pendingHref) router.push(pendingHref); };
   const cancelExit = () => { setExitDialog(false); setPendingHref(null); };
 
-<<<<<<< Updated upstream
-  const availableProducts = useMemo(
-    () => products.filter((p) =>
-      (p.stock ?? 0) > 0 &&
-      (p.name.toLowerCase().includes(search.toLowerCase()) ||
-        (p.sku?.toLowerCase().includes(search.toLowerCase()) ?? false))
-    ),
-    [products, search]
-  );
-=======
  const availableProducts = useMemo(
     () => products.filter((p) => {
       const matchesSearch =
@@ -125,7 +114,6 @@ function NewSaleContent() {
   // Helper de clave — identifica un item único en el carrito
   const cartKey = (productId: number, variantId: number | null | undefined) =>
     `${productId}-${variantId ?? "base"}`;
->>>>>>> Stashed changes
 
   // ── Carrito ────────────────────────────────────────────────────────
   const addToCart = (product: Product) => {

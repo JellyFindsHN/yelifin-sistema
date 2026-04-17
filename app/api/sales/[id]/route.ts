@@ -7,14 +7,11 @@ const sql = neon(process.env.DATABASE_URL!);
 
 type Params = { params: Promise<{ id: string }> };
 
-<<<<<<< Updated upstream
-=======
 // Clave compuesta para identificar un item único (producto + variante)
 function itemKey(productId: number, variantId: number | null) {
   return `${productId}-${variantId ?? "null"}`;
 }
 
->>>>>>> Stashed changes
 // ── GET /api/sales/[id] ────────────────────────────────────────────────
 export async function GET(request: NextRequest, { params }: Params) {
   const auth = await verifyAuth(request);
@@ -154,13 +151,6 @@ export async function PATCH(request: NextRequest, { params }: Params) {
       await sql`BEGIN`;
       try {
         for (const item of items) {
-<<<<<<< Updated upstream
-          const [lastBatch] = await sql`
-            SELECT id FROM inventory_batches
-            WHERE user_id = ${userId} AND product_id = ${item.product_id}
-            ORDER BY received_at DESC LIMIT 1
-          `;
-=======
           if (item.is_service) continue;
 
           const variantId = item.variant_id ? Number(item.variant_id) : null;
@@ -182,7 +172,6 @@ export async function PATCH(request: NextRequest, { params }: Params) {
                 ORDER BY received_at DESC LIMIT 1
               `;
 
->>>>>>> Stashed changes
           if (lastBatch) {
             await sql`
               UPDATE inventory_batches
@@ -212,10 +201,6 @@ export async function PATCH(request: NextRequest, { params }: Params) {
             WHERE id = ${s.supply_id} AND user_id = ${userId}
           `;
           await sql`
-<<<<<<< Updated upstream
-            INSERT INTO supply_movements (user_id, movement_type, supply_id, quantity, reference_type, reference_id)
-            VALUES (${userId}, 'IN', ${s.supply_id}, ${s.quantity}, 'SALE_CANCELLED', ${saleId})
-=======
             INSERT INTO supply_movements (
               user_id, movement_type, supply_id,
               quantity, reference_type, reference_id
@@ -223,7 +208,6 @@ export async function PATCH(request: NextRequest, { params }: Params) {
               ${userId}, 'IN', ${s.supply_id},
               ${s.quantity}, 'SALE_CANCELLED', ${saleId}
             )
->>>>>>> Stashed changes
           `;
         }
 
@@ -267,48 +251,6 @@ export async function PATCH(request: NextRequest, { params }: Params) {
         if (!acc) return createErrorResponse("Cuenta de destino no encontrada", 404);
       }
 
-<<<<<<< Updated upstream
-      const currentItems = await sql`
-        SELECT product_id, variant_id, quantity FROM sale_items
-        WHERE sale_id = ${saleId} AND user_id = ${userId}
-      `;
-
-      const currentMap = new Map<number, number>();
-      for (const i of currentItems) currentMap.set(Number(i.product_id), Number(i.quantity));
-
-      const newMap = new Map<number, { quantity: number; unit_price: number; discount: number }>();
-      for (const i of newItems) newMap.set(Number(i.product_id), {
-        quantity: Number(i.quantity),
-        unit_price: Number(i.unit_price),
-        discount: Number(i.discount ?? 0),
-      });
-
-      // Validar stock para aumentos
-      for (const [productId, newData] of newMap.entries()) {
-        const currentQty = currentMap.get(productId) ?? 0;
-        const delta = newData.quantity - currentQty;
-        if (delta > 0) {
-          const batches = await sql`
-            SELECT COALESCE(SUM(qty_available), 0)::int AS available
-            FROM inventory_batches
-            WHERE user_id = ${userId} AND product_id = ${productId}
-          `;
-          const available = Number(batches[0]?.available ?? 0);
-          if (available < delta) {
-            const [product] = await sql`SELECT name FROM products WHERE id = ${productId}`;
-            return createErrorResponse(
-              `Stock insuficiente para "${product?.name}". Disponible: ${available}`, 400
-            );
-          }
-        }
-      }
-
-      // Recalcular costos FIFO
-      const processedItems: any[] = [];
-      for (const [productId, data] of newMap.entries()) {
-        const currentQty = currentMap.get(productId) ?? 0;
-        const delta = data.quantity - currentQty;
-=======
       // Traer items actuales — clave compuesta producto+variante
       const currentItems = await sql`
         SELECT si.product_id, si.variant_id, si.quantity, si.unit_cost, p.is_service
@@ -420,7 +362,6 @@ export async function PATCH(request: NextRequest, { params }: Params) {
         const current    = currentMap.get(key);
         const currentQty = current?.quantity ?? 0;
         const delta      = data.quantity - currentQty;
->>>>>>> Stashed changes
 
         const [product] = await sql`
           SELECT is_service FROM products
@@ -429,27 +370,6 @@ export async function PATCH(request: NextRequest, { params }: Params) {
         const isService = Boolean(product?.is_service);
 
         let unitCost = 0;
-<<<<<<< Updated upstream
-        if (delta === 0) {
-          const [existing] = await sql`
-            SELECT unit_cost FROM sale_items
-            WHERE sale_id = ${saleId} AND product_id = ${productId} AND user_id = ${userId}
-          `;
-          unitCost = Number(existing?.unit_cost ?? 0);
-        } else {
-          const batches = await sql`
-            SELECT id, qty_available, unit_cost FROM inventory_batches
-            WHERE user_id = ${userId} AND product_id = ${productId} AND qty_available > 0
-            ORDER BY received_at ASC
-          `;
-          let remaining = data.quantity;
-          let totalCost = 0;
-          for (const batch of batches) {
-            if (remaining <= 0) break;
-            const take = Math.min(remaining, Number(batch.qty_available));
-            totalCost += take * Number(batch.unit_cost);
-            remaining -= take;
-=======
 
         if (!isService) {
           if (delta === 0 && current) {
@@ -486,20 +406,13 @@ export async function PATCH(request: NextRequest, { params }: Params) {
               remaining  -= take;
             }
             unitCost = data.quantity > 0 ? totalCost / data.quantity : 0;
->>>>>>> Stashed changes
           }
-          unitCost = data.quantity > 0 ? totalCost / data.quantity : 0;
         }
 
         processedItems.push({
-<<<<<<< Updated upstream
-          product_id: productId,
-          quantity: data.quantity,
-=======
           product_id: data.product_id,
           variant_id: data.variant_id,
           quantity:   data.quantity,
->>>>>>> Stashed changes
           unit_price: data.unit_price,
           unit_cost: unitCost,
           discount: data.discount,
@@ -510,16 +423,6 @@ export async function PATCH(request: NextRequest, { params }: Params) {
 
       const newSubtotal = processedItems.reduce((acc, i) => acc + i.unit_price * i.quantity, 0);
       const globalDiscount = Number(discount ?? sale.discount) || 0;
-<<<<<<< Updated upstream
-      const itemDiscounts = processedItems.reduce((acc, i) => acc + i.discount, 0);
-      const totalDiscount = globalDiscount + itemDiscounts;
-      const shippingAmount = Number(shipping_cost ?? sale.shipping_cost) || 0;
-      const taxableBase = newSubtotal - totalDiscount;
-      const taxAmount = taxRateNum > 0 ? taxableBase * taxRateNum / (100 + taxRateNum) : 0;
-      const grandTotal = taxableBase + shippingAmount;
-
-      // Cuenta final a usar
-=======
       const itemDiscounts  = processedItems.reduce((acc, i) => acc + i.discount, 0);
       const totalDiscount  = globalDiscount + itemDiscounts;
       const shippingAmount = (shipping_cost !== undefined && shipping_cost !== null)
@@ -528,16 +431,11 @@ export async function PATCH(request: NextRequest, { params }: Params) {
       const taxableBase    = newSubtotal - totalDiscount;
       const taxAmount      = taxRateNum > 0 ? taxableBase * taxRateNum / (100 + taxRateNum) : 0;
       const grandTotal     = taxableBase + shippingAmount;
->>>>>>> Stashed changes
       const finalAccountId = account_id ?? sale.account_id;
 
       await sql`BEGIN`;
       try {
-<<<<<<< Updated upstream
-        // Ajustar inventario
-=======
         // Ajustar inventario por variante (solo físicos)
->>>>>>> Stashed changes
         for (const item of processedItems) {
           if (item.delta > 0) {
             // Necesita más stock → descontar FIFO por variante
@@ -572,10 +470,6 @@ export async function PATCH(request: NextRequest, { params }: Params) {
             }
 
             await sql`
-<<<<<<< Updated upstream
-              INSERT INTO inventory_movements (user_id, movement_type, product_id, quantity, reference_type, reference_id)
-              VALUES (${userId}, 'OUT', ${item.product_id}, ${item.delta}, 'SALE', ${saleId})
-=======
               INSERT INTO inventory_movements (
                 user_id, movement_type, product_id, variant_id,
                 quantity, reference_type, reference_id
@@ -583,7 +477,6 @@ export async function PATCH(request: NextRequest, { params }: Params) {
                 ${userId}, 'OUT', ${item.product_id}, ${item.variant_id},
                 ${item.delta}, 'SALE_EDITED', ${saleId}
               )
->>>>>>> Stashed changes
             `;
 
           } else if (item.delta < 0) {
@@ -612,10 +505,6 @@ export async function PATCH(request: NextRequest, { params }: Params) {
             }
 
             await sql`
-<<<<<<< Updated upstream
-              INSERT INTO inventory_movements (user_id, movement_type, product_id, quantity, reference_type, reference_id)
-              VALUES (${userId}, 'IN', ${item.product_id}, ${Math.abs(item.delta)}, 'SALE_EDITED', ${saleId})
-=======
               INSERT INTO inventory_movements (
                 user_id, movement_type, product_id, variant_id,
                 quantity, reference_type, reference_id
@@ -623,25 +512,10 @@ export async function PATCH(request: NextRequest, { params }: Params) {
                 ${userId}, 'IN', ${item.product_id}, ${item.variant_id},
                 ${Math.abs(item.delta)}, 'SALE_EDITED', ${saleId}
               )
->>>>>>> Stashed changes
             `;
           }
         }
 
-<<<<<<< Updated upstream
-        // Devolver stock de productos eliminados
-        for (const [productId, currentQty] of currentMap.entries()) {
-          if (!newMap.has(productId)) {
-            const [lastBatch] = await sql`
-              SELECT id FROM inventory_batches
-              WHERE user_id = ${userId} AND product_id = ${productId}
-              ORDER BY received_at DESC LIMIT 1
-            `;
-            if (lastBatch) {
-              await sql`
-                UPDATE inventory_batches SET qty_available = qty_available + ${currentQty}
-                WHERE id = ${lastBatch.id} AND user_id = ${userId}
-=======
         // Devolver stock de items eliminados en el edit
         for (const [key, current] of currentMap.entries()) {
           if (newMap.has(key) || current.is_service) continue;
@@ -664,19 +538,13 @@ export async function PATCH(request: NextRequest, { params }: Params) {
                   AND product_id = ${productId}
                   AND variant_id IS NULL
                 ORDER BY received_at DESC LIMIT 1
->>>>>>> Stashed changes
               `;
 
           if (lastBatch) {
             await sql`
-<<<<<<< Updated upstream
-              INSERT INTO inventory_movements (user_id, movement_type, product_id, quantity, reference_type, reference_id)
-              VALUES (${userId}, 'IN', ${productId}, ${currentQty}, 'SALE_EDITED', ${saleId})
-=======
               UPDATE inventory_batches
               SET qty_available = qty_available + ${current.quantity}
               WHERE id = ${lastBatch.id} AND user_id = ${userId}
->>>>>>> Stashed changes
             `;
           }
 
@@ -695,10 +563,6 @@ export async function PATCH(request: NextRequest, { params }: Params) {
         await sql`DELETE FROM sale_items WHERE sale_id = ${saleId} AND user_id = ${userId}`;
         for (const item of processedItems) {
           await sql`
-<<<<<<< Updated upstream
-            INSERT INTO sale_items (user_id, sale_id, product_id, quantity, unit_price, unit_cost, line_total)
-            VALUES (${userId}, ${saleId}, ${item.product_id}, ${item.quantity}, ${item.unit_price}, ${item.unit_cost}, ${item.line_total})
-=======
             INSERT INTO sale_items (
               user_id, sale_id, product_id, variant_id,
               quantity, unit_price, unit_cost, line_total
@@ -708,26 +572,13 @@ export async function PATCH(request: NextRequest, { params }: Params) {
               ${item.quantity}, ${item.unit_price},
               ${item.unit_cost}, ${item.line_total}
             )
->>>>>>> Stashed changes
           `;
         }
 
         // Actualizar cabecera — ahora incluye account_id
         await sql`
           UPDATE sales SET
-<<<<<<< Updated upstream
-            customer_id   = ${customer_id ?? sale.customer_id},
-            payment_method = (
-              SELECT CASE type
-                WHEN 'CASH'   THEN 'CASH'
-                WHEN 'BANK'   THEN 'TRANSFER'
-                WHEN 'WALLET' THEN 'TRANSFER'
-                ELSE 'OTHER'
-              END
-              FROM accounts WHERE id = ${finalAccountId} AND user_id = ${userId}),
-=======
             customer_id   = ${customer_id   ?? sale.customer_id},
->>>>>>> Stashed changes
             account_id    = ${finalAccountId},
             subtotal      = ${newSubtotal},
             discount      = ${totalDiscount},
@@ -765,8 +616,6 @@ export async function PATCH(request: NextRequest, { params }: Params) {
     console.error("PATCH /api/sales/[id]:", error);
     return createErrorResponse("Error al procesar la acción", 500);
   }
-<<<<<<< Updated upstream
-=======
 }
 
 // ── DELETE /api/sales/[id] ─────────────────────────────────────────────
@@ -910,5 +759,4 @@ export async function DELETE(request: NextRequest, { params }: Params) {
     console.error("DELETE /api/sales/[id]:", error);
     return createErrorResponse("Error al cancelar la venta", 500);
   }
->>>>>>> Stashed changes
 }

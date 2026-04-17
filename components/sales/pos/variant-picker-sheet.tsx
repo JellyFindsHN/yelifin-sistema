@@ -179,12 +179,11 @@ function VariantOption({
               >
                 {k}: {v}
               </span>
-            ))}
+            ))} 
           </div>
         )}
       </div>
 
-      {/* Precio + stock */}
       <div className="shrink-0 text-right space-y-1">
         <p className={cn(
           "text-sm font-bold",

@@ -131,13 +131,9 @@ export interface Product {
   is_active: boolean;
   created_at: string;
   updated_at: string;
-<<<<<<< Updated upstream
-  stock?: number;
-=======
   stock: number;
   is_service: boolean;
   variants: ProductVariant[];
->>>>>>> Stashed changes
 }
 
 export interface ProductVariant {

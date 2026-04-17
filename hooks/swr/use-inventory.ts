@@ -15,11 +15,7 @@ export type VariantStock = {
   image_url:     string | null;
   stock:         number;
   avg_unit_cost: number;
-<<<<<<< Updated upstream
-  total_value: number;
-=======
   total_value:   number;
->>>>>>> Stashed changes
 };
 
 export type InventoryItem = {

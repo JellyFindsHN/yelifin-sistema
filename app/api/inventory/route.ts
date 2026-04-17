@@ -106,20 +106,12 @@ export async function GET(request: NextRequest) {
       ORDER BY p.name ASC
     `;
 
-<<<<<<< Updated upstream
-    // Estadísticas globales
-    const totalStock = inventory.reduce((acc: number, i: any) => acc + Number(i.stock), 0);
-    const totalValue = inventory.reduce((acc: number, i: any) => acc + Number(i.total_value), 0);
-    const lowStock = inventory.filter((i: any) => Number(i.stock) > 0 && Number(i.stock) < 10).length;
-    const outOfStock = inventory.filter((i: any) => Number(i.stock) === 0).length;
-=======
     const physical = inventory.filter((i: any) => !i.is_service);
 
     const totalStock = physical.reduce((acc: number, i: any) => acc + Number(i.stock), 0);
     const totalValue = physical.reduce((acc: number, i: any) => acc + Number(i.total_value), 0);
     const lowStock   = physical.filter((i: any) => Number(i.stock) > 0 && Number(i.stock) < 10).length;
     const outOfStock = physical.filter((i: any) => Number(i.stock) === 0).length;
->>>>>>> Stashed changes
 
     return Response.json({
       data: inventory,

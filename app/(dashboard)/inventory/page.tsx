@@ -30,7 +30,7 @@ import {
 } from "lucide-react";
 import Image from "next/image";
 import { toast } from "sonner";
-import { SearchBar } from "@/components/shared/search-bar";
+import { SearchBar } from "@/components/shared/search-bar"
 import { cn } from "@/lib/utils";
 
 import { useInventory, VariantStock } from "@/hooks/swr/use-inventory";
@@ -50,13 +50,9 @@ import { CreateTransactionModal }     from "@/components/transactions/create-tra
 import { useAccounts }                from "@/hooks/swr/use-accounts";
 
 // ── Helpers ────────────────────────────────────────────────────────────
-<<<<<<< Updated upstream
-const getStockBadge = (stock: number) => {
-=======
 
 const getStockBadge = (stock: number, is_service?: boolean) => {
   if (is_service) return <Badge className="bg-blue-100 text-blue-700 border-blue-200">Servicio</Badge>;
->>>>>>> Stashed changes
   if (stock === 0) return <Badge variant="destructive">Agotado</Badge>;
   if (stock < 5)   return <Badge variant="destructive">{stock} uds</Badge>;
   if (stock < 10)  return <Badge className="bg-yellow-100 text-yellow-700 border-yellow-200">{stock} uds</Badge>;
@@ -71,14 +67,9 @@ export default function InventoryPage() {
   const { products, mutate: mutateProducts } = useProducts();
   const { deleteVariant, isDeleting: isDeletingVariant } = useDeleteVariant();
 
-<<<<<<< Updated upstream
-  const [search, setSearch] = useState("");
-  const [stockFilter, setStockFilter] = useState("all");
-=======
   const [search,      setSearch]      = useState("");
   const [stockFilter, setStockFilter] = useState("in_stock");
   const [expanded,    setExpanded]    = useState<Set<number>>(new Set());
->>>>>>> Stashed changes
 
   // Diálogos de producto
   const [createOpen,       setCreateOpen]       = useState(false);
@@ -116,19 +107,12 @@ export default function InventoryPage() {
       (item.sku?.toLowerCase().includes(search.toLowerCase()) ?? false);
 
     const matchesStock =
-<<<<<<< Updated upstream
-      stockFilter === "all" ? true :
-        stockFilter === "out" ? item.stock === 0 :
-          stockFilter === "low" ? item.stock > 0 && item.stock < 10 :
-            item.stock >= 10;
-=======
       stockFilter === "services" ? item.is_service :
       stockFilter === "in_stock" ? item.stock > 0 || item.is_service :
       stockFilter === "all"      ? true :
       stockFilter === "out"      ? item.stock === 0 && !item.is_service :
       stockFilter === "low"      ? item.stock > 0 && item.stock < 10 :
       item.stock >= 10;
->>>>>>> Stashed changes
 
     return matchesSearch && matchesStock;
   });
@@ -138,10 +122,6 @@ export default function InventoryPage() {
     mutateInventory();
   };
 
-<<<<<<< Updated upstream
-  // ── Actions menu ────────────────────────────────────────────────────
-  const ActionsMenu = ({ item }: { item: typeof inventory[0] }) => (
-=======
   const handleDeleteVariant = async () => {
     if (!deleteVariantTarget) return;
     try {
@@ -157,7 +137,6 @@ export default function InventoryPage() {
   // ── Actions menus ────────────────────────────────────────────────
 
   const ProductActionsMenu = ({ item }: { item: typeof inventory[0] }) => (
->>>>>>> Stashed changes
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0">
@@ -165,33 +144,6 @@ export default function InventoryPage() {
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end">
-<<<<<<< Updated upstream
-        <DropdownMenuItem
-          onClick={() => {
-            const p = findProduct(item.product_id);
-            if (p) setInventoryProduct(p);
-          }}
-        >
-          <PackagePlus className="h-4 w-4 mr-2 text-primary" />
-          Agregar stock
-        </DropdownMenuItem>
-        <DropdownMenuItem
-          onClick={() => {
-            const p = findProduct(item.product_id);
-            if (p) setAdjustProduct(p);
-          }}
-        >
-          <SlidersHorizontal className="h-4 w-4 mr-2 text-muted-foreground" />
-          Ajuste de inventario
-        </DropdownMenuItem>
-        <DropdownMenuSeparator />
-        <DropdownMenuItem
-          onClick={() => {
-            const p = findProduct(item.product_id);
-            if (p) setEditProduct(p);
-          }}
-        >
-=======
         {!item.is_service && (
           <>
             <DropdownMenuItem onClick={() => { const p = findProduct(item.product_id); if (p) setInventoryProduct(p); }}>
@@ -210,7 +162,6 @@ export default function InventoryPage() {
           </>
         )}
         <DropdownMenuItem onClick={() => { const p = findProduct(item.product_id); if (p) setEditProduct(p); }}>
->>>>>>> Stashed changes
           <Pencil className="h-4 w-4 mr-2" />
           Editar producto
         </DropdownMenuItem>
@@ -545,35 +496,6 @@ export default function InventoryPage() {
                   </TableCell>
                 </TableRow>
               ) : (
-<<<<<<< Updated upstream
-                filtered.map((item) => (
-                  <TableRow key={item.product_id}>
-                    <TableCell>
-                      <div className="flex items-center gap-3">
-                        <div className="relative h-10 w-10 rounded-lg overflow-hidden bg-muted flex items-center justify-center shrink-0">
-                          {item.image_url
-                            ? <Image src={item.image_url} alt={item.product_name} fill className="object-cover" />
-                            : <Package className="h-5 w-5 text-muted-foreground/40" />
-                          }
-                        </div>
-                        <span className="font-medium">{item.product_name}</span>
-                      </div>
-                    </TableCell>
-                    <TableCell className="font-mono text-sm text-muted-foreground">
-                      {item.sku ?? "—"}
-                    </TableCell>
-                    <TableCell>{getStockBadge(item.stock)}</TableCell>
-                    <TableCell>{format(item.avg_unit_cost)}</TableCell>
-                    <TableCell>{format(item.price)}</TableCell>
-                    <TableCell className="text-right font-medium">
-                      {format(item.total_value)}
-                    </TableCell>
-                    <TableCell>
-                      <ActionsMenu item={item} />
-                    </TableCell>
-                  </TableRow>
-                ))
-=======
                 filtered.map((item) => {
                   const product     = findProduct(item.product_id);
                   const hasVariants = item.variants_stock.length > 0 && !item.is_service;
@@ -649,7 +571,6 @@ export default function InventoryPage() {
                     </>
                   );
                 })
->>>>>>> Stashed changes
               )}
             </TableBody>
           </Table>
@@ -670,25 +591,6 @@ export default function InventoryPage() {
             </CardContent>
           </Card>
         ) : (
-<<<<<<< Updated upstream
-          filtered.map((item) => (
-            <Card key={item.product_id}>
-              <CardContent className="pl-3 pr-2">
-                <div className="flex items-center gap-3">
-                  <div className="relative h-12 w-12 rounded-lg overflow-hidden bg-muted flex items-center justify-center shrink-0">
-                    {item.image_url
-                      ? <Image src={item.image_url} alt={item.product_name} fill className="object-cover" />
-                      : <Package className="h-6 w-6 text-muted-foreground/40" />
-                    }
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center justify-between gap-2">
-                      <p className="font-medium truncate">{item.product_name}</p>
-                      <div className="flex items-center gap-1 shrink-0">
-                        {getStockBadge(item.stock)}
-                        <ActionsMenu item={item} />
-                      </div>
-=======
           filtered.map((item) => {
             const product     = findProduct(item.product_id);
             const hasVariants = item.variants_stock.length > 0 && !item.is_service;
@@ -724,29 +626,8 @@ export default function InventoryPage() {
                       {item.sku && (
                         <p className="text-xs text-muted-foreground font-mono">{item.sku}</p>
                       )}
->>>>>>> Stashed changes
                     </div>
                   </div>
-<<<<<<< Updated upstream
-                </div>
-                <div className="grid grid-cols-3 gap-2 mt-3 pt-3 border-t text-center">
-                  <div>
-                    <p className="text-xs text-muted-foreground">Costo prom.</p>
-                    <p className="text-sm font-medium">{format(item.avg_unit_cost)}</p>
-                  </div>
-                  <div>
-                    <p className="text-xs text-muted-foreground">Precio venta</p>
-                    <p className="text-sm font-medium">{format(item.price)}</p>
-                  </div>
-                  <div>
-                    <p className="text-xs text-muted-foreground">Valor total</p>
-                    <p className="text-sm font-bold text-primary">{format(item.total_value)}</p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          ))
-=======
 
                   {/* Resumen general del producto */}
                   <div className="grid grid-cols-3 gap-2 mt-3 pt-3 border-t text-center">
@@ -801,7 +682,6 @@ export default function InventoryPage() {
               </Card>
             );
           })
->>>>>>> Stashed changes
         )}
       </div>
 
