@@ -26,12 +26,34 @@ export async function GET(request: NextRequest) {
         p.is_active,
         p.created_at,
         p.updated_at,
-        COALESCE(SUM(ib.qty_available), 0) AS stock
+        COALESCE(SUM(ib.qty_available), 0) AS stock,
+        (
+          SELECT COALESCE(
+            json_agg(
+              json_build_object(
+                'id',             pv.id,
+                'variant_name',   pv.variant_name,
+                'sku',            pv.sku,
+                'attributes',     pv.attributes,
+                'price_override', pv.price_override,
+                'image_url',      pv.image_url,
+                'is_active',      pv.is_active,
+                'created_at',     pv.created_at,
+                'updated_at',     pv.updated_at
+              ) ORDER BY pv.id
+            ),
+            '[]'::json
+          )
+          FROM product_variants pv
+          WHERE pv.product_id = p.id
+            AND pv.user_id    = p.user_id
+            AND pv.is_active  = TRUE
+        ) AS variants
       FROM products p
       LEFT JOIN inventory_batches ib
         ON ib.product_id = p.id
-       AND ib.user_id = p.user_id
-      WHERE p.user_id = ${userId}
+       AND ib.user_id    = p.user_id
+      WHERE p.user_id   = ${userId}
         AND p.is_active = TRUE
       GROUP BY p.id
       ORDER BY p.created_at DESC
@@ -42,7 +64,7 @@ export async function GET(request: NextRequest) {
       total: products.length,
     });
   } catch (error) {
-    console.error(" GET /api/products:", error);
+    console.error("GET /api/products:", error);
     return createErrorResponse("Error al obtener productos", 500);
   }
 }
@@ -55,10 +77,13 @@ export async function POST(request: NextRequest) {
   try {
     const { userId } = auth.data;
     const body = await request.json();
+<<<<<<< Updated upstream
 
     const { name, description, sku, price, image_url } = body;
+=======
+    const { name, description, sku, price, image_url, is_service } = body;
+>>>>>>> Stashed changes
 
-    // Validaciones
     if (!name || typeof name !== "string" || name.trim().length < 1) {
       return createErrorResponse("El nombre del producto es requerido", 400);
     }
@@ -70,14 +95,18 @@ export async function POST(request: NextRequest) {
       );
     }
 
+<<<<<<< Updated upstream
     // Verificar límite del plan (sin GROUP BY para evitar error)
+=======
+    // Verificar límite del plan
+>>>>>>> Stashed changes
     const [limitCheck] = await sql`
       SELECT
         sp.max_products,
         (
           SELECT COUNT(*)
           FROM products p
-          WHERE p.user_id = us.user_id
+          WHERE p.user_id  = us.user_id
             AND p.is_active = TRUE
         )::int AS current_count
       FROM user_subscriptions us
@@ -102,13 +131,11 @@ export async function POST(request: NextRequest) {
     // Verificar SKU duplicado
     if (sku) {
       const [existing] = await sql`
-        SELECT id
-        FROM products
+        SELECT id FROM products
         WHERE user_id = ${userId}
-          AND sku = ${sku}
+          AND sku     = ${sku}
         LIMIT 1
       `;
-
       if (existing) {
         return createErrorResponse("Ya existe un producto con este SKU", 409);
       }
@@ -120,18 +147,27 @@ export async function POST(request: NextRequest) {
       VALUES (
         ${userId},
         ${name.trim()},
-        ${description ?? null},
-        ${sku ?? null},
+        ${description  ?? null},
+        ${sku          ?? null},
         ${null},
         ${Number(price)},
+<<<<<<< Updated upstream
         ${image_url ?? null}
+=======
+        ${image_url    ?? null},
+        ${is_service   ?? false}
+>>>>>>> Stashed changes
       )
       RETURNING *
     `;
 
-    return Response.json({ data: product }, { status: 201 });
+    // Devolver con variants vacío para consistencia de shape
+    return Response.json(
+      { data: { ...product, variants: [] } },
+      { status: 201 }
+    );
   } catch (error) {
-    console.error(" POST /api/products:", error);
+    console.error("POST /api/products:", error);
     return createErrorResponse("Error al crear producto", 500);
   }
 }

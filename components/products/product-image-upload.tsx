@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useRef, useState, useEffect } from "react";
 import Image from "next/image";
 import { Upload, X } from "lucide-react";
 import { toast } from "sonner";
@@ -52,15 +52,28 @@ async function convertToWebP(file: File, quality = 0.85): Promise<Blob> {
 
 // ── Tipos ──────────────────────────────────────────────────────────────
 type Props = {
-  disabled?: boolean;
-  onChange: (file: File | null) => void;
+  disabled?:      boolean;
+  onChange:       (file: File | null) => void;
+  // Props opcionales para modo edición
+  initialPreview?: string | null;
+  onRemove?:       () => void;
 };
 
 // ── Componente ─────────────────────────────────────────────────────────
-export function ProductImageUpload({ disabled, onChange }: Props) {
-  const [preview, setPreview] = useState<string | null>(null);
+export function ProductImageUpload({
+  disabled,
+  onChange,
+  initialPreview,
+  onRemove,
+}: Props) {
+  const [preview,    setPreview]    = useState<string | null>(initialPreview ?? null);
   const [isDragging, setIsDragging] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Sincronizar si cambia initialPreview desde el padre (ej: se abre el dialog con otra variante)
+  useEffect(() => {
+    setPreview(initialPreview ?? null);
+  }, [initialPreview]);
 
   const processFile = async (file: File) => {
     if (!file.type.startsWith("image/")) {
@@ -74,7 +87,8 @@ export function ProductImageUpload({ disabled, onChange }: Props) {
     }
 
     try {
-      if (preview) URL.revokeObjectURL(preview);
+      // Solo revocar si es un blob local, no una URL de Firebase
+      if (preview?.startsWith("blob:")) URL.revokeObjectURL(preview);
 
       const webpBlob = await convertToWebP(file);
       const webpFile = new File(
@@ -99,14 +113,11 @@ export function ProductImageUpload({ disabled, onChange }: Props) {
 
   const handleRemove = (e: React.MouseEvent) => {
     e.stopPropagation();
-
-    if (preview) URL.revokeObjectURL(preview);
+    if (preview?.startsWith("blob:")) URL.revokeObjectURL(preview);
     setPreview(null);
     onChange(null);
-
-    if (fileInputRef.current) {
-      fileInputRef.current.value = "";
-    }
+    onRemove?.(); // notificar al padre si está en modo edición
+    if (fileInputRef.current) fileInputRef.current.value = "";
   };
 
   const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
@@ -123,12 +134,9 @@ export function ProductImageUpload({ disabled, onChange }: Props) {
   const handleDrop = async (e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault();
     if (disabled) return;
-
     setIsDragging(false);
-
     const file = e.dataTransfer.files?.[0];
     if (!file) return;
-
     await processFile(file);
   };
 

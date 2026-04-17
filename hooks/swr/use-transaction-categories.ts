@@ -11,6 +11,14 @@ export interface TransactionCategory {
   is_active: boolean;
 }
 
+interface CategoriesResponse {
+  data: TransactionCategory[];
+}
+
+interface CategoryResponse {
+  data: TransactionCategory;
+}
+
 function useAuthFetch() {
   const { firebaseUser } = useAuth();
   return async (url: string) => {
@@ -35,13 +43,13 @@ export function useTransactionCategories(type?: string) {
     ? `/api/transaction-categories?type=${type}`
     : "/api/transaction-categories";
 
-  const { data, error, mutate } = useSWR<TransactionCategory[]>(
+  const { data, error, mutate } = useSWR<CategoriesResponse>(
     firebaseUser ? url : null,
     (url: string) => authFetch(url)
   );
 
   return {
-    categories: data ?? [],
+    categories: data?.data ?? [],
     isLoading: !error && !data,
     error,
     mutate,
@@ -51,7 +59,10 @@ export function useTransactionCategories(type?: string) {
 export function useCreateCategory() {
   const { firebaseUser } = useAuth();
 
-  const create = async (data: { name: string; type: string }) => {
+  const create = async (payload: {
+    name: string;
+    type: "INCOME" | "EXPENSE" | "TRANSFER";
+  }): Promise<TransactionCategory> => {
     const token = await firebaseUser?.getIdToken();
     if (!token) throw new Error("No autenticado");
 
@@ -61,13 +72,16 @@ export function useCreateCategory() {
         "Content-Type": "application/json",
         Authorization: `Bearer ${token}`,
       },
-      body: JSON.stringify(data),
+      body: JSON.stringify(payload),
     });
+
     if (!res.ok) {
       const error = await res.json();
-      throw new Error(error.error || "Error creating category");
+      throw new Error(error.error || "Error al crear categoría");
     }
-    return res.json();
+
+    const result: CategoryResponse = await res.json();
+    return result.data;
   };
 
   return { create };
@@ -78,8 +92,8 @@ export function useUpdateCategory() {
 
   const update = async (
     id: number,
-    data: { name?: string; is_active?: boolean }
-  ) => {
+    payload: { name?: string; is_active?: boolean }
+  ): Promise<TransactionCategory> => {
     const token = await firebaseUser?.getIdToken();
     if (!token) throw new Error("No autenticado");
 
@@ -89,13 +103,16 @@ export function useUpdateCategory() {
         "Content-Type": "application/json",
         Authorization: `Bearer ${token}`,
       },
-      body: JSON.stringify(data),
+      body: JSON.stringify(payload),
     });
+
     if (!res.ok) {
       const error = await res.json();
-      throw new Error(error.error || "Error updating category");
+      throw new Error(error.error || "Error al actualizar categoría");
     }
-    return res.json();
+
+    const result: CategoryResponse = await res.json();
+    return result.data;
   };
 
   return { update };
@@ -104,7 +121,7 @@ export function useUpdateCategory() {
 export function useDeleteCategory() {
   const { firebaseUser } = useAuth();
 
-  const remove = async (id: number) => {
+  const remove = async (id: number): Promise<void> => {
     const token = await firebaseUser?.getIdToken();
     if (!token) throw new Error("No autenticado");
 
@@ -114,11 +131,11 @@ export function useDeleteCategory() {
         Authorization: `Bearer ${token}`,
       },
     });
+
     if (!res.ok) {
       const error = await res.json();
-      throw new Error(error.error || "Error deleting category");
+      throw new Error(error.error || "Error al eliminar categoría");
     }
-    return res.json();
   };
 
   return { remove };

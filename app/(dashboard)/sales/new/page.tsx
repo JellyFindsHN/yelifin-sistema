@@ -26,6 +26,10 @@ import { SaleOptionsPanel } from "@/components/sales/pos/sale-options-panel";
 import { SuppliesUsedModal, SupplyUsed } from "@/components/sales/pos/supplies-used-modal";
 import { MobileCartSheet } from "@/components/sales/pos/mobile-cart-sheet";
 
+import { VariantPickerSheet } from "@/components/sales/pos/variant-picker-sheet";
+import { useInventory }        from "@/hooks/swr/use-inventory";
+import { Product, ProductVariant } from "@/types";
+
 const ACCOUNT_TYPE_TO_PAYMENT: Record<string, string> = {
   CASH: "CASH", BANK: "TRANSFER", WALLET: "TRANSFER", OTHER: "OTHER",
 };
@@ -45,6 +49,7 @@ function NewSaleContent() {
   const eventId = eventIdParam ? Number(eventIdParam) : null;
   const backHref = eventId ? "/events" : "/sales";
 
+  const { inventory } = useInventory();
   const { products } = useProducts();
   const { createSale, isCreating } = useCreateSale();
   const { accounts } = useAccounts();
@@ -69,6 +74,7 @@ function NewSaleContent() {
   const [desktopStep, setDesktopStep] = useState<1 | 2>(1);
   const [exitDialog, setExitDialog] = useState(false);
   const [pendingHref, setPendingHref] = useState<string | null>(null);
+  const [variantPickerProduct, setVariantPickerProduct] = useState<Product | null>(null);
 
   const hasCart = cart.length > 0;
   const hasSupplies = supplies.length > 0;
@@ -92,6 +98,7 @@ function NewSaleContent() {
   const confirmExit = () => { setExitDialog(false); if (pendingHref) router.push(pendingHref); };
   const cancelExit = () => { setExitDialog(false); setPendingHref(null); };
 
+<<<<<<< Updated upstream
   const availableProducts = useMemo(
     () => products.filter((p) =>
       (p.stock ?? 0) > 0 &&
@@ -100,39 +107,112 @@ function NewSaleContent() {
     ),
     [products, search]
   );
+=======
+ const availableProducts = useMemo(
+    () => products.filter((p) => {
+      const matchesSearch =
+        p.name.toLowerCase().includes(search.toLowerCase()) ||
+        (p.sku?.toLowerCase().includes(search.toLowerCase()) ?? false);
+ 
+      // Mostrar si: servicio, tiene variantes, o tiene stock
+      const hasStock = p.is_service || p.variants.length > 0 || (p.stock ?? 0) > 0;
+ 
+      return matchesSearch && hasStock;
+    }),
+    [products, search]
+  );
+
+  // Helper de clave — identifica un item único en el carrito
+  const cartKey = (productId: number, variantId: number | null | undefined) =>
+    `${productId}-${variantId ?? "base"}`;
+>>>>>>> Stashed changes
 
   // ── Carrito ────────────────────────────────────────────────────────
-  const addToCart = (product: any) => {
+  const addToCart = (product: Product) => {
+    // Si tiene variantes → abrir picker
+    if (product.variants.length > 0) {
+      setVariantPickerProduct(product);
+      return;
+    }
+    // Sin variantes → agregar directo (lógica original)
+    addItemToCart(product, null);
+  };
+
+   const addItemToCart = (product: Product, variant: ProductVariant | null) => {
+    const variantId  = variant?.id ?? null;
+    const key        = cartKey(product.id, variantId);
+    const price      = variant?.price_override != null
+      ? Number(variant.price_override)
+      : product.price;
+    const label      = variant ? variant.variant_name : product.name;
+    const image      = variant?.image_url ?? product.image_url;
+ 
+    // Stock a verificar — del producto base o de la variante
+    const invItem   = inventory.find((i) => i.product_id === product.id);
+    const stockAvail = variantId
+      ? Number(invItem?.variants_stock.find((v) => v.variant_id === variantId)?.stock ?? 0)
+      : Number(invItem?.base_stock ?? product.stock ?? 0);
+ 
     setCart((prev) => {
-      const existing = prev.find((i) => i.product_id === product.id);
+      const existing = prev.find((i) => cartKey(i.product_id, i.variant_id) === key);
       if (existing) {
-        if (existing.quantity >= (product.stock ?? 0)) {
-          toast.error(`Stock máximo: ${product.stock} unidades`);
+        if (!product.is_service && existing.quantity >= stockAvail) {
+          toast.error(`Stock máximo: ${stockAvail} unidades`);
           return prev;
         }
         return prev.map((i) =>
-          i.product_id === product.id ? { ...i, quantity: i.quantity + 1 } : i
+          cartKey(i.product_id, i.variant_id) === key
+            ? { ...i, quantity: i.quantity + 1 }
+            : i
         );
       }
       return [...prev, {
-        product_id: product.id,
+        product_id:   product.id,
+        variant_id:   variantId,
         product_name: product.name,
-        image_url: product.image_url,
-        quantity: 1,
-        unit_price: product.price,
-        discount: 0,
+        variant_name: variant?.variant_name ?? null,
+        image_url:    image,
+        quantity:     1,
+        unit_price:   price,
+        discount:     0,
       }];
     });
   };
 
-  const updateQuantity = (id: number, delta: number) =>
+  const updateQuantity = (productId: number, delta: number, variantId?: number | null) =>
     setCart((prev) =>
-      prev.map((i) => i.product_id === id ? { ...i, quantity: i.quantity + delta } : i)
+      prev
+        .map((i) =>
+          cartKey(i.product_id, i.variant_id) === cartKey(productId, variantId)
+            ? { ...i, quantity: i.quantity + delta }
+            : i
+        )
         .filter((i) => i.quantity > 0)
     );
-  const removeFromCart = (id: number) => setCart((prev) => prev.filter((i) => i.product_id !== id));
-  const updateItemPrice = (id: number, v: number) => setCart((prev) => prev.map((i) => i.product_id === id ? { ...i, unit_price: v } : i));
-  const updateDiscount = (id: number, v: number) => setCart((prev) => prev.map((i) => i.product_id === id ? { ...i, discount: v } : i));
+ 
+  const removeFromCart = (productId: number, variantId?: number | null) =>
+    setCart((prev) =>
+      prev.filter((i) => cartKey(i.product_id, i.variant_id) !== cartKey(productId, variantId))
+    );
+ 
+  const updateItemPrice = (productId: number, v: number, variantId?: number | null) =>
+    setCart((prev) =>
+      prev.map((i) =>
+        cartKey(i.product_id, i.variant_id) === cartKey(productId, variantId)
+          ? { ...i, unit_price: v }
+          : i
+      )
+    );
+ 
+  const updateDiscount = (productId: number, v: number, variantId?: number | null) =>
+    setCart((prev) =>
+      prev.map((i) =>
+        cartKey(i.product_id, i.variant_id) === cartKey(productId, variantId)
+          ? { ...i, discount: v }
+          : i
+      )
+    );
+ 
 
   const updateSupplyQty = (id: number, qty: number) =>
     setSuppliesUsed((prev) => prev.map((s) => s.supply_id === id ? { ...s, quantity: qty } : s));
@@ -162,6 +242,7 @@ function NewSaleContent() {
         customer_id: customerId,
         items: cart.map((i) => ({
           product_id: i.product_id,
+           variant_id: i.variant_id ?? undefined,
           quantity: i.quantity,
           unit_price: i.unit_price,
           discount: discountType === "per_item" ? i.discount : 0,
@@ -331,6 +412,20 @@ function NewSaleContent() {
           </div>
         )}
       </div>
+
+        <VariantPickerSheet
+        open={!!variantPickerProduct}
+        onOpenChange={(v) => !v && setVariantPickerProduct(null)}
+        product={variantPickerProduct}
+        variantsStock={
+          inventory.find((i) => i.product_id === variantPickerProduct?.id)
+            ?.variants_stock ?? []
+        }
+        onSelect={(product, variant) => {
+          addItemToCart(product, variant);
+          setVariantPickerProduct(null);
+        }}
+      />
 
       <SuppliesUsedModal
         open={suppliesOpen}

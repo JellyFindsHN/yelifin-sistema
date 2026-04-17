@@ -131,17 +131,24 @@ export interface Product {
   is_active: boolean;
   created_at: string;
   updated_at: string;
+<<<<<<< Updated upstream
   stock?: number;
+=======
+  stock: number;
+  is_service: boolean;
+  variants: ProductVariant[];
+>>>>>>> Stashed changes
 }
 
 export interface ProductVariant {
   id: number;
   user_id: number;
   product_id: number;
-  variant_name: string | null;
+  variant_name: string;
   sku: string | null;
   attributes: Record<string, string> | null;
   price_override: number | null;
+  image_url: string | null;
   is_active: boolean;
   created_at: string;
   updated_at: string;
@@ -170,7 +177,7 @@ export interface InventoryMovement {
   product_id: number;
   variant_id: number | null;
   quantity: number;
-  reference_type: 'PURCHASE' | 'SALE' | 'ADJUSTMENT' | null;
+  reference_type: 'PURCHASE' | 'SALE' | 'ADJUSTMENT' | 'INITIAL' | 'SALE_CANCELLED' | 'SALE_EDITED' | null;
   reference_id: number | null;
   notes: string | null;
   created_at: string;
@@ -250,15 +257,20 @@ export interface Sale {
   user_id: number;
   sale_number: string;
   customer_id: number | null;
+  event_id: number | null;          
   subtotal: number;
   discount: number;
+  shipping_cost: number;            
   tax: number;
+  tax_rate: number;
   total: number;
+  status: 'PENDING' | 'COMPLETED' | 'CANCELLED';
   payment_method: 'CASH' | 'CARD' | 'TRANSFER' | 'MIXED' | 'OTHER' | null;
   account_id: number | null;
   sold_at: string;
   notes: string | null;
   created_at: string;
+  updated_at: string | null;
 }
 
 export interface SaleItem {

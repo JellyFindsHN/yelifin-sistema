@@ -82,14 +82,13 @@ export async function GET(request: NextRequest) {
         s.notes,
         s.created_at,
         COUNT(si.id)::int AS items_count,
-        -- net_profit solo para ventas COMPLETED (PENDING aún no es dinero real)
         CASE WHEN s.status = 'COMPLETED'
           THEN COALESCE(SUM(si.line_total - (si.unit_cost * si.quantity)), 0) - COALESCE(s.tax, 0)
           ELSE 0
         END AS net_profit
       FROM sales s
-      LEFT JOIN customers  c  ON c.id  = s.customer_id
-      LEFT JOIN accounts   a  ON a.id  = s.account_id
+      LEFT JOIN customers  c  ON c.id      = s.customer_id
+      LEFT JOIN accounts   a  ON a.id      = s.account_id
       LEFT JOIN sale_items si ON si.sale_id = s.id
       WHERE s.user_id = ${userId}
         AND (${fromDateISO}::timestamptz IS NULL OR s.sold_at >= ${fromDateISO})
@@ -101,7 +100,7 @@ export async function GET(request: NextRequest) {
 
     return Response.json({ data: sales, total: sales.length });
   } catch (error) {
-    console.error(" GET /api/sales:", error);
+    console.error("GET /api/sales:", error);
     return createErrorResponse("Error al obtener ventas", 500);
   }
 }
@@ -122,7 +121,7 @@ export async function POST(request: NextRequest) {
       status = "COMPLETED",   // ← nuevo: PENDING o COMPLETED
     } = body;
 
-    // ── Validaciones ────────────────────────────────────────────────────
+    // ── Validaciones básicas ────────────────────────────────────────────
     if (!items || !Array.isArray(items) || items.length === 0)
       return createErrorResponse("Se requiere al menos un producto", 400);
     if (!payment_method)
@@ -143,12 +142,14 @@ export async function POST(request: NextRequest) {
         return createErrorResponse("El precio unitario es requerido", 400);
     }
 
+    // ── Validar cuenta ──────────────────────────────────────────────────
     const [account] = await sql`
       SELECT id FROM accounts
       WHERE id = ${account_id} AND user_id = ${userId} AND is_active = TRUE
     `;
     if (!account) return createErrorResponse("Cuenta no encontrada", 404);
 
+    // ── Validar evento ──────────────────────────────────────────────────
     const eventIdNum = event_id ? Number(event_id) : null;
     if (eventIdNum) {
       const [ev] = await sql`
@@ -157,6 +158,7 @@ export async function POST(request: NextRequest) {
       if (!ev) return createErrorResponse("Evento no encontrado", 404);
     }
 
+<<<<<<< Updated upstream
     // ── FIFO ────────────────────────────────────────────────────────────
     const processedItems: any[] = [];
 
@@ -167,15 +169,100 @@ export async function POST(request: NextRequest) {
         WHERE user_id = ${userId} AND product_id = ${item.product_id} AND qty_available > 0
         ORDER BY received_at ASC
       `;
+=======
+    // ── FIFO — productos físicos con soporte de variantes ───────────────
+    const processedItems: any[] = [];
 
-      const totalAvailable = batches.reduce((acc: number, b: any) => acc + Number(b.qty_available), 0);
+    for (const item of items) {
+      const variantId = item.variant_id ? Number(item.variant_id) : null;
+
+      // Verificar producto
+      const [product] = await sql`
+        SELECT id, name, is_service FROM products
+        WHERE id = ${item.product_id} AND user_id = ${userId} AND is_active = TRUE
+      `;
+      if (!product)
+        return createErrorResponse(`Producto #${item.product_id} no encontrado`, 404);
+
+      // Servicio: sin inventario
+      if (product.is_service) {
+        processedItems.push({
+          product_id:    item.product_id,
+          variant_id:    variantId,
+          quantity:      item.quantity,
+          unit_price:    item.unit_price,
+          unit_cost:     0,
+          item_discount: item.discount ?? 0,
+          line_total:    item.unit_price * item.quantity - (item.discount ?? 0),
+          batches:       [],
+          is_service:    true,
+          label:         product.name,
+        });
+        continue;
+      }
+
+      // Validar variante si se envió — debe pertenecer al producto y estar activa
+      if (variantId !== null) {
+        const [variant] = await sql`
+          SELECT id, variant_name, price_override
+          FROM product_variants
+          WHERE id         = ${variantId}
+            AND product_id = ${item.product_id}
+            AND user_id    = ${userId}
+            AND is_active  = TRUE
+        `;
+        if (!variant)
+          return createErrorResponse(
+            `Variante #${variantId} no encontrada o no pertenece a "${product.name}"`,
+            404
+          );
+      }
+
+      // FIFO: filtrar batches por product_id + variant_id
+      // Si variant_id es null → buscar batches sin variante asignada
+      // Si variant_id tiene valor → buscar batches de esa variante
+      const batches = variantId !== null
+        ? await sql`
+            SELECT id, qty_available, unit_cost
+            FROM inventory_batches
+            WHERE user_id    = ${userId}
+              AND product_id = ${item.product_id}
+              AND variant_id = ${variantId}
+              AND qty_available > 0
+            ORDER BY received_at ASC
+          `
+        : await sql`
+            SELECT id, qty_available, unit_cost
+            FROM inventory_batches
+            WHERE user_id    = ${userId}
+              AND product_id = ${item.product_id}
+              AND variant_id IS NULL
+              AND qty_available > 0
+            ORDER BY received_at ASC
+          `;
+
+      const totalAvailable = batches.reduce(
+        (acc: number, b: any) => acc + Number(b.qty_available), 0
+      );
+
+      const label = variantId !== null
+        ? `${product.name} (variante #${variantId})`
+        : product.name;
+>>>>>>> Stashed changes
+
       if (totalAvailable < item.quantity) {
         const [product] = await sql`SELECT name FROM products WHERE id = ${item.product_id}`;
         return createErrorResponse(
+<<<<<<< Updated upstream
           `Stock insuficiente para "${product?.name}". Disponible: ${totalAvailable}`, 400
+=======
+          `Stock insuficiente para "${label}". Disponible: ${totalAvailable}`,
+          400
+>>>>>>> Stashed changes
         );
       }
 
+      // Calcular costo promedio FIFO
       let remaining = item.quantity;
       let totalCost = 0;
       for (const batch of batches) {
@@ -187,13 +274,18 @@ export async function POST(request: NextRequest) {
 
       processedItems.push({
         product_id:    item.product_id,
-        variant_id:    item.variant_id ?? null,
+        variant_id:    variantId,
         quantity:      item.quantity,
         unit_price:    item.unit_price,
         unit_cost:     totalCost / item.quantity,
         item_discount: item.discount ?? 0,
         line_total:    item.unit_price * item.quantity - (item.discount ?? 0),
         batches,
+<<<<<<< Updated upstream
+=======
+        is_service:    false,
+        label,
+>>>>>>> Stashed changes
       });
     }
 
@@ -204,10 +296,17 @@ export async function POST(request: NextRequest) {
         const supply_id = Number(s.supply_id);
         const quantity  = Number(s.quantity);
         const unit_cost = Number(s.unit_cost);
-        if (!supply_id || quantity <= 0) return createErrorResponse("Datos de suministro inválidos", 400);
-        const [supply] = await sql`SELECT id FROM supplies WHERE id = ${supply_id} AND user_id = ${userId}`;
-        if (!supply) return createErrorResponse(`Suministro #${supply_id} no encontrado`, 404);
-        normalizedSupplies.push({ supply_id, quantity, unit_cost, line_total: quantity * unit_cost });
+        if (!supply_id || quantity <= 0)
+          return createErrorResponse("Datos de suministro inválidos", 400);
+        const [supply] = await sql`
+          SELECT id FROM supplies WHERE id = ${supply_id} AND user_id = ${userId}
+        `;
+        if (!supply)
+          return createErrorResponse(`Suministro #${supply_id} no encontrado`, 404);
+        normalizedSupplies.push({
+          supply_id, quantity, unit_cost,
+          line_total: quantity * unit_cost,
+        });
       }
     }
 
@@ -225,9 +324,13 @@ export async function POST(request: NextRequest) {
 
     // ── Número de venta ─────────────────────────────────────────────────
     const [lastSale] = await sql`
-      SELECT sale_number FROM sales WHERE user_id = ${userId} ORDER BY created_at DESC LIMIT 1
+      SELECT sale_number FROM sales
+      WHERE user_id = ${userId}
+      ORDER BY created_at DESC LIMIT 1
     `;
-    const lastNum    = lastSale ? parseInt(String(lastSale.sale_number).replace(/\D/g, "")) || 0 : 0;
+    const lastNum    = lastSale
+      ? parseInt(String(lastSale.sale_number).replace(/\D/g, "")) || 0
+      : 0;
     const saleNumber = `VTA-${String(lastNum + 1).padStart(5, "0")}`;
 
     const txParts: string[] = [`Venta ${saleNumber}`];
@@ -250,7 +353,8 @@ export async function POST(request: NextRequest) {
           status, sold_at, notes
         ) VALUES (
           ${userId}, ${saleNumber}, ${customer_id ?? null},
-          ${subtotal}, ${totalDiscount}, ${taxRateNum}, ${taxAmount}, ${shippingAmount}, ${grandTotal},
+          ${subtotal}, ${totalDiscount}, ${taxRateNum}, ${taxAmount},
+          ${shippingAmount}, ${grandTotal},
           ${payment_method}, ${account_id}, ${eventIdNum},
           ${status}, ${occurredAt}::timestamptz, ${notes ?? null}
         )
@@ -258,18 +362,25 @@ export async function POST(request: NextRequest) {
       `;
       const saleId = sale.id as number;
 
+<<<<<<< Updated upstream
       // 2. Items + FIFO (SIEMPRE se descuenta inventario)
+=======
+      // 2. Items + FIFO con variantes
+>>>>>>> Stashed changes
       for (const item of processedItems) {
         await sql`
           INSERT INTO sale_items (
             user_id, sale_id, product_id, variant_id,
             quantity, unit_price, unit_cost, line_total
           ) VALUES (
-            ${userId}, ${saleId}, ${item.product_id}, ${item.variant_id},
-            ${item.quantity}, ${item.unit_price}, ${item.unit_cost}, ${item.line_total}
+            ${userId}, ${saleId},
+            ${item.product_id}, ${item.variant_id},
+            ${item.quantity}, ${item.unit_price},
+            ${item.unit_cost}, ${item.line_total}
           )
         `;
 
+<<<<<<< Updated upstream
         let remaining = item.quantity;
         for (const batch of item.batches) {
           if (remaining <= 0) break;
@@ -278,6 +389,32 @@ export async function POST(request: NextRequest) {
             UPDATE inventory_batches
             SET qty_available = qty_available - ${take}
             WHERE id = ${batch.id} AND user_id = ${userId}
+=======
+        if (!item.is_service) {
+          // Descontar batches FIFO
+          let remaining = item.quantity;
+          for (const batch of item.batches) {
+            if (remaining <= 0) break;
+            const take = Math.min(remaining, Number(batch.qty_available));
+            await sql`
+              UPDATE inventory_batches
+              SET qty_available = qty_available - ${take}
+              WHERE id = ${batch.id} AND user_id = ${userId}
+            `;
+            remaining -= take;
+          }
+
+          // Movimiento de inventario con variant_id
+          await sql`
+            INSERT INTO inventory_movements (
+              user_id, movement_type, product_id, variant_id,
+              quantity, reference_type, reference_id
+            ) VALUES (
+              ${userId}, 'OUT',
+              ${item.product_id}, ${item.variant_id},
+              ${item.quantity}, 'SALE', ${saleId}
+            )
+>>>>>>> Stashed changes
           `;
           remaining -= take;
         }
@@ -296,20 +433,33 @@ export async function POST(request: NextRequest) {
       // 3. Suministros (SIEMPRE)
       for (const s of normalizedSupplies) {
         await sql`
-          INSERT INTO sale_supplies (user_id, sale_id, supply_id, quantity, unit_cost, line_total)
-          VALUES (${userId}, ${saleId}, ${s.supply_id}, ${s.quantity}, ${s.unit_cost}, ${s.line_total})
+          INSERT INTO sale_supplies (
+            user_id, sale_id, supply_id,
+            quantity, unit_cost, line_total
+          )
+          VALUES (
+            ${userId}, ${saleId}, ${s.supply_id},
+            ${s.quantity}, ${s.unit_cost}, ${s.line_total}
+          )
         `;
         await sql`
-          UPDATE supplies SET stock = GREATEST(0, stock - ${s.quantity})
+          UPDATE supplies
+          SET stock = GREATEST(0, stock - ${s.quantity})
           WHERE id = ${s.supply_id} AND user_id = ${userId}
         `;
         await sql`
-          INSERT INTO supply_movements (user_id, movement_type, supply_id, quantity, reference_type, reference_id)
-          VALUES (${userId}, 'OUT', ${s.supply_id}, ${s.quantity}, 'SALE', ${saleId})
+          INSERT INTO supply_movements (
+            user_id, movement_type, supply_id,
+            quantity, reference_type, reference_id
+          )
+          VALUES (
+            ${userId}, 'OUT', ${s.supply_id},
+            ${s.quantity}, 'SALE', ${saleId}
+          )
         `;
       }
 
-      // 4. Transacción + balance + cliente SOLO si COMPLETED
+      // 4. Transacción + balance + cliente — solo si COMPLETED
       if (status === "COMPLETED") {
         const txRefType = eventIdNum ? "EVENT" : "SALE";
         const txRefId   = eventIdNum ? eventIdNum : saleId;
@@ -317,7 +467,8 @@ export async function POST(request: NextRequest) {
         await sql`
           INSERT INTO transactions (
             user_id, type, account_id, amount,
-            category, description, reference_type, reference_id, occurred_at
+            category, description,
+            reference_type, reference_id, occurred_at
           ) VALUES (
             ${userId}, 'INCOME', ${account_id}, ${grandTotal},
             'Ventas', ${txDescription},
@@ -326,14 +477,21 @@ export async function POST(request: NextRequest) {
         `;
 
         await sql`
-          UPDATE accounts SET balance = balance + ${grandTotal}
+          UPDATE accounts
+          SET balance = balance + ${grandTotal}
           WHERE id = ${account_id} AND user_id = ${userId}
         `;
 
         if (customer_id) {
           await sql`
             UPDATE customers
+<<<<<<< Updated upstream
             SET total_orders = total_orders + 1, total_spent = total_spent + ${grandTotal}, updated_at = CURRENT_TIMESTAMP
+=======
+            SET total_orders = total_orders + 1,
+                total_spent  = total_spent  + ${grandTotal},
+                updated_at   = CURRENT_TIMESTAMP
+>>>>>>> Stashed changes
             WHERE id = ${customer_id} AND user_id = ${userId}
           `;
         }
@@ -342,12 +500,20 @@ export async function POST(request: NextRequest) {
       await sql`COMMIT`;
 
       return Response.json({
-        message: status === "PENDING" ? "Venta pendiente registrada" : "Venta registrada exitosamente",
+        message: status === "PENDING"
+          ? "Venta pendiente registrada"
+          : "Venta registrada exitosamente",
         data: {
-          id: saleId, sale_number: saleNumber, status,
-          subtotal, discount: totalDiscount, tax_rate: taxRateNum,
-          tax: taxAmount, shipping_cost: shippingAmount,
-          supplies_cost: suppliesCost, total: grandTotal,
+          id:            saleId,
+          sale_number:   saleNumber,
+          status,
+          subtotal,
+          discount:      totalDiscount,
+          tax_rate:      taxRateNum,
+          tax:           taxAmount,
+          shipping_cost: shippingAmount,
+          supplies_cost: suppliesCost,
+          total:         grandTotal,
         },
       }, { status: 201 });
 

@@ -15,7 +15,7 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
-import { Loader2, PackagePlus, Calculator, Wallet } from "lucide-react";
+import { Loader2, PackagePlus, Calculator, Wallet, Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { useCreatePurchase } from "@/hooks/swr/use-purchases";
@@ -34,20 +34,36 @@ const CURRENCY_NAMES: Record<string, string> = {
   EUR: "Euros",
 };
 
-type CostMode = "unit" | "total";
+// ── Tipos ──────────────────────────────────────────────────────────────
+
+// "base" = producto sin variante, número como string = variant_id
+type VariantKey = "base" | string;
+
+type LineItem = {
+  key:         string; // id interno para React key
+  variant_key: VariantKey;
+  quantity:    string;
+  unit_cost:   string; // en la moneda seleccionada (USD o HNL)
+};
+
+// ── Schema — solo campos de cabecera ──────────────────────────────────
 
 const schema = z.object({
   account_id:    z.coerce.number().min(1, "Selecciona una cuenta"),
-  quantity:      z.coerce.number().int().min(1, "Mínimo 1 unidad"),
-  unit_cost_usd: z.coerce.number().min(0, "El costo debe ser mayor o igual a 0"),
   currency:      z.enum(["USD", "HNL"]),
-  exchange_rate: z.coerce.number().min(1, "La tasa de cambio debe ser mayor a 0"),
+  exchange_rate: z.coerce.number().min(1, "La tasa debe ser mayor a 0"),
   shipping:      z.coerce.number().min(0).default(0),
   notes:         z.string().optional(),
   purchased_at:  z.string().optional(),
 });
 
 type FormData = z.infer<typeof schema>;
+
+function uid() {
+  return Math.random().toString(36).slice(2, 9);
+}
+
+// ── Props ──────────────────────────────────────────────────────────────
 
 type Props = {
   product:      Product | null;
@@ -56,15 +72,19 @@ type Props = {
   onSuccess:    () => void;
 };
 
+// ── Componente ─────────────────────────────────────────────────────────
+
 export function AddInventoryDialog({ product, open, onOpenChange, onSuccess }: Props) {
   const { createPurchase, isCreating } = useCreatePurchase();
   const { accounts }                   = useAccounts();
   const { format, symbol, currency: businessCurrency } = useCurrency();
-  const [costMode, setCostMode]        = useState<CostMode>("total");
-  const [totalInput, setTotalInput]    = useState<string>("");
+
+  const [items, setItems] = useState<LineItem[]>([
+    { key: uid(), variant_key: "base", quantity: "1", unit_cost: "0" },
+  ]);
 
   const {
-    register, handleSubmit, reset, control, setValue, getValues,
+    register, handleSubmit, reset, control, setValue,
     formState: { errors },
   } = useForm<FormData>({
     resolver: zodResolver(schema),
@@ -72,59 +92,68 @@ export function AddInventoryDialog({ product, open, onOpenChange, onSuccess }: P
       currency:      "USD",
       exchange_rate: TASA_DEFAULT,
       shipping:      0,
-      quantity:      1,
-      unit_cost_usd: 0,
     },
   });
 
-  const quantity     = useWatch({ control, name: "quantity" });
-  const unitCostUsd  = useWatch({ control, name: "unit_cost_usd" });
   const currency     = useWatch({ control, name: "currency" });
   const exchangeRate = useWatch({ control, name: "exchange_rate" });
   const shipping     = useWatch({ control, name: "shipping" });
 
-  const qty  = Number(quantity)     || 0;
-  const cost = Number(unitCostUsd)  || 0;
-  const rate = Number(exchangeRate) || TASA_DEFAULT;
-  const ship = Number(shipping)     || 0;
+  const rate  = Number(exchangeRate) || TASA_DEFAULT;
+  const ship  = Number(shipping)     || 0;
   const isUSD = currency === "USD";
 
-  const unitCostHnl     = isUSD ? cost * rate : cost;
-  const shippingPerUnit = qty > 0 ? ship / qty : 0;
-  const finalUnitCost   = unitCostHnl + shippingPerUnit;
-  const totalCost       = finalUnitCost * qty;
+  const totalUnits      = items.reduce((acc, i) => acc + (Number(i.quantity) || 0), 0);
+  const shippingPerUnit = totalUnits > 0 ? ship / totalUnits : 0;
 
-  // Sync totalInput when switching to total mode or qty changes
-  useEffect(() => {
-    if (costMode === "total" && cost > 0 && qty > 0) {
-      setTotalInput(String(+(cost * qty).toFixed(4)));
-    }
-  }, [costMode, qty]);
-
-  const handleTotalInput = (raw: string) => {
-    setTotalInput(raw);
-    const rawTotal = Number(raw) || 0;
-    if (qty <= 0) return;
-    const unitOriginal = rawTotal / qty;
-    setValue("unit_cost_usd", Math.max(0, unitOriginal));
-  };
+  const totalCost = items.reduce((acc, i) => {
+    const qty     = Number(i.quantity)  || 0;
+    const cost    = Number(i.unit_cost) || 0;
+    const costHnl = isUSD ? cost * rate : cost;
+    return acc + (costHnl + shippingPerUnit) * qty;
+  }, 0);
 
   useEffect(() => {
     if (open) {
-      setCostMode("total");
+      setItems([{ key: uid(), variant_key: "base", quantity: "1", unit_cost: "0" }]);
       reset({
         currency:      "USD",
         exchange_rate: TASA_DEFAULT,
         shipping:      0,
-        quantity:      1,
-        unit_cost_usd: 0,
         purchased_at:  new Date().toISOString().split("T")[0],
       });
     }
   }, [open, reset]);
 
+  // ── Manejo de items ────────────────────────────────────────────────
+
+  const addItem = () =>
+    setItems((prev) => [...prev, { key: uid(), variant_key: "base", quantity: "1", unit_cost: "0" }]);
+
+  const removeItem = (key: string) =>
+    setItems((prev) => prev.filter((i) => i.key !== key));
+
+  const updateItem = (key: string, field: keyof Omit<LineItem, "key">, value: string) =>
+    setItems((prev) => prev.map((i) => i.key === key ? { ...i, [field]: value } : i));
+
+  // Claves ya usadas por otras filas (para deshabilitar en el selector)
+  const usedVariantKeys = (currentKey: string) =>
+    items.filter((i) => i.key !== currentKey).map((i) => i.variant_key);
+
+  // ── Submit ──────────────────────────────────────────────────────────
+
   const onSubmit = async (data: FormData) => {
     if (!product) return;
+
+    for (const item of items) {
+      if (!item.quantity || Number(item.quantity) < 1) {
+        toast.error("Todas las filas deben tener al menos 1 unidad"); return;
+      }
+      if (Number(item.unit_cost) < 0) {
+        toast.error("El costo no puede ser negativo"); return;
+      }
+    }
+
     try {
       await createPurchase({
         account_id:    data.account_id,
@@ -135,10 +164,15 @@ export function AddInventoryDialog({ product, open, onOpenChange, onSuccess }: P
         purchased_at:  data.purchased_at
           ? new Date(data.purchased_at + "T00:00:00-06:00").toISOString()
           : new Date().toISOString(),
-        items: [{ product_id: product.id, product_name: product.name, quantity: data.quantity, unit_cost_usd: data.unit_cost_usd }],
-
+        items: items.map((item) => ({
+          product_id:    product.id,
+          variant_id:    item.variant_key === "base" ? undefined : Number(item.variant_key),
+          quantity:      Number(item.quantity),
+          unit_cost_usd: Number(item.unit_cost),
+        })),
       });
-      toast.success(`${data.quantity} unidades de ${product.name} registradas`);
+
+      toast.success(`${totalUnits} unidades registradas para ${product.name}`);
       onOpenChange(false);
       onSuccess();
     } catch (error: any) {
@@ -146,7 +180,25 @@ export function AddInventoryDialog({ product, open, onOpenChange, onSuccess }: P
     }
   };
 
+  // ── Helpers ─────────────────────────────────────────────────────────
+
+  const getVariantLabel = (variantKey: VariantKey) => {
+    if (variantKey === "base") return `${product?.name ?? "Producto"} (base)`;
+    const v = product?.variants.find((v) => String(v.id) === variantKey);
+    return v?.variant_name ?? "Variante";
+  };
+
+  const getVariantPrice = (variantKey: VariantKey): number => {
+    if (variantKey === "base") return Number(product?.price ?? 0);
+    const v = product?.variants.find((v) => String(v.id) === variantKey);
+    return v?.price_override != null ? Number(v.price_override) : Number(product?.price ?? 0);
+  };
+
   if (!product) return null;
+
+  const hasVariants   = product.variants.length > 0;
+  const maxItems      = product.variants.length + 1; // base + cada variante
+  const canAddMore    = !hasVariants ? false : items.length < maxItems;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -157,11 +209,8 @@ export function AddInventoryDialog({ product, open, onOpenChange, onSuccess }: P
           "max-h-[92dvh] flex flex-col p-0",
           "sm:bottom-auto sm:left-1/2 sm:right-auto sm:top-1/2",
           "sm:-translate-x-1/2 sm:-translate-y-1/2",
-          "sm:w-full sm:max-w-md",
-          "lg:max-w-xl",
-          "xl:max-w-xl",
-          "sm:rounded-2xl sm:border",
-          "sm:max-h-[88vh]",
+          "sm:w-full sm:max-w-lg lg:max-w-2xl",
+          "sm:rounded-2xl sm:border sm:max-h-[88vh]",
           "data-[state=open]:animate-in data-[state=closed]:animate-out",
           "data-[state=open]:slide-in-from-bottom sm:data-[state=open]:slide-in-from-bottom-[48%]",
           "data-[state=closed]:slide-out-to-bottom sm:data-[state=closed]:slide-out-to-bottom-[48%]",
@@ -170,12 +219,10 @@ export function AddInventoryDialog({ product, open, onOpenChange, onSuccess }: P
         onInteractOutside={(e) => e.preventDefault()}
         onEscapeKeyDown={() => onOpenChange(false)}
       >
-        {/* Handle móvil */}
         <div className="sm:hidden flex justify-center pt-3 pb-1 shrink-0">
           <div className="w-10 h-1 rounded-full bg-muted-foreground/30" />
         </div>
 
-        {/* Header */}
         <DialogHeader className="shrink-0 px-5 pt-2 pb-3 sm:pt-5 border-b">
           <DialogTitle className="flex items-center gap-2 text-lg font-bold">
             <PackagePlus className="h-5 w-5 text-primary" />
@@ -183,18 +230,18 @@ export function AddInventoryDialog({ product, open, onOpenChange, onSuccess }: P
           </DialogTitle>
           <p className="text-sm text-muted-foreground truncate">
             {product.name}
-            {product.sku && <span className="font-mono ml-2 text-xs">({product.sku})</span>}
+            {product.sku && (
+              <span className="font-mono ml-2 text-xs">({product.sku})</span>
+            )}
           </p>
         </DialogHeader>
 
-        {/* Scroll */}
         <form
           id="add-inventory-form"
           onSubmit={handleSubmit(onSubmit)}
           className="flex-1 overflow-y-auto px-5 py-4 space-y-4"
           style={{ scrollbarWidth: "none" } as React.CSSProperties}
         >
-
           {/* Cuenta */}
           <div className="space-y-1.5">
             <Label className="text-sm font-medium flex items-center gap-1.5">
@@ -208,7 +255,7 @@ export function AddInventoryDialog({ product, open, onOpenChange, onSuccess }: P
               <SelectTrigger className={cn("h-11 w-full", errors.account_id && "border-destructive")}>
                 <SelectValue placeholder="Selecciona una cuenta" />
               </SelectTrigger>
-              <SelectContent className="w-full">
+              <SelectContent>
                 {accounts.map((a) => (
                   <SelectItem key={a.id} value={String(a.id)}>
                     <div className="flex items-center justify-between gap-8 w-full">
@@ -226,28 +273,10 @@ export function AddInventoryDialog({ product, open, onOpenChange, onSuccess }: P
             )}
           </div>
 
-          <Separator />
-
-          {/* Cantidad */}
-          <div className="space-y-1.5">
-            <Label className="text-sm font-medium">
-              Cantidad <span className="text-destructive text-xs">*</span>
-            </Label>
-            <Input
-              type="number" min="1"
-              {...register("quantity")}
-              disabled={isCreating}
-              className="h-11 text-base"
-            />
-            {errors.quantity && <p className="text-xs text-destructive">{errors.quantity.message}</p>}
-          </div>
-
           {/* Moneda + Tasa */}
           <div className={`grid gap-3 ${isUSD ? "grid-cols-2" : "grid-cols-1"}`}>
             <div className="space-y-1.5">
-              <Label className="text-sm font-medium">
-                Moneda <span className="text-destructive text-xs">*</span>
-              </Label>
+              <Label className="text-sm font-medium">Moneda</Label>
               <Select
                 defaultValue="USD"
                 onValueChange={(val) => setValue("currency", val as "USD" | "HNL")}
@@ -266,9 +295,7 @@ export function AddInventoryDialog({ product, open, onOpenChange, onSuccess }: P
             </div>
             {isUSD && (
               <div className="space-y-1.5">
-                <Label className="text-sm font-medium">
-                  USD → {symbol} <span className="text-destructive text-xs">*</span>
-                </Label>
+                <Label className="text-sm font-medium">USD → {symbol}</Label>
                 <Input
                   type="number" step="0.01"
                   placeholder={`${TASA_DEFAULT}`}
@@ -283,73 +310,166 @@ export function AddInventoryDialog({ product, open, onOpenChange, onSuccess }: P
             )}
           </div>
 
-          {/* Costo — toggle unitario / total */}
-          <div className="space-y-1.5">
+          <Separator />
+
+          {/* ── Items dinámicos ────────────────────────────────────── */}
+          <div className="space-y-3">
             <div className="flex items-center justify-between">
               <Label className="text-sm font-medium">
-                Costo ({isUSD ? "USD" : symbol}) <span className="text-destructive text-xs">*</span>
+                {hasVariants ? "Producto / variantes" : "Cantidad y costo"}
               </Label>
-              <div className="flex rounded-lg border overflow-hidden text-xs">
-                {(["unit", "total"] as CostMode[]).map((mode, i) => (
-                  <button
-                    key={mode}
-                    type="button"
-                    disabled={isCreating}
-                    onClick={() => setCostMode(mode)}
-                    className={`px-3 py-1 font-medium transition-colors ${i > 0 ? "border-l" : ""} ${
-                      costMode === mode
-                        ? "bg-primary text-primary-foreground"
-                        : "text-muted-foreground hover:bg-muted"
-                    }`}
-                  >
-                    {mode === "unit" ? "Por unidad" : "Total"}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            <div className="relative">
-              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm font-medium">
-                {isUSD ? "$" : symbol}
-              </span>
-              {costMode === "unit" ? (
-                <Input
-                  type="number" step="0.01" min="0" placeholder="0.00"
-                  {...register("unit_cost_usd")}
+              {canAddMore && (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={addItem}
                   disabled={isCreating}
-                  className="h-11 pl-8 text-base"
-                />
-              ) : (
-                <Input
-                  type="number" step="0.01" min="0" placeholder="0.00"
-                  value={totalInput}
-                  onChange={(e) => handleTotalInput(e.target.value)}
-                  disabled={isCreating || qty <= 0}
-                  className="h-11 pl-8 text-base"
-                />
+                  className="h-7 text-xs gap-1 text-primary hover:text-primary"
+                >
+                  <Plus className="h-3 w-3" />
+                  Agregar fila
+                </Button>
               )}
             </div>
 
-            {/* Valor derivado */}
-            {cost > 0 && qty > 0 && (
-              <p className="text-xs text-muted-foreground text-right">
-                {costMode === "unit"
-                  ? <>Total ({qty} uds): <span className="font-medium text-foreground">{isUSD ? `$${(cost * qty).toFixed(2)}` : format(cost * qty)}</span></>
-                  : <>Por unidad: <span className="font-medium text-foreground">{isUSD ? `$${cost.toFixed(2)}` : format(cost)}</span></>
-                }
-              </p>
-            )}
+            {/* Cabecera de columnas */}
+            <div className={cn(
+              "grid gap-2 text-xs text-muted-foreground font-medium",
+              hasVariants
+                ? "grid-cols-[1fr_72px_96px_32px]"
+                : "grid-cols-[72px_96px]"
+            )}>
+              {hasVariants && <span>Variante</span>}
+              <span className="text-center">Cant.</span>
+              <span>Costo ({isUSD ? "USD" : symbol})</span>
+              {hasVariants && <span />}
+            </div>
 
-            {errors.unit_cost_usd && (
-              <p className="text-xs text-destructive">{errors.unit_cost_usd.message}</p>
-            )}
+            {/* Filas */}
+            {items.map((item) => {
+              const qty       = Number(item.quantity)  || 0;
+              const cost      = Number(item.unit_cost) || 0;
+              const costHnl   = isUSD ? cost * rate : cost;
+              const unitFinal = costHnl + shippingPerUnit;
+              const salePrice = getVariantPrice(item.variant_key);
+              const margin    = salePrice - unitFinal;
+              const used      = usedVariantKeys(item.key);
+
+              return (
+                <div key={item.key} className="space-y-1">
+                  <div className={cn(
+                    "grid gap-2 items-center",
+                    hasVariants
+                      ? "grid-cols-[1fr_72px_96px_32px]"
+                      : "grid-cols-[72px_96px]"
+                  )}>
+                    {/* Selector de variante */}
+                    {hasVariants && (
+                      <Select
+                        value={item.variant_key}
+                        onValueChange={(val) => updateItem(item.key, "variant_key", val)}
+                        disabled={isCreating}
+                      >
+                        <SelectTrigger className="h-10 text-sm">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="base" disabled={used.includes("base")}>
+                            <span className={cn(used.includes("base") && "opacity-40")}>
+                              {product.name} (base)
+                            </span>
+                          </SelectItem>
+                          {product.variants.map((v) => {
+                            const isUsed = used.includes(String(v.id));
+                            return (
+                              <SelectItem key={v.id} value={String(v.id)} disabled={isUsed}>
+                                <span className={cn(isUsed && "opacity-40")}>
+                                  {v.variant_name}
+                                  {v.price_override != null && v.price_override !== product.price && (
+                                    <span className="ml-1.5 text-xs text-muted-foreground font-mono">
+                                      {format(v.price_override)}
+                                    </span>
+                                  )}
+                                </span>
+                              </SelectItem>
+                            );
+                          })}
+                        </SelectContent>
+                      </Select>
+                    )}
+
+                    {/* Cantidad */}
+                    <Input
+                      type="number"
+                      min="1"
+                      value={item.quantity}
+                      onChange={(e) => updateItem(item.key, "quantity", e.target.value)}
+                      disabled={isCreating}
+                      className="h-10 text-sm text-center"
+                    />
+
+                    {/* Costo */}
+                    <div className="relative">
+                      <span className="absolute left-2 top-1/2 -translate-y-1/2 text-muted-foreground text-xs">
+                        {isUSD ? "$" : symbol}
+                      </span>
+                      <Input
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        placeholder="0.00"
+                        value={item.unit_cost}
+                        onChange={(e) => updateItem(item.key, "unit_cost", e.target.value)}
+                        disabled={isCreating}
+                        className="h-10 text-sm pl-5"
+                      />
+                    </div>
+
+                    {/* Eliminar fila */}
+                    {hasVariants && (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => removeItem(item.key)}
+                        disabled={isCreating || items.length === 1}
+                        className="h-10 w-8 text-muted-foreground hover:text-destructive"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </Button>
+                    )}
+                  </div>
+
+                  {/* Mini resumen por fila */}
+                  {qty > 0 && cost > 0 && (
+                    <p className="text-xs text-muted-foreground leading-none pl-0.5">
+                      {qty} × {format(unitFinal)} ={" "}
+                      <span className="font-medium text-foreground">{format(unitFinal * qty)}</span>
+                      {salePrice > 0 && (
+                        <span className={cn(
+                          "ml-2 font-medium",
+                          margin >= 0 ? "text-green-600" : "text-destructive"
+                        )}>
+                          Margen: {format(margin)}
+                        </span>
+                      )}
+                    </p>
+                  )}
+                </div>
+              );
+            })}
           </div>
 
           {/* Envío */}
           <div className="space-y-1.5">
             <Label className="text-sm font-medium">
               Gastos de envío ({symbol})
-              <span className="text-xs text-muted-foreground font-normal ml-1">· se distribuye entre unidades</span>
+              {ship > 0 && totalUnits > 0 && (
+                <span className="text-xs text-muted-foreground font-normal ml-1">
+                  · {format(shippingPerUnit)}/ud distribuido entre {totalUnits} uds
+                </span>
+              )}
             </Label>
             <div className="relative">
               <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm font-medium">
@@ -364,32 +484,39 @@ export function AddInventoryDialog({ product, open, onOpenChange, onSuccess }: P
             </div>
           </div>
 
-          {/* Resumen */}
-          {qty > 0 && cost > 0 && (
+          {/* Resumen total */}
+          {totalUnits > 0 && totalCost > 0 && (
             <div className="rounded-lg bg-primary/5 border border-primary/10 p-3 space-y-1.5">
               <div className="flex items-center gap-1.5 text-xs font-medium text-primary mb-2">
                 <Calculator className="h-3.5 w-3.5" />
-                Resumen
+                Resumen de la compra
               </div>
-              {isUSD && (
-                <div className="flex justify-between text-xs text-muted-foreground">
-                  <span>Costo (USD → {symbol})</span>
-                  <span>${cost.toFixed(2)} × {rate} = {format(unitCostHnl)}</span>
-                </div>
-              )}
+              {items
+                .filter((i) => Number(i.quantity) > 0 && Number(i.unit_cost) > 0)
+                .map((item) => {
+                  const qty       = Number(item.quantity);
+                  const cost      = Number(item.unit_cost);
+                  const costHnl   = isUSD ? cost * rate : cost;
+                  const unitFinal = costHnl + shippingPerUnit;
+                  return (
+                    <div key={item.key} className="flex justify-between text-xs text-muted-foreground">
+                      <span className="truncate max-w-[55%]">{getVariantLabel(item.variant_key)}</span>
+                      <span>
+                        {qty} uds · {format(unitFinal)}/u ={" "}
+                        <span className="font-medium text-foreground">{format(unitFinal * qty)}</span>
+                      </span>
+                    </div>
+                  );
+                })}
               {ship > 0 && (
                 <div className="flex justify-between text-xs text-muted-foreground">
-                  <span>Envío por unidad</span>
-                  <span>{format(shippingPerUnit)}</span>
+                  <span>Envío total</span>
+                  <span>{format(ship)}</span>
                 </div>
               )}
               <Separator className="my-1" />
-              <div className="flex justify-between text-xs font-medium">
-                <span>Costo unitario final</span>
-                <span>{format(finalUnitCost)}</span>
-              </div>
               <div className="flex justify-between text-sm font-bold text-primary">
-                <span>Total ({qty} uds)</span>
+                <span>Total ({totalUnits} uds)</span>
                 <span>{format(totalCost)}</span>
               </div>
             </div>
@@ -421,11 +548,10 @@ export function AddInventoryDialog({ product, open, onOpenChange, onSuccess }: P
               className="h-11 text-base"
             />
           </div>
-
         </form>
 
-        {/* Footer fijo */}
-         <div className="shrink-0 px-5 py-4 border-t bg-transparent xl:bg-transparent md:bg-transparent sm:bg-background flex gap-3">
+        {/* Footer */}
+        <div className="shrink-0 px-5 py-4 border-t bg-transparent xl:bg-transparent md:bg-transparent sm:bg-background flex gap-3">
           <Button
             type="button" variant="outline"
             onClick={() => onOpenChange(false)}

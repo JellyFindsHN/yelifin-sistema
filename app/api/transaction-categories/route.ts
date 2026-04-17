@@ -1,9 +1,12 @@
 // app/api/transaction-categories/route.ts
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest } from "next/server";
 import { neon } from "@neondatabase/serverless";
 import { verifyAuth, createErrorResponse, isAuthSuccess } from "@/lib/auth";
 
 const sql = neon(process.env.DATABASE_URL!);
+
+const VALID_TYPES = ["INCOME", "EXPENSE", "TRANSFER"] as const;
+type TransactionType = (typeof VALID_TYPES)[number];
 
 export async function GET(request: NextRequest) {
   const auth = await verifyAuth(request);
@@ -14,23 +17,25 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const type = searchParams.get("type");
 
-    const categories = type
-      ? await sql`
-          SELECT id, name, type, is_active
-          FROM transaction_categories
-          WHERE user_id = ${userId} AND type = ${type}
-          ORDER BY type, name
-        `
-      : await sql`
-          SELECT id, name, type, is_active
-          FROM transaction_categories
-          WHERE user_id = ${userId}
-          ORDER BY type, name
-        `;
-    console.log("Categorías obtenidas:", categories);
-    return Response.json(categories);
-  } catch (error: any) {
-    console.error(" GET /api/transaction-categories:", error);
+    if (type && !VALID_TYPES.includes(type as TransactionType)) {
+      return createErrorResponse(
+        "Tipo inválido. Debe ser INCOME, EXPENSE o TRANSFER",
+        400
+      );
+    }
+
+    const categories = await sql`
+      SELECT id, name, type, is_active, created_at
+      FROM transaction_categories
+      WHERE user_id  = ${userId}
+        AND (${type}::text IS NULL OR type = ${type})
+        AND is_active = TRUE
+      ORDER BY type, name
+    `;
+
+    return Response.json({ data: categories });
+  } catch (error) {
+    console.error("GET /api/transaction-categories:", error);
     return createErrorResponse("Error al obtener categorías", 500);
   }
 }
@@ -41,19 +46,31 @@ export async function POST(request: NextRequest) {
 
   try {
     const { userId } = auth.data;
-    const { name, type } = await request.json();
+    const body = await request.json();
+    const { name, type } = body;
 
-    if (!name || !type) {
-      return createErrorResponse("Nombre y tipo son requeridos", 400);
+    if (!name || typeof name !== "string" || name.trim().length < 1) {
+      return createErrorResponse("El nombre es requerido", 400);
+    }
+
+    if (!type) {
+      return createErrorResponse("El tipo es requerido", 400);
+    }
+
+    if (!VALID_TYPES.includes(type as TransactionType)) {
+      return createErrorResponse(
+        "Tipo inválido. Debe ser INCOME, EXPENSE o TRANSFER",
+        400
+      );
     }
 
     const [category] = await sql`
       INSERT INTO transaction_categories (user_id, name, type)
-      VALUES (${userId}, ${name}, ${type})
+      VALUES (${userId}, ${name.trim()}, ${type})
       RETURNING *
     `;
 
-    return Response.json(category, { status: 201 });
+    return Response.json({ data: category }, { status: 201 });
   } catch (error: any) {
     if (error.code === "23505") {
       return createErrorResponse(
@@ -61,7 +78,7 @@ export async function POST(request: NextRequest) {
         409
       );
     }
-    console.error(" POST /api/transaction-categories:", error);
+    console.error("POST /api/transaction-categories:", error);
     return createErrorResponse("Error al crear categoría", 500);
   }
 }

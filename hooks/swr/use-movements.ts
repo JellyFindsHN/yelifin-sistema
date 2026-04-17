@@ -6,45 +6,64 @@ import { useAuth } from '@/hooks/use-auth';
 
 const KEY = '/api/inventory/movements';
 
+// ── Tipos ──────────────────────────────────────────────────────────────
+
 export type Movement = {
-  id: number;
-  movement_type: 'IN' | 'OUT';
-  product_id: number;
-  product_name: string;
-  image_url: string | null;
-  sku: string | null;
-  quantity: number;
-  reference_type: 'PURCHASE' | 'SALE' | 'ADJUSTMENT' | 'INITIAL';
-  reference_id: number | null;
-  notes: string | null;
-  created_at: string;
-  // IN — compra
-  unit_cost_usd: number | null;
-  unit_cost_hnl: number | null;
-  shipping_per_unit: number | null;
-  total_cost: number | null;
-  // OUT — venta
-  unit_price: number | null;
-  unit_cost: number | null;
-  line_total: number | null;
-  profit: number | null;
-  sale_number: string | null;
+  id:             number;
+  movement_type:  'IN' | 'OUT' | 'ADJUST';
+  product_id:     number;
+  product_name:   string;
+  image_url:      string | null;
+  sku:            string | null;
+  // Variante (null si el movimiento es del producto base)
+  variant_id:     number | null;
+  variant_name:   string | null;
+  variant_sku:    string | null;
+  quantity:       number;
+  reference_type: 'PURCHASE' | 'SALE' | 'ADJUSTMENT' | 'INITIAL' | 'SALE_CANCELLED' | 'SALE_EDITED' | null;
+  reference_id:   number | null;
+  notes:          string | null;
+  created_at:     string;
+
+  // ── Compra (IN / reference_type = PURCHASE) ────────────────────
+  purchase_currency:  string | null;   // moneda de la compra (USD, HNL, etc.)
+  exchange_rate:      number | null;   // tasa usada al momento de la compra
+  // Solo tiene valor cuando purchase_currency = 'USD'
+  unit_cost_usd:      number | null;
+  // Siempre disponible — costo en moneda local
+  unit_cost_hnl:      number | null;
+  // Costo en la moneda original de la compra (USD si fue en USD, HNL si fue en HNL)
+  unit_cost_purchase: number | null;
+  shipping_per_unit:  number | null;
+  total_cost:         number | null;
+
+  // ── Venta (OUT / reference_type = SALE) ───────────────────────
+  unit_price:    number | null;
+  unit_cost:     number | null;
+  line_total:    number | null;
+  profit:        number | null;
+  sale_number:   string | null;
   customer_name: string | null;
 };
 
 export type MovementFilters = {
-  date?: string;
-  month?: number;
-  year?: number;
+  date?:       string;
+  month?:      number;
+  year?:       number;
   product_id?: number;
+  variant_id?: number;
 };
+
+// ── Auth fetch ─────────────────────────────────────────────────────────
 
 function useAuthFetch() {
   const { firebaseUser } = useAuth();
   return async (url: string) => {
     const token = await firebaseUser?.getIdToken();
     if (!token) throw new Error('No autenticado');
-    const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
+    const res = await fetch(url, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
     if (!res.ok) {
       const err = await res.json();
       throw new Error(err.error || 'Error en la solicitud');
@@ -52,6 +71,8 @@ function useAuthFetch() {
     return res.json();
   };
 }
+
+// ── useMovements ───────────────────────────────────────────────────────
 
 export function useMovements(filters?: MovementFilters) {
   const { firebaseUser } = useAuth();
@@ -62,15 +83,16 @@ export function useMovements(filters?: MovementFilters) {
   if (filters?.month)      params.set('month',      String(filters.month));
   if (filters?.year)       params.set('year',       String(filters.year));
   if (filters?.product_id) params.set('product_id', String(filters.product_id));
+  if (filters?.variant_id) params.set('variant_id', String(filters.variant_id));
 
   const url = `${KEY}?${params.toString()}`;
 
   const { data, isLoading, error, mutate } = useSWR(
     firebaseUser ? url : null,
     (u: string) => authFetch(u),
-     {
-      revalidateOnFocus:    false,
-      dedupingInterval:     5 * 60_000,
+    {
+      revalidateOnFocus: false,
+      dedupingInterval:  5 * 60_000,
     }
   );
 
@@ -83,12 +105,14 @@ export function useMovements(filters?: MovementFilters) {
   };
 }
 
+// ── useMovementPeriods ─────────────────────────────────────────────────
+
 export function useMovementPeriods() {
   const { firebaseUser } = useAuth();
   const authFetch = useAuthFetch();
 
   const { data, isLoading } = useSWR(
-    firebaseUser ? "/api/inventory/movements/periods" : null,
+    firebaseUser ? '/api/inventory/movements/periods' : null,
     (u: string) => authFetch(u),
     { revalidateOnFocus: false, dedupingInterval: 300_000 }
   );
