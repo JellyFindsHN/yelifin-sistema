@@ -142,12 +142,8 @@ export async function POST(request: NextRequest) {
         ${sku          ?? null},
         ${null},
         ${Number(price)},
-<<<<<<< Updated upstream
-        ${image_url ?? null}
-=======
         ${image_url    ?? null},
         ${is_service   ?? false}
->>>>>>> Stashed changes
       )
       RETURNING *
     `;
