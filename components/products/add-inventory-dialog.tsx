@@ -250,6 +250,34 @@ export function AddInventoryDialog({ product, open, onOpenChange, onSuccess }: P
           className="flex-1 overflow-y-auto px-5 py-4 space-y-4"
           style={{ scrollbarWidth: "none" } as React.CSSProperties}
         >
+
+                    {/* Toggle pendiente */}
+          <div className={cn(
+            "flex items-start justify-between gap-4 rounded-xl border p-4 transition-colors",
+            isPending ? "border-amber-300/60 bg-amber-50/60 dark:bg-amber-950/20" : "border-border bg-muted/20"
+          )}>
+            <div className="flex items-start gap-3">
+              <div className={cn(
+                "mt-0.5 rounded-lg p-1.5 transition-colors",
+                isPending ? "bg-amber-100 text-amber-700" : "bg-muted text-muted-foreground"
+              )}>
+                <Clock className="h-4 w-4" />
+              </div>
+              <div className="space-y-0.5">
+                <p className="text-sm font-medium leading-none">Mercancía pendiente de llegada</p>
+                <p className="text-xs text-muted-foreground leading-relaxed">
+                  El dinero se debita ahora, pero el stock se acredita al inventario
+                  sólo cuando confirmés la llegada. Podés ajustar el envío en ese momento.
+                </p>
+              </div>
+            </div>
+            <Switch
+              checked={isPending}
+              onCheckedChange={setIsPending}
+              disabled={isCreating}
+              className="shrink-0 mt-0.5"
+            />
+          </div>
           {/* Cuenta */}
           <div className="space-y-1.5">
             <Label className="text-sm font-medium flex items-center gap-1.5">
@@ -554,34 +582,6 @@ export function AddInventoryDialog({ product, open, onOpenChange, onSuccess }: P
               {...register("notes")}
               disabled={isCreating}
               className="h-11 text-base"
-            />
-          </div>
-
-          {/* Toggle pendiente */}
-          <div className={cn(
-            "flex items-start justify-between gap-4 rounded-xl border p-4 transition-colors",
-            isPending ? "border-amber-300/60 bg-amber-50/60 dark:bg-amber-950/20" : "border-border bg-muted/20"
-          )}>
-            <div className="flex items-start gap-3">
-              <div className={cn(
-                "mt-0.5 rounded-lg p-1.5 transition-colors",
-                isPending ? "bg-amber-100 text-amber-700" : "bg-muted text-muted-foreground"
-              )}>
-                <Clock className="h-4 w-4" />
-              </div>
-              <div className="space-y-0.5">
-                <p className="text-sm font-medium leading-none">Mercancía pendiente de llegada</p>
-                <p className="text-xs text-muted-foreground leading-relaxed">
-                  El dinero se debita ahora, pero el stock se acredita al inventario
-                  sólo cuando confirmés la llegada. Podés ajustar el envío en ese momento.
-                </p>
-              </div>
-            </div>
-            <Switch
-              checked={isPending}
-              onCheckedChange={setIsPending}
-              disabled={isCreating}
-              className="shrink-0 mt-0.5"
             />
           </div>
         </form>
