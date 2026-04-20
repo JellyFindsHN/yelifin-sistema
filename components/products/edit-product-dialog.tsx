@@ -12,7 +12,9 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Loader2, Upload, X, Pencil, DollarSign, Hash, FileText, ImageIcon } from "lucide-react";
+import {
+  Loader2, Upload, X, Pencil, DollarSign, Hash, FileText, ImageIcon,
+} from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { useUpdateProduct } from "@/hooks/swr/use-products";
@@ -24,14 +26,19 @@ import { Product } from "@/types";
 import Image from "next/image";
 import { is } from "date-fns/locale";
 
-const schema = z.object({
-  name:        z.string().min(1, "El nombre es requerido"),
-  description: z.string().optional(),
-  sku:         z.string().min(1, "El SKU es requerido"),
-  price:       z.coerce.number().min(0, "El precio debe ser mayor o igual a 0"),
-});
+// ── Schema condicional según tipo ──────────────────────────────────────
 
-type FormData = z.infer<typeof schema>;
+const createSchema = (isService: boolean) =>
+  z.object({
+    name:        z.string().min(1, "El nombre es requerido"),
+    description: z.string().optional(),
+    sku:         isService
+                   ? z.string().optional()
+                   : z.string().min(1, "El SKU es requerido para productos"),
+    price:       z.coerce.number().min(0, "El precio debe ser mayor o igual a 0"),
+  });
+
+type FormData = z.infer<ReturnType<typeof createSchema>>;
 
 type Props = {
   product:      Product | null;
@@ -42,6 +49,7 @@ type Props = {
 };
 
 // ── WebP converter ─────────────────────────────────────────────────────
+
 async function convertToWebP(file: File, quality = 0.85): Promise<Blob> {
   return new Promise((resolve, reject) => {
     const img = document.createElement("img");
@@ -57,38 +65,54 @@ async function convertToWebP(file: File, quality = 0.85): Promise<Blob> {
       canvas.width = width; canvas.height = height;
       canvas.getContext("2d")!.drawImage(img, 0, 0, width, height);
       canvas.toBlob(
-        (blob) => { URL.revokeObjectURL(url); blob ? resolve(blob) : reject(new Error("Error al convertir")); },
-        "image/webp", quality,
+        (blob) => {
+          URL.revokeObjectURL(url);
+          blob ? resolve(blob) : reject(new Error("Error al convertir imagen"));
+        },
+        "image/webp",
+        quality,
       );
     };
-    img.onerror = () => { URL.revokeObjectURL(url); reject(new Error("Error al cargar imagen")); };
+    img.onerror = () => {
+      URL.revokeObjectURL(url);
+      reject(new Error("Error al cargar imagen"));
+    };
     img.src = url;
   });
 }
 
+// ── Eliminar imagen de Firebase Storage desde download URL ─────────────
+
 async function deleteOldImage(imageUrl: string) {
   try {
-    await deleteObject(ref(storage, imageUrl));
+    const path = decodeURIComponent(
+      imageUrl.split("/o/")[1].split("?")[0]
+    );
+    await deleteObject(ref(storage, path));
   } catch {
     console.warn("No se pudo eliminar la imagen anterior de Storage");
   }
 }
 
 // ── Componente ─────────────────────────────────────────────────────────
-export function EditProductDialog({ product, open, onOpenChange, onSuccess, is_service }: Props) {
+export function EditProductDialog({
+  product, open, onOpenChange, onSuccess, is_service,
+}: Props) {
   const { firebaseUser }              = useAuth();
   const { updateProduct, isUpdating } = useUpdateProduct(product?.id ?? null);
   const { symbol }                    = useCurrency();
 
-  const [imageFile,        setImageFile]       = useState<File | null>(null);
-  const [imagePreview,     setImagePreview]     = useState<string | null>(null);
-  const [isUploadingImage, setIsUploadingImage] = useState(false);
+  const [imageFile,        setImageFile]        = useState<File | null>(null);
+  const [imagePreview,     setImagePreview]      = useState<string | null>(null);
+  const [isUploadingImage, setIsUploadingImage]  = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const {
     register, handleSubmit, reset,
     formState: { errors },
-  } = useForm<FormData>({ resolver: zodResolver(schema) });
+  } = useForm<FormData>({
+    resolver: zodResolver(createSchema(is_service)),
+  });
 
   useEffect(() => {
     if (product && open) {
@@ -103,7 +127,8 @@ export function EditProductDialog({ product, open, onOpenChange, onSuccess, is_s
     }
   }, [product, open, reset]);
 
-  // ── Imagen ─────────────────────────────────────────────────────────
+  // ── Imagen ──────────────────────────────────────────────────────────
+
   const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -128,7 +153,8 @@ export function EditProductDialog({ product, open, onOpenChange, onSuccess, is_s
     return getDownloadURL(storageRef);
   };
 
-  // ── Submit ─────────────────────────────────────────────────────────
+  // ── Submit ──────────────────────────────────────────────────────────
+
   const onSubmit = async (data: FormData) => {
     try {
       let image_url: string | null | undefined = product?.image_url;
@@ -139,6 +165,7 @@ export function EditProductDialog({ product, open, onOpenChange, onSuccess, is_s
         image_url = await uploadImage(imageFile);
         setIsUploadingImage(false);
       } else if (!imagePreview && product?.image_url) {
+        // El usuario quitó la imagen sin subir una nueva
         await deleteOldImage(product.image_url);
         image_url = null;
       }
@@ -149,7 +176,9 @@ export function EditProductDialog({ product, open, onOpenChange, onSuccess, is_s
       onSuccess();
     } catch (error: any) {
       setIsUploadingImage(false);
-      toast.error(error.message || "Error al actualizar el " + (is_service ? "servicio" : "producto"));
+      toast.error(
+        error.message || `Error al actualizar el ${is_service ? "servicio" : "producto"}`
+      );
     }
   };
 
@@ -165,17 +194,14 @@ export function EditProductDialog({ product, open, onOpenChange, onSuccess, is_s
   return (
     <Dialog open={open} onOpenChange={(v) => !v && handleClose()}>
       <DialogContent
-         className={cn(
+        className={cn(
           "fixed bottom-0 left-0 right-0 top-auto translate-x-0 translate-y-0",
           "w-full max-w-full rounded-t-2xl rounded-b-none border-t border-x-0 border-b-0",
           "max-h-[92dvh] flex flex-col p-0",
           "sm:bottom-auto sm:left-1/2 sm:right-auto sm:top-1/2",
           "sm:-translate-x-1/2 sm:-translate-y-1/2",
-          "sm:w-full sm:max-w-md",
-          "lg:max-w-xl",
-          "xl:max-w-xl",
-          "sm:rounded-2xl sm:border",
-          "sm:max-h-[88vh]",
+          "sm:w-full sm:max-w-md lg:max-w-xl xl:max-w-xl",
+          "sm:rounded-2xl sm:border sm:max-h-[88vh]",
           "data-[state=open]:animate-in data-[state=closed]:animate-out",
           "data-[state=open]:slide-in-from-bottom sm:data-[state=open]:slide-in-from-bottom-[48%]",
           "data-[state=closed]:slide-out-to-bottom sm:data-[state=closed]:slide-out-to-bottom-[48%]",
@@ -193,7 +219,7 @@ export function EditProductDialog({ product, open, onOpenChange, onSuccess, is_s
         <DialogHeader className="shrink-0 px-5 pt-2 pb-3 sm:pt-5 border-b">
           <DialogTitle className="flex items-center gap-2 text-lg font-bold">
             <Pencil className="h-4 w-4 text-primary" />
-            Editar { is_service ? "servicio" : "producto" }
+            Editar {is_service ? "servicio" : "producto"}
           </DialogTitle>
         </DialogHeader>
 
@@ -210,7 +236,9 @@ export function EditProductDialog({ product, open, onOpenChange, onSuccess, is_s
               <div
                 className={cn(
                   "relative w-full aspect-video rounded-xl border-2 border-dashed transition-colors overflow-hidden cursor-pointer",
-                  imagePreview ? "border-transparent" : "border-muted-foreground/20 hover:border-primary/40 bg-muted/20",
+                  imagePreview
+                    ? "border-transparent"
+                    : "border-muted-foreground/20 hover:border-primary/40 bg-muted/20",
                 )}
                 onClick={() => !isLoading && fileInputRef.current?.click()}
               >
@@ -224,7 +252,9 @@ export function EditProductDialog({ product, open, onOpenChange, onSuccess, is_s
                     >
                       <X className="h-3.5 w-3.5" />
                     </button>
-                    <span className="absolute bottom-2 right-2 text-xs bg-black/60 text-white px-2 py-0.5 rounded-full">WebP</span>
+                    <span className="absolute bottom-2 right-2 text-xs bg-black/60 text-white px-2 py-0.5 rounded-full">
+                      WebP
+                    </span>
                   </>
                 ) : (
                   <div className="flex flex-col items-center justify-center h-full gap-2 text-muted-foreground p-4">
@@ -232,51 +262,89 @@ export function EditProductDialog({ product, open, onOpenChange, onSuccess, is_s
                       <Upload className="h-5 w-5" />
                     </div>
                     <p className="text-sm font-medium">Toca para subir imagen</p>
-                    <p className="text-xs text-center opacity-70">PNG, JPG, WebP · máx 5MB · se convierte a WebP</p>
+                    <p className="text-xs text-center opacity-70">
+                      PNG, JPG, WebP · máx 5MB · se convierte a WebP
+                    </p>
                   </div>
                 )}
               </div>
               <input
-                ref={fileInputRef} type="file" accept="image/*" className="hidden"
-                onChange={handleImageSelect} disabled={isLoading}
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={handleImageSelect}
+                disabled={isLoading}
               />
             </div>
 
             {/* Nombre */}
             <div className="space-y-2">
               <FieldLabel icon={<FileText className="h-3.5 w-3.5" />} label="Nombre" required />
-              <Input {...register("name")} disabled={isLoading} className="h-11 text-base" />
-              {errors.name && <p className="text-xs text-destructive">{errors.name.message}</p>}
+              <Input
+                {...register("name")}
+                disabled={isLoading}
+                className="h-11 text-base"
+              />
+              {errors.name && (
+                <p className="text-xs text-destructive">{errors.name.message}</p>
+              )}
             </div>
 
             {/* SKU */}
             <div className="space-y-2">
-              <FieldLabel icon={<Hash className="h-3.5 w-3.5" />} label="SKU" required />
-              <Input {...register("sku")} disabled={isLoading} className="h-11 text-base font-mono" />
-              {errors.sku && <p className="text-xs text-destructive">{errors.sku.message}</p>}
+              <FieldLabel
+                icon={<Hash className="h-3.5 w-3.5" />}
+                label="SKU"
+                required={!is_service}
+                optional={is_service}
+              />
+              <Input
+                {...register("sku")}
+                placeholder={is_service ? "Ej: SERV-001 (opcional)" : "Ej: CAM-NEG-M"}
+                disabled={isLoading}
+                className="h-11 text-base font-mono"
+              />
+              {errors.sku && (
+                <p className="text-xs text-destructive">{errors.sku.message}</p>
+              )}
             </div>
 
             {/* Precio */}
             <div className="space-y-2">
-              <FieldLabel icon={<DollarSign className="h-3.5 w-3.5" />} label="Precio de venta" required />
+              <FieldLabel
+                icon={<DollarSign className="h-3.5 w-3.5" />}
+                label="Precio de venta"
+                required
+              />
               <div className="relative">
                 <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground font-medium text-sm">
                   {symbol}
                 </span>
                 <Input
-                  type="number" step="0.01" min="0" placeholder="0.00"
-                  {...register("price")} disabled={isLoading}
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  placeholder="0.00"
+                  {...register("price")}
+                  disabled={isLoading}
                   className="h-11 pl-8 text-base"
                 />
               </div>
-              {errors.price && <p className="text-xs text-destructive">{errors.price.message}</p>}
+              {errors.price && (
+                <p className="text-xs text-destructive">{errors.price.message}</p>
+              )}
             </div>
 
             {/* Descripción */}
             <div className="space-y-2">
               <FieldLabel icon={<FileText className="h-3.5 w-3.5" />} label="Descripción" optional />
               <Textarea
-                placeholder="Describe el producto brevemente..."
+                placeholder={
+                  is_service
+                    ? "Describe el servicio brevemente..."
+                    : "Describe el producto brevemente..."
+                }
                 rows={2}
                 {...register("description")}
                 disabled={isLoading}
@@ -287,23 +355,34 @@ export function EditProductDialog({ product, open, onOpenChange, onSuccess, is_s
           </form>
         </div>
 
-        {/* Footer fijo */}
-         <div className="shrink-0 px-5 py-4 border-t bg-transparent xl:bg-transparent md:bg-transparent sm:bg-background flex gap-3">
+        {/* Footer */}
+        <div className="shrink-0 px-5 py-4 border-t bg-transparent xl:bg-transparent md:bg-transparent sm:bg-background flex gap-3">
           <Button
-            type="button" variant="outline"
-            onClick={handleClose} disabled={isLoading}
+            type="button"
+            variant="outline"
+            onClick={handleClose}
+            disabled={isLoading}
             className="flex-1 h-11"
           >
             Cancelar
           </Button>
           <Button
-            type="submit" form="edit-product-form"
-            disabled={isLoading} className="flex-1 h-11 gap-2"
+            type="submit"
+            form="edit-product-form"
+            disabled={isLoading}
+            className="flex-1 h-11 gap-2"
           >
-            {isLoading
-              ? <><Loader2 className="h-4 w-4 animate-spin" />{isUploadingImage ? "Subiendo..." : "Guardando..."}</>
-              : <><Pencil className="h-4 w-4" />Guardar cambios</>
-            }
+            {isLoading ? (
+              <>
+                <Loader2 className="h-4 w-4 animate-spin" />
+                {isUploadingImage ? "Subiendo imagen..." : "Guardando..."}
+              </>
+            ) : (
+              <>
+                <Pencil className="h-4 w-4" />
+                Guardar cambios
+              </>
+            )}
           </Button>
         </div>
       </DialogContent>
@@ -311,7 +390,8 @@ export function EditProductDialog({ product, open, onOpenChange, onSuccess, is_s
   );
 }
 
-// ── FieldLabel ─────────────────────────────────────────────────────────
+// ── FieldLabel ──────────────────────────────────────────────────────────
+
 function FieldLabel({ icon, label, required, optional }: {
   icon?:     React.ReactNode;
   label:     string;

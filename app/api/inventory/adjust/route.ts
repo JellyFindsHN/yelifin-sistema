@@ -11,40 +11,73 @@ export async function POST(request: NextRequest) {
 
   try {
     const { userId } = auth.data;
-    const body = await request.json();
+    const body       = await request.json();
 
-    const { product_id, type, quantity, notes, unit_cost } = body;
+    const { product_id, variant_id, type, quantity, notes, unit_cost } = body;
 
     // ── Validaciones ───────────────────────────────────────────────
-    if (!product_id)               return createErrorResponse("El producto es requerido", 400);
+    if (!product_id)
+      return createErrorResponse("El producto es requerido", 400);
     if (!type || !["in", "out"].includes(type))
-                                   return createErrorResponse("El tipo debe ser 'in' o 'out'", 400);
-    if (!quantity || quantity < 1) return createErrorResponse("La cantidad debe ser al menos 1", 400);
-    if (!notes?.trim())            return createErrorResponse("El motivo del ajuste es requerido", 400);
+      return createErrorResponse("El tipo debe ser 'in' o 'out'", 400);
+    if (!quantity || quantity < 1)
+      return createErrorResponse("La cantidad debe ser al menos 1", 400);
+    if (!notes?.trim())
+      return createErrorResponse("El motivo del ajuste es requerido", 400);
 
-    let unitCost = Number(unit_cost) || 0;
-    if (type === "in" && unitCost < 0) {
+    const unitCost  = Number(unit_cost) || 0;
+    const variantId = variant_id ? Number(variant_id) : null;
+
+    if (type === "in" && unitCost < 0)
       return createErrorResponse("El costo unitario no puede ser negativo", 400);
-    }
 
-    // Verificar que el producto pertenece al usuario
+    // Verificar producto
     const [product] = await sql`
-      SELECT id FROM products
-      WHERE id = ${product_id} AND user_id = ${userId}
+      SELECT id, is_service FROM products
+      WHERE id = ${product_id} AND user_id = ${userId} AND is_active = TRUE
     `;
     if (!product) return createErrorResponse("Producto no encontrado", 404);
+    if (product.is_service)
+      return createErrorResponse("No se puede ajustar inventario de un servicio", 400);
 
-    // Si es OUT, verificar que haya stock suficiente
-    if (type === "out") {
-      const [stockRow] = await sql`
-        SELECT COALESCE(SUM(qty_available), 0)::int AS stock
-        FROM inventory_batches
-        WHERE product_id = ${product_id} AND user_id = ${userId}
+    // Verificar variante si se envió
+    if (variantId !== null) {
+      const [variant] = await sql`
+        SELECT id FROM product_variants
+        WHERE id         = ${variantId}
+          AND product_id = ${product_id}
+          AND user_id    = ${userId}
+          AND is_active  = TRUE
       `;
-      if (stockRow.stock < quantity) {
+      if (!variant)
+        return createErrorResponse(
+          `Variante #${variantId} no encontrada o no pertenece a este producto`,
+          404
+        );
+    }
+
+    // Verificar stock disponible para OUT (filtrado por variante)
+    if (type === "out") {
+      const [stockRow] = variantId !== null
+        ? await sql`
+            SELECT COALESCE(SUM(qty_available), 0)::numeric AS stock
+            FROM inventory_batches
+            WHERE product_id = ${product_id}
+              AND variant_id = ${variantId}
+              AND user_id    = ${userId}
+          `
+        : await sql`
+            SELECT COALESCE(SUM(qty_available), 0)::numeric AS stock
+            FROM inventory_batches
+            WHERE product_id = ${product_id}
+              AND variant_id IS NULL
+              AND user_id    = ${userId}
+          `;
+
+      if (Number(stockRow.stock) < quantity) {
         return createErrorResponse(
           `Stock insuficiente. Disponible: ${stockRow.stock} unidades`,
-          400,
+          400
         );
       }
     }
@@ -55,13 +88,15 @@ export async function POST(request: NextRequest) {
     try {
 
       if (type === "in") {
-        // ── Ajuste positivo: crear batch con o sin costo ─────────────────
+        // ── Ajuste positivo: nuevo batch ────────────────────────────
         const [batch] = await sql`
           INSERT INTO inventory_batches (
-            user_id, product_id, variant_id, purchase_batch_item_id,
+            user_id, product_id, variant_id,
+            purchase_batch_item_id,
             qty_in, qty_available, unit_cost, received_at
           ) VALUES (
-            ${userId}, ${product_id}, ${null}, ${null},
+            ${userId}, ${product_id}, ${variantId},
+            ${null},
             ${quantity}, ${quantity}, ${unitCost}, NOW()
           )
           RETURNING id
@@ -72,44 +107,51 @@ export async function POST(request: NextRequest) {
             user_id, movement_type, product_id, variant_id,
             quantity, reference_type, reference_id, notes
           ) VALUES (
-            ${userId}, ${movementType}, ${product_id}, ${null},
+            ${userId}, ${movementType}, ${product_id}, ${variantId},
             ${quantity}, 'ADJUSTMENT', ${batch.id}, ${notes.trim()}
           )
         `;
 
       } else {
-        // ── Ajuste negativo: FIFO sobre batches disponibles ────────
+        // ── Ajuste negativo: FIFO por variante ──────────────────────
+        const batches = variantId !== null
+          ? await sql`
+              SELECT id, qty_available
+              FROM inventory_batches
+              WHERE product_id  = ${product_id}
+                AND variant_id  = ${variantId}
+                AND user_id     = ${userId}
+                AND qty_available > 0
+              ORDER BY received_at ASC
+            `
+          : await sql`
+              SELECT id, qty_available
+              FROM inventory_batches
+              WHERE product_id  = ${product_id}
+                AND variant_id IS NULL
+                AND user_id     = ${userId}
+                AND qty_available > 0
+              ORDER BY received_at ASC
+            `;
+
         let remaining = quantity;
-
-        const batches = await sql`
-          SELECT id, qty_available
-          FROM inventory_batches
-          WHERE product_id = ${product_id}
-            AND user_id    = ${userId}
-            AND qty_available > 0
-          ORDER BY received_at ASC
-        `;
-
         for (const batch of batches) {
           if (remaining <= 0) break;
-
-          const deduct = Math.min(remaining, batch.qty_available);
+          const deduct = Math.min(remaining, Number(batch.qty_available));
           remaining -= deduct;
-
           await sql`
             UPDATE inventory_batches
             SET qty_available = qty_available - ${deduct}
-            WHERE id = ${batch.id}
+            WHERE id = ${batch.id} AND user_id = ${userId}
           `;
         }
 
-        // Un solo movement que representa el total ajustado
         await sql`
           INSERT INTO inventory_movements (
             user_id, movement_type, product_id, variant_id,
             quantity, reference_type, reference_id, notes
           ) VALUES (
-            ${userId}, ${movementType}, ${product_id}, ${null},
+            ${userId}, ${movementType}, ${product_id}, ${variantId},
             ${quantity}, 'ADJUSTMENT', ${null}, ${notes.trim()}
           )
         `;
@@ -122,9 +164,9 @@ export async function POST(request: NextRequest) {
           message: type === "in"
             ? "Ajuste positivo registrado exitosamente"
             : "Ajuste negativo registrado exitosamente",
-          data: { product_id, type, quantity },
+          data: { product_id, variant_id: variantId, type, quantity },
         },
-        { status: 201 },
+        { status: 201 }
       );
 
     } catch (innerError) {
@@ -133,7 +175,7 @@ export async function POST(request: NextRequest) {
     }
 
   } catch (error) {
-    console.error(" POST /api/inventory/adjust:", error);
+    console.error("POST /api/inventory/adjust:", error);
     return createErrorResponse("Error al registrar el ajuste", 500);
   }
 }

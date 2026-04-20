@@ -29,9 +29,17 @@ import { InventorySection, InventorySectionValue } from "./inventory-section";
 const schema = z.object({
   name:        z.string().min(1, "El nombre es requerido"),
   description: z.string().optional(),
-  sku:         z.string().min(1, "El SKU es requerido"),
+  sku:         z.string().optional(),
   price:       z.coerce.number().min(0, "El precio debe ser mayor o igual a 0"),
   is_service:  z.boolean().optional(),
+}).superRefine((data, ctx) => {
+  if (!data.is_service && (!data.sku || data.sku.trim().length === 0)) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: "El SKU es requerido para productos",
+      path: ["sku"],
+    });
+  }
 });
 
 type FormData = z.infer<typeof schema>;
@@ -92,8 +100,8 @@ export function CreateProductDialog({ open, onOpenChange, onSuccess }: Props) {
         setIsUploadingImage(false);
       }
 
-      const result    = await createProduct({ ...data, image_url });
-      const productId = result?.data?.id as number;
+      const product   = await createProduct({ ...data, image_url });
+      const productId = product?.id as number;
       if (!productId) throw new Error("No se obtuvo el ID del producto");
 
       // Si es servicio, no registrar inventario

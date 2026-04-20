@@ -8,9 +8,11 @@ const KEY = '/api/sales';
 
 export type CartItem = {
   product_id:   number;
+  variant_id:   number | null | undefined; 
   product_name: string;
+  variant_name: string | null | undefined;
   image_url:    string | null;
-  quantity:     number; 
+  quantity:     number;
   unit_price:   number;
   discount:     number;
 };
@@ -75,6 +77,7 @@ export type SaleDetail = Sale & {
   items: {
     id:           number;
     product_id:   number;
+    variant_name: string | null;
     product_name: string;
     image_url:    string | null;
     quantity:     number;

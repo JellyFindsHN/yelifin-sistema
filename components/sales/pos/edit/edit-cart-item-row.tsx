@@ -17,10 +17,10 @@ const formatCurrency = (v: number) =>
 type Props = {
   item: CartItem;
   discountType: "none" | "global" | "per_item";
-  onQuantity: (id: number, delta: number) => void;
-  onRemove: (id: number) => void;
-  onPriceChange: (id: number, value: number) => void;
-  onDiscountChange: (id: number, value: number) => void;
+  onQuantity: (id: number, delta: number, variantId?: number | null) => void;
+  onRemove: (id: number, variantId?: number | null) => void;
+  onPriceChange: (id: number, value: number, variantId?: number | null) => void;
+  onDiscountChange: (id: number, value: number, variantId?: number | null) => void;
 };
 
 export function EditCartItemRow({
@@ -56,6 +56,11 @@ export function EditCartItemRow({
           <p className="text-sm font-medium truncate leading-tight">
             {item.product_name}
           </p>
+          {item.variant_name && (
+            <p className="text-xs text-muted-foreground truncate leading-tight">
+              {item.variant_name}
+            </p>
+          )}
           <Input
             type="number"
             value={item.unit_price === 0 ? "" : item.unit_price}
@@ -64,7 +69,8 @@ export function EditCartItemRow({
               const n = parseFloat(raw);
               onPriceChange(
                 item.product_id,
-                isNaN(n) ? 0 : Math.max(0, n)
+                isNaN(n) ? 0 : Math.max(0, n),
+                item.variant_id,
               );
             }}
             className="h-6 text-xs px-1.5 w-24 mt-0.5"
@@ -77,7 +83,7 @@ export function EditCartItemRow({
           variant="ghost"
           size="icon"
           className="h-7 w-7 text-destructive shrink-0"
-          onClick={() => onRemove(item.product_id)}
+          onClick={() => onRemove(item.product_id, item.variant_id)}
         >
           <Trash2 className="h-3.5 w-3.5" />
         </Button>
@@ -89,7 +95,7 @@ export function EditCartItemRow({
             variant="outline"
             size="icon"
             className="h-6 w-6"
-            onClick={() => onQuantity(item.product_id, -1)}
+            onClick={() => onQuantity(item.product_id, -1, item.variant_id)}
           >
             <Minus className="h-3 w-3" />
           </Button>
@@ -100,7 +106,7 @@ export function EditCartItemRow({
             variant="outline"
             size="icon"
             className="h-6 w-6"
-            onClick={() => onQuantity(item.product_id, 1)}
+            onClick={() => onQuantity(item.product_id, 1, item.variant_id)}
           >
             <Plus className="h-3 w-3" />
           </Button>
@@ -118,7 +124,8 @@ export function EditCartItemRow({
                   const n = parseFloat(raw);
                   onDiscountChange(
                     item.product_id,
-                    isNaN(n) ? 0 : Math.max(0, n)
+                    isNaN(n) ? 0 : Math.max(0, n),
+                    item.variant_id,
                   );
                 }}
                 className="h-6 text-xs px-1.5 w-20"

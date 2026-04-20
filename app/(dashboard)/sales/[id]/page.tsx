@@ -24,6 +24,7 @@ import {
   FlaskConical,
   Clock,
   CheckCircle,
+  Layers,
 } from "lucide-react";
 
 import { useSale, usePatchSale } from "@/hooks/swr/use-sales";
@@ -303,6 +304,12 @@ export default function SaleDetailPage({ params }: Props) {
                 </div>
                 <div className="flex-1 min-w-0">
                   <p className="font-medium truncate">{item.product_name}</p>
+                  {item.variant_name && (
+                    <div className="flex items-center gap-1 mt-0.5">
+                      <Layers className="h-3 w-3 text-primary shrink-0" />
+                      <p className="text-xs text-primary font-medium truncate">{item.variant_name}</p>
+                    </div>
+                  )}
                   <div className="flex flex-wrap gap-x-3 gap-y-0.5 mt-1 text-xs text-muted-foreground">
                     <span>
                       {item.quantity} × {format(Number(item.unit_price))}

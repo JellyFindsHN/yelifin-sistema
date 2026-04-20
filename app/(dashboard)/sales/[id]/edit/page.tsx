@@ -34,9 +34,11 @@ import {
 import { useAccounts } from "@/hooks/swr/use-accounts";
 import { useCustomers } from "@/hooks/swr/use-costumers";
 import { useSupplies } from "@/hooks/swr/use-supplies";
-
+import { useInventory } from "@/hooks/swr/use-inventory";
+import { Product, ProductVariant } from "@/types";
 
 import { PosProductGrid } from "@/components/sales/pos/product-grid";
+import { VariantPickerSheet } from "@/components/sales/pos/variant-picker-sheet";
 import {
   EditCartPanel,
   type EditDiscountType as DiscountType,
@@ -95,6 +97,7 @@ function EditSaleContent() {
   const { accounts } = useAccounts();
   const { customers } = useCustomers();
   const { supplies } = useSupplies();
+  const { inventory } = useInventory();
   const { editSale, confirmSale, isPatching } = usePatchSale(saleId);
 
   const [cart, setCart] = useState<CartItem[]>([]);
@@ -134,6 +137,9 @@ function EditSaleContent() {
   const [exitDialog, setExitDialog] = useState(false);
   const [pendingHref, setPendingHref] =
     useState<string | null>(null);
+
+  const [variantPickerProduct, setVariantPickerProduct] =
+    useState<Product | null>(null);
 
   const hasCart = cart.length > 0;
   const hasSupplies = supplies.length > 0;
@@ -183,12 +189,14 @@ function EditSaleContent() {
 
     const mappedCart: CartItem[] = sale.items.map(
       (i: any) => ({
-        product_id: i.product_id,
+        product_id:   i.product_id,
+        variant_id:   i.variant_id ?? null,
         product_name: i.product_name,
-        image_url: i.image_url,
-        quantity: Number(i.quantity),
-        unit_price: Number(i.unit_price),
-        discount: 0,
+        variant_name: i.variant_name ?? null,
+        image_url:    i.image_url,
+        quantity:     Number(i.quantity),
+        unit_price:   Number(i.unit_price),
+        discount:     0,
       })
     );
 
@@ -233,34 +241,52 @@ function EditSaleContent() {
   // productos disponibles
   const availableProducts = useMemo(
     () =>
-      products.filter((p: any) => {
-        if ((p.stock ?? 0) <= 0) return false;
+      products.filter((p) => {
+        const hasStock = p.is_service || p.variants.length > 0 || (p.stock ?? 0) > 0;
+        if (!hasStock) return false;
         if (!search.trim()) return true;
         const q = search.toLowerCase();
         return (
           p.name.toLowerCase().includes(q) ||
-          (p.sku?.toLowerCase().includes(q) ??
-            false)
+          (p.sku?.toLowerCase().includes(q) ?? false)
         );
       }),
     [products, search]
   );
 
   // carrito
-  const addToCart = (product: any) => {
+  const addToCart = (product: Product) => {
+    if (product.variants.length > 0) {
+      setVariantPickerProduct(product);
+      return;
+    }
+    addItemToCart(product, null);
+  };
+
+  const addItemToCart = (product: Product, variant: ProductVariant | null) => {
+    const variantId  = variant?.id ?? null;
+    const key        = cartKey(product.id, variantId);
+    const price      = variant?.price_override != null
+      ? Number(variant.price_override)
+      : product.price;
+    const image      = variant?.image_url ?? product.image_url;
+
+    const invItem    = inventory.find((i) => i.product_id === product.id);
+    const stockAvail = variantId
+      ? Number(invItem?.variants_stock.find((v) => v.variant_id === variantId)?.stock ?? 0)
+      : Number(invItem?.base_stock ?? product.stock ?? 0);
+
     setCart((prev) => {
       const existing = prev.find(
-        (i) => i.product_id === product.id
+        (i) => cartKey(i.product_id, i.variant_id) === key
       );
       if (existing) {
-        if (existing.quantity >= (product.stock ?? 0)) {
-          toast.error(
-            `Stock máximo: ${product.stock} unidades`
-          );
+        if (!product.is_service && existing.quantity >= stockAvail) {
+          toast.error(`Stock máximo: ${stockAvail} unidades`);
           return prev;
         }
         return prev.map((i) =>
-          i.product_id === product.id
+          cartKey(i.product_id, i.variant_id) === key
             ? { ...i, quantity: i.quantity + 1 }
             : i
         );
@@ -268,44 +294,49 @@ function EditSaleContent() {
       return [
         ...prev,
         {
-          product_id: product.id,
+          product_id:   product.id,
+          variant_id:   variantId,
           product_name: product.name,
-          image_url: product.image_url,
-          quantity: 1,
-          unit_price: Number(product.price),
-          discount: 0,
+          variant_name: variant?.variant_name ?? null,
+          image_url:    image,
+          quantity:     1,
+          unit_price:   price,
+          discount:     0,
         },
       ];
     });
   };
 
-  const updateQuantity = (id: number, delta: number) =>
+  const cartKey = (productId: number, variantId?: number | null) =>
+    `${productId}-${variantId ?? "base"}`;
+
+  const updateQuantity = (id: number, delta: number, variantId?: number | null) =>
     setCart((prev) =>
       prev
         .map((i) =>
-          i.product_id === id
+          cartKey(i.product_id, i.variant_id) === cartKey(id, variantId)
             ? { ...i, quantity: i.quantity + delta }
             : i
         )
         .filter((i) => i.quantity > 0)
     );
 
-  const removeFromCart = (id: number) =>
+  const removeFromCart = (id: number, variantId?: number | null) =>
     setCart((prev) =>
-      prev.filter((i) => i.product_id !== id)
+      prev.filter((i) => cartKey(i.product_id, i.variant_id) !== cartKey(id, variantId))
     );
 
-  const updateItemPrice = (id: number, v: number) =>
+  const updateItemPrice = (id: number, v: number, variantId?: number | null) =>
     setCart((prev) =>
       prev.map((i) =>
-        i.product_id === id ? { ...i, unit_price: v } : i
+        cartKey(i.product_id, i.variant_id) === cartKey(id, variantId) ? { ...i, unit_price: v } : i
       )
     );
 
-  const updateDiscount = (id: number, v: number) =>
+  const updateDiscount = (id: number, v: number, variantId?: number | null) =>
     setCart((prev) =>
       prev.map((i) =>
-        i.product_id === id ? { ...i, discount: v } : i
+        cartKey(i.product_id, i.variant_id) === cartKey(id, variantId) ? { ...i, discount: v } : i
       )
     );
 
@@ -709,6 +740,21 @@ function EditSaleContent() {
           </div>
         )}
       </div>
+
+      {/* Picker de variantes */}
+      <VariantPickerSheet
+        open={!!variantPickerProduct}
+        onOpenChange={(v) => !v && setVariantPickerProduct(null)}
+        product={variantPickerProduct}
+        variantsStock={
+          inventory.find((i) => i.product_id === variantPickerProduct?.id)
+            ?.variants_stock ?? []
+        }
+        onSelect={(product, variant) => {
+          addItemToCart(product, variant);
+          setVariantPickerProduct(null);
+        }}
+      />
 
       {/* Modal suministros */}
       <SuppliesUsedModal

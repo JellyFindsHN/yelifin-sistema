@@ -6,28 +6,49 @@ import { useAuth } from '@/hooks/use-auth';
 
 const KEY = '/api/inventory';
 
-type InventoryItem = {
-  product_id: number;
-  product_name: string;
-  sku: string | null;
-  image_url: string | null;
-  price: number;
-  stock: number;
+export type VariantStock = {
+  variant_id:    number;
+  variant_name:  string;
+  sku:           string | null;
+  attributes:    Record<string, string> | null;
+  price_override: number | null;
+  image_url:     string | null;
+  stock:         number;
   avg_unit_cost: number;
-  total_value: number;
-  is_service: boolean;
+  total_value:   number;
+  is_service:    boolean;
 };
 
-type InventoryStats = {
+export type InventoryItem = {
+  product_id:       number;
+  product_name:     string;
+  sku:              string | null;
+  image_url:        string | null;
+  price:            number;
+  is_service:       boolean;
+  // Stock total (base + variantes)
+  stock:            number;
+  avg_unit_cost:    number;
+  total_value:      number;
+  // Stock y costos solo del producto base
+  base_stock:       number;
+  base_avg_unit_cost: number;
+  base_total_value: number;
+  // Desglose por variante
+  variants_stock:   VariantStock[];
+};
+
+export type InventoryStats = {
   total_products: number;
-  total_stock: number;
-  total_value: number;
-  low_stock: number;
-  out_of_stock: number;
+  total_physical: number;
+  total_stock:    number;
+  total_value:    number;
+  low_stock:      number;
+  out_of_stock:   number;
 };
 
 type InventoryResponse = {
-  data: InventoryItem[];
+  data:  InventoryItem[];
   stats: InventoryStats;
 };
 
@@ -54,22 +75,21 @@ export function useInventory() {
   const { data, error, isLoading, mutate } = useSWR<InventoryResponse>(
     firebaseUser ? KEY : null,
     (url: string) => authFetch(url),
-     {
-      dedupingInterval:     5 * 60_000,
-    }
+    { dedupingInterval: 5 * 60_000 }
   );
 
   return {
     inventory: data?.data ?? [],
     stats: data?.stats ?? {
       total_products: 0,
-      total_stock: 0,
-      total_value: 0,
-      low_stock: 0,
-      out_of_stock: 0,
+      total_physical: 0,
+      total_stock:    0,
+      total_value:    0,
+      low_stock:      0,
+      out_of_stock:   0,
     },
     isLoading,
-    error: error?.message ?? null,
+    error:  error?.message ?? null,
     mutate,
   };
 }
