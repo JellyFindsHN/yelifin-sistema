@@ -352,29 +352,28 @@ export async function POST(request: NextRequest) {
     );
     const occurredAt = sold_at ?? new Date().toISOString();
 
-    // ── Número de venta ─────────────────────────────────────────────────
-    const [lastSale] = await sql`
-      SELECT sale_number FROM sales
-      WHERE user_id = ${userId}
-      ORDER BY created_at DESC LIMIT 1
-    `;
-    const lastNum = lastSale
-      ? parseInt(String(lastSale.sale_number).replace(/\D/g, "")) || 0
-      : 0;
-    const saleNumber = `VTA-${String(lastNum + 1).padStart(5, "0")}`;
-
-    const txParts: string[] = [`Venta ${saleNumber}`];
-    if (taxRateNum > 0) txParts.push(`ISV ${taxRateNum}% incluido`);
-    if (shippingAmount > 0)
-      txParts.push(`envío L ${shippingAmount.toFixed(2)}`);
-    const txDescription =
-      txParts.length > 1
-        ? `${txParts[0]} (${txParts.slice(1).join(", ")})`
-        : txParts[0];
-
     // ══════════════════════════════════════════════════════════════════
     await sql`BEGIN`;
     try {
+      // ── Número de venta (advisory lock evita duplicados bajo concurrencia) ──
+      await sql`SELECT pg_advisory_xact_lock(${userId})`;
+      const [lastSale] = await sql`
+        SELECT MAX(CAST(REGEXP_REPLACE(sale_number, '[^0-9]', '', 'g') AS INTEGER)) AS last_num
+        FROM sales
+        WHERE user_id = ${userId}
+      `;
+      const lastNum = lastSale?.last_num ? Number(lastSale.last_num) : 0;
+      const saleNumber = `VTA-${String(lastNum + 1).padStart(5, "0")}`;
+
+      const txParts: string[] = [`Venta ${saleNumber}`];
+      if (taxRateNum > 0) txParts.push(`ISV ${taxRateNum}% incluido`);
+      if (shippingAmount > 0)
+        txParts.push(`envío L ${shippingAmount.toFixed(2)}`);
+      const txDescription =
+        txParts.length > 1
+          ? `${txParts[0]} (${txParts.slice(1).join(", ")})`
+          : txParts[0];
+
       // 1. Crear venta
       const [sale] = await sql`
         INSERT INTO sales (
