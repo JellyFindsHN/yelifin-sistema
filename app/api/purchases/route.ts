@@ -14,17 +14,21 @@ export async function POST(request: NextRequest) {
     const body       = await request.json();
 
     const {
-      account_id, currency, exchange_rate,
+      account_id, credit_card_id, currency, exchange_rate,
       shipping, notes, purchased_at, items,
       status = "COMPLETED",
     } = body;
+
+    const isCreditCard = !!credit_card_id && !account_id;
 
     if (status !== "PENDING" && status !== "COMPLETED")
       return createErrorResponse("Estado inválido", 400);
 
     // ── Validaciones básicas ────────────────────────────────────────
-    if (!account_id)
+    if (!isCreditCard && !account_id)
       return createErrorResponse("La cuenta es requerida", 400);
+    if (isCreditCard && !credit_card_id)
+      return createErrorResponse("La tarjeta de crédito es requerida", 400);
     if (!items || !Array.isArray(items) || items.length === 0)
       return createErrorResponse("Se requiere al menos un producto", 400);
 
@@ -35,12 +39,18 @@ export async function POST(request: NextRequest) {
         return createErrorResponse("El costo unitario es requerido", 400);
     }
 
-    // ── Validar cuenta ──────────────────────────────────────────────
-    const [account] = await sql`
-      SELECT id, balance FROM accounts
-      WHERE id = ${account_id} AND user_id = ${userId} AND is_active = TRUE
-    `;
-    if (!account) return createErrorResponse("Cuenta no encontrada", 404);
+    // ── Validar cuenta o tarjeta ────────────────────────────────────
+    if (!isCreditCard) {
+      const [account] = await sql`
+        SELECT id FROM accounts WHERE id = ${account_id} AND user_id = ${userId} AND is_active = TRUE
+      `;
+      if (!account) return createErrorResponse("Cuenta no encontrada", 404);
+    } else {
+      const [card] = await sql`
+        SELECT id FROM credit_cards WHERE id = ${Number(credit_card_id)} AND user_id = ${userId} AND is_active = TRUE
+      `;
+      if (!card) return createErrorResponse("Tarjeta de crédito no encontrada", 404);
+    }
 
     // ── Validar productos y variantes ───────────────────────────────
     for (const item of items) {
@@ -113,7 +123,7 @@ export async function POST(request: NextRequest) {
           subtotal, shipping, tax, total,
           is_paid, purchased_at, notes, status
         ) VALUES (
-          ${userId}, ${account_id}, ${curr}, ${rate},
+          ${userId}, ${isCreditCard ? null : account_id}, ${curr}, ${rate},
           ${subtotal}, ${shippingTotal}, ${0}, ${total},
           ${false}, ${occurredAt}, ${notes ?? null}, ${status}
         )
@@ -159,23 +169,39 @@ export async function POST(request: NextRequest) {
         }
       }
 
-      // 3. Transacción financiera de egreso
-      await sql`
-        INSERT INTO transactions (
-          user_id, account_id, type, amount,
-          description, reference_type, reference_id, occurred_at
-        ) VALUES (
-          ${userId}, ${account_id}, 'EXPENSE', ${total},
-          ${txDescription}, 'PURCHASE', ${purchaseBatchId}, ${occurredAt}
-        )
-      `;
-
-      // 4. Descontar balance
-      await sql`
-        UPDATE accounts
-        SET balance = balance - ${total}
-        WHERE id = ${account_id} AND user_id = ${userId}
-      `;
+      // 3. Movimiento financiero
+      if (isCreditCard) {
+        // Cargo a tarjeta de crédito
+        const isUsd = curr === "USD";
+        const amountLocal = isUsd ? total * rate : total;
+        await sql`
+          INSERT INTO credit_card_transactions (
+            user_id, credit_card_id, type, description,
+            amount, currency, exchange_rate, amount_local,
+            occurred_at
+          ) VALUES (
+            ${userId}, ${Number(credit_card_id)}, 'CHARGE', ${txDescription},
+            ${total}, ${curr}, ${isUsd ? rate : null}, ${amountLocal},
+            ${occurredAt}
+          )
+        `;
+        if (isUsd) {
+          await sql`UPDATE credit_cards SET balance_usd = balance_usd + ${total}, updated_at = NOW() WHERE id = ${Number(credit_card_id)} AND user_id = ${userId}`;
+        } else {
+          await sql`UPDATE credit_cards SET balance = balance + ${total}, updated_at = NOW() WHERE id = ${Number(credit_card_id)} AND user_id = ${userId}`;
+        }
+      } else {
+        await sql`
+          INSERT INTO transactions (
+            user_id, account_id, type, amount,
+            description, reference_type, reference_id, occurred_at
+          ) VALUES (
+            ${userId}, ${account_id}, 'EXPENSE', ${total},
+            ${txDescription}, 'PURCHASE', ${purchaseBatchId}, ${occurredAt}
+          )
+        `;
+        await sql`UPDATE accounts SET balance = balance - ${total} WHERE id = ${account_id} AND user_id = ${userId}`;
+      }
 
       await sql`COMMIT`;
 

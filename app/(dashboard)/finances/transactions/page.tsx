@@ -33,6 +33,7 @@ import { useSWRConfig } from "swr";
 import { Fab } from "@/components/ui/fab";
 import { useAccounts } from "@/hooks/swr/use-accounts";
 import { useCurrency } from "@/hooks/swr/use-currency";
+import { useCreditCards } from "@/hooks/swr/use-credit-cards";
 import { CreateTransactionModal } from "@/components/transactions/create-transaction-modal";
 import { EditTransactionModal } from "@/components/transactions/edit-transaction-modal";
 import { toast } from "sonner";
@@ -108,9 +109,10 @@ export default function TransactionsPage() {
     date:   filterMode === "date" && specificDate ? specificDate : undefined,
   });
 
-  const { periods }  = useTransactionPeriods();
-  const { accounts } = useAccounts();
-  const { format }   = useCurrency();
+  const { periods }     = useTransactionPeriods();
+  const { accounts }    = useAccounts();
+  const { creditCards } = useCreditCards();
+  const { format }      = useCurrency();
 
   const availableYears   = [...new Set(periods.map((p) => p.year))].sort((a, b) => b - a);
   const monthsForYear    = (y: number) =>
@@ -453,6 +455,7 @@ export default function TransactionsPage() {
         open={modalOpen}
         onOpenChange={setModalOpen}
         accounts={accounts}
+        creditCards={creditCards}
         onSuccess={() => { invalidateAll(); setModalOpen(false); }}
       />
 

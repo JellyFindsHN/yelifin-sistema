@@ -54,8 +54,9 @@ const mainNav = [
   {
     title: "Finanzas", url: "/finances", icon: CreditCard,
     submenu: [
-      { title: "Cuentas",        url: "/finances" },
-      { title: "Transacciones",  url: "/finances/transactions" },
+      { title: "Cuentas",          url: "/finances" },
+      { title: "Transacciones",    url: "/finances/transactions" },
+      { title: "Tarjetas crédito", url: "/finances/credit-cards" },
     ],
   },
   { title: "Eventos",     url: "/events",   icon: Calendar },

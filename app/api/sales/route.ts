@@ -5,66 +5,103 @@ import { verifyAuth, createErrorResponse, isAuthSuccess } from "@/lib/auth";
 
 const sql = neon(process.env.DATABASE_URL!);
 
-function startOfMonth(d: Date) {
-  return new Date(d.getFullYear(), d.getMonth(), 1, 0, 0, 0, 0);
+// ── Timezone-aware date helpers ────────────────────────────────────────────
+// Returns the UTC offset in ms for a given IANA timezone at a specific instant.
+// Works on Vercel (runtime = UTC) because toLocaleString is parsed as "UTC local".
+function tzOffsetMs(tz: string, at: Date): number {
+  const tzStr  = at.toLocaleString("en-US", { timeZone: tz });
+  const utcStr = at.toLocaleString("en-US", { timeZone: "UTC" });
+  return new Date(tzStr).getTime() - new Date(utcStr).getTime();
 }
-function endOfMonth(d: Date) {
-  return new Date(d.getFullYear(), d.getMonth() + 1, 0, 23, 59, 59, 999);
+
+// Midnight (start of day) in the given timezone, expressed as a UTC Date.
+function startOfDayTZ(d: Date, tz: string): Date {
+  const ymd    = d.toLocaleDateString("sv", { timeZone: tz }); // "YYYY-MM-DD"
+  const offset = tzOffsetMs(tz, d);
+  const [y, m, day] = ymd.split("-").map(Number);
+  return new Date(Date.UTC(y, m - 1, day, 0, 0, 0, 0) - offset);
 }
-function startOfDay(d: Date) {
-  return new Date(d.getFullYear(), d.getMonth(), d.getDate(), 0, 0, 0, 0);
+
+function endOfDayTZ(d: Date, tz: string): Date {
+  return new Date(startOfDayTZ(d, tz).getTime() + 86_400_000 - 1);
 }
-function endOfDay(d: Date) {
-  return new Date(d.getFullYear(), d.getMonth(), d.getDate(), 23, 59, 59, 999);
+
+function startOfMonthTZ(d: Date, tz: string): Date {
+  const ymd    = d.toLocaleDateString("sv", { timeZone: tz });
+  const offset = tzOffsetMs(tz, d);
+  const [y, m] = ymd.split("-").map(Number);
+  return new Date(Date.UTC(y, m - 1, 1, 0, 0, 0, 0) - offset);
 }
+
+function endOfMonthTZ(d: Date, tz: string): Date {
+  const ymd    = d.toLocaleDateString("sv", { timeZone: tz });
+  const offset = tzOffsetMs(tz, d);
+  const [y, m] = ymd.split("-").map(Number);
+  const firstOfNext = new Date(Date.UTC(y, m, 1, 0, 0, 0, 0) - offset);
+  return new Date(firstOfNext.getTime() - 1);
+}
+
+// Parse a "YYYY-MM-DD" string (local date in TZ) into a UTC boundary.
+function parseDateTZ(dateStr: string, tz: string, edge: "start" | "end"): Date {
+  const ref    = new Date(`${dateStr}T12:00:00Z`); // noon UTC as reference for offset
+  const offset = tzOffsetMs(tz, ref);
+  const [y, m, day] = dateStr.split("-").map(Number);
+  const midnight = new Date(Date.UTC(y, m - 1, day, 0, 0, 0, 0) - offset);
+  return edge === "start" ? midnight : new Date(midnight.getTime() + 86_400_000 - 1);
+}
+
+// ──────────────────────────────────────────────────────────────────────────
 
 type Preset = "today" | "7d" | "this_month" | "last_month" | "all";
 
-function resolveRange(params: URLSearchParams) {
-  const preset = (params.get("preset") as Preset) || "this_month";
-  const from = params.get("from");
-  const to = params.get("to");
+function resolveRange(params: URLSearchParams, tz: string) {
+  const preset  = (params.get("preset") as Preset) || "this_month";
+  const from    = params.get("from");
+  const to      = params.get("to");
   const payment = params.get("payment");
-  const now = new Date();
+  const now     = new Date();
+
   let fromDate: Date | null = null;
-  let toDate: Date | null = null;
+  let toDate:   Date | null = null;
 
   if (from || to) {
-    if (from) fromDate = startOfDay(new Date(from));
-    if (to) toDate = endOfDay(new Date(to));
+    if (from) fromDate = parseDateTZ(from, tz, "start");
+    if (to)   toDate   = parseDateTZ(to,   tz, "end");
   } else {
     switch (preset) {
       case "today":
-        fromDate = startOfDay(now);
-        toDate = endOfDay(now);
+        fromDate = startOfDayTZ(now, tz);
+        toDate   = endOfDayTZ(now, tz);
         break;
       case "7d": {
-        const seven = new Date(now);
-        seven.setDate(seven.getDate() - 6);
-        fromDate = startOfDay(seven);
-        toDate = endOfDay(now);
+        const seven = new Date(now.getTime() - 6 * 86_400_000);
+        fromDate = startOfDayTZ(seven, tz);
+        toDate   = endOfDayTZ(now, tz);
         break;
       }
       case "this_month":
-        fromDate = startOfMonth(now);
-        toDate = endOfMonth(now);
+        fromDate = startOfMonthTZ(now, tz);
+        toDate   = endOfMonthTZ(now, tz);
         break;
       case "last_month": {
-        const last = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-        fromDate = startOfMonth(last);
-        toDate = endOfMonth(last);
+        // "last month" relative to the current TZ date
+        const ymd  = now.toLocaleDateString("sv", { timeZone: tz });
+        const [y, m] = ymd.split("-").map(Number);
+        const lastMonth = new Date(Date.UTC(y, m - 2, 15)); // mid of prev month
+        fromDate = startOfMonthTZ(lastMonth, tz);
+        toDate   = endOfMonthTZ(lastMonth, tz);
         break;
       }
       default:
         fromDate = null;
-        toDate = null;
+        toDate   = null;
     }
   }
 
   return {
     fromDateISO: fromDate?.toISOString() ?? null,
-    toDateISO: toDate?.toISOString() ?? null,
-    payment: payment && payment !== "all" ? payment : null,
+    toDateISO:   toDate?.toISOString()   ?? null,
+    payment:     payment && payment !== "all" ? payment : null,
   };
 }
 
@@ -76,7 +113,13 @@ export async function GET(request: NextRequest) {
   try {
     const { userId } = auth.data;
     const { searchParams } = new URL(request.url);
-    const { fromDateISO, toDateISO, payment } = resolveRange(searchParams);
+
+    const [profile] = await sql`
+      SELECT timezone FROM user_profile WHERE user_id = ${userId}
+    `;
+    const tz = profile?.timezone ?? "America/Tegucigalpa";
+
+    const { fromDateISO, toDateISO, payment } = resolveRange(searchParams, tz);
 
     const sales = await sql`
       SELECT
@@ -139,20 +182,30 @@ export async function POST(request: NextRequest) {
       tax_rate,
       payment_method,
       account_id,
+      credit_card_id,
+      sale_currency,
+      exchange_rate,
       notes,
       sold_at,
       supplies_used,
       event_id,
-      status = "COMPLETED", // ← nuevo: PENDING o COMPLETED
+      status = "COMPLETED",
     } = body;
+
+    const isCreditCard = payment_method === "CREDIT_CARD";
+    const isCreditCardUsd = isCreditCard && sale_currency === "USD";
 
     // ── Validaciones básicas ────────────────────────────────────────────
     if (!items || !Array.isArray(items) || items.length === 0)
       return createErrorResponse("Se requiere al menos un producto", 400);
     if (!payment_method)
       return createErrorResponse("El método de pago es requerido", 400);
-    if (!account_id)
+    if (!isCreditCard && !account_id)
       return createErrorResponse("La cuenta de destino es requerida", 400);
+    if (isCreditCard && !credit_card_id)
+      return createErrorResponse("La tarjeta de crédito es requerida", 400);
+    if (isCreditCardUsd && (!exchange_rate || Number(exchange_rate) <= 0))
+      return createErrorResponse("La tasa de cambio es requerida para ventas en USD", 400);
     if (!["PENDING", "COMPLETED"].includes(status))
       return createErrorResponse("Estado inválido", 400);
 
@@ -170,12 +223,23 @@ export async function POST(request: NextRequest) {
         return createErrorResponse("El precio unitario es requerido", 400);
     }
 
-    // ── Validar cuenta ──────────────────────────────────────────────────
-    const [account] = await sql`
-      SELECT id FROM accounts
-      WHERE id = ${account_id} AND user_id = ${userId} AND is_active = TRUE
-    `;
-    if (!account) return createErrorResponse("Cuenta no encontrada", 404);
+    // ── Validar cuenta (solo si no es tarjeta de crédito) ──────────────
+    if (!isCreditCard) {
+      const [account] = await sql`
+        SELECT id FROM accounts
+        WHERE id = ${account_id} AND user_id = ${userId} AND is_active = TRUE
+      `;
+      if (!account) return createErrorResponse("Cuenta no encontrada", 404);
+    }
+
+    // ── Validar tarjeta de crédito ──────────────────────────────────────
+    if (isCreditCard) {
+      const [card] = await sql`
+        SELECT id FROM credit_cards
+        WHERE id = ${Number(credit_card_id)} AND user_id = ${userId} AND is_active = TRUE
+      `;
+      if (!card) return createErrorResponse("Tarjeta de crédito no encontrada", 404);
+    }
 
     // ── Validar evento ──────────────────────────────────────────────────
     const eventIdNum = event_id ? Number(event_id) : null;
@@ -352,41 +416,42 @@ export async function POST(request: NextRequest) {
     );
     const occurredAt = sold_at ?? new Date().toISOString();
 
-    // ── Número de venta ─────────────────────────────────────────────────
-    const [lastSale] = await sql`
-      SELECT sale_number FROM sales
-      WHERE user_id = ${userId}
-      ORDER BY created_at DESC LIMIT 1
-    `;
-    const lastNum = lastSale
-      ? parseInt(String(lastSale.sale_number).replace(/\D/g, "")) || 0
-      : 0;
-    const saleNumber = `VTA-${String(lastNum + 1).padStart(5, "0")}`;
-
-    const txParts: string[] = [`Venta ${saleNumber}`];
-    if (taxRateNum > 0) txParts.push(`ISV ${taxRateNum}% incluido`);
-    if (shippingAmount > 0)
-      txParts.push(`envío L ${shippingAmount.toFixed(2)}`);
-    const txDescription =
-      txParts.length > 1
-        ? `${txParts[0]} (${txParts.slice(1).join(", ")})`
-        : txParts[0];
-
     // ══════════════════════════════════════════════════════════════════
     await sql`BEGIN`;
     try {
+      // ── Número de venta (advisory lock evita duplicados bajo concurrencia) ──
+      await sql`SELECT pg_advisory_xact_lock(${userId})`;
+      const [lastSale] = await sql`
+        SELECT MAX(CAST(REGEXP_REPLACE(sale_number, '[^0-9]', '', 'g') AS INTEGER)) AS last_num
+        FROM sales
+        WHERE user_id = ${userId}
+      `;
+      const lastNum = lastSale?.last_num ? Number(lastSale.last_num) : 0;
+      const saleNumber = `VTA-${String(lastNum + 1).padStart(5, "0")}`;
+
+      const txParts: string[] = [`Venta ${saleNumber}`];
+      if (taxRateNum > 0) txParts.push(`ISV ${taxRateNum}% incluido`);
+      if (shippingAmount > 0)
+        txParts.push(`envío L ${shippingAmount.toFixed(2)}`);
+      const txDescription =
+        txParts.length > 1
+          ? `${txParts[0]} (${txParts.slice(1).join(", ")})`
+          : txParts[0];
       // 1. Crear venta
       const [sale] = await sql`
         INSERT INTO sales (
           user_id, sale_number, customer_id,
           subtotal, discount, tax_rate, tax, shipping_cost, total,
-          payment_method, account_id, event_id,
+          payment_method, account_id, credit_card_id, event_id,
           status, sold_at, notes
         ) VALUES (
           ${userId}, ${saleNumber}, ${customer_id ?? null},
           ${subtotal}, ${totalDiscount}, ${taxRateNum}, ${taxAmount},
           ${shippingAmount}, ${grandTotal},
-          ${payment_method}, ${account_id}, ${eventIdNum},
+          ${payment_method},
+          ${isCreditCard ? null : account_id},
+          ${isCreditCard ? Number(credit_card_id) : null},
+          ${eventIdNum},
           ${status}, ${occurredAt}::timestamptz, ${notes ?? null}
         )
         RETURNING id
@@ -464,26 +529,60 @@ export async function POST(request: NextRequest) {
 
       // 4. Transacción + balance + cliente — solo si COMPLETED
       if (status === "COMPLETED") {
-        const txRefType = eventIdNum ? "EVENT" : "SALE";
-        const txRefId = eventIdNum ? eventIdNum : saleId;
+        if (isCreditCard) {
+          // Cargo a tarjeta de crédito
+          const chargeAmount = isCreditCardUsd ? Number(grandTotal) : grandTotal;
+          const chargeCurrency = isCreditCardUsd ? "USD" : (sale_currency ?? "LOCAL");
+          const rateNum = isCreditCardUsd ? Number(exchange_rate) : null;
+          const localEquivalent = isCreditCardUsd ? grandTotal * Number(exchange_rate) : grandTotal;
 
-        await sql`
-          INSERT INTO transactions (
-            user_id, type, account_id, amount,
-            category, description,
-            reference_type, reference_id, occurred_at
-          ) VALUES (
-            ${userId}, 'INCOME', ${account_id}, ${grandTotal},
-            'Ventas', ${txDescription},
-            ${txRefType}, ${txRefId}, ${occurredAt}::timestamptz
-          )
-        `;
+          await sql`
+            INSERT INTO credit_card_transactions (
+              user_id, credit_card_id, type, description,
+              amount, currency, exchange_rate, amount_local,
+              sale_id, occurred_at
+            ) VALUES (
+              ${userId}, ${Number(credit_card_id)}, 'CHARGE', ${txDescription},
+              ${chargeAmount}, ${chargeCurrency}, ${rateNum},
+              ${localEquivalent}, ${saleId}, ${occurredAt}::timestamptz
+            )
+          `;
 
-        await sql`
-          UPDATE accounts
-          SET balance = balance + ${grandTotal}
-          WHERE id = ${account_id} AND user_id = ${userId}
-        `;
+          if (isCreditCardUsd) {
+            await sql`
+              UPDATE credit_cards
+              SET balance_usd = balance_usd + ${chargeAmount}, updated_at = NOW()
+              WHERE id = ${Number(credit_card_id)} AND user_id = ${userId}
+            `;
+          } else {
+            await sql`
+              UPDATE credit_cards
+              SET balance = balance + ${chargeAmount}, updated_at = NOW()
+              WHERE id = ${Number(credit_card_id)} AND user_id = ${userId}
+            `;
+          }
+        } else {
+          const txRefType = eventIdNum ? "EVENT" : "SALE";
+          const txRefId = eventIdNum ? eventIdNum : saleId;
+
+          await sql`
+            INSERT INTO transactions (
+              user_id, type, account_id, amount,
+              category, description,
+              reference_type, reference_id, occurred_at
+            ) VALUES (
+              ${userId}, 'INCOME', ${account_id}, ${grandTotal},
+              'Ventas', ${txDescription},
+              ${txRefType}, ${txRefId}, ${occurredAt}::timestamptz
+            )
+          `;
+
+          await sql`
+            UPDATE accounts
+            SET balance = balance + ${grandTotal}
+            WHERE id = ${account_id} AND user_id = ${userId}
+          `;
+        }
 
         if (customer_id) {
           await sql`

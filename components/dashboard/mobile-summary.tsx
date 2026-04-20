@@ -4,19 +4,20 @@
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import { useCurrency } from "@/hooks/swr/use-currency";
+import { useTimezone, formatInTZ } from "@/hooks/swr/use-timezone";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Package, AlertTriangle } from "lucide-react";
-
-const formatDateFull = (d: string) =>
-  new Date(d).toLocaleDateString("es-HN", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" });
 
 type Props = { lowStock: any[]; recentSales: any[]; isLoading: boolean };
 
 export function MobileSummary({ lowStock, recentSales, isLoading }: Props) {
   const router = useRouter();
   const { format } = useCurrency();
+  const tz = useTimezone();
+  const formatDateFull = (d: string) =>
+    formatInTZ(d, tz, { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" });
 
   return (
     <div className="space-y-3 lg:hidden">

@@ -25,10 +25,13 @@ import {
   Clock,
   CheckCircle,
   Layers,
+  FileText,
+  Printer,
 } from "lucide-react";
 
 import { useSale, usePatchSale } from "@/hooks/swr/use-sales";
 import { useCurrency } from "@/hooks/swr/use-currency";
+import { useTimezone, formatInTZ } from "@/hooks/swr/use-timezone";
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 
 type Props = { params: Promise<{ id: string }> };
@@ -42,6 +45,7 @@ export default function SaleDetailPage({ params }: Props) {
   const { confirmSale, cancelSale, isPatching } = usePatchSale(numericId);
   const router              = useRouter();
   const { format }          = useCurrency();
+  const tz                  = useTimezone();
 
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [cancelOpen,  setCancelOpen]  = useState(false);
@@ -148,12 +152,38 @@ export default function SaleDetailPage({ params }: Props) {
             )}
           </div>
           <p className="text-muted-foreground text-sm">
-            {new Date(sale.sold_at).toLocaleDateString("es-HN", {
+            {formatInTZ(sale.sold_at, tz, {
               day: "numeric",
               month: "short",
               year: "numeric",
             })}
           </p>
+        </div>
+
+        {/* Invoice / Receipt actions */}
+        <div className="flex gap-2 shrink-0">
+          <Button
+            variant="outline"
+            size="sm"
+            className="gap-1.5 text-xs"
+            asChild
+          >
+            <Link href={`/sales/${sale.id}/invoice`}>
+              <FileText className="h-3.5 w-3.5" />
+              Factura PDF
+            </Link>
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            className="gap-1.5 text-xs"
+            asChild
+          >
+            <Link href={`/sales/${sale.id}/receipt`}>
+              <Printer className="h-3.5 w-3.5" />
+              Ticket
+            </Link>
+          </Button>
         </div>
       </div>
 

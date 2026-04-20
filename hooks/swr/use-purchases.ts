@@ -17,7 +17,8 @@ export type PurchaseItem = {
 };
 
 export type CreatePurchaseInput = {
-  account_id: number;
+  account_id?: number;
+  credit_card_id?: number;
   currency: 'USD' | 'HNL';
   exchange_rate: number;
   shipping: number;

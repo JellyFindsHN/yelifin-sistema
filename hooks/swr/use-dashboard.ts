@@ -26,6 +26,10 @@ export type DashboardData = {
       low_stock: number;
     };
     balance: number;
+    credit_card_debt: {
+      local: number;
+      usd:   number;
+    };
   };
   sales_chart:     { date: string; revenue: number; profit: number }[];
   payment_methods: { method: string; amount: number }[];

@@ -103,22 +103,67 @@ export async function POST(request: NextRequest) {
     const {
       type, account_id, to_account_id, amount,
       category, description, occurred_at,
-      reference_type, reference_id, 
+      reference_type, reference_id,
+      // Tarjeta de crédito (solo para EXPENSE)
+      credit_card_id, currency, exchange_rate,
     } = body;
 
     if (!type || !["INCOME", "EXPENSE", "TRANSFER"].includes(type))
       return createErrorResponse("Tipo de transacción inválido", 400);
-    if (!account_id)
-      return createErrorResponse("La cuenta es requerida", 400);
     if (!amount || Number(amount) <= 0)
       return createErrorResponse("El monto debe ser mayor a 0", 400);
+
+    const isCreditCardExpense = type === "EXPENSE" && !!credit_card_id;
+
+    if (!isCreditCardExpense && !account_id)
+      return createErrorResponse("La cuenta es requerida", 400);
     if (type === "TRANSFER" && !to_account_id)
       return createErrorResponse("La cuenta destino es requerida", 400);
     if (type === "TRANSFER" && account_id === to_account_id)
       return createErrorResponse("Las cuentas deben ser diferentes", 400);
 
-    // Validar reference_type si viene
-    const VALID_REF_TYPES = ["SALE", "PURCHASE", "SUPPLY_PURCHASE", "EVENT", "OTHER"];
+    const amt = Number(amount);
+    const occurredAt = occurred_at ?? new Date().toISOString();
+
+    // ── Egreso con tarjeta de crédito ──────────────────────────────────
+    if (isCreditCardExpense) {
+      const [card] = await sql`
+        SELECT id, balance, balance_usd FROM credit_cards
+        WHERE id = ${Number(credit_card_id)} AND user_id = ${userId} AND is_active = TRUE
+      `;
+      if (!card) return createErrorResponse("Tarjeta no encontrada", 404);
+
+      const isUsd = currency === "USD";
+      const rateNum = isUsd ? Number(exchange_rate ?? 1) : null;
+      const amountLocal = isUsd ? amt * Number(exchange_rate ?? 1) : amt;
+
+      const [ccTxn] = await sql`
+        INSERT INTO credit_card_transactions (
+          user_id, credit_card_id, type, description,
+          amount, currency, exchange_rate, amount_local, occurred_at
+        ) VALUES (
+          ${userId}, ${Number(credit_card_id)}, 'CHARGE',
+          ${description ?? null},
+          ${amt}, ${currency ?? "LOCAL"}, ${rateNum}, ${amountLocal},
+          ${occurredAt}
+        )
+        RETURNING id
+      `;
+
+      if (isUsd) {
+        await sql`UPDATE credit_cards SET balance_usd = balance_usd + ${amt}, updated_at = NOW() WHERE id = ${Number(credit_card_id)} AND user_id = ${userId}`;
+      } else {
+        await sql`UPDATE credit_cards SET balance = balance + ${amt}, updated_at = NOW() WHERE id = ${Number(credit_card_id)} AND user_id = ${userId}`;
+      }
+
+      return Response.json(
+        { message: "Cargo a tarjeta registrado", data: { id: ccTxn.id } },
+        { status: 201 }
+      );
+    }
+
+    // ── Transacción normal (cuenta) ────────────────────────────────────
+    const VALID_REF_TYPES = ["SALE", "PURCHASE", "SUPPLY_PURCHASE", "EVENT", "OTHER", "CREDIT_CARD_PAYMENT"];
     const refType = reference_type && VALID_REF_TYPES.includes(reference_type)
       ? reference_type
       : "OTHER";
@@ -129,9 +174,6 @@ export async function POST(request: NextRequest) {
       WHERE id = ${account_id} AND user_id = ${userId} AND is_active = TRUE
     `;
     if (!account) return createErrorResponse("Cuenta no encontrada", 404);
-
-    const amt = Number(amount);
-    const occurredAt = occurred_at ?? new Date().toISOString();
 
     const [transaction] = await sql`
       INSERT INTO transactions (
@@ -146,7 +188,6 @@ export async function POST(request: NextRequest) {
       RETURNING id
     `;
 
-    // Actualizar balances
     if (type === "INCOME") {
       await sql`UPDATE accounts SET balance = balance + ${amt} WHERE id = ${account_id} AND user_id = ${userId}`;
     } else if (type === "EXPENSE") {

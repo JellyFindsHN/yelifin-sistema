@@ -24,6 +24,7 @@ import {
   Truck,
   ArrowLeft,
   Clock,
+  CreditCard,
 } from "lucide-react";
 import { useCurrency } from "@/hooks/swr/use-currency";
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
@@ -32,9 +33,13 @@ import { SearchableSelect } from "@/components/shared/SearchableSelect";
 type Props = {
   customers: any[];
   accounts: any[];
+  creditCards?: any[];
   hasSupplies: boolean;
   customerId: number | null;
   accountId: number | null;
+  creditCardId: number | null;
+  saleCardCurrency: string;
+  exchangeRate: number;
   notes: string;
   grandTotal: number;
   shippingCost: number;
@@ -42,6 +47,9 @@ type Props = {
   isPending: boolean;
   onCustomerChange: (id: number | null) => void;
   onAccountChange: (id: number) => void;
+  onCreditCardChange: (id: number | null) => void;
+  onSaleCardCurrencyChange: (v: string) => void;
+  onExchangeRateChange: (v: number) => void;
   onNotesChange: (v: string) => void;
   onShippingCostChange: (v: number) => void;
   onIsPendingChange: (v: boolean) => void;
@@ -53,9 +61,13 @@ type Props = {
 export function SaleOptionsPanel({
   customers,
   accounts,
+  creditCards = [],
   hasSupplies,
   customerId,
   accountId,
+  creditCardId,
+  saleCardCurrency,
+  exchangeRate,
   notes,
   grandTotal,
   shippingCost,
@@ -63,6 +75,9 @@ export function SaleOptionsPanel({
   isPending,
   onCustomerChange,
   onAccountChange,
+  onCreditCardChange,
+  onSaleCardCurrencyChange,
+  onExchangeRateChange,
   onNotesChange,
   onShippingCostChange,
   onIsPendingChange,
@@ -70,7 +85,10 @@ export function SaleOptionsPanel({
   onOpenSupplies,
   onBack,
 }: Props) {
-  const { format, symbol } = useCurrency();
+  const { format, symbol, currency: nativeCurrency } = useCurrency();
+
+  const [paymentMode, setPaymentMode] = useState<"account" | "credit_card">("account");
+  const isCreditCardUsd = paymentMode === "credit_card" && saleCardCurrency === "USD";
 
   // --- estado para el confirm dialog ---
   const [confirmOpen, setConfirmOpen] = useState(false);
@@ -122,28 +140,130 @@ export function SaleOptionsPanel({
             />
           </div>
 
+          {/* Modo de pago */}
+          {creditCards.length > 0 && (
+            <div className="grid grid-cols-2 gap-1.5 p-1 bg-muted rounded-lg">
+              <button
+                type="button"
+                onClick={() => { setPaymentMode("account"); onCreditCardChange(null); }}
+                className={`flex items-center justify-center gap-1.5 py-1.5 rounded-md text-xs font-medium transition-colors cursor-pointer ${
+                  paymentMode === "account"
+                    ? "bg-background shadow-sm text-foreground"
+                    : "text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                <Wallet className="h-3 w-3" />
+                Cuenta
+              </button>
+              <button
+                type="button"
+                onClick={() => { setPaymentMode("credit_card"); onAccountChange(0); }}
+                className={`flex items-center justify-center gap-1.5 py-1.5 rounded-md text-xs font-medium transition-colors cursor-pointer ${
+                  paymentMode === "credit_card"
+                    ? "bg-background shadow-sm text-foreground"
+                    : "text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                <CreditCard className="h-3 w-3" />
+                Tarjeta
+              </button>
+            </div>
+          )}
+
           {/* Cuenta destino */}
-          <div className="space-y-1.5">
-            <Label className="text-xs flex items-center gap-1.5">
-              <Wallet className="h-3.5 w-3.5" />
-              Cuenta de destino *
-            </Label>
-            <Select
-              value={accountId?.toString() ?? ""}
-              onValueChange={(v) => onAccountChange(Number(v))}
-            >
-              <SelectTrigger className="h-8 text-sm w-full">
-                <SelectValue placeholder="Seleccionar cuenta..." />
-              </SelectTrigger>
-              <SelectContent>
-                {accounts.map((a) => (
-                  <SelectItem key={a.id} value={a.id.toString()}>
-                    {a.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
+          {paymentMode === "account" && (
+            <div className="space-y-1.5">
+              <Label className="text-xs flex items-center gap-1.5">
+                <Wallet className="h-3.5 w-3.5" />
+                Cuenta de destino *
+              </Label>
+              <Select
+                value={accountId?.toString() ?? ""}
+                onValueChange={(v) => onAccountChange(Number(v))}
+              >
+                <SelectTrigger className="h-8 text-sm w-full">
+                  <SelectValue placeholder="Seleccionar cuenta..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {accounts.map((a) => (
+                    <SelectItem key={a.id} value={a.id.toString()}>
+                      {a.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+
+          {/* Tarjeta de crédito */}
+          {paymentMode === "credit_card" && (
+            <div className="space-y-3">
+              <div className="space-y-1.5">
+                <Label className="text-xs flex items-center gap-1.5">
+                  <CreditCard className="h-3.5 w-3.5" />
+                  Tarjeta de crédito *
+                </Label>
+                <Select
+                  value={creditCardId?.toString() ?? ""}
+                  onValueChange={(v) => onCreditCardChange(Number(v))}
+                >
+                  <SelectTrigger className="h-8 text-sm w-full">
+                    <SelectValue placeholder="Seleccionar tarjeta..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {creditCards.map((c) => (
+                      <SelectItem key={c.id} value={c.id.toString()}>
+                        {c.name}{c.last_four ? ` ···· ${c.last_four}` : ""}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Moneda de la compra */}
+              <div className="space-y-1.5">
+                <Label className="text-xs">Moneda de la compra</Label>
+                <Select
+                  value={saleCardCurrency}
+                  onValueChange={onSaleCardCurrencyChange}
+                >
+                  <SelectTrigger className="h-8 text-sm w-full">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value={nativeCurrency}>{nativeCurrency} — Moneda local</SelectItem>
+                    <SelectItem value="USD">USD — Dólares</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Tasa de cambio — solo si USD */}
+              {isCreditCardUsd && (
+                <div className="space-y-1.5">
+                  <Label className="text-xs">
+                    Tasa de cambio (1 USD = ? {nativeCurrency}) *
+                  </Label>
+                  <Input
+                    type="number"
+                    step="0.0001"
+                    min="0.0001"
+                    placeholder="Ej: 24.89"
+                    value={exchangeRate === 0 ? "" : exchangeRate}
+                    onChange={(e) => {
+                      const n = parseFloat(e.target.value);
+                      onExchangeRateChange(isNaN(n) ? 0 : n);
+                    }}
+                    className="h-8 text-sm"
+                  />
+                  {exchangeRate > 0 && (
+                    <p className="text-[10px] text-muted-foreground">
+                      Costo equivalente: {format(grandTotal * exchangeRate)}
+                    </p>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
 
           {/* Envío */}
           <div className="space-y-1.5">

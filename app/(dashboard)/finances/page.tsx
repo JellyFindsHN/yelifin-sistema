@@ -22,6 +22,7 @@ import {
 import { useFinances, useFinancePeriods } from "@/hooks/swr/use-finances";
 import { useAccounts, Account } from "@/hooks/swr/use-accounts";
 import { useCurrency } from "@/hooks/swr/use-currency";
+import { useCreditCards } from "@/hooks/swr/use-credit-cards";
 import { CreateTransactionModal } from "@/components/transactions/create-transaction-modal";
 import { CreateAccountDialog } from "@/components/accounts/create-account-dialog";
 import { EditAccountDialog } from "@/components/accounts/edit-account-dialog";
@@ -71,6 +72,7 @@ export default function FinancesPage() {
   const { periods } = useFinancePeriods();
   const { accounts, mutate: mutateAccounts } = useAccounts();
   const { format } = useCurrency();
+  const { creditCards } = useCreditCards();
 
   const availableYears = [...new Set(periods.map((p) => p.year))].sort((a, b) => b - a);
   const monthsForYear = (y: number) => {
@@ -361,6 +363,7 @@ export default function FinancesPage() {
         open={transactionOpen}
         onOpenChange={setTransactionOpen}
         accounts={accounts}
+        creditCards={creditCards}
       />
       <CreateAccountDialog
         open={createAccountOpen}

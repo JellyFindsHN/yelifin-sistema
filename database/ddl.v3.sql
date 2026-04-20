@@ -547,3 +547,63 @@ ALTER TABLE product_variants ADD COLUMN IF NOT EXISTS image_url TEXT;
     CHECK (status IN ('PENDING', 'COMPLETED'));
 
   CREATE INDEX IF NOT EXISTS idx_purchase_batches_status ON purchase_batches(user_id, status);
+
+-- =========================
+-- TARJETAS DE CRÉDITO
+-- =========================
+
+CREATE TABLE IF NOT EXISTS credit_cards (
+  id BIGSERIAL PRIMARY KEY,
+  user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  name VARCHAR(120) NOT NULL,
+  last_four CHAR(4),
+  credit_limit NUMERIC(14,2),
+  statement_closing_day INT CHECK (statement_closing_day BETWEEN 1 AND 31),
+  payment_due_day INT CHECK (payment_due_day BETWEEN 1 AND 31),
+  balance NUMERIC(14,2) NOT NULL DEFAULT 0,
+  balance_usd NUMERIC(14,2) NOT NULL DEFAULT 0,
+  is_active BOOLEAN NOT NULL DEFAULT TRUE,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE(user_id, name)
+);
+
+CREATE INDEX IF NOT EXISTS idx_credit_cards_user ON credit_cards(user_id);
+
+CREATE TABLE IF NOT EXISTS credit_card_transactions (
+  id BIGSERIAL PRIMARY KEY,
+  user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  credit_card_id BIGINT NOT NULL REFERENCES credit_cards(id) ON DELETE CASCADE,
+  type VARCHAR(10) NOT NULL CHECK (type IN ('CHARGE','PAYMENT')),
+  description VARCHAR(255),
+  amount NUMERIC(14,2) NOT NULL CHECK (amount >= 0),
+  currency VARCHAR(3) NOT NULL,
+  exchange_rate NUMERIC(12,6),
+  amount_local NUMERIC(14,2),
+  sale_id BIGINT REFERENCES sales(id) ON DELETE SET NULL,
+  account_transaction_id BIGINT REFERENCES transactions(id) ON DELETE SET NULL,
+  occurred_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_cc_transactions_user ON credit_card_transactions(user_id);
+CREATE INDEX IF NOT EXISTS idx_cc_transactions_card ON credit_card_transactions(credit_card_id);
+CREATE INDEX IF NOT EXISTS idx_cc_transactions_date ON credit_card_transactions(credit_card_id, occurred_at);
+
+-- Modificar sales para soportar pago con tarjeta de crédito
+ALTER TABLE sales
+  ADD COLUMN IF NOT EXISTS credit_card_id BIGINT REFERENCES credit_cards(id) ON DELETE SET NULL;
+
+-- Ampliar CHECK de payment_method en sales para incluir CREDIT_CARD
+ALTER TABLE sales DROP CONSTRAINT IF EXISTS sales_payment_method_check;
+ALTER TABLE sales ADD CONSTRAINT sales_payment_method_check
+  CHECK (payment_method IN ('CASH','CARD','TRANSFER','MIXED','OTHER','CREDIT_CARD'));
+
+-- Agregar credit_card_id a transactions para pagos a tarjeta
+ALTER TABLE transactions
+  ADD COLUMN IF NOT EXISTS credit_card_id BIGINT REFERENCES credit_cards(id) ON DELETE SET NULL;
+
+-- Ampliar CHECK de reference_type en transactions para incluir CREDIT_CARD_PAYMENT
+ALTER TABLE transactions DROP CONSTRAINT IF EXISTS transactions_reference_type_check;
+ALTER TABLE transactions ADD CONSTRAINT transactions_reference_type_check
+  CHECK (reference_type IN ('SALE','PURCHASE','SUPPLY_PURCHASE','EVENT','OTHER','CREDIT_CARD_PAYMENT'));

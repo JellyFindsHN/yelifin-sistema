@@ -15,12 +15,13 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
-import { Loader2, PackagePlus, Calculator, Wallet, Plus, Trash2, Clock } from "lucide-react";
+import { Loader2, PackagePlus, Calculator, Wallet, Plus, Trash2, Clock, CreditCard } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { useCreatePurchase } from "@/hooks/swr/use-purchases";
 import { useAccounts } from "@/hooks/swr/use-accounts";
+import { useCreditCards } from "@/hooks/swr/use-credit-cards";
 import { useCurrency } from "@/hooks/swr/use-currency";
 import { Product } from "@/types";
 
@@ -50,7 +51,7 @@ type LineItem = {
 // ── Schema — solo campos de cabecera ──────────────────────────────────
 
 const schema = z.object({
-  account_id:    z.coerce.number().min(1, "Selecciona una cuenta"),
+  account_id:    z.coerce.number().optional(),
   currency:      z.enum(["USD", "HNL"]),
   exchange_rate: z.coerce.number().min(1, "La tasa debe ser mayor a 0"),
   shipping:      z.coerce.number().min(0).default(0),
@@ -78,8 +79,11 @@ type Props = {
 export function AddInventoryDialog({ product, open, onOpenChange, onSuccess }: Props) {
   const { createPurchase, isCreating } = useCreatePurchase();
   const { accounts }                   = useAccounts();
+  const { creditCards }                = useCreditCards();
   const { format, symbol, currency: businessCurrency } = useCurrency();
 
+  const [paymentMode, setPaymentMode] = useState<"account" | "credit_card">("account");
+  const [creditCardId, setCreditCardId] = useState<number | null>(null);
   const [isPending, setIsPending] = useState(false);
   const [items, setItems] = useState<LineItem[]>([
     { key: uid(), variant_key: "base", quantity: "1", unit_cost: "0" },
@@ -119,6 +123,8 @@ export function AddInventoryDialog({ product, open, onOpenChange, onSuccess }: P
     if (open) {
       setItems([{ key: uid(), variant_key: "base", quantity: "1", unit_cost: "0" }]);
       setIsPending(false);
+      setPaymentMode("account");
+      setCreditCardId(null);
       reset({
         currency:      "USD",
         exchange_rate: TASA_DEFAULT,
@@ -157,9 +163,15 @@ export function AddInventoryDialog({ product, open, onOpenChange, onSuccess }: P
       }
     }
 
+    const isCreditCard = paymentMode === "credit_card";
+    if (!isCreditCard && !data.account_id)
+      return toast.error("Selecciona una cuenta");
+    if (isCreditCard && !creditCardId)
+      return toast.error("Selecciona una tarjeta de crédito");
+
     try {
       await createPurchase({
-        account_id:    data.account_id,
+        ...(isCreditCard ? { credit_card_id: creditCardId! } : { account_id: data.account_id! }),
         currency:      data.currency,
         exchange_rate: data.exchange_rate,
         shipping:      data.shipping,
@@ -250,7 +262,34 @@ export function AddInventoryDialog({ product, open, onOpenChange, onSuccess }: P
           className="flex-1 overflow-y-auto px-5 py-4 space-y-4"
           style={{ scrollbarWidth: "none" } as React.CSSProperties}
         >
+          {/* Modo de pago */}
+          {creditCards.length > 0 && (
+            <div className="grid grid-cols-2 gap-1.5 p-1 bg-muted rounded-lg">
+              <button
+                type="button"
+                onClick={() => setPaymentMode("account")}
+                className={cn(
+                  "flex items-center justify-center gap-1.5 py-1.5 rounded-md text-xs font-medium transition-colors cursor-pointer",
+                  paymentMode === "account" ? "bg-background shadow-sm" : "text-muted-foreground hover:text-foreground"
+                )}
+              >
+                <Wallet className="h-3 w-3" /> Cuenta
+              </button>
+              <button
+                type="button"
+                onClick={() => setPaymentMode("credit_card")}
+                className={cn(
+                  "flex items-center justify-center gap-1.5 py-1.5 rounded-md text-xs font-medium transition-colors cursor-pointer",
+                  paymentMode === "credit_card" ? "bg-background shadow-sm" : "text-muted-foreground hover:text-foreground"
+                )}
+              >
+                <CreditCard className="h-3 w-3" /> Tarjeta
+              </button>
+            </div>
+          )}
+
           {/* Cuenta */}
+          {paymentMode === "account" && (
           <div className="space-y-1.5">
             <Label className="text-sm font-medium flex items-center gap-1.5">
               <Wallet className="h-3.5 w-3.5 text-muted-foreground" />
@@ -276,10 +315,34 @@ export function AddInventoryDialog({ product, open, onOpenChange, onSuccess }: P
                 ))}
               </SelectContent>
             </Select>
-            {errors.account_id && (
-              <p className="text-xs text-destructive">{errors.account_id.message}</p>
-            )}
           </div>
+          )}
+
+          {/* Tarjeta de crédito */}
+          {paymentMode === "credit_card" && (
+          <div className="space-y-1.5">
+            <Label className="text-sm font-medium flex items-center gap-1.5">
+              <CreditCard className="h-3.5 w-3.5 text-muted-foreground" />
+              Tarjeta de crédito <span className="text-destructive text-xs">*</span>
+            </Label>
+            <Select
+              value={creditCardId ? String(creditCardId) : ""}
+              onValueChange={(val) => setCreditCardId(Number(val))}
+              disabled={isCreating}
+            >
+              <SelectTrigger className="h-11 w-full">
+                <SelectValue placeholder="Selecciona una tarjeta" />
+              </SelectTrigger>
+              <SelectContent>
+                {creditCards.map((c) => (
+                  <SelectItem key={c.id} value={String(c.id)}>
+                    {c.name}{c.last_four ? ` ···· ${c.last_four}` : ""}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          )}
 
           {/* Moneda + Tasa */}
           <div className={`grid gap-3 ${isUSD ? "grid-cols-2" : "grid-cols-1"}`}>

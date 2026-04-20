@@ -48,6 +48,7 @@ import { AdjustInventoryDialog }      from "@/components/products/adjust-invento
 import { useCurrency }                from "@/hooks/swr/use-currency";
 import { CreateTransactionModal }     from "@/components/transactions/create-transaction-modal";
 import { useAccounts }                from "@/hooks/swr/use-accounts";
+import { useCreditCards }             from "@/hooks/swr/use-credit-cards";
 import { usePurchases }               from "@/hooks/swr/use-purchases";
 
 // ── Helpers ────────────────────────────────────────────────────────────
@@ -86,6 +87,7 @@ export default function InventoryPage() {
   const [deleteVariantTarget, setDeleteVariantTarget] = useState<{ product: Product; variant: ProductVariant } | null>(null);
 
   const { accounts, mutate: mutateAccounts } = useAccounts();
+  const { creditCards } = useCreditCards();
   const { format }     = useCurrency();
   const { purchases, mutate: mutatePurchases } = usePurchases();
 
@@ -801,6 +803,7 @@ export default function InventoryPage() {
         open={transactionOpen}
         onOpenChange={setTransactionOpen}
         accounts={accounts}
+        creditCards={creditCards}
         onSuccess={() => setTransactionOpen(false)}
       />
     </div>

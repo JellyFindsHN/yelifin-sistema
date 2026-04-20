@@ -25,12 +25,15 @@ import {
   ArrowDownCircle,
   ArrowUpCircle,
   ArrowLeftRight,
+  CreditCard,
+  Wallet,
 } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { useCreateTransaction } from "@/hooks/swr/use-transactions";
 import { useCurrency } from "@/hooks/swr/use-currency";
 import { useTransactionCategories } from "@/hooks/swr/use-transaction-categories";
+import { CreditCard as CreditCardType } from "@/hooks/swr/use-credit-cards";
 
 type TxType = "INCOME" | "EXPENSE" | "TRANSFER";
 
@@ -44,6 +47,7 @@ type Props = {
   open: boolean;
   onOpenChange: (v: boolean) => void;
   accounts: { id: number; name: string; balance: number }[];
+  creditCards?: CreditCardType[];
   onSuccess?: () => void;
   defaultType?: TxType;
 };
@@ -52,15 +56,20 @@ export function CreateTransactionModal({
   open,
   onOpenChange,
   accounts,
+  creditCards = [],
   onSuccess,
   defaultType = "EXPENSE",
 }: Props) {
   const { createTransaction, isCreating } = useCreateTransaction();
-  const { format, symbol } = useCurrency();
+  const { format, symbol, currency: nativeCurrency } = useCurrency();
   const { mutate } = useSWRConfig();
 
   const [type, setType] = useState<TxType>(defaultType);
+  const [sourceMode, setSourceMode] = useState<"account" | "credit_card">("account");
   const [accountId, setAccountId] = useState("");
+  const [creditCardId, setCreditCardId] = useState("");
+  const [ccCurrency, setCcCurrency] = useState(nativeCurrency);
+  const [ccExchangeRate, setCcExchangeRate] = useState("");
   const [toAccountId, setToAccountId] = useState("");
   const [amount, setAmount] = useState("");
   const [category, setCategory] = useState("");
@@ -69,13 +78,21 @@ export function CreateTransactionModal({
     new Date().toISOString().split("T")[0],
   );
 
+  const showCreditCardOption = type === "EXPENSE" && creditCards.length > 0;
+  const isCreditCardMode = showCreditCardOption && sourceMode === "credit_card";
+  const isCcUsd = isCreditCardMode && ccCurrency === "USD";
+
   // Obtener categorías dinámicas filtradas por tipo
   const { categories } = useTransactionCategories(type);
   const activeCategories = categories.filter((c) => c.is_active);
 
   const resetForm = () => {
     setType(defaultType);
+    setSourceMode("account");
     setAccountId("");
+    setCreditCardId("");
+    setCcCurrency(nativeCurrency);
+    setCcExchangeRate("");
     setToAccountId("");
     setAmount("");
     setCategory("");
@@ -100,24 +117,34 @@ export function CreateTransactionModal({
     );
 
   const onSubmit = async () => {
-    if (!accountId) return toast.error("Selecciona una cuenta");
     if (!amount || Number(amount) <= 0)
       return toast.error("El monto debe ser mayor a 0");
-    if (type === "TRANSFER" && !toAccountId)
-      return toast.error("Selecciona cuenta destino");
-    if (type === "TRANSFER" && accountId === toAccountId)
-      return toast.error("Las cuentas deben ser diferentes");
+
+    if (isCreditCardMode) {
+      if (!creditCardId) return toast.error("Selecciona una tarjeta de crédito");
+      if (isCcUsd && (!ccExchangeRate || Number(ccExchangeRate) <= 0))
+        return toast.error("Ingresa la tasa de cambio para cargos en USD");
+    } else {
+      if (!accountId) return toast.error("Selecciona una cuenta");
+      if (type === "TRANSFER" && !toAccountId)
+        return toast.error("Selecciona cuenta destino");
+      if (type === "TRANSFER" && accountId === toAccountId)
+        return toast.error("Las cuentas deben ser diferentes");
+    }
 
     try {
       await createTransaction({
         type,
-        account_id: Number(accountId),
+        account_id: isCreditCardMode ? undefined : Number(accountId),
         to_account_id: type === "TRANSFER" ? Number(toAccountId) : undefined,
+        credit_card_id: isCreditCardMode ? Number(creditCardId) : undefined,
+        currency: isCreditCardMode ? ccCurrency : undefined,
+        exchange_rate: isCcUsd ? Number(ccExchangeRate) : undefined,
         amount: Number(amount),
         category: category || undefined,
         description: description || undefined,
         occurred_at: new Date(occurredAt).toISOString(),
-      });
+      } as any);
 
       toast.success("Transacción registrada exitosamente");
       mutateAll();
@@ -191,6 +218,34 @@ export function CreateTransactionModal({
           </div>
 
           <div className="grid-gap-4 flex flex-col ">
+            {/* Toggle cuenta / tarjeta (solo para EXPENSE) */}
+            {showCreditCardOption && (
+              <div className="grid grid-cols-2 gap-1.5 p-1 bg-muted rounded-lg">
+                <button
+                  type="button"
+                  onClick={() => setSourceMode("account")}
+                  className={cn(
+                    "flex items-center justify-center gap-1.5 py-1.5 rounded-md text-xs font-medium transition-colors cursor-pointer",
+                    sourceMode === "account" ? "bg-background shadow-sm" : "text-muted-foreground hover:text-foreground"
+                  )}
+                >
+                  <Wallet className="h-3 w-3" /> Cuenta
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setSourceMode("credit_card")}
+                  className={cn(
+                    "flex items-center justify-center gap-1.5 py-1.5 rounded-md text-xs font-medium transition-colors cursor-pointer",
+                    sourceMode === "credit_card" ? "bg-background shadow-sm" : "text-muted-foreground hover:text-foreground"
+                  )}
+                >
+                  <CreditCard className="h-3 w-3" /> Tarjeta
+                </button>
+              </div>
+            )}
+
+            {/* Selector de cuenta */}
+            {!isCreditCardMode && (
             <div className="space-y-1.5">
               <Label className="text-sm font-medium">
                 {type === "TRANSFER" ? "Cuenta origen" : "Cuenta"}{" "}
@@ -214,6 +269,55 @@ export function CreateTransactionModal({
                 </SelectContent>
               </Select>
             </div>
+            )}
+
+            {/* Selector de tarjeta de crédito */}
+            {isCreditCardMode && (
+              <div className="space-y-3">
+                <div className="space-y-1.5">
+                  <Label className="text-sm font-medium">
+                    Tarjeta de crédito <span className="text-destructive text-xs">*</span>
+                  </Label>
+                  <Select value={creditCardId} onValueChange={setCreditCardId}>
+                    <SelectTrigger className="w-full h-11 text-left">
+                      <SelectValue placeholder="Selecciona una tarjeta" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {creditCards.map((c) => (
+                        <SelectItem key={c.id} value={String(c.id)}>
+                          {c.name}{c.last_four ? ` ···· ${c.last_four}` : ""}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-sm font-medium">Moneda del cargo</Label>
+                  <Select value={ccCurrency} onValueChange={setCcCurrency}>
+                    <SelectTrigger className="h-11 w-full">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value={nativeCurrency}>{nativeCurrency} — Moneda local</SelectItem>
+                      <SelectItem value="USD">USD — Dólares</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                {isCcUsd && (
+                  <div className="space-y-1.5">
+                    <Label className="text-sm font-medium">
+                      Tasa de cambio (1 USD = ? {nativeCurrency}) <span className="text-destructive text-xs">*</span>
+                    </Label>
+                    <Input
+                      type="number" step="0.0001" min="0" placeholder="Ej: 24.89"
+                      value={ccExchangeRate}
+                      onChange={(e) => setCcExchangeRate(e.target.value)}
+                      className="h-11 text-base"
+                    />
+                  </div>
+                )}
+              </div>
+            )}
 
             {type === "TRANSFER" && (
               <div className="space-y-1.5 sm:mt-3">
