@@ -540,3 +540,10 @@ ALTER TABLE products
   ADD COLUMN IF NOT EXISTS is_service BOOLEAN NOT NULL DEFAULT FALSE;
 
 ALTER TABLE product_variants ADD COLUMN IF NOT EXISTS image_url TEXT;
+
+-- Migration: compras pendientes (debita dinero pero no registra inventario hasta confirmación)
+ ALTER TABLE purchase_batches
+    ADD COLUMN IF NOT EXISTS status VARCHAR(20) NOT NULL DEFAULT 'COMPLETED'
+    CHECK (status IN ('PENDING', 'COMPLETED'));
+
+  CREATE INDEX IF NOT EXISTS idx_purchase_batches_status ON purchase_batches(user_id, status);

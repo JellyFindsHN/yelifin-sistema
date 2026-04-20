@@ -132,7 +132,7 @@ export function CreateProductVariantDialog({
       await createVariant({
         variant_name:   data.variant_name.trim(),
         sku:            data.sku?.trim() || undefined,
-        price_override: data.price_override !== "" && data.price_override !== undefined
+        price_override: data.price_override !== "" && data.price_override !== undefined && Number(data.price_override) > 0
                           ? Number(data.price_override)
                           : null,
         attributes:     attributesObj,

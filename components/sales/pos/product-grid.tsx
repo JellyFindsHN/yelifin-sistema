@@ -36,7 +36,7 @@ export function PosProductGrid({ products, cart, onAdd, search }: Props) {
   return (
     <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5 mb-5">
       {products.map((product) => {
-        const inCart = cart.find((i) => i.product_id === product.id);
+        const cartQty = cart.filter((i) => i.product_id === product.id).reduce((acc, i) => acc + i.quantity, 0);
         return (
           <Card
             key={product.id}
@@ -54,9 +54,9 @@ export function PosProductGrid({ products, cart, onAdd, search }: Props) {
               ) : (
                 <Package className="h-8 w-8 text-muted-foreground/20" />
               )}
-              {inCart && (
+              {cartQty > 0 && (
                 <div className="absolute top-1.5 right-1.5 bg-primary text-primary-foreground text-xs font-bold rounded-full h-5 w-5 flex items-center justify-center shadow">
-                  {inCart.quantity}
+                  {cartQty}
                 </div>
               )}
               <div className="absolute bottom-1.5 left-1.5">

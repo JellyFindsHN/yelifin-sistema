@@ -16,7 +16,11 @@ export async function POST(request: NextRequest) {
     const {
       account_id, currency, exchange_rate,
       shipping, notes, purchased_at, items,
+      status = "COMPLETED",
     } = body;
+
+    if (status !== "PENDING" && status !== "COMPLETED")
+      return createErrorResponse("Estado inválido", 400);
 
     // ── Validaciones básicas ────────────────────────────────────────
     if (!account_id)
@@ -107,17 +111,17 @@ export async function POST(request: NextRequest) {
         INSERT INTO purchase_batches (
           user_id, account_id, currency, exchange_rate,
           subtotal, shipping, tax, total,
-          is_paid, purchased_at, notes
+          is_paid, purchased_at, notes, status
         ) VALUES (
           ${userId}, ${account_id}, ${curr}, ${rate},
           ${subtotal}, ${shippingTotal}, ${0}, ${total},
-          ${false}, ${occurredAt}, ${notes ?? null}
+          ${false}, ${occurredAt}, ${notes ?? null}, ${status}
         )
         RETURNING id
       `;
       const purchaseBatchId = batch.id as number;
 
-      // 2. Items + inventory_batches + movements
+      // 2. Items (+ inventory sólo si status = COMPLETED)
       for (const item of processedItems) {
         const [batchItem] = await sql`
           INSERT INTO purchase_batch_items (
@@ -132,25 +136,27 @@ export async function POST(request: NextRequest) {
           RETURNING id
         `;
 
-        await sql`
-          INSERT INTO inventory_batches (
-            user_id, product_id, variant_id, purchase_batch_item_id,
-            qty_in, qty_available, unit_cost, received_at
-          ) VALUES (
-            ${userId}, ${item.product_id}, ${item.variant_id}, ${batchItem.id},
-            ${item.quantity}, ${item.quantity}, ${item.unit_cost}, ${occurredAt}
-          )
-        `;
+        if (status === "COMPLETED") {
+          await sql`
+            INSERT INTO inventory_batches (
+              user_id, product_id, variant_id, purchase_batch_item_id,
+              qty_in, qty_available, unit_cost, received_at
+            ) VALUES (
+              ${userId}, ${item.product_id}, ${item.variant_id}, ${batchItem.id},
+              ${item.quantity}, ${item.quantity}, ${item.unit_cost}, ${occurredAt}
+            )
+          `;
 
-        await sql`
-          INSERT INTO inventory_movements (
-            user_id, movement_type, product_id, variant_id,
-            quantity, reference_type, reference_id, notes
-          ) VALUES (
-            ${userId}, 'IN', ${item.product_id}, ${item.variant_id},
-            ${item.quantity}, 'PURCHASE', ${purchaseBatchId}, ${notes ?? null}
-          )
-        `;
+          await sql`
+            INSERT INTO inventory_movements (
+              user_id, movement_type, product_id, variant_id,
+              quantity, reference_type, reference_id, notes
+            ) VALUES (
+              ${userId}, 'IN', ${item.product_id}, ${item.variant_id},
+              ${item.quantity}, 'PURCHASE', ${purchaseBatchId}, ${notes ?? null}
+            )
+          `;
+        }
       }
 
       // 3. Transacción financiera de egreso
@@ -175,7 +181,9 @@ export async function POST(request: NextRequest) {
 
       return Response.json(
         {
-          message: "Compra registrada exitosamente",
+          message: status === "PENDING"
+            ? "Compra registrada como pendiente"
+            : "Compra registrada exitosamente",
           data: {
             id:    purchaseBatchId,
             total,
@@ -213,6 +221,7 @@ export async function GET(request: NextRequest) {
         pb.subtotal,
         pb.shipping,
         pb.total,
+        pb.status,
         pb.is_paid,
         pb.purchased_at,
         pb.notes,

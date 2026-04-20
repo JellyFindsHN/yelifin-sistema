@@ -15,7 +15,8 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
-import { Loader2, PackagePlus, Calculator, Wallet, Plus, Trash2 } from "lucide-react";
+import { Loader2, PackagePlus, Calculator, Wallet, Plus, Trash2, Clock } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { useCreatePurchase } from "@/hooks/swr/use-purchases";
@@ -79,6 +80,7 @@ export function AddInventoryDialog({ product, open, onOpenChange, onSuccess }: P
   const { accounts }                   = useAccounts();
   const { format, symbol, currency: businessCurrency } = useCurrency();
 
+  const [isPending, setIsPending] = useState(false);
   const [items, setItems] = useState<LineItem[]>([
     { key: uid(), variant_key: "base", quantity: "1", unit_cost: "0" },
   ]);
@@ -116,6 +118,7 @@ export function AddInventoryDialog({ product, open, onOpenChange, onSuccess }: P
   useEffect(() => {
     if (open) {
       setItems([{ key: uid(), variant_key: "base", quantity: "1", unit_cost: "0" }]);
+      setIsPending(false);
       reset({
         currency:      "USD",
         exchange_rate: TASA_DEFAULT,
@@ -161,6 +164,7 @@ export function AddInventoryDialog({ product, open, onOpenChange, onSuccess }: P
         exchange_rate: data.exchange_rate,
         shipping:      data.shipping,
         notes:         data.notes,
+        status:        isPending ? "PENDING" : "COMPLETED",
         purchased_at:  data.purchased_at
           ? new Date(data.purchased_at + "T00:00:00-06:00").toISOString()
           : new Date().toISOString(),
@@ -172,7 +176,11 @@ export function AddInventoryDialog({ product, open, onOpenChange, onSuccess }: P
         })),
       });
 
-      toast.success(`${totalUnits} unidades registradas para ${product.name}`);
+      toast.success(
+        isPending
+          ? `Compra pendiente registrada — el stock se acreditará al confirmar llegada`
+          : `${totalUnits} unidades registradas para ${product.name}`
+      );
       onOpenChange(false);
       onSuccess();
     } catch (error: any) {
@@ -548,6 +556,34 @@ export function AddInventoryDialog({ product, open, onOpenChange, onSuccess }: P
               className="h-11 text-base"
             />
           </div>
+
+          {/* Toggle pendiente */}
+          <div className={cn(
+            "flex items-start justify-between gap-4 rounded-xl border p-4 transition-colors",
+            isPending ? "border-amber-300/60 bg-amber-50/60 dark:bg-amber-950/20" : "border-border bg-muted/20"
+          )}>
+            <div className="flex items-start gap-3">
+              <div className={cn(
+                "mt-0.5 rounded-lg p-1.5 transition-colors",
+                isPending ? "bg-amber-100 text-amber-700" : "bg-muted text-muted-foreground"
+              )}>
+                <Clock className="h-4 w-4" />
+              </div>
+              <div className="space-y-0.5">
+                <p className="text-sm font-medium leading-none">Mercancía pendiente de llegada</p>
+                <p className="text-xs text-muted-foreground leading-relaxed">
+                  El dinero se debita ahora, pero el stock se acredita al inventario
+                  sólo cuando confirmés la llegada. Podés ajustar el envío en ese momento.
+                </p>
+              </div>
+            </div>
+            <Switch
+              checked={isPending}
+              onCheckedChange={setIsPending}
+              disabled={isCreating}
+              className="shrink-0 mt-0.5"
+            />
+          </div>
         </form>
 
         {/* Footer */}
@@ -567,7 +603,9 @@ export function AddInventoryDialog({ product, open, onOpenChange, onSuccess }: P
           >
             {isCreating
               ? <><Loader2 className="h-4 w-4 animate-spin" />Registrando...</>
-              : <><PackagePlus className="h-4 w-4" />Registrar compra</>
+              : isPending
+                ? <><Clock className="h-4 w-4" />Registrar como pendiente</>
+                : <><PackagePlus className="h-4 w-4" />Registrar compra</>
             }
           </Button>
         </div>

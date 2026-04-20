@@ -26,7 +26,7 @@ import {
   Package, Warehouse, AlertTriangle, DollarSign,
   Plus, MoreVertical, Pencil, Trash2, PackagePlus,
   ShoppingCart, SlidersHorizontal, ArrowLeftRight,
-  ChevronDown, Layers, Box,
+  ChevronDown, Layers, Box, Clock,
 } from "lucide-react";
 import Image from "next/image";
 import { toast } from "sonner";
@@ -48,6 +48,7 @@ import { AdjustInventoryDialog }      from "@/components/products/adjust-invento
 import { useCurrency }                from "@/hooks/swr/use-currency";
 import { CreateTransactionModal }     from "@/components/transactions/create-transaction-modal";
 import { useAccounts }                from "@/hooks/swr/use-accounts";
+import { usePurchases }               from "@/hooks/swr/use-purchases";
 
 // ── Helpers ────────────────────────────────────────────────────────────
 
@@ -68,7 +69,7 @@ export default function InventoryPage() {
   const { deleteVariant, isDeleting: isDeletingVariant } = useDeleteVariant();
 
   const [search,      setSearch]      = useState("");
-  const [stockFilter, setStockFilter] = useState("in_stock");
+  const [stockFilter, setStockFilter] = useState("all");
   const [expanded,    setExpanded]    = useState<Set<number>>(new Set());
 
   // Diálogos de producto
@@ -84,8 +85,12 @@ export default function InventoryPage() {
   const [editVariant,         setEditVariant]         = useState<{ product: Product; variant: ProductVariant } | null>(null);
   const [deleteVariantTarget, setDeleteVariantTarget] = useState<{ product: Product; variant: ProductVariant } | null>(null);
 
-  const { accounts }   = useAccounts();
+  const { accounts, mutate: mutateAccounts } = useAccounts();
   const { format }     = useCurrency();
+  const { purchases, mutate: mutatePurchases } = usePurchases();
+
+  const pendingPurchases = purchases.filter((p) => p.status === "PENDING");
+
 
   const findProduct = (productId: number): Product | null =>
     products.find((p) => p.id === productId) ?? null;
@@ -106,20 +111,25 @@ export default function InventoryPage() {
       item.product_name.toLowerCase().includes(search.toLowerCase()) ||
       (item.sku?.toLowerCase().includes(search.toLowerCase()) ?? false);
 
+    const stock = Number(item.stock);
     const matchesStock =
-      stockFilter === "services" ? item.is_service :
-      stockFilter === "in_stock" ? item.stock > 0 || item.is_service :
       stockFilter === "all"      ? true :
-      stockFilter === "out"      ? item.stock === 0 && !item.is_service :
-      stockFilter === "low"      ? item.stock > 0 && item.stock < 10 :
-      item.stock >= 10;
+      stockFilter === "in_stock" ? stock > 0 || item.is_service :
+      stockFilter === "out"      ? stock == 0 && !item.is_service :
+      stockFilter === "low"      ? stock > 0 && stock < 10 :
+      stockFilter === "ok"       ? stock >= 10 || item.is_service :
+      stockFilter === "services" ? item.is_service :
+      true;
 
     return matchesSearch && matchesStock;
   });
 
+  console.log("InventoryPage render", { inventory, filtered, pendingPurchases });
   const handleSuccess = () => {
     mutateProducts();
     mutateInventory();
+    mutatePurchases();
+    mutateAccounts();
   };
 
   const handleDeleteVariant = async () => {
@@ -163,7 +173,7 @@ export default function InventoryPage() {
         )}
         <DropdownMenuItem onClick={() => { const p = findProduct(item.product_id); if (p) setEditProduct(p); }}>
           <Pencil className="h-4 w-4 mr-2" />
-          Editar producto
+          {item.is_service ? "Editar servicio" : "Editar producto"}
         </DropdownMenuItem>
         <DropdownMenuItem
           className="text-destructive focus:text-destructive"
@@ -447,6 +457,25 @@ export default function InventoryPage() {
         ))}
       </div>
 
+      {/* ── Banner compras pendientes ─────────────────────────────── */}
+      {pendingPurchases.length > 0 && (
+        <button
+          type="button"
+          onClick={() => router.push("/purchases/pending")}
+          className="w-full flex items-center justify-between gap-3 rounded-xl border border-amber-200 bg-amber-50/60 dark:bg-amber-950/20 dark:border-amber-800/40 px-4 py-3 text-left hover:bg-amber-100/60 dark:hover:bg-amber-950/40 transition-colors"
+        >
+          <div className="flex items-center gap-2.5 min-w-0">
+            <Clock className="h-4 w-4 text-amber-600 shrink-0" />
+            <p className="text-sm font-medium text-amber-800 dark:text-amber-300 truncate">
+              {pendingPurchases.length} compra{pendingPurchases.length !== 1 ? "s" : ""} pendiente{pendingPurchases.length !== 1 ? "s" : ""} de llegada — inventario no acreditado
+            </p>
+          </div>
+          <Badge className="shrink-0 bg-amber-100 text-amber-700 border-amber-300 dark:bg-amber-900/40 dark:text-amber-300">
+            Ver →
+          </Badge>
+        </button>
+      )}
+
       {/* Filtros */}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
         <div className="relative flex-1 sm:max-w-sm">
@@ -458,6 +487,7 @@ export default function InventoryPage() {
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">Todo el inventario</SelectItem>
+            <SelectItem value="services">Servicios</SelectItem>
             <SelectItem value="ok">Stock suficiente</SelectItem>
             <SelectItem value="low">Stock bajo</SelectItem>
             <SelectItem value="out">Agotados</SelectItem>
@@ -701,6 +731,7 @@ export default function InventoryPage() {
         open={!!editProduct}
         onOpenChange={(open) => !open && setEditProduct(null)}
         onSuccess={handleSuccess}
+        is_service={editProduct?.is_service ?? false}
       />
       <DeleteProductDialog
         product={deleteProduct}

@@ -77,6 +77,7 @@ export type SaleDetail = Sale & {
   items: {
     id:           number;
     product_id:   number;
+    variant_name: string | null;
     product_name: string;
     image_url:    string | null;
     quantity:     number;

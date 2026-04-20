@@ -34,10 +34,10 @@ type Props = {
   taxRate: number;
   taxAmount: number;
   suppliesUsed: SupplyUsed[];
-  onQuantity: (id: number, delta: number) => void;
-  onRemove: (id: number) => void;
-  onPriceChange: (id: number, value: number) => void;
-  onDiscountChange: (id: number, value: number) => void;
+  onQuantity: (id: number, delta: number, variantId?: number | null) => void;
+  onRemove: (id: number, variantId?: number | null) => void;
+  onPriceChange: (id: number, value: number, variantId?: number | null) => void;
+  onDiscountChange: (id: number, value: number, variantId?: number | null) => void;
   onDiscountTypeChange: (type: EditDiscountType) => void;
   onGlobalDiscountChange: (value: number) => void;
   onTaxRateChange: (value: number) => void;
@@ -105,7 +105,7 @@ export function EditCartPanel({
           <div className="space-y-2 max-h-64 overflow-y-auto pr-0.5">
             {cart.map((item) => (
               <EditCartItemRow
-                key={item.product_id}
+                key={`${item.product_id}-${item.variant_id ?? "base"}`}
                 item={item}
                 discountType={discountType}
                 onQuantity={onQuantity}

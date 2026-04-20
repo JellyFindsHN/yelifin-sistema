@@ -17,12 +17,13 @@ export type PurchaseItem = {
 };
 
 export type CreatePurchaseInput = {
-  account_id: number;           // ← nuevo
+  account_id: number;
   currency: 'USD' | 'HNL';
   exchange_rate: number;
   shipping: number;
   notes?: string;
   purchased_at?: string;
+  status?: 'PENDING' | 'COMPLETED';
   items: Omit<PurchaseItem, 'unit_cost' | 'total_cost'>[];
 };
 
@@ -35,6 +36,7 @@ export type Purchase = {
   subtotal: number;
   shipping: number;
   total: number;
+  status: 'PENDING' | 'COMPLETED';
   is_paid: boolean;
   purchased_at: string;
   notes: string | null;
@@ -91,4 +93,22 @@ export function useCreatePurchase() {
     }
   };
   return { createPurchase, isCreating };
+}
+
+export function useConfirmPurchaseArrival(id: number | null) {
+  const authFetch = useAuthFetch();
+  const [isConfirming, setIsConfirming] = useState(false);
+  const confirmArrival = async (shipping?: number) => {
+    if (!id) throw new Error('ID requerido');
+    setIsConfirming(true);
+    try {
+      return await authFetch(`${KEY}/${id}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ shipping }),
+      });
+    } finally {
+      setIsConfirming(false);
+    }
+  };
+  return { confirmArrival, isConfirming };
 }

@@ -70,7 +70,7 @@ export async function POST(request: NextRequest, { params }: Params) {
         ${variant_name.trim()},
         ${sku            ?? null},
         ${attributes     ? JSON.stringify(attributes) : null},
-        ${price_override !== undefined && price_override !== null
+        ${price_override !== undefined && price_override !== null && Number(price_override) > 0
             ? Number(price_override)
             : null},
         ${image_url      ?? null}

@@ -2,8 +2,8 @@
 "use client";
 
 import {
-  Sheet, SheetContent, SheetHeader, SheetTitle,
-} from "@/components/ui/sheet";
+  Dialog, DialogContent, DialogHeader, DialogTitle,
+} from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Layers, Box } from "lucide-react";
@@ -49,24 +49,37 @@ export function VariantPickerSheet({
   };
 
   return (
-    <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent
-        side="bottom"
-        className="rounded-t-2xl max-h-[80dvh] flex flex-col p-0"
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent
+        className={cn(
+          "fixed bottom-0 left-0 right-0 top-auto translate-x-0 translate-y-0",
+          "w-full max-w-full rounded-t-2xl rounded-b-none border-t border-x-0 border-b-0",
+          "max-h-[80dvh] flex flex-col p-0",
+          "sm:bottom-auto sm:left-1/2 sm:right-auto sm:top-1/2",
+          "sm:-translate-x-1/2 sm:-translate-y-1/2",
+          "sm:w-full sm:max-w-md",
+          "sm:rounded-2xl sm:border sm:max-h-[80vh]",
+          "data-[state=open]:animate-in data-[state=closed]:animate-out",
+          "data-[state=open]:slide-in-from-bottom sm:data-[state=open]:slide-in-from-bottom-[48%]",
+          "data-[state=closed]:slide-out-to-bottom sm:data-[state=closed]:slide-out-to-bottom-[48%]",
+          "duration-300",
+        )}
+        onInteractOutside={(e) => e.preventDefault()}
+        onEscapeKeyDown={() => onOpenChange(false)}
       >
-        {/* Handle */}
-        <div className="flex justify-center pt-3 pb-1 shrink-0">
+        {/* Handle móvil */}
+        <div className="sm:hidden flex justify-center pt-3 pb-1 shrink-0">
           <div className="w-10 h-1 rounded-full bg-muted-foreground/30" />
         </div>
 
         {/* Header */}
-        <SheetHeader className="shrink-0 px-5 pb-3 pt-1 border-b">
-          <SheetTitle className="flex items-center gap-2 text-base font-bold">
+        <DialogHeader className="shrink-0 px-5 pb-3 pt-2 sm:pt-5 border-b">
+          <DialogTitle className="flex items-center gap-2 text-base font-bold">
             <Layers className="h-4 w-4 text-primary" />
             Seleccionar variante
-          </SheetTitle>
+          </DialogTitle>
           <p className="text-xs text-muted-foreground text-left">{product.name}</p>
-        </SheetHeader>
+        </DialogHeader>
 
         {/* Lista */}
         <div
@@ -115,8 +128,8 @@ export function VariantPickerSheet({
             Cancelar
           </Button>
         </div>
-      </SheetContent>
-    </Sheet>
+      </DialogContent>
+    </Dialog>
   );
 }
 

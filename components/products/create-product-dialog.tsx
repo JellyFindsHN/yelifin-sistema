@@ -101,7 +101,7 @@ export function CreateProductDialog({ open, onOpenChange, onSuccess }: Props) {
       }
 
       const product   = await createProduct({ ...data, image_url });
-      const productId = product?.data?.id as number;
+      const productId = product?.id as number;
       if (!productId) throw new Error("No se obtuvo el ID del producto");
 
       // Si es servicio, no registrar inventario
