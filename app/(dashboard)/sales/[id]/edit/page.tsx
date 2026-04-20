@@ -370,7 +370,7 @@ function EditSaleContent() {
         })),
         discount: appliedGlobal,
         shipping_cost:
-          shippingCost > 0 ? shippingCost : undefined,
+          shippingCost >= 0 ? shippingCost : undefined,
         tax_rate: taxRate > 0 ? taxRate : undefined,
         notes: notes || undefined,
         customer_id: customerId,
@@ -379,10 +379,10 @@ function EditSaleContent() {
         supplies_used:
           suppliesUsed.length > 0
             ? suppliesUsed.map((s) => ({
-                supply_id: s.supply_id,
-                quantity: s.quantity,
-                unit_cost: s.unit_cost,
-              }))
+              supply_id: s.supply_id,
+              quantity: s.quantity,
+              unit_cost: s.unit_cost,
+            }))
             : undefined,
       };
 
@@ -396,47 +396,47 @@ function EditSaleContent() {
     }
   };
 
-const handleConfirmComplete = async () => {
-  if (!sale) return;
-  setConfirmCompleteOpen(false);
-  if (cart.length === 0) return toast.error("El carrito está vacío");
-  if (!accountId) return toast.error("Selecciona una cuenta de destino");
+  const handleConfirmComplete = async () => {
+    if (!sale) return;
+    setConfirmCompleteOpen(false);
+    if (cart.length === 0) return toast.error("El carrito está vacío");
+    if (!accountId) return toast.error("Selecciona una cuenta de destino");
 
-  try {
-    // 1. Primero guardar todos los cambios (SIN cambiar status)
-    await editSale({
-      items: cart.map((i) => ({
-        product_id: i.product_id,
-        quantity: i.quantity,
-        unit_price: i.unit_price,
-        discount: discountType === "per_item" ? i.discount : 0,
-      })),
-      discount: appliedGlobal,
-      shipping_cost: shippingCost > 0 ? shippingCost : undefined,
-      tax_rate: taxRate > 0 ? taxRate : undefined,
-      notes: notes || undefined,
-      customer_id: customerId,
-      account_id: accountId,
-      // ⚠️ NO enviar status aquí
-      supplies_used: suppliesUsed.length > 0
-        ? suppliesUsed.map((s) => ({
+    try {
+      // 1. Primero guardar todos los cambios (SIN cambiar status)
+      await editSale({
+        items: cart.map((i) => ({
+          product_id: i.product_id,
+          quantity: i.quantity,
+          unit_price: i.unit_price,
+          discount: discountType === "per_item" ? i.discount : 0,
+        })),
+        discount: appliedGlobal,
+        shipping_cost: shippingCost > 0 ? shippingCost : undefined,
+        tax_rate: taxRate > 0 ? taxRate : undefined,
+        notes: notes || undefined,
+        customer_id: customerId,
+        account_id: accountId,
+        // ⚠️ NO enviar status aquí
+        supplies_used: suppliesUsed.length > 0
+          ? suppliesUsed.map((s) => ({
             supply_id: s.supply_id,
             quantity: s.quantity,
             unit_cost: s.unit_cost,
           }))
-        : undefined,
-    });
+          : undefined,
+      });
 
-    // 2. Luego completar la venta (cambiar status)
-    await confirmSale();
-    
-    toast.success("Venta completada");
-    router.push("/sales");
-  } catch (err: any) {
-    console.error("Error:", err);
-    toast.error(err.message || "Error al completar la venta");
-  }
-};
+      // 2. Luego completar la venta (cambiar status)
+      await confirmSale();
+
+      toast.success("Venta completada");
+      router.push("/sales");
+    } catch (err: any) {
+      console.error("Error:", err);
+      toast.error(err.message || "Error al completar la venta");
+    }
+  };
 
   // Confirmar cancelar (modal → acción simple)
   const handleConfirmCancel = async () => {
@@ -605,8 +605,7 @@ const handleConfirmComplete = async () => {
               {cart.length} producto
               {cart.length !== 1 ? "s" : ""}
               {suppliesUsed.length > 0 &&
-                ` · ${suppliesUsed.length} suministro${
-                  suppliesUsed.length !== 1 ? "s" : ""
+                ` · ${suppliesUsed.length} suministro${suppliesUsed.length !== 1 ? "s" : ""
                 }`}
               {taxRate > 0 &&
                 ` · ISV ${taxRate}% incluido`}
@@ -620,11 +619,10 @@ const handleConfirmComplete = async () => {
           <div className="flex items-center gap-2 text-sm">
             <button
               onClick={() => setDesktopStep(1)}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition-colors cursor-pointer ${
-                desktopStep === 1
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition-colors cursor-pointer ${desktopStep === 1
                   ? "bg-primary text-primary-foreground"
                   : "text-muted-foreground hover:bg-muted"
-              }`}
+                }`}
             >
               <ShoppingCart className="h-3.5 w-3.5" />
               Productos
@@ -635,13 +633,12 @@ const handleConfirmComplete = async () => {
                 cart.length > 0 && setDesktopStep(2)
               }
               disabled={cart.length === 0}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition-colors ${
-                cart.length === 0
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition-colors ${cart.length === 0
                   ? "text-muted-foreground/40 cursor-not-allowed"
                   : desktopStep === 2
-                  ? "bg-primary text-primary-foreground cursor-pointer"
-                  : "text-muted-foreground hover:bg-muted cursor-pointer"
-              }`}
+                    ? "bg-primary text-primary-foreground cursor-pointer"
+                    : "text-muted-foreground hover:bg-muted cursor-pointer"
+                }`}
             >
               Detalle
             </button>

@@ -12,12 +12,12 @@ export async function GET(request: NextRequest) {
   try {
     const { userId } = auth.data;
 
-    // Inventario agrupado por producto con stock total y costo promedio ponderado
     const inventory = await sql`
       SELECT
         p.id             AS product_id,
         p.name           AS product_name,
         p.sku,
+        p.is_service,
         p.image_url,
         p.price,
 

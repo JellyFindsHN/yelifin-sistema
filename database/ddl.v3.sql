@@ -534,13 +534,9 @@ CREATE TABLE transaction_categories (
 );
 
 CREATE INDEX idx_transaction_categories_user ON transaction_categories(user_id);
-<<<<<<< Updated upstream
-CREATE INDEX idx_transaction_categories_type ON transaction_categories(user_id, type, is_active);
-=======
 CREATE INDEX idx_transaction_categories_type ON transaction_categories(user_id, type, is_active);
 
-ALTER TABLE products 
+ALTER TABLE products
   ADD COLUMN IF NOT EXISTS is_service BOOLEAN NOT NULL DEFAULT FALSE;
 
-  ALTER TABLE product_variants ADD COLUMN image_url TEXT;
->>>>>>> Stashed changes
+ALTER TABLE product_variants ADD COLUMN IF NOT EXISTS image_url TEXT;

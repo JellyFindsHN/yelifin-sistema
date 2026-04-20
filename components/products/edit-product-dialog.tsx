@@ -24,6 +24,7 @@ import { storage } from "@/lib/firebase";
 import { ref, uploadBytes, getDownloadURL, deleteObject } from "firebase/storage";
 import { Product } from "@/types";
 import Image from "next/image";
+import { is } from "date-fns/locale";
 
 // ── Schema condicional según tipo ──────────────────────────────────────
 
@@ -42,6 +43,7 @@ type FormData = z.infer<ReturnType<typeof createSchema>>;
 type Props = {
   product:      Product | null;
   open:         boolean;
+  is_service:   boolean;
   onOpenChange: (open: boolean) => void;
   onSuccess:    () => void;
 };
@@ -93,14 +95,9 @@ async function deleteOldImage(imageUrl: string) {
 }
 
 // ── Componente ─────────────────────────────────────────────────────────
-<<<<<<< Updated upstream
-export function EditProductDialog({ product, open, onOpenChange, onSuccess }: Props) {
-=======
-
 export function EditProductDialog({
   product, open, onOpenChange, onSuccess, is_service,
 }: Props) {
->>>>>>> Stashed changes
   const { firebaseUser }              = useAuth();
   const { updateProduct, isUpdating } = useUpdateProduct(product?.id ?? null);
   const { symbol }                    = useCurrency();
@@ -174,18 +171,14 @@ export function EditProductDialog({
       }
 
       await updateProduct({ ...data, image_url });
-      toast.success("Producto actualizado exitosamente");
+      toast.success(`${is_service ? "Servicio" : "Producto"} actualizado exitosamente`);
       onOpenChange(false);
       onSuccess();
     } catch (error: any) {
       setIsUploadingImage(false);
-<<<<<<< Updated upstream
-      toast.error(error.message || "Error al actualizar el producto");
-=======
       toast.error(
         error.message || `Error al actualizar el ${is_service ? "servicio" : "producto"}`
       );
->>>>>>> Stashed changes
     }
   };
 
@@ -226,11 +219,7 @@ export function EditProductDialog({
         <DialogHeader className="shrink-0 px-5 pt-2 pb-3 sm:pt-5 border-b">
           <DialogTitle className="flex items-center gap-2 text-lg font-bold">
             <Pencil className="h-4 w-4 text-primary" />
-<<<<<<< Updated upstream
-            Editar producto
-=======
             Editar {is_service ? "servicio" : "producto"}
->>>>>>> Stashed changes
           </DialogTitle>
         </DialogHeader>
 

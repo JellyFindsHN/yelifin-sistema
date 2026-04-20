@@ -15,7 +15,7 @@ export default function TermsPage() {
             <ArrowLeft className="h-4 w-4" />
             Volver al inicio
           </Link>
-          <span className="text-lg font-semibold">Nexly</span>
+          <span className="text-lg font-semibold"></span>
         </div>
       </header>
 
@@ -31,14 +31,14 @@ export default function TermsPage() {
 
         <section className="space-y-4 text-sm leading-relaxed md:text-base">
           <p>
-            Al crear una cuenta en Nexly y utilizar la plataforma, aceptas
+            Al crear una cuenta en  y utilizar la plataforma, aceptas
             estos Términos de servicio. Si no estás de acuerdo con alguna
             parte, no debes usar el sistema.
           </p>
 
           <h2 className="text-lg font-semibold mt-6">1. Uso de la plataforma</h2>
           <p>
-            Nexly está diseñado para ayudarte a gestionar el inventario, las
+             está diseñado para ayudarte a gestionar el inventario, las
             ventas, las finanzas y los eventos de tu emprendimiento. Eres
             responsable de toda la información que registres en tu cuenta y de
             que su uso cumpla con las leyes aplicables en tu país.
@@ -48,7 +48,7 @@ export default function TermsPage() {
           <p>
             Debes mantener la confidencialidad de tus credenciales de acceso y
             notificar inmediatamente si detectas un acceso no autorizado.
-            Nexly no se hace responsable por pérdidas causadas por el uso
+             no se hace responsable por pérdidas causadas por el uso
             indebido de tu cuenta.
           </p>
 

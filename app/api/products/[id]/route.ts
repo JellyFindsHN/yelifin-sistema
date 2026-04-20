@@ -7,7 +7,6 @@ const sql = neon(process.env.DATABASE_URL!);
 
 type Params = { params: Promise<{ id: string }> };
 
-// ── GET /api/products/[id] ─────────────────────────────────────────────
 export async function GET(request: NextRequest, { params }: Params) {
   const auth = await verifyAuth(request);
   if (!isAuthSuccess(auth)) return createErrorResponse(auth.error, auth.status);
@@ -74,7 +73,6 @@ export async function GET(request: NextRequest, { params }: Params) {
   }
 }
 
-// ── PATCH /api/products/[id] ───────────────────────────────────────────
 export async function PATCH(request: NextRequest, { params }: Params) {
   const auth = await verifyAuth(request);
   if (!isAuthSuccess(auth)) return createErrorResponse(auth.error, auth.status);
@@ -133,7 +131,6 @@ export async function PATCH(request: NextRequest, { params }: Params) {
   }
 }
 
-// ── DELETE /api/products/[id] ──────────────────────────────────────────
 export async function DELETE(request: NextRequest, { params }: Params) {
   const auth = await verifyAuth(request);
   if (!isAuthSuccess(auth)) return createErrorResponse(auth.error, auth.status);

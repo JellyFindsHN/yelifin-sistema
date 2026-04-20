@@ -5,7 +5,6 @@ import { verifyAuth, createErrorResponse, isAuthSuccess } from "@/lib/auth";
 
 const sql = neon(process.env.DATABASE_URL!);
 
-// ── GET /api/products ──────────────────────────────────────────────────
 export async function GET(request: NextRequest) {
   const auth = await verifyAuth(request);
   if (!isAuthSuccess(auth)) return createErrorResponse(auth.error, auth.status);
@@ -19,6 +18,7 @@ export async function GET(request: NextRequest) {
         p.user_id,
         p.name,
         p.description,
+        p.is_service,
         p.sku,
         p.barcode,
         p.price,
@@ -69,7 +69,6 @@ export async function GET(request: NextRequest) {
   }
 }
 
-// ── POST /api/products ─────────────────────────────────────────────────
 export async function POST(request: NextRequest) {
   const auth = await verifyAuth(request);
   if (!isAuthSuccess(auth)) return createErrorResponse(auth.error, auth.status);
@@ -90,7 +89,6 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Verificar límite del plan
     const [limitCheck] = await sql`
       SELECT
         sp.max_products,
@@ -119,7 +117,6 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Verificar SKU duplicado
     if (sku) {
       const [existing] = await sql`
         SELECT id FROM products
@@ -132,9 +129,8 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Crear producto (barcode queda NULL)
     const [product] = await sql`
-      INSERT INTO products (user_id, name, description, sku, barcode, price, image_url)
+      INSERT INTO products (user_id, name, description, sku, barcode, price, image_url, is_service)
       VALUES (
         ${userId},
         ${name.trim()},

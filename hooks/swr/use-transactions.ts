@@ -40,6 +40,15 @@ export type CreateTransactionInput = {
   occurred_at?: string;
 };
 
+export type UpdateTransactionInput = {
+  amount?: number;
+  account_id?: number;
+  to_account_id?: number;
+  category?: string;
+  description?: string;
+  occurred_at?: string;
+};
+
 export type TransactionPeriod = { year: number; month: number };
 
 function useAuthFetch() {
@@ -79,9 +88,9 @@ export function useTransactions(filters?: {
   const { data, isLoading, error, mutate } = useSWR(
     firebaseUser ? url : null,
     (u: string) => authFetch(u),
-     {
-      revalidateOnFocus:    false,
-      dedupingInterval:     5 * 60_000,
+    {
+      revalidateOnFocus:  false,
+      dedupingInterval:   5 * 60_000,
     }
   );
 
@@ -124,4 +133,39 @@ export function useCreateTransaction() {
   };
 
   return { createTransaction, isCreating };
+}
+
+export function useUpdateTransaction() {
+  const authFetch = useAuthFetch();
+  const [isUpdating, setIsUpdating] = useState(false);
+
+  const updateTransaction = async (id: number, input: UpdateTransactionInput) => {
+    setIsUpdating(true);
+    try {
+      return await authFetch(`${KEY}/${id}`, {
+        method: "PATCH",
+        body: JSON.stringify(input),
+      });
+    } finally {
+      setIsUpdating(false);
+    }
+  };
+
+  return { updateTransaction, isUpdating };
+}
+
+export function useDeleteTransaction() {
+  const authFetch = useAuthFetch();
+  const [isDeleting, setIsDeleting] = useState(false);
+
+  const deleteTransaction = async (id: number) => {
+    setIsDeleting(true);
+    try {
+      return await authFetch(`${KEY}/${id}`, { method: "DELETE" });
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
+  return { deleteTransaction, isDeleting };
 }

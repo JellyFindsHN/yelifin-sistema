@@ -134,6 +134,7 @@ export interface Product {
   stock: number;
   is_service: boolean;
   variants: ProductVariant[];
+  variants_count: number;
 }
 
 export interface ProductVariant {

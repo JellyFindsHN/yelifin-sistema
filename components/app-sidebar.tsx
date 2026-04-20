@@ -224,7 +224,7 @@ export function AppSidebar() {
               <Zap className="h-5 w-5 text-primary-foreground" />
             </div>
             {!isCollapsed && (
-              <span className="text-lg font-semibold text-sidebar-foreground">Nexly</span>
+              <span className="text-lg font-semibold text-sidebar-foreground">Konta</span>
             )}
           </Link>
         </SidebarHeader>

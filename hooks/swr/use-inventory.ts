@@ -16,6 +16,7 @@ export type VariantStock = {
   stock:         number;
   avg_unit_cost: number;
   total_value:   number;
+  is_service:    boolean;
 };
 
 export type InventoryItem = {

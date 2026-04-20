@@ -141,7 +141,7 @@ export default function ProfilePage() {
             </p>
             <p className="text-xs text-muted-foreground">
               Aún te falta terminar algunos pasos del onboarding. Esto te
-              ayudará a aprovechar al máximo Nexly y tener datos más precisos.
+              ayudará a aprovechar al máximo  y tener datos más precisos.
             </p>
             <div className="flex flex-wrap gap-2 pt-1">
               <Button

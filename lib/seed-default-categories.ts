@@ -1,5 +1,5 @@
 // lib/seed-default-categories.ts
-import { neon } from "@neondatabase/serverless";
+import { NeonQueryFunction } from "@neondatabase/serverless";
 
 const DEFAULT_CATEGORIES = [
   // INCOME
@@ -25,10 +25,11 @@ const DEFAULT_CATEGORIES = [
   { name: "Transferencia", type: "TRANSFER" },
 ];
 
-export async function seedDefaultCategories(userId: number) {
-  const sql = neon(process.env.DATABASE_URL!);
-
-  // Insert todas las categorías usando Promise.all
+export async function seedDefaultCategories(
+  userId: number,
+  sql: NeonQueryFunction<false, false>
+) {
+  // Usar el cliente sql recibido por parámetro (que ya está en transacción)
   await Promise.all(
     DEFAULT_CATEGORIES.map((cat) =>
       sql`

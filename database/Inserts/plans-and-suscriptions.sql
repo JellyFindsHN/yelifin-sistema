@@ -11,7 +11,7 @@ INSERT INTO subscription_plans (name, slug, description, price_usd, billing_inte
 (
   'Original',
   'original',
-  'Plan gratuito de por vida para usuarios fundadores de Nexly.',
+  'Plan gratuito de por vida para usuarios fundadores de .',
   0.00, 'LIFETIME', NULL, NULL, 500
 ),
 (

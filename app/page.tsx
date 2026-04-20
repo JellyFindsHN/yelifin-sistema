@@ -126,7 +126,7 @@ export default function Home() {
       {/* Benefits */}
       <section className="bg-primary text-primary-foreground py-12 sm:py-16 lg:py-20">
         <div className="container mx-auto px-4 sm:px-6 lg:px-8 max-w-4xl">
-          <h2 className="text-3xl sm:text-4xl font-bold mb-8 sm:mb-12 text-center">¿Por qué elegir Nexly?</h2>
+          <h2 className="text-3xl sm:text-4xl font-bold mb-8 sm:mb-12 text-center">¿Por qué elegir Konta?</h2>
           <div className="grid sm:grid-cols-2 gap-4 sm:gap-6">
             {[
               { title: "Precio Justo",               desc: "Solo $9.99/mes con todo incluido" },
@@ -171,10 +171,10 @@ export default function Home() {
               <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center shadow-lg shadow-primary/30">
                 <Zap className="w-5 h-5 text-primary-foreground" />
               </div>
-              <span className="text-lg sm:text-xl font-bold">Nexly</span>
+              <span className="text-lg sm:text-xl font-bold">Konta</span>
             </div>
             <p className="text-muted-foreground text-xs sm:text-sm text-center">
-              © 2026 Nexly. Sistema de gestión para emprendedores.
+              © 2026 hiKonta. Sistema de gestión para emprendedores.
             </p>
             <div className="flex flex-wrap justify-center gap-4 sm:gap-6 text-xs sm:text-sm text-muted-foreground">
               <Link href="/login"    className="hover:text-primary transition-colors">Iniciar Sesión</Link>

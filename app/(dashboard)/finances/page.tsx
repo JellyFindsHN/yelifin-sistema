@@ -73,8 +73,17 @@ export default function FinancesPage() {
   const { format } = useCurrency();
 
   const availableYears = [...new Set(periods.map((p) => p.year))].sort((a, b) => b - a);
-  const monthsForYear = (y: number) =>
-    periods.filter((p) => p.year === y).map((p) => p.month).sort((a, b) => b - a);
+  const monthsForYear = (y: number) => {
+    const periodsMonths = periods.filter((p) => p.year === y).map((p) => p.month);
+
+    if (y === now.getFullYear()) {
+      const currentMonth = now.getMonth() + 1;
+      if (!periodsMonths.includes(currentMonth)) {
+        periodsMonths.push(currentMonth);
+      }
+    }
+    return periodsMonths.sort((a, b) => b - a);
+  };
 
   const totalBalance = (summary?.accounts ?? []).reduce((acc, a) => acc + Number(a.balance), 0);
 

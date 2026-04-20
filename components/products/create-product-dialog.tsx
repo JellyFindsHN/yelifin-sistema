@@ -1,4 +1,3 @@
-// components/products/create-product-dialog.tsx
 "use client";
 
 import { useState } from "react";
@@ -11,7 +10,8 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { Loader2, X, PackagePlus, DollarSign, Hash, FileText, ImageIcon } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
+import { Loader2, PackagePlus, DollarSign, Hash, FileText, ImageIcon, Wrench } from "lucide-react";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
@@ -26,14 +26,11 @@ import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { ProductImageUpload } from "./product-image-upload";
 import { InventorySection, InventorySectionValue } from "./inventory-section";
 
-// ── Schema ─────────────────────────────────────────────────────────────
 const schema = z.object({
   name:        z.string().min(1, "El nombre es requerido"),
   description: z.string().optional(),
   sku:         z.string().optional(),
   price:       z.coerce.number().min(0, "El precio debe ser mayor o igual a 0"),
-<<<<<<< Updated upstream
-=======
   is_service:  z.boolean().optional(),
 }).superRefine((data, ctx) => {
   if (!data.is_service && (!data.sku || data.sku.trim().length === 0)) {
@@ -43,7 +40,6 @@ const schema = z.object({
       path: ["sku"],
     });
   }
->>>>>>> Stashed changes
 });
 
 type FormData = z.infer<typeof schema>;
@@ -54,29 +50,31 @@ type Props = {
   onSuccess:    () => void;
 };
 
-// ── Componente ─────────────────────────────────────────────────────────
 export function CreateProductDialog({ open, onOpenChange, onSuccess }: Props) {
   const { firebaseUser }                                   = useAuth();
   const { createProduct, isCreating }                      = useCreateProduct();
   const { createPurchase, isCreating: isCreatingPurchase } = useCreatePurchase();
   const { symbol }                                         = useCurrency();
 
-  const [imageFile,        setImageFile]       = useState<File | null>(null);
+  const [imageFile,        setImageFile]        = useState<File | null>(null);
   const [isUploadingImage, setIsUploadingImage] = useState(false);
   const [inventory,        setInventory]        = useState<InventorySectionValue>(null);
 
   const {
-    register, handleSubmit, reset, watch,
+    register, handleSubmit, reset, watch, setValue,
     formState: { errors },
-    setValue,
-  } = useForm<FormData>({ resolver: zodResolver(schema) });
+  } = useForm<FormData>({
+    resolver: zodResolver(schema),
+    defaultValues: { is_service: false },
+  });
 
   const nameValue    = watch("name");
+  const isService    = watch("is_service") ?? false;
+
   const suggestedSku = nameValue
     ? nameValue.split(" ").map((w) => w[0]?.toUpperCase() ?? "").join("").slice(0, 4) + "-001"
     : "";
 
-  // ── Upload imagen ──────────────────────────────────────────────────
   const uploadImage = async (file: File): Promise<string> => {
     const path       = `products/${firebaseUser!.uid}/${Date.now()}.webp`;
     const storageRef = ref(storage, path);
@@ -84,20 +82,17 @@ export function CreateProductDialog({ open, onOpenChange, onSuccess }: Props) {
     return getDownloadURL(storageRef);
   };
 
-  // ── Submit ─────────────────────────────────────────────────────────
   const onSubmit = async (data: FormData) => {
-    // Validar inventario si está activo
-    if (inventory) {
+    if (!data.is_service && inventory) {
       const qty = Number(inventory.data.quantity);
       if (!qty || qty < 1) { toast.error("La cantidad debe ser al menos 1"); return; }
     }
-    if (inventory?.mode === "purchase" && !inventory.data.account_id) {
+    if (!data.is_service && inventory?.mode === "purchase" && !inventory.data.account_id) {
       toast.error("Selecciona una cuenta para la compra");
       return;
     }
 
     try {
-      // 1. Subir imagen si hay
       let image_url: string | null = null;
       if (imageFile) {
         setIsUploadingImage(true);
@@ -105,18 +100,12 @@ export function CreateProductDialog({ open, onOpenChange, onSuccess }: Props) {
         setIsUploadingImage(false);
       }
 
-<<<<<<< Updated upstream
-      // 2. Crear producto
-      const result    = await createProduct({ ...data, image_url });
-      const productId = result?.data?.id as number;
-=======
       const product   = await createProduct({ ...data, image_url });
-      const productId = product?.id;
->>>>>>> Stashed changes
+      const productId = product?.data?.id as number;
       if (!productId) throw new Error("No se obtuvo el ID del producto");
 
-      // 3. Registrar inventario según modo
-      if (inventory?.mode === "purchase") {
+      // Si es servicio, no registrar inventario
+      if (!data.is_service && inventory?.mode === "purchase") {
         const d = inventory.data;
         await createPurchase({
           account_id:    d.account_id!,
@@ -133,7 +122,7 @@ export function CreateProductDialog({ open, onOpenChange, onSuccess }: Props) {
         });
         toast.success("Producto e inventario registrados exitosamente");
 
-      } else if (inventory?.mode === "existing") {
+      } else if (!data.is_service && inventory?.mode === "existing") {
         const d = inventory.data;
         const token = await firebaseUser?.getIdToken();
         const res = await fetch("/api/inventory/existing", {
@@ -154,7 +143,7 @@ export function CreateProductDialog({ open, onOpenChange, onSuccess }: Props) {
         toast.success("Producto creado con existencia inicial");
 
       } else {
-        toast.success("Producto creado exitosamente");
+        toast.success(data.is_service ? "Servicio creado exitosamente" : "Producto creado exitosamente");
       }
 
       handleClose();
@@ -166,7 +155,6 @@ export function CreateProductDialog({ open, onOpenChange, onSuccess }: Props) {
     }
   };
 
-  // ── Reset ──────────────────────────────────────────────────────────
   const handleClose = () => {
     reset();
     setImageFile(null);
@@ -175,15 +163,21 @@ export function CreateProductDialog({ open, onOpenChange, onSuccess }: Props) {
     onOpenChange(false);
   };
 
-  const isLoading  = isCreating || isCreatingPurchase || isUploadingImage;
-  const hasInv     = inventory !== null;
-  const submitLabel = isUploadingImage      ? "Subiendo imagen..."
-                    : isCreatingPurchase    ? "Registrando compra..."
-                    : isCreating            ? "Creando producto..."
-                    : hasInv                ? "Crear y registrar"
+  // Cuando se activa "es servicio", limpiar inventario
+  const handleServiceToggle = (checked: boolean) => {
+    setValue("is_service", checked);
+    if (checked) setInventory(null);
+  };
+
+  const isLoading   = isCreating || isCreatingPurchase || isUploadingImage;
+  const hasInv      = inventory !== null && !isService;
+  const submitLabel = isUploadingImage   ? "Subiendo imagen..."
+                    : isCreatingPurchase ? "Registrando compra..."
+                    : isCreating        ? "Creando..."
+                    : hasInv            ? "Crear y registrar"
+                    : isService         ? "Crear servicio"
                     : "Crear producto";
 
-  // ── Render ─────────────────────────────────────────────────────────
   return (
     <Dialog open={open} onOpenChange={(v) => !v && handleClose()}>
       <DialogContent
@@ -193,11 +187,8 @@ export function CreateProductDialog({ open, onOpenChange, onSuccess }: Props) {
           "max-h-[92dvh] flex flex-col p-0",
           "sm:bottom-auto sm:left-1/2 sm:right-auto sm:top-1/2",
           "sm:-translate-x-1/2 sm:-translate-y-1/2",
-          "sm:w-full sm:max-w-md",
-          "lg:max-w-xl",
-          "xl:max-w-xl",
-          "sm:rounded-2xl sm:border",
-          "sm:max-h-[88vh]",
+          "sm:w-full sm:max-w-md lg:max-w-xl xl:max-w-xl",
+          "sm:rounded-2xl sm:border sm:max-h-[88vh]",
           "data-[state=open]:animate-in data-[state=closed]:animate-out",
           "data-[state=open]:slide-in-from-bottom sm:data-[state=open]:slide-in-from-bottom-[48%]",
           "data-[state=closed]:slide-out-to-bottom sm:data-[state=closed]:slide-out-to-bottom-[48%]",
@@ -213,7 +204,9 @@ export function CreateProductDialog({ open, onOpenChange, onSuccess }: Props) {
 
         {/* Header */}
         <DialogHeader className="shrink-0 px-5 pt-2 pb-3 sm:pt-5 border-b">
-          <DialogTitle className="text-lg font-bold">Nuevo producto</DialogTitle>
+          <DialogTitle className="text-lg font-bold">
+            {isService ? "Nuevo servicio" : "Nuevo producto"}
+          </DialogTitle>
         </DialogHeader>
 
         {/* Scroll */}
@@ -222,6 +215,34 @@ export function CreateProductDialog({ open, onOpenChange, onSuccess }: Props) {
           style={{ scrollbarWidth: "none" } as React.CSSProperties}
         >
           <form id="create-product-form" onSubmit={handleSubmit(onSubmit)} className="space-y-5">
+
+            {/* Toggle de servicio — va primero para que cambie el contexto del form */}
+            <div className={cn(
+              "flex items-start justify-between gap-4 rounded-xl border p-4 transition-colors",
+              isService ? "border-primary/30 bg-primary/5" : "border-border bg-muted/30"
+            )}>
+              <div className="flex items-start gap-3">
+                <div className={cn(
+                  "mt-0.5 rounded-lg p-1.5 transition-colors",
+                  isService ? "bg-primary/10 text-primary" : "bg-muted text-muted-foreground"
+                )}>
+                  <Wrench className="h-4 w-4" />
+                </div>
+                <div className="space-y-0.5">
+                  <p className="text-sm font-medium leading-none">Es un servicio</p>
+                  <p className="text-xs text-muted-foreground leading-relaxed">
+                    Actívalo si vendés algo intangible como un mantenimiento,
+                    consultoría o instalación. Los servicios no descuentan inventario.
+                  </p>
+                </div>
+              </div>
+              <Switch
+                checked={isService}
+                onCheckedChange={handleServiceToggle}
+                disabled={isLoading}
+                className="shrink-0 mt-0.5"
+              />
+            </div>
 
             {/* Imagen */}
             <div className="space-y-2">
@@ -234,18 +255,24 @@ export function CreateProductDialog({ open, onOpenChange, onSuccess }: Props) {
               <FieldLabel icon={<FileText className="h-3.5 w-3.5" />} label="Nombre" required />
               <Input
                 {...register("name")}
+                placeholder={isService ? "Ej: Mantenimiento de equipo" : "Ej: Camiseta negra talla M"}
                 disabled={isLoading}
                 className="h-11 text-base"
               />
               {errors.name && <p className="text-xs text-destructive">{errors.name.message}</p>}
             </div>
 
-            {/* SKU */}
+            {/* SKU — opcional para servicios */}
             <div className="space-y-2">
-              <FieldLabel icon={<Hash className="h-3.5 w-3.5" />} label="SKU" required />
+              <FieldLabel
+                icon={<Hash className="h-3.5 w-3.5" />}
+                label="SKU"
+                required={!isService}
+                optional={isService}
+              />
               <Input
-                id="sku-input"
-                {...register("sku")}
+                {...register("sku", { required: !isService })}
+                placeholder={isService ? "Ej: SERV-001 (opcional)" : "Ej: CAM-NEG-M"}
                 disabled={isLoading}
                 className="h-11 text-base font-mono"
               />
@@ -285,7 +312,11 @@ export function CreateProductDialog({ open, onOpenChange, onSuccess }: Props) {
             <div className="space-y-2">
               <FieldLabel icon={<FileText className="h-3.5 w-3.5" />} label="Descripción" optional />
               <Textarea
-                placeholder="Describe el producto brevemente..."
+                placeholder={
+                  isService
+                    ? "Describe el servicio que ofrecés..."
+                    : "Describe el producto brevemente..."
+                }
                 rows={2}
                 {...register("description")}
                 disabled={isLoading}
@@ -293,18 +324,20 @@ export function CreateProductDialog({ open, onOpenChange, onSuccess }: Props) {
               />
             </div>
 
-            {/* Inventario */}
-            <InventorySection
-              value={inventory}
-              onChange={setInventory}
-              disabled={isLoading}
-            />
+            {/* Inventario: solo si NO es servicio */}
+            {!isService && (
+              <InventorySection
+                value={inventory}
+                onChange={setInventory}
+                disabled={isLoading}
+              />
+            )}
 
           </form>
         </div>
 
         {/* Footer */}
-       <div className="shrink-0 px-5 py-4 border-t bg-transparent xl:bg-transparent md:bg-transparent sm:bg-background flex gap-3">
+        <div className="shrink-0 px-5 py-4 border-t bg-transparent sm:bg-background flex gap-3">
           <Button
             type="button"
             variant="outline"
@@ -331,7 +364,6 @@ export function CreateProductDialog({ open, onOpenChange, onSuccess }: Props) {
   );
 }
 
-// ── FieldLabel ─────────────────────────────────────────────────────────
 function FieldLabel({ icon, label, required, optional }: {
   icon?:     React.ReactNode;
   label:     string;

@@ -1,4 +1,3 @@
-// app/(dashboard)/finances/transactions/page.tsx
 "use client";
 
 import { useState } from "react";
@@ -11,24 +10,32 @@ import { Skeleton } from "@/components/ui/skeleton";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
-
 import {
-  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem,
+  DropdownMenuSeparator, DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
 import {
-  ArrowDownCircle, ArrowUpCircle, ArrowLeftRight, SlidersHorizontal, TrendingUp, TrendingDown, MoreVertical, Pencil, Trash2
+  ArrowDownCircle, ArrowUpCircle, ArrowLeftRight, SlidersHorizontal,
+  TrendingUp, TrendingDown, MoreVertical, Pencil, Trash2,
 } from "lucide-react";
 import {
-  useTransactions, useTransactionPeriods
+  useTransactions, useTransactionPeriods, useDeleteTransaction,
+  Transaction,
 } from "@/hooks/swr/use-transactions";
+import { useSWRConfig } from "swr";
 import { Fab } from "@/components/ui/fab";
 import { useAccounts } from "@/hooks/swr/use-accounts";
 import { useCurrency } from "@/hooks/swr/use-currency";
 import { CreateTransactionModal } from "@/components/transactions/create-transaction-modal";
+import { EditTransactionModal } from "@/components/transactions/edit-transaction-modal";
+import { toast } from "sonner";
 
 // ── Helpers ────────────────────────────────────────────────────────────
 const formatDate = (d: string) =>
@@ -76,29 +83,37 @@ const REF_LABELS: Record<string, string> = {
 // ── Page ───────────────────────────────────────────────────────────────
 export default function TransactionsPage() {
   const router = useRouter();
+  const { mutate: globalMutate } = useSWRConfig();
   const now = new Date();
 
-  const [filterMode, setFilterMode] = useState<"month" | "date">("month");
-  const [selectedYear, setSelectedYear] = useState(now.getFullYear());
+  const [filterMode,    setFilterMode]    = useState<"month" | "date">("month");
+  const [selectedYear,  setSelectedYear]  = useState(now.getFullYear());
   const [selectedMonth, setSelectedMonth] = useState(now.getMonth() + 1);
-  const [specificDate, setSpecificDate] = useState("");
+  const [specificDate,  setSpecificDate]  = useState("");
   const [accountFilter, setAccountFilter] = useState("all");
-  const [typeFilter, setTypeFilter] = useState("all");
-  const [modalOpen, setModalOpen] = useState(false);
+  const [typeFilter,    setTypeFilter]    = useState("all");
+  const [modalOpen,     setModalOpen]     = useState(false);
+
+  // Edit
+  const [editingTx,    setEditingTx]    = useState<Transaction | null>(null);
+  // Delete
+  const [deletingTx,   setDeletingTx]   = useState<Transaction | null>(null);
+
+  const { deleteTransaction, isDeleting } = useDeleteTransaction();
 
   const { transactions, totals, isLoading, mutate } = useTransactions({
     account_id: accountFilter !== "all" ? Number(accountFilter) : undefined,
-    month: filterMode === "month" ? selectedMonth : undefined,
-    year: filterMode === "month" ? selectedYear : undefined,
-    date: filterMode === "date" && specificDate ? specificDate : undefined,
+    month:  filterMode === "month" ? selectedMonth : undefined,
+    year:   filterMode === "month" ? selectedYear  : undefined,
+    date:   filterMode === "date" && specificDate ? specificDate : undefined,
   });
 
-  const { periods } = useTransactionPeriods();
+  const { periods }  = useTransactionPeriods();
   const { accounts } = useAccounts();
-  const { format } = useCurrency();
+  const { format }   = useCurrency();
 
-  const availableYears = [...new Set(periods.map((p) => p.year))].sort((a, b) => b - a);
-  const monthsForYear = (y: number) =>
+  const availableYears   = [...new Set(periods.map((p) => p.year))].sort((a, b) => b - a);
+  const monthsForYear    = (y: number) =>
     periods.filter((p) => p.year === y).map((p) => p.month).sort((a, b) => b - a);
 
   const filtered = transactions.filter((t) =>
@@ -111,37 +126,70 @@ export default function TransactionsPage() {
     ? formatDate(specificDate)
     : `${MONTH_NAMES[selectedMonth]} ${selectedYear}`;
 
-  const handleTransactionClick = (t: typeof filtered[0]) => {
+  const handleTransactionClick = (t: Transaction) => {
     if (t.reference_type === "SALE" && t.reference_id) {
       router.push(`/sales/${t.reference_id}`);
     }
   };
 
+  const invalidateAll = () => {
+    globalMutate((key) =>
+      typeof key === "string" && (
+        key.startsWith("/api/transactions") ||
+        key.startsWith("/api/accounts") ||
+        key.startsWith("/api/finances")
+      )
+    );
+  };
+
+  const handleDelete = async () => {
+    if (!deletingTx) return;
+    try {
+      await deleteTransaction(deletingTx.id);
+      toast.success("Transacción eliminada");
+      setDeletingTx(null);
+      invalidateAll();
+    } catch (e: any) {
+      toast.error(e.message || "Error al eliminar");
+    }
+  };
+
+  // Solo transacciones manuales (OTHER) son editables/eliminables
+  const isEditable = (t: Transaction) => t.reference_type === "OTHER" || !t.reference_type;
 
   // ── Actions menu ────────────────────────────────────────────────────
-  const ActionsMenu = () => (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0">
-          <MoreVertical className="h-4 w-4" />
-        </Button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="end">
-        <DropdownMenuItem
+  const ActionsMenu = ({ t }: { t: Transaction }) => {
+    if (!isEditable(t)) return <div className="w-8" />;
+    return (
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-8 w-8 shrink-0"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <MoreVertical className="h-4 w-4" />
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end">
+          <DropdownMenuItem onClick={(e) => { e.stopPropagation(); setEditingTx(t); }}>
+            <Pencil className="h-4 w-4 mr-2" />
+            Editar
+          </DropdownMenuItem>
+          <DropdownMenuSeparator />
+          <DropdownMenuItem
+            className="text-destructive focus:text-destructive"
+            onClick={(e) => { e.stopPropagation(); setDeletingTx(t); }}
+          >
+            <Trash2 className="h-4 w-4 mr-2" />
+            Eliminar
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
+    );
+  };
 
-        >
-          <Pencil className="h-4 w-4 mr-2" />
-          Editar
-        </DropdownMenuItem>
-        <DropdownMenuItem
-          className="text-destructive focus:text-destructive"
-        >
-          <Trash2 className="h-4 w-4 mr-2" />
-          Eliminar
-        </DropdownMenuItem>
-      </DropdownMenuContent>
-    </DropdownMenu>
-  );
   return (
     <div className="space-y-4 pb-8">
 
@@ -156,9 +204,9 @@ export default function TransactionsPage() {
       {/* Stats */}
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
         {[
-          { label: "Ingresos", value: totals.income, color: "text-green-600", icon: TrendingUp },
-          { label: "Egresos", value: totals.expense, color: "text-destructive", icon: TrendingDown },
-          { label: "Neto", value: neto, color: neto >= 0 ? "text-green-600" : "text-destructive", icon: ArrowLeftRight },
+          { label: "Ingresos",  value: totals.income,  color: "text-green-600",   icon: TrendingUp },
+          { label: "Egresos",   value: totals.expense, color: "text-destructive", icon: TrendingDown },
+          { label: "Neto",      value: neto, color: neto >= 0 ? "text-green-600" : "text-destructive", icon: ArrowLeftRight },
         ].map((s, index) => (
           <Card key={s.label} className={index === 2 ? "col-span-2 sm:col-span-1" : ""}>
             <CardContent className="pl-3">
@@ -176,40 +224,30 @@ export default function TransactionsPage() {
 
       {/* Filtros */}
       <div className="space-y-2.5">
-
-        {/* Toggle modo */}
         <div className="grid grid-cols-2 rounded-lg border overflow-hidden">
           {(["month", "date"] as const).map((mode, i) => (
             <button
               key={mode}
               onClick={() => setFilterMode(mode)}
-              className={`py-2 text-xs font-medium transition-colors ${i > 0 ? "border-l" : ""} ${filterMode === mode
-                ? "bg-primary text-primary-foreground"
-                : "text-muted-foreground hover:bg-muted"
-                }`}
+              className={`py-2 text-xs font-medium transition-colors ${i > 0 ? "border-l" : ""} ${
+                filterMode === mode ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-muted"
+              }`}
             >
               {mode === "month" ? "Por mes" : "Fecha exacta"}
             </button>
           ))}
         </div>
 
-        {/* Período */}
         {filterMode === "month" ? (
           <div className="grid grid-cols-2 gap-2">
-            <Select
-              value={String(selectedMonth)}
-              onValueChange={(v) => setSelectedMonth(Number(v))}
-            >
-              <SelectTrigger className="w-full">
-                <SelectValue />
-              </SelectTrigger>
+            <Select value={String(selectedMonth)} onValueChange={(v) => setSelectedMonth(Number(v))}>
+              <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
               <SelectContent>
                 {monthsForYear(selectedYear).map((m) => (
                   <SelectItem key={m} value={String(m)}>{MONTH_NAMES[m]}</SelectItem>
                 ))}
               </SelectContent>
             </Select>
-
             <Select
               value={String(selectedYear)}
               onValueChange={(v) => {
@@ -219,9 +257,7 @@ export default function TransactionsPage() {
                 if (months.length && !months.includes(selectedMonth)) setSelectedMonth(months[0]);
               }}
             >
-              <SelectTrigger className="w-full">
-                <SelectValue />
-              </SelectTrigger>
+              <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
               <SelectContent>
                 {availableYears.map((y) => (
                   <SelectItem key={y} value={String(y)}>{y}</SelectItem>
@@ -238,12 +274,9 @@ export default function TransactionsPage() {
           />
         )}
 
-        {/* Cuenta + Tipo */}
         <div className="grid grid-cols-2 gap-2">
           <Select value={accountFilter} onValueChange={setAccountFilter}>
-            <SelectTrigger className="w-full">
-              <SelectValue placeholder="Cuenta" />
-            </SelectTrigger>
+            <SelectTrigger className="w-full"><SelectValue placeholder="Cuenta" /></SelectTrigger>
             <SelectContent>
               <SelectItem value="all">Todas las cuentas</SelectItem>
               {accounts.map((a) => (
@@ -251,11 +284,8 @@ export default function TransactionsPage() {
               ))}
             </SelectContent>
           </Select>
-
           <Select value={typeFilter} onValueChange={setTypeFilter}>
-            <SelectTrigger className="w-full">
-              <SelectValue />
-            </SelectTrigger>
+            <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
             <SelectContent>
               <SelectItem value="all">Todos</SelectItem>
               <SelectItem value="INCOME">Ingresos</SelectItem>
@@ -285,11 +315,11 @@ export default function TransactionsPage() {
           filtered.map((t) => {
             const cfg = TYPE_CONFIG[t.type];
             const Icon = cfg.icon;
-            const isClickable = t.reference_type === "SALE" && t.reference_id;
+            const clickable = t.reference_type === "SALE" && t.reference_id;
             return (
               <Card
-                className={`pt-3 pb-2.5 ${isClickable ? "cursor-pointer hover:bg-muted/50 transition-colors" : ""}`}
                 key={t.id}
+                className={`pt-3 pb-2.5 ${clickable ? "cursor-pointer hover:bg-muted/50 transition-colors" : ""}`}
                 onClick={() => handleTransactionClick(t)}
               >
                 <CardContent className="pl-3.5">
@@ -305,24 +335,21 @@ export default function TransactionsPage() {
                           </p>
                           <p className="text-xs text-muted-foreground truncate">
                             {t.account_name}
-                            {t.to_account_name && (
-                              <span> → {t.to_account_name}</span>
-                            )}
+                            {t.to_account_name && <span> → {t.to_account_name}</span>}
                           </p>
-                          <p className="text-xs text-muted-foreground">
-                            {formatDate(t.occurred_at)}
-                          </p>
+                          <p className="text-xs text-muted-foreground">{formatDate(t.occurred_at)}</p>
                         </div>
-                          <div className="text-right shrink-0">
+                        <div className="flex items-start gap-1 shrink-0">
+                          <div className="text-right">
                             <p className={`text-sm font-bold ${cfg.color}`}>
                               {cfg.sign}{format(Number(t.amount))}
                             </p>
                             <Badge className={`text-[10px] mt-0.5 ${cfg.badge}`} variant="outline">
                               {cfg.label}
                             </Badge>
+                          </div>
+                          <ActionsMenu t={t} />
                         </div>
-
-
                       </div>
                     </div>
                   </div>
@@ -352,14 +379,14 @@ export default function TransactionsPage() {
               {isLoading ? (
                 Array.from({ length: 6 }).map((_, i) => (
                   <TableRow key={i}>
-                    {Array.from({ length: 6 }).map((__, j) => (
+                    {Array.from({ length: 7 }).map((__, j) => (
                       <TableCell key={j}><Skeleton className="h-4 w-full" /></TableCell>
                     ))}
                   </TableRow>
                 ))
               ) : filtered.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={6} className="text-center py-12 text-muted-foreground">
+                  <TableCell colSpan={7} className="text-center py-12 text-muted-foreground">
                     No hay transacciones en este período
                   </TableCell>
                 </TableRow>
@@ -367,11 +394,11 @@ export default function TransactionsPage() {
                 filtered.map((t) => {
                   const cfg = TYPE_CONFIG[t.type];
                   const Icon = cfg.icon;
-                  const isClickable = t.reference_type === "SALE" && t.reference_id;
+                  const clickable = t.reference_type === "SALE" && t.reference_id;
                   return (
                     <TableRow
                       key={t.id}
-                      className={isClickable ? "cursor-pointer hover:bg-muted/50" : ""}
+                      className={clickable ? "cursor-pointer hover:bg-muted/50" : ""}
                       onClick={() => handleTransactionClick(t)}
                     >
                       <TableCell>
@@ -400,11 +427,9 @@ export default function TransactionsPage() {
                       <TableCell className={`text-right font-bold ${cfg.color}`}>
                         {cfg.sign}{format(Number(t.amount))}
                       </TableCell>
-                      {t.reference_type == 'OTHER' && (
-                        <TableCell>
-                          <ActionsMenu />
-                        </TableCell>
-                      )}
+                      <TableCell>
+                        <ActionsMenu t={t} />
+                      </TableCell>
                     </TableRow>
                   );
                 })
@@ -414,22 +439,56 @@ export default function TransactionsPage() {
         </CardContent>
       </Card>
 
+      {/* FAB */}
       <Fab
-        actions={[
-          {
-            label: "Nueva transacción",
-            icon: ArrowLeftRight,
-            onClick: () => setModalOpen(true),
-          },
-        ]}
+        actions={[{
+          label: "Nueva transacción",
+          icon: ArrowLeftRight,
+          onClick: () => setModalOpen(true),
+        }]}
       />
 
+      {/* Modal crear */}
       <CreateTransactionModal
         open={modalOpen}
         onOpenChange={setModalOpen}
         accounts={accounts}
-        onSuccess={() => { mutate(); setModalOpen(false); }}
+        onSuccess={() => { invalidateAll(); setModalOpen(false); }}
       />
+
+      {/* Modal editar */}
+      {editingTx && (
+        <EditTransactionModal
+          open={!!editingTx}
+          transaction={editingTx}
+          accounts={accounts}
+          onOpenChange={(v) => { if (!v) setEditingTx(null); }}
+          onSuccess={() => { setEditingTx(null); invalidateAll(); }}
+        />
+      )}
+
+      {/* Confirm eliminar */}
+      <AlertDialog open={!!deletingTx} onOpenChange={(v) => { if (!v) setDeletingTx(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Eliminar transacción?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Se revertirá el balance de la cuenta. Esta acción no se puede deshacer.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isDeleting}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDelete}
+              disabled={isDeleting}
+              className="bg-destructive hover:bg-destructive/90"
+            >
+              {isDeleting ? "Eliminando..." : "Eliminar"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
     </div>
   );
 }

@@ -9,7 +9,7 @@ const _geist = Geist({ subsets: ["latin"] });
 const _geistMono = Geist_Mono({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: 'NexLy - Sistema de Gestión de Inventario y Ventas',
+  title: 'Konta - Sistema de Gestión de Inventario y Ventas',
   description: 'Sistema completo de gestión de inventario, ventas y finanzas para pequeños negocios',
   icons: {
     icon: [
