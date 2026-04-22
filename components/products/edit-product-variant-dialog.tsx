@@ -29,7 +29,7 @@ import { ProductImageUpload } from "./product-image-upload";
 
 const schema = z.object({
   variant_name:   z.string().min(1, "El nombre de la variante es requerido"),
-  sku:            z.string().optional(),
+  sku:            z.string().min(1, "El SKU es requerido"),
   price_override: z.coerce.number().min(0, "El precio debe ser mayor o igual a 0").optional()
                     .or(z.literal("")),
 });
@@ -41,13 +41,15 @@ type FormData = z.infer<typeof schema>;
 type AttributePair = { key: string; value: string };
 
 type Props = {
-  open:         boolean;
-  onOpenChange: (open: boolean) => void;
-  productId:    number;
-  productName:  string;
-  basePrice:    number;
-  variant:      ProductVariant | null;
-  onSuccess:    () => void;
+  open:          boolean;
+  onOpenChange:  (open: boolean) => void;
+  productId:     number;
+  productName:   string;
+  basePrice:     number;
+  baseSku?:      string;
+  variantIndex?: number;
+  variant:       ProductVariant | null;
+  onSuccess:     () => void;
 };
 
 // ── Helper para eliminar imagen desde download URL ─────────────────────
@@ -66,7 +68,7 @@ async function deleteOldImage(imageUrl: string) {
 // ── Componente ─────────────────────────────────────────────────────────
 
 export function EditProductVariantDialog({
-  open, onOpenChange, productId, productName, basePrice, variant, onSuccess,
+  open, onOpenChange, productId, productName, basePrice, baseSku, variantIndex = 0, variant, onSuccess,
 }: Props) {
   const { firebaseUser }              = useAuth();
   const { updateVariant, isUpdating } = useUpdateVariant(productId, variant?.id ?? null);
@@ -91,9 +93,12 @@ export function EditProductVariantDialog({
 
   useEffect(() => {
     if (variant && open) {
+      const autoSku = baseSku
+        ? `${baseSku}-${String(variantIndex + 1).padStart(3, "0")}`
+        : "";
       reset({
         variant_name:   variant.variant_name,
-        sku:            variant.sku ?? "",
+        sku:            variant.sku?.trim() || autoSku,
         price_override: variant.price_override ?? "",
       });
       setImagePreview(variant.image_url ?? null);
@@ -169,7 +174,7 @@ export function EditProductVariantDialog({
 
       await updateVariant({
         variant_name:   data.variant_name.trim(),
-        sku:            data.sku?.trim() || undefined,
+        sku:            data.sku.trim(),
         price_override: data.price_override !== "" && data.price_override !== undefined
                           ? Number(data.price_override)
                           : null,
@@ -264,7 +269,7 @@ export function EditProductVariantDialog({
             </div>
 
             <div className="space-y-2">
-              <FieldLabel icon={<Hash className="h-3.5 w-3.5" />} label="SKU" optional />
+              <FieldLabel icon={<Hash className="h-3.5 w-3.5" />} label="SKU" required />
               <Input
                 {...register("sku")}
                 placeholder="Ej: CAM-NEG-M"

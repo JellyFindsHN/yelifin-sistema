@@ -254,6 +254,17 @@ export async function verifyAuthAndSubscription(request: NextRequest): Promise<A
   return authResult;
 }
 
+// ── verifyAdmin ────────────────────────────────────────────────────────
+
+export async function verifyAdmin(request: NextRequest): Promise<AuthResult> {
+  const auth = await verifyAuth(request);
+  if (!isAuthSuccess(auth)) return auth;
+  if (auth.data.subscription.planSlug !== "admin") {
+    return { error: "Acceso denegado — se requiere rol de administrador", status: 403, data: null };
+  }
+  return auth;
+}
+
 // ── createErrorResponse (helper de respuesta) ──────────────────────────
 
 export function createErrorResponse(

@@ -34,7 +34,7 @@ export function PosProductGrid({ products, cart, onAdd, search }: Props) {
   }
 
   return (
-    <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5 mb-5">
+    <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5 mb-20">
       {products.map((product) => {
         const cartQty = cart.filter((i) => i.product_id === product.id).reduce((acc, i) => acc + i.quantity, 0);
         return (

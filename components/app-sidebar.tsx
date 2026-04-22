@@ -54,8 +54,9 @@ const mainNav = [
   {
     title: "Finanzas", url: "/finances", icon: CreditCard,
     submenu: [
-      { title: "Cuentas",        url: "/finances" },
-      { title: "Transacciones",  url: "/finances/transactions" },
+      { title: "Cuentas",          url: "/finances" },
+      { title: "Transacciones",    url: "/finances/transactions" },
+      { title: "Tarjetas crédito", url: "/finances/credit-cards" },
     ],
   },
   { title: "Eventos",     url: "/events",   icon: Calendar },
@@ -70,6 +71,16 @@ const secondaryNav = [
       { title: "Inventario",    url: "/reports/inventory" },
       { title: "Rentabilidad",  url: "/reports/profit" },
       { title: "Eventos",       url: "/reports/events" },
+    ],
+  },
+]
+
+const adminNav = [
+  {
+    title: "Administración", url: "/admin", icon: Shield,
+    submenu: [
+      { title: "Resumen",   url: "/admin" },
+      { title: "Usuarios",  url: "/admin/users" },
     ],
   },
 ]
@@ -243,6 +254,15 @@ export function AppSidebar() {
               {!isCollapsed && <SidebarGroupLabel>Análisis</SidebarGroupLabel>}
               <SidebarGroupContent>
                 <SidebarMenu>{renderNav(secondaryNav)}</SidebarMenu>
+              </SidebarGroupContent>
+            </SidebarGroup>
+          )}
+
+          {isAdmin && (
+            <SidebarGroup>
+              {!isCollapsed && <SidebarGroupLabel>Admin</SidebarGroupLabel>}
+              <SidebarGroupContent>
+                <SidebarMenu>{renderNav(adminNav)}</SidebarMenu>
               </SidebarGroupContent>
             </SidebarGroup>
           )}

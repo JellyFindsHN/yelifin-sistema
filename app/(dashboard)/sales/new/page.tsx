@@ -56,6 +56,7 @@ function NewSaleContent() {
   const { supplies } = useSupplies();
   const { mutate: mutateEvents } = useEvents();
 
+
   // ── Estado principal ───────────────────────────────────────────────
   const [search, setSearch] = useState("");
   const [cart, setCart] = useState<CartItem[]>([]);
@@ -230,7 +231,7 @@ function NewSaleContent() {
         customer_id: customerId,
         items: cart.map((i) => ({
           product_id: i.product_id,
-           variant_id: i.variant_id ?? undefined,
+          variant_id: i.variant_id ?? undefined,
           quantity: i.quantity,
           unit_price: i.unit_price,
           discount: discountType === "per_item" ? i.discount : 0,
@@ -241,7 +242,7 @@ function NewSaleContent() {
         payment_method: paymentMethod as any,
         account_id: accountId,
         notes: notes || undefined,
-        status: isPending ? "PENDING" : "COMPLETED",  // ← nuevo
+        status: isPending ? "PENDING" : "COMPLETED",
         supplies_used: suppliesUsed.length > 0
           ? suppliesUsed.map((s) => ({ supply_id: s.supply_id, quantity: s.quantity, unit_cost: s.unit_cost }))
           : undefined,
@@ -279,7 +280,8 @@ function NewSaleContent() {
 
   const baseOptionsProps = {
     customers, accounts, hasSupplies,
-    customerId, accountId, notes, grandTotal, shippingCost,
+    customerId, accountId,
+    notes, grandTotal, shippingCost,
     isCreating, isPending,
     onCustomerChange: setCustomerId,
     onAccountChange: setAccountId,

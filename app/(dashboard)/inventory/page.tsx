@@ -48,6 +48,7 @@ import { AdjustInventoryDialog }      from "@/components/products/adjust-invento
 import { useCurrency }                from "@/hooks/swr/use-currency";
 import { CreateTransactionModal }     from "@/components/transactions/create-transaction-modal";
 import { useAccounts }                from "@/hooks/swr/use-accounts";
+import { useCreditCards }             from "@/hooks/swr/use-credit-cards";
 import { usePurchases }               from "@/hooks/swr/use-purchases";
 
 // ── Helpers ────────────────────────────────────────────────────────────
@@ -84,8 +85,10 @@ export default function InventoryPage() {
   const [variantProduct,      setVariantProduct]      = useState<Product | null>(null);
   const [editVariant,         setEditVariant]         = useState<{ product: Product; variant: ProductVariant } | null>(null);
   const [deleteVariantTarget, setDeleteVariantTarget] = useState<{ product: Product; variant: ProductVariant } | null>(null);
+  const [adjustVariant,       setAdjustVariant]       = useState<{ product: Product; variant: ProductVariant } | null>(null);
 
   const { accounts, mutate: mutateAccounts } = useAccounts();
+  const { creditCards } = useCreditCards();
   const { format }     = useCurrency();
   const { purchases, mutate: mutatePurchases } = usePurchases();
 
@@ -194,6 +197,11 @@ export default function InventoryPage() {
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end">
+        <DropdownMenuItem onClick={() => setAdjustVariant({ product, variant })}>
+          <SlidersHorizontal className="h-4 w-4 mr-2 text-muted-foreground" />
+          Ajuste de inventario
+        </DropdownMenuItem>
+        <DropdownMenuSeparator />
         <DropdownMenuItem onClick={() => setEditVariant({ product, variant })}>
           <Pencil className="h-4 w-4 mr-2" />
           Editar variante
@@ -751,6 +759,13 @@ export default function InventoryPage() {
         onOpenChange={(open) => !open && setAdjustProduct(null)}
         onSuccess={handleSuccess}
       />
+      <AdjustInventoryDialog
+        product={adjustVariant?.product ?? null}
+        variant={adjustVariant?.variant ?? null}
+        open={!!adjustVariant}
+        onOpenChange={(open) => !open && setAdjustVariant(null)}
+        onSuccess={handleSuccess}
+      />
 
       {/* ── Diálogos de variante ─────────────────────────────────── */}
       <CreateProductVariantDialog
@@ -759,6 +774,8 @@ export default function InventoryPage() {
         productId={variantProduct?.id ?? 0}
         productName={variantProduct?.name ?? ""}
         basePrice={variantProduct?.price ?? 0}
+        baseSku={variantProduct?.sku ?? undefined}
+        variantCount={variantProduct?.variants.length ?? 0}
         onSuccess={handleSuccess}
       />
       <EditProductVariantDialog
@@ -767,6 +784,8 @@ export default function InventoryPage() {
         productId={editVariant?.product.id ?? 0}
         productName={editVariant?.product.name ?? ""}
         basePrice={editVariant?.product.price ?? 0}
+        baseSku={editVariant?.product.sku ?? undefined}
+        variantIndex={editVariant ? editVariant.product.variants.findIndex((v) => v.id === editVariant.variant.id) : 0}
         variant={editVariant?.variant ?? null}
         onSuccess={handleSuccess}
       />
@@ -801,6 +820,7 @@ export default function InventoryPage() {
         open={transactionOpen}
         onOpenChange={setTransactionOpen}
         accounts={accounts}
+        creditCards={creditCards}
         onSuccess={() => setTransactionOpen(false)}
       />
     </div>

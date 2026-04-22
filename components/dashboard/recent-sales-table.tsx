@@ -3,14 +3,12 @@
 
 import { useRouter } from "next/navigation";
 import { useCurrency } from "@/hooks/swr/use-currency";
+import { useTimezone, formatInTZ } from "@/hooks/swr/use-timezone";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Banknote, CreditCard, ArrowLeftRight, HelpCircle } from "lucide-react";
-
-const formatDateFull = (d: string) =>
-  new Date(d).toLocaleDateString("es-HN", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" });
 
 const paymentLabel: Record<string, { label: string; icon: any }> = {
   CASH:     { label: "Efectivo",      icon: Banknote },
@@ -25,6 +23,9 @@ type Props = { recentSales: any[]; isLoading: boolean };
 export function RecentSalesTable({ recentSales, isLoading }: Props) {
   const router = useRouter();
   const { format: formatCurrency } = useCurrency();
+  const tz = useTimezone();
+  const formatDateFull = (d: string) =>
+    formatInTZ(d, tz, { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" });
 
   return (
     <Card className="hidden lg:block">

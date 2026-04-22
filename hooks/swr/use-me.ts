@@ -2,6 +2,7 @@
 "use client";
 
 import useSWR from "swr";
+import { useState } from "react";
 import { useAuth } from "@/hooks/use-auth";
 import type {
   UserProfileResponse,
@@ -14,12 +15,16 @@ const KEY = "/api/auth/me";
 function useAuthFetch() {
   const { firebaseUser } = useAuth();
 
-  return async (url: string) => {
+  return async (url: string, options: RequestInit = {}) => {
     const token = await firebaseUser?.getIdToken();
     if (!token) throw new Error("No autenticado");
 
     const res = await fetch(url, {
-      headers: { Authorization: `Bearer ${token}` },
+      ...options,
+      headers: {
+        Authorization: `Bearer ${token}`,
+        ...options.headers,
+      },
     });
 
     if (!res.ok) {
@@ -27,10 +32,71 @@ function useAuthFetch() {
       throw new Error(body.error || "Error al obtener perfil");
     }
 
-    // El endpoint /api/auth/me devuelve el objeto directamente,
-    // no envuelto en { data: ... }, así que retornamos tal cual.
-    return res.json() as Promise<UserProfileResponse>;
+    return res.json();
   };
+}
+
+export type UpdateProfileInput = {
+  display_name?:     string | null;
+  business_name?:    string | null;
+  business_logo_url?: string | null;
+  timezone?:         string;
+  currency?:         string;
+  locale?:           string;
+};
+
+export function useUpdateProfile() {
+  const authFetch = useAuthFetch();
+  const [isSaving, setIsSaving] = useState(false);
+
+  const updateProfile = async (input: UpdateProfileInput) => {
+    setIsSaving(true);
+    try {
+      return await authFetch(KEY, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(input),
+      });
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  return { updateProfile, isSaving };
+}
+
+export function useUploadLogo() {
+  const { firebaseUser } = useAuth();
+  const [isUploading, setIsUploading] = useState(false);
+
+  const uploadLogo = async (file: File): Promise<string> => {
+    setIsUploading(true);
+    try {
+      const token = await firebaseUser?.getIdToken();
+      if (!token) throw new Error("No autenticado");
+
+      const form = new FormData();
+      form.append("file", file);
+
+      const res = await fetch("/api/upload", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}` },
+        body: form,
+      });
+
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body.error || "Error al subir imagen");
+      }
+
+      const { url } = await res.json();
+      return url as string;
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
+  return { uploadLogo, isUploading };
 }
 
 export function useMe() {

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -23,7 +23,7 @@ import {
 } from "@/components/ui/table";
 import {
   ArrowDownCircle, ArrowUpCircle, ArrowLeftRight, SlidersHorizontal,
-  TrendingUp, TrendingDown, MoreVertical, Pencil, Trash2,
+  TrendingUp, TrendingDown, MoreVertical, Pencil, Trash2, CreditCard,
 } from "lucide-react";
 import {
   useTransactions, useTransactionPeriods, useDeleteTransaction,
@@ -33,6 +33,7 @@ import { useSWRConfig } from "swr";
 import { Fab } from "@/components/ui/fab";
 import { useAccounts } from "@/hooks/swr/use-accounts";
 import { useCurrency } from "@/hooks/swr/use-currency";
+import { useCreditCards, useAllCreditCardTransactions, AllCardTransaction } from "@/hooks/swr/use-credit-cards";
 import { CreateTransactionModal } from "@/components/transactions/create-transaction-modal";
 import { EditTransactionModal } from "@/components/transactions/edit-transaction-modal";
 import { toast } from "sonner";
@@ -72,13 +73,36 @@ const TYPE_CONFIG = {
   },
 };
 
+const CC_TYPE_CONFIG = {
+  CHARGE: {
+    label: "Cargo CC",
+    icon: CreditCard,
+    color: "text-destructive",
+    badge: "bg-red-100 text-red-700 border-red-200",
+    sign: "-",
+  },
+  PAYMENT: {
+    label: "Pago CC",
+    icon: CreditCard,
+    color: "text-green-600",
+    badge: "bg-green-100 text-green-700 border-green-200",
+    sign: "+",
+  },
+};
+
 const REF_LABELS: Record<string, string> = {
   SALE: "Venta",
   PURCHASE: "Compra inventario",
   SUPPLY_PURCHASE: "Compra suministros",
   EVENT: "Evento",
   OTHER: "Manual",
+  CREDIT_CARD_PAYMENT: "Pago tarjeta",
 };
+
+// ── Unified row type ───────────────────────────────────────────────────
+type Row =
+  | { _src: "account"; data: Transaction }
+  | { _src: "cc"; data: AllCardTransaction };
 
 // ── Page ───────────────────────────────────────────────────────────────
 export default function TransactionsPage() {
@@ -90,41 +114,73 @@ export default function TransactionsPage() {
   const [selectedYear,  setSelectedYear]  = useState(now.getFullYear());
   const [selectedMonth, setSelectedMonth] = useState(now.getMonth() + 1);
   const [specificDate,  setSpecificDate]  = useState("");
-  const [accountFilter, setAccountFilter] = useState("all");
+  const [sourceFilter,  setSourceFilter]  = useState("all"); // "all" | "cc-{id}" | account_id
   const [typeFilter,    setTypeFilter]    = useState("all");
   const [modalOpen,     setModalOpen]     = useState(false);
 
-  // Edit
-  const [editingTx,    setEditingTx]    = useState<Transaction | null>(null);
-  // Delete
-  const [deletingTx,   setDeletingTx]   = useState<Transaction | null>(null);
+  const [editingTx,  setEditingTx]  = useState<Transaction | null>(null);
+  const [deletingTx, setDeletingTx] = useState<Transaction | null>(null);
 
   const { deleteTransaction, isDeleting } = useDeleteTransaction();
 
-  const { transactions, totals, isLoading, mutate } = useTransactions({
-    account_id: accountFilter !== "all" ? Number(accountFilter) : undefined,
-    month:  filterMode === "month" ? selectedMonth : undefined,
-    year:   filterMode === "month" ? selectedYear  : undefined,
-    date:   filterMode === "date" && specificDate ? specificDate : undefined,
+  const periodParams = {
+    month: filterMode === "month" ? selectedMonth : undefined,
+    year:  filterMode === "month" ? selectedYear  : undefined,
+    date:  filterMode === "date" && specificDate ? specificDate : undefined,
+  };
+
+  const isCardFilter    = sourceFilter.startsWith("cc-");
+  const selectedCardId  = isCardFilter ? Number(sourceFilter.replace("cc-", "")) : undefined;
+  const isAccountFilter = !isCardFilter && sourceFilter !== "all";
+
+  const { transactions, totals, isLoading: loadingAcc, mutate } = useTransactions({
+    account_id: isAccountFilter ? Number(sourceFilter) : undefined,
+    ...periodParams,
   });
 
-  const { periods }  = useTransactionPeriods();
-  const { accounts } = useAccounts();
-  const { format }   = useCurrency();
+  const { transactions: ccTxs, isLoading: loadingCC } = useAllCreditCardTransactions({
+    card_id: selectedCardId,
+    ...periodParams,
+  });
 
-  const availableYears   = [...new Set(periods.map((p) => p.year))].sort((a, b) => b - a);
-  const monthsForYear    = (y: number) =>
+  const { periods }     = useTransactionPeriods();
+  const { accounts }    = useAccounts();
+  const { creditCards } = useCreditCards();
+  const { format } = useCurrency();
+
+  const isLoading = loadingAcc || loadingCC;
+
+  const availableYears = [...new Set(periods.map((p) => p.year))].sort((a, b) => b - a);
+  const monthsForYear  = (y: number) =>
     periods.filter((p) => p.year === y).map((p) => p.month).sort((a, b) => b - a);
-
-  const filtered = transactions.filter((t) =>
-    typeFilter === "all" ? true : t.type === typeFilter
-  );
 
   const neto = totals.income - totals.expense;
 
   const periodLabel = filterMode === "date" && specificDate
     ? formatDate(specificDate)
     : `${MONTH_NAMES[selectedMonth]} ${selectedYear}`;
+
+  // ── Merge & filter ─────────────────────────────────────────────────
+  const rows = useMemo<Row[]>(() => {
+    const accRows: Row[] = (isCardFilter ? [] : transactions)
+      .filter((t) => typeFilter === "all" || t.type === typeFilter)
+      .map((t) => ({ _src: "account" as const, data: t }));
+
+    const ccRows: Row[] = (isAccountFilter ? [] : ccTxs)
+      .filter((t) => {
+        if (typeFilter === "all") return true;
+        if (typeFilter === "EXPENSE") return t.type === "CHARGE";
+        if (typeFilter === "INCOME")  return t.type === "PAYMENT";
+        return false;
+      })
+      .map((t) => ({ _src: "cc" as const, data: t }));
+
+    return [...accRows, ...ccRows].sort(
+      (a, b) =>
+        new Date(b.data.occurred_at).getTime() -
+        new Date(a.data.occurred_at).getTime()
+    );
+  }, [transactions, ccTxs, typeFilter, isCardFilter, isAccountFilter]);
 
   const handleTransactionClick = (t: Transaction) => {
     if (t.reference_type === "SALE" && t.reference_id) {
@@ -137,7 +193,8 @@ export default function TransactionsPage() {
       typeof key === "string" && (
         key.startsWith("/api/transactions") ||
         key.startsWith("/api/accounts") ||
-        key.startsWith("/api/finances")
+        key.startsWith("/api/finances") ||
+        key.startsWith("/api/credit-card-transactions")
       )
     );
   };
@@ -154,10 +211,9 @@ export default function TransactionsPage() {
     }
   };
 
-  // Solo transacciones manuales (OTHER) son editables/eliminables
   const isEditable = (t: Transaction) => t.reference_type === "OTHER" || !t.reference_type;
 
-  // ── Actions menu ────────────────────────────────────────────────────
+  // ── Actions menu (solo transacciones de cuenta) ────────────────────
   const ActionsMenu = ({ t }: { t: Transaction }) => {
     if (!isEditable(t)) return <div className="w-8" />;
     return (
@@ -187,6 +243,198 @@ export default function TransactionsPage() {
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
+    );
+  };
+
+  // ── Row renderers ──────────────────────────────────────────────────
+  const renderMobileCard = (row: Row, i: number) => {
+    if (row._src === "account") {
+      const t = row.data;
+      const cfg = TYPE_CONFIG[t.type];
+      const Icon = cfg.icon;
+      const clickable = t.reference_type === "SALE" && t.reference_id;
+      return (
+        <Card
+          key={`acc-${t.id}`}
+          className={`pt-3 pb-2.5 ${clickable ? "cursor-pointer hover:bg-muted/50 transition-colors" : ""}`}
+          onClick={() => handleTransactionClick(t)}
+        >
+          <CardContent className="pl-3.5">
+            <div className="flex items-start gap-3">
+              <div className="h-8 w-8 rounded-full bg-muted flex items-center justify-center shrink-0">
+                <Icon className={`h-4 w-4 ${cfg.color}`} />
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium truncate">
+                      {t.description || REF_LABELS[t.reference_type ?? "OTHER"] || "—"}
+                    </p>
+                    <p className="text-xs text-muted-foreground truncate">
+                      {t.account_name}
+                      {t.to_account_name && <span> → {t.to_account_name}</span>}
+                    </p>
+                    <p className="text-xs text-muted-foreground">{formatDate(t.occurred_at)}</p>
+                  </div>
+                  <div className="flex items-start gap-1 shrink-0">
+                    <div className="text-right">
+                      <p className={`text-sm font-bold ${cfg.color}`}>
+                        {cfg.sign}{format(Number(t.amount))}
+                      </p>
+                      <Badge className={`text-[10px] mt-0.5 ${cfg.badge}`} variant="outline">
+                        {cfg.label}
+                      </Badge>
+                    </div>
+                    <ActionsMenu t={t} />
+                  </div>
+                </div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      );
+    }
+
+    // CC transaction
+    const t = row.data;
+    const cfg = CC_TYPE_CONFIG[t.type];
+    const Icon = cfg.icon;
+    const isUsd = t.currency === "USD";
+    return (
+      <Card key={`cc-${t.id}`} className="pt-3 pb-2.5">
+        <CardContent className="pl-3.5">
+          <div className="flex items-start gap-3">
+            <div className="h-8 w-8 rounded-full bg-muted flex items-center justify-center shrink-0">
+              <Icon className={`h-4 w-4 ${cfg.color}`} />
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="flex items-start justify-between gap-2">
+                <div className="min-w-0">
+                  <p className="text-sm font-medium truncate">
+                    {t.description || "—"}
+                  </p>
+                  <p className="text-xs text-muted-foreground truncate">
+                    {t.card_name}{t.last_four ? ` ···· ${t.last_four}` : ""}
+                  </p>
+                  <p className="text-xs text-muted-foreground">{formatDate(t.occurred_at)}</p>
+                </div>
+                <div className="text-right shrink-0">
+                  <p className={`text-sm font-bold ${cfg.color}`}>
+                    {cfg.sign}{isUsd
+                      ? `$${Number(t.amount).toFixed(2)}`
+                      : format(Number(t.amount))
+                    }
+                  </p>
+                  {isUsd && t.amount_local != null && (
+                    <p className="text-[10px] text-muted-foreground">
+                      ≈ {format(Number(t.amount_local))}
+                    </p>
+                  )}
+                  <Badge className={`text-[10px] mt-0.5 ${cfg.badge}`} variant="outline">
+                    {cfg.label}
+                    {isUsd && <span className="ml-1">USD</span>}
+                  </Badge>
+                </div>
+              </div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  };
+
+  const renderDesktopRow = (row: Row) => {
+    if (row._src === "account") {
+      const t = row.data;
+      const cfg = TYPE_CONFIG[t.type];
+      const Icon = cfg.icon;
+      const clickable = t.reference_type === "SALE" && t.reference_id;
+      return (
+        <TableRow
+          key={`acc-${t.id}`}
+          className={clickable ? "cursor-pointer hover:bg-muted/50" : ""}
+          onClick={() => handleTransactionClick(t)}
+        >
+          <TableCell>
+            <Badge className={`gap-1 ${cfg.badge}`} variant="outline">
+              <Icon className="h-3 w-3" />
+              {cfg.label}
+            </Badge>
+          </TableCell>
+          <TableCell className="max-w-48 truncate text-sm">
+            {t.description || "—"}
+          </TableCell>
+          <TableCell className="text-sm">
+            {t.account_name}
+            {t.to_account_name && (
+              <span className="text-muted-foreground"> → {t.to_account_name}</span>
+            )}
+          </TableCell>
+          <TableCell>
+            <Badge variant="secondary" className="text-xs">
+              {REF_LABELS[t.reference_type ?? "OTHER"] ?? "Manual"}
+            </Badge>
+          </TableCell>
+          <TableCell className="text-muted-foreground text-sm whitespace-nowrap">
+            {formatDate(t.occurred_at)}
+          </TableCell>
+          <TableCell className={`text-right font-bold ${cfg.color}`}>
+            {cfg.sign}{format(Number(t.amount))}
+          </TableCell>
+          <TableCell>
+            <ActionsMenu t={t} />
+          </TableCell>
+        </TableRow>
+      );
+    }
+
+    // CC transaction
+    const t = row.data;
+    const cfg = CC_TYPE_CONFIG[t.type];
+    const Icon = cfg.icon;
+    const isUsd = t.currency === "USD";
+    return (
+      <TableRow key={`cc-${t.id}`}>
+        <TableCell>
+          <Badge className={`gap-1 ${cfg.badge}`} variant="outline">
+            <Icon className="h-3 w-3" />
+            {cfg.label}
+          </Badge>
+        </TableCell>
+        <TableCell className="max-w-48 truncate text-sm">
+          {t.description || "—"}
+        </TableCell>
+        <TableCell className="text-sm">
+          <span className="flex items-center gap-1">
+            <CreditCard className="h-3 w-3 text-muted-foreground shrink-0" />
+            {t.card_name}{t.last_four ? ` ···· ${t.last_four}` : ""}
+          </span>
+        </TableCell>
+        <TableCell>
+          <Badge variant="secondary" className="text-xs">
+            Tarjeta crédito
+          </Badge>
+        </TableCell>
+        <TableCell className="text-muted-foreground text-sm whitespace-nowrap">
+          {formatDate(t.occurred_at)}
+        </TableCell>
+        <TableCell className={`text-right font-bold ${cfg.color}`}>
+          <span>
+            {cfg.sign}{isUsd
+              ? `$${Number(t.amount).toFixed(2)} USD`
+              : format(Number(t.amount))
+            }
+          </span>
+          {isUsd && t.amount_local != null && (
+            <p className="text-[10px] font-normal text-muted-foreground">
+              ≈ {format(Number(t.amount_local))}
+            </p>
+          )}
+        </TableCell>
+        <TableCell>
+          <div className="w-8" />
+        </TableCell>
+      </TableRow>
     );
   };
 
@@ -275,21 +523,42 @@ export default function TransactionsPage() {
         )}
 
         <div className="grid grid-cols-2 gap-2">
-          <Select value={accountFilter} onValueChange={setAccountFilter}>
-            <SelectTrigger className="w-full"><SelectValue placeholder="Cuenta" /></SelectTrigger>
+          {/* Fuente: cuentas + tarjetas */}
+          <Select value={sourceFilter} onValueChange={setSourceFilter}>
+            <SelectTrigger className="w-full"><SelectValue placeholder="Fuente" /></SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">Todas las cuentas</SelectItem>
-              {accounts.map((a) => (
-                <SelectItem key={a.id} value={String(a.id)}>{a.name}</SelectItem>
-              ))}
+              <SelectItem value="all">Todas las fuentes</SelectItem>
+              {accounts.length > 0 && (
+                <>
+                  <div className="px-2 py-1 text-[10px] font-semibold text-muted-foreground uppercase tracking-wide">
+                    Cuentas
+                  </div>
+                  {accounts.map((a) => (
+                    <SelectItem key={a.id} value={String(a.id)}>{a.name}</SelectItem>
+                  ))}
+                </>
+              )}
+              {creditCards.length > 0 && (
+                <>
+                  <div className="px-2 py-1 text-[10px] font-semibold text-muted-foreground uppercase tracking-wide">
+                    Tarjetas de crédito
+                  </div>
+                  {creditCards.map((c) => (
+                    <SelectItem key={c.id} value={`cc-${c.id}`}>
+                      {c.name}{c.last_four ? ` ···· ${c.last_four}` : ""}
+                    </SelectItem>
+                  ))}
+                </>
+              )}
             </SelectContent>
           </Select>
+
           <Select value={typeFilter} onValueChange={setTypeFilter}>
             <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
             <SelectContent>
               <SelectItem value="all">Todos</SelectItem>
-              <SelectItem value="INCOME">Ingresos</SelectItem>
-              <SelectItem value="EXPENSE">Egresos</SelectItem>
+              <SelectItem value="INCOME">Ingresos / Pagos CC</SelectItem>
+              <SelectItem value="EXPENSE">Egresos / Cargos CC</SelectItem>
               <SelectItem value="TRANSFER">Transferencias</SelectItem>
             </SelectContent>
           </Select>
@@ -302,7 +571,7 @@ export default function TransactionsPage() {
           Array.from({ length: 4 }).map((_, i) => (
             <Skeleton key={i} className="h-20 w-full rounded-xl" />
           ))
-        ) : filtered.length === 0 ? (
+        ) : rows.length === 0 ? (
           <Card>
             <CardContent className="flex flex-col items-center justify-center py-12">
               <SlidersHorizontal className="h-10 w-10 text-muted-foreground/40" />
@@ -312,51 +581,7 @@ export default function TransactionsPage() {
             </CardContent>
           </Card>
         ) : (
-          filtered.map((t) => {
-            const cfg = TYPE_CONFIG[t.type];
-            const Icon = cfg.icon;
-            const clickable = t.reference_type === "SALE" && t.reference_id;
-            return (
-              <Card
-                key={t.id}
-                className={`pt-3 pb-2.5 ${clickable ? "cursor-pointer hover:bg-muted/50 transition-colors" : ""}`}
-                onClick={() => handleTransactionClick(t)}
-              >
-                <CardContent className="pl-3.5">
-                  <div className="flex items-start gap-3">
-                    <div className="h-8 w-8 rounded-full bg-muted flex items-center justify-center shrink-0">
-                      <Icon className={`h-4 w-4 ${cfg.color}`} />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-start justify-between gap-2">
-                        <div className="min-w-0">
-                          <p className="text-sm font-medium truncate">
-                            {t.description || REF_LABELS[t.reference_type ?? "OTHER"] || "—"}
-                          </p>
-                          <p className="text-xs text-muted-foreground truncate">
-                            {t.account_name}
-                            {t.to_account_name && <span> → {t.to_account_name}</span>}
-                          </p>
-                          <p className="text-xs text-muted-foreground">{formatDate(t.occurred_at)}</p>
-                        </div>
-                        <div className="flex items-start gap-1 shrink-0">
-                          <div className="text-right">
-                            <p className={`text-sm font-bold ${cfg.color}`}>
-                              {cfg.sign}{format(Number(t.amount))}
-                            </p>
-                            <Badge className={`text-[10px] mt-0.5 ${cfg.badge}`} variant="outline">
-                              {cfg.label}
-                            </Badge>
-                          </div>
-                          <ActionsMenu t={t} />
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            );
-          })
+          rows.map((row, i) => renderMobileCard(row, i))
         )}
       </div>
 
@@ -368,7 +593,7 @@ export default function TransactionsPage() {
               <TableRow>
                 <TableHead>Tipo</TableHead>
                 <TableHead>Descripción</TableHead>
-                <TableHead>Cuenta</TableHead>
+                <TableHead>Cuenta / Tarjeta</TableHead>
                 <TableHead>Origen</TableHead>
                 <TableHead>Fecha</TableHead>
                 <TableHead className="text-right">Monto</TableHead>
@@ -384,55 +609,14 @@ export default function TransactionsPage() {
                     ))}
                   </TableRow>
                 ))
-              ) : filtered.length === 0 ? (
+              ) : rows.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={7} className="text-center py-12 text-muted-foreground">
                     No hay transacciones en este período
                   </TableCell>
                 </TableRow>
               ) : (
-                filtered.map((t) => {
-                  const cfg = TYPE_CONFIG[t.type];
-                  const Icon = cfg.icon;
-                  const clickable = t.reference_type === "SALE" && t.reference_id;
-                  return (
-                    <TableRow
-                      key={t.id}
-                      className={clickable ? "cursor-pointer hover:bg-muted/50" : ""}
-                      onClick={() => handleTransactionClick(t)}
-                    >
-                      <TableCell>
-                        <Badge className={`gap-1 ${cfg.badge}`} variant="outline">
-                          <Icon className="h-3 w-3" />
-                          {cfg.label}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="max-w-48 truncate text-sm">
-                        {t.description || "—"}
-                      </TableCell>
-                      <TableCell className="text-sm">
-                        {t.account_name}
-                        {t.to_account_name && (
-                          <span className="text-muted-foreground"> → {t.to_account_name}</span>
-                        )}
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant="secondary" className="text-xs">
-                          {REF_LABELS[t.reference_type ?? "OTHER"] ?? "Manual"}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="text-muted-foreground text-sm whitespace-nowrap">
-                        {formatDate(t.occurred_at)}
-                      </TableCell>
-                      <TableCell className={`text-right font-bold ${cfg.color}`}>
-                        {cfg.sign}{format(Number(t.amount))}
-                      </TableCell>
-                      <TableCell>
-                        <ActionsMenu t={t} />
-                      </TableCell>
-                    </TableRow>
-                  );
-                })
+                rows.map((row) => renderDesktopRow(row))
               )}
             </TableBody>
           </Table>
@@ -453,6 +637,7 @@ export default function TransactionsPage() {
         open={modalOpen}
         onOpenChange={setModalOpen}
         accounts={accounts}
+        creditCards={creditCards}
         onSuccess={() => { invalidateAll(); setModalOpen(false); }}
       />
 

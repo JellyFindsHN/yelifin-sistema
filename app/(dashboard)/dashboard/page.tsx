@@ -21,6 +21,7 @@ import {
 
 import { useDashboard, useDashboardPeriods } from "@/hooks/swr/use-dashboard";
 import { useAccounts } from "@/hooks/swr/use-accounts";
+import { useCreditCards } from "@/hooks/swr/use-credit-cards";
 import { Fab } from "@/components/ui/fab";
 import { CreateTransactionModal } from "@/components/transactions/create-transaction-modal";
 
@@ -30,6 +31,7 @@ import { MobileSummary } from "@/components/dashboard/mobile-summary";
 import { SalesCharts } from "@/components/dashboard/sales-charts";
 import { TopProductsStock } from "@/components/dashboard/top-products-stock";
 import { RecentSalesTable } from "@/components/dashboard/recent-sales-table";
+import { CreditCardDebtWidget } from "@/components/dashboard/credit-card-debt-widget";
 
 const MONTH_NAMES = [
   "",
@@ -60,6 +62,7 @@ export default function DashboardPage() {
   });
   const { periods } = useDashboardPeriods();
   const { accounts } = useAccounts();
+  const { creditCards } = useCreditCards();
 
   const availableYears = [...new Set(periods.map((p) => p.year))].sort(
     (a, b) => b - a
@@ -192,6 +195,11 @@ export default function DashboardPage() {
       </div>
 
       <MetricsGrid metrics={m} isLoading={isLoading} />
+      <CreditCardDebtWidget
+        debtLocal={m?.credit_card_debt?.local ?? 0}
+        debtUsd={m?.credit_card_debt?.usd ?? 0}
+        isLoading={isLoading}
+      />
       <MobileSummary
         lowStock={data?.low_stock ?? []}
         recentSales={data?.recent_sales ?? []}
@@ -234,6 +242,7 @@ export default function DashboardPage() {
         open={transactionOpen}
         onOpenChange={setTransactionOpen}
         accounts={accounts}
+        creditCards={creditCards}
         onSuccess={() => {
           mutate();
           setTransactionOpen(false);

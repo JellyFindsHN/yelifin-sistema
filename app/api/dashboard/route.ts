@@ -131,6 +131,15 @@ export async function GET(request: NextRequest) {
       FROM accounts WHERE user_id = ${userId} AND is_active = TRUE
     `;
 
+    // ── Deuda de tarjetas de crédito ───────────────────────────────────
+    const [creditCardDebt] = await sql`
+      SELECT
+        COALESCE(SUM(balance),     0) AS total_local,
+        COALESCE(SUM(balance_usd), 0) AS total_usd
+      FROM credit_cards
+      WHERE user_id = ${userId} AND is_active = TRUE
+    `;
+
     // ── Sales chart (con cálculo correcto de profit) ───────────────────────
     const salesChart = await sql`
   WITH daily_revenue AS (
@@ -278,6 +287,10 @@ export async function GET(request: NextRequest) {
             low_stock: Number(inventoryStats?.low_stock ?? 0),
           },
           balance: Number(accountsBalance?.total ?? 0),
+          credit_card_debt: {
+            local: Number(creditCardDebt?.total_local ?? 0),
+            usd:   Number(creditCardDebt?.total_usd   ?? 0),
+          },
         },
         sales_chart: salesChart.map((r: any) => ({ date: r.date, revenue: Number(r.revenue), profit: Number(r.profit) })),
         payment_methods: paymentMethods.map((r: any) => ({ method: String(r.method), amount: Number(r.amount) })),

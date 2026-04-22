@@ -26,10 +26,10 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
   return (
     <SWRProvider>
-      <SidebarProvider>
+      <SidebarProvider className="h-svh overflow-hidden">
         <AppSidebar />
 
-        <SidebarInset className="min-h-svh flex flex-col">
+        <SidebarInset className="flex flex-col overflow-hidden">
           {/* Header */}
           <header className="sticky top-0 z-20 flex h-14 shrink-0 items-center gap-2 border-b bg-background px-4 py-4 lg:px-6">
             <SidebarTrigger className="-ml-1" />
