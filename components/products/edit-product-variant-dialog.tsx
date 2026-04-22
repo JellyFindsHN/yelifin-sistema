@@ -30,8 +30,10 @@ import { ProductImageUpload } from "./product-image-upload";
 const schema = z.object({
   variant_name:   z.string().min(1, "El nombre de la variante es requerido"),
   sku:            z.string().min(1, "El SKU es requerido"),
-  price_override: z.coerce.number().min(0, "El precio debe ser mayor o igual a 0").optional()
-                    .or(z.literal("")),
+  price_override: z.preprocess(
+    (val) => (val === "" || val === null || val === undefined ? undefined : Number(val)),
+    z.number().min(0, "El precio debe ser mayor o igual a 0").optional()
+  ),
 });
 
 type FormData = z.infer<typeof schema>;
@@ -87,7 +89,7 @@ export function EditProductVariantDialog({
   } = useForm<FormData>({ resolver: zodResolver(schema) });
 
   const priceOverrideValue = watch("price_override");
-  const hasCustomPrice     = priceOverrideValue !== "" && priceOverrideValue !== undefined;
+  const hasCustomPrice     = priceOverrideValue !== undefined;
 
   // ── Poblar form cuando cambia la variante ──────────────────────────
 
@@ -99,7 +101,7 @@ export function EditProductVariantDialog({
       reset({
         variant_name:   variant.variant_name,
         sku:            variant.sku?.trim() || autoSku,
-        price_override: variant.price_override ?? "",
+        price_override: variant.price_override ?? undefined,
       });
       setImagePreview(variant.image_url ?? null);
       setImageFile(null);
@@ -112,7 +114,7 @@ export function EditProductVariantDialog({
         setAttributes([{ key: "", value: "" }]);
       }
     }
-  }, [variant, open, reset]);
+  }, [variant, open, reset, baseSku, variantIndex]);
 
   // ── Atributos dinámicos ────────────────────────────────────────────
 
@@ -175,9 +177,7 @@ export function EditProductVariantDialog({
       await updateVariant({
         variant_name:   data.variant_name.trim(),
         sku:            data.sku.trim(),
-        price_override: data.price_override !== "" && data.price_override !== undefined
-                          ? Number(data.price_override)
-                          : null,
+        price_override: data.price_override !== undefined ? data.price_override : null,
         attributes:     attributesObj,
         image_url,
       });

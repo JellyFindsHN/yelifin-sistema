@@ -291,7 +291,7 @@ export default function InventoryPage() {
           </div>
         </TableCell>
         <TableCell className="font-mono text-xs text-muted-foreground">
-          {variantStock.sku ?? "—"}
+          {variantStock.sku || "—"}
         </TableCell>
         <TableCell>{getStockBadge(Number(variantStock.stock))}</TableCell>
         <TableCell className="text-sm">
@@ -386,6 +386,9 @@ export default function InventoryPage() {
             <div className="flex items-center justify-between gap-2">
               <div className="min-w-0">
                 <p className="text-sm font-medium truncate">{variantStock.variant_name}</p>
+                {variantStock.sku && (
+                  <p className="text-xs text-muted-foreground font-mono">{variantStock.sku}</p>
+                )}
                 {variantStock.attributes && (
                   <div className="flex flex-wrap gap-1 mt-0.5">
                     {Object.entries(variantStock.attributes).map(([k, v]) => (

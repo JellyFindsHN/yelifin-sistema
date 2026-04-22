@@ -57,11 +57,11 @@ export async function PATCH(request: NextRequest, { params }: Params) {
     const [updated] = await sql`
       UPDATE product_variants SET
         variant_name   = COALESCE(${variant_name  ?? null}, variant_name),
-        sku            = COALESCE(${sku           ?? null}, sku),
+        sku            = COALESCE(${sku?.trim() || null}, sku),
         attributes     = COALESCE(${attributes    ? JSON.stringify(attributes) : null}, attributes),
-        price_override = COALESCE(${price_override !== undefined && price_override !== null
-                                      ? Number(price_override)
-                                      : null},           price_override),
+        price_override = ${price_override !== undefined && price_override !== null
+                              ? Number(price_override)
+                              : null},
         image_url      = COALESCE(${image_url     ?? null}, image_url),
         is_active      = COALESCE(${is_active     !== undefined ? is_active : null}, is_active),
         updated_at     = CURRENT_TIMESTAMP
