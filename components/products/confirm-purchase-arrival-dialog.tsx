@@ -10,30 +10,38 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
-import { Loader2, Truck, PackageCheck, AlertTriangle } from "lucide-react";
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from "@/components/ui/select";
+import { Loader2, Truck, PackageCheck, AlertTriangle, Wallet } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { useConfirmPurchaseArrival, Purchase } from "@/hooks/swr/use-purchases";
 import { useCurrency } from "@/hooks/swr/use-currency";
 
+type Account = { id: number; name: string; balance: number };
+
 type Props = {
   purchase:     Purchase | null;
+  accounts:     Account[];
   open:         boolean;
   onOpenChange: (open: boolean) => void;
   onSuccess:    () => void;
 };
 
 export function ConfirmPurchaseArrivalDialog({
-  purchase, open, onOpenChange, onSuccess,
+  purchase, accounts, open, onOpenChange, onSuccess,
 }: Props) {
   const { confirmArrival, isConfirming } = useConfirmPurchaseArrival(purchase?.id ?? null);
   const { format, symbol }               = useCurrency();
 
-  const [newShipping, setNewShipping] = useState("");
+  const [newShipping,       setNewShipping]       = useState("");
+  const [shippingAccountId, setShippingAccountId] = useState<string>("stored");
 
   useEffect(() => {
     if (open && purchase) {
       setNewShipping(Number(purchase.shipping) > 0 ? String(purchase.shipping) : "");
+      setShippingAccountId("stored");
     }
   }, [open, purchase]);
 
@@ -45,9 +53,20 @@ export function ConfirmPurchaseArrivalDialog({
   const newTotal         = Number(purchase.total) + shippingDelta;
   const hasAdjustment    = shippingDelta !== 0;
 
+  // Qué cuenta se muestra en el resumen del ajuste
+  const effectiveAccId = shippingAccountId === "stored" ? null : Number(shippingAccountId);
+  const storedShippingName = purchase.shipping_account_name ?? purchase.account_name ?? null;
+  const selectedAcc = effectiveAccId
+    ? accounts.find((a) => a.id === effectiveAccId)
+    : null;
+  const adjustmentAccountName = selectedAcc?.name ?? storedShippingName ?? "—";
+
   const handleConfirm = async () => {
     try {
-      await confirmArrival(newShipping === "" ? 0 : parsedShipping);
+      await confirmArrival(
+        newShipping === "" ? 0 : parsedShipping,
+        effectiveAccId ?? undefined,
+      );
       toast.success("Inventario registrado exitosamente");
       onOpenChange(false);
       onSuccess();
@@ -105,7 +124,12 @@ export function ConfirmPurchaseArrivalDialog({
             </div>
             {originalShipping > 0 && (
               <div className="flex justify-between text-muted-foreground">
-                <span>Envío original</span>
+                <span>
+                  Envío original
+                  {storedShippingName && (
+                    <span className="ml-1 text-xs">({storedShippingName})</span>
+                  )}
+                </span>
                 <span>{format(originalShipping)}</span>
               </div>
             )}
@@ -145,6 +169,40 @@ export function ConfirmPurchaseArrivalDialog({
             </p>
           </div>
 
+          {/* Cuenta para el envío — solo si hay ajuste y hay cuentas */}
+          {parsedShipping > 0 && accounts.length > 0 && (
+            <div className="space-y-1.5">
+              <Label className="text-sm font-medium flex items-center gap-1.5">
+                <Wallet className="h-3.5 w-3.5 text-muted-foreground" />
+                Cuenta para el envío
+              </Label>
+              <Select
+                value={shippingAccountId}
+                onValueChange={setShippingAccountId}
+                disabled={isConfirming}
+              >
+                <SelectTrigger className="h-10 w-full">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="stored">
+                    {storedShippingName ? `Original (${storedShippingName})` : "Misma cuenta de la compra"}
+                  </SelectItem>
+                  {accounts.map((a) => (
+                    <SelectItem key={a.id} value={String(a.id)}>
+                      <div className="flex items-center justify-between gap-8 w-full">
+                        <span>{a.name}</span>
+                        <span className="text-xs text-muted-foreground font-mono">
+                          {format(Number(a.balance))}
+                        </span>
+                      </div>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+
           {/* Ajuste financiero si el envío cambió */}
           {hasAdjustment && (
             <div className={cn(
@@ -177,6 +235,9 @@ export function ConfirmPurchaseArrivalDialog({
                 <span>Nuevo total</span>
                 <span>{format(newTotal)}</span>
               </div>
+              <p className="text-xs text-muted-foreground pt-0.5">
+                Cuenta: {adjustmentAccountName}
+              </p>
             </div>
           )}
 

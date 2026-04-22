@@ -137,6 +137,12 @@ export default function ReceiptPage({ params }: Props) {
                 <span className="text-right truncate">{sale.customer_name}</span>
               </div>
             )}
+            {sale.customer_phone && (
+              <div className="flex justify-between gap-2">
+                <span className="text-gray-500 shrink-0">Tel.</span>
+                <span className="text-right">{sale.customer_phone}</span>
+              </div>
+            )}
           </div>
 
           <Dashes />
@@ -209,7 +215,7 @@ export default function ReceiptPage({ params }: Props) {
             </div>
           </div>
 
-          {sale.notes && (
+          {sale.notes?.trim() && (
             <>
               <Dashes />
               <div className="px-4 pb-1 text-[10px] text-gray-500 text-center italic">

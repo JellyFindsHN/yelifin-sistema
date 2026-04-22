@@ -15,7 +15,7 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
-import { Loader2, PackagePlus, Calculator, Wallet, Plus, Trash2, Clock, CreditCard } from "lucide-react";
+import { Loader2, PackagePlus, Calculator, Wallet, Plus, Trash2, Clock, CreditCard, Truck } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
@@ -84,6 +84,7 @@ export function AddInventoryDialog({ product, open, onOpenChange, onSuccess }: P
 
   const [paymentMode, setPaymentMode] = useState<"account" | "credit_card">("account");
   const [creditCardId, setCreditCardId] = useState<number | null>(null);
+  const [shippingAccountId, setShippingAccountId] = useState<number | null>(null);
   const [isPending, setIsPending] = useState(false);
   const [items, setItems] = useState<LineItem[]>([
     { key: uid(), variant_key: "base", quantity: "1", unit_cost: "0" },
@@ -125,6 +126,7 @@ export function AddInventoryDialog({ product, open, onOpenChange, onSuccess }: P
       setIsPending(false);
       setPaymentMode("account");
       setCreditCardId(null);
+      setShippingAccountId(null);
       reset({
         currency:      "USD",
         exchange_rate: TASA_DEFAULT,
@@ -172,6 +174,7 @@ export function AddInventoryDialog({ product, open, onOpenChange, onSuccess }: P
     try {
       await createPurchase({
         ...(isCreditCard ? { credit_card_id: creditCardId! } : { account_id: data.account_id! }),
+        ...(shippingAccountId && data.shipping > 0 ? { shipping_account_id: shippingAccountId } : {}),
         currency:      data.currency,
         exchange_rate: data.exchange_rate,
         shipping:      data.shipping,
@@ -554,6 +557,48 @@ export function AddInventoryDialog({ product, open, onOpenChange, onSuccess }: P
               />
             </div>
           </div>
+
+          {/* Cuenta para el envío (solo si hay envío y hay cuentas disponibles) */}
+          {ship > 0 && accounts.length > 0 && (
+            <div className="space-y-1.5">
+              <Label className="text-sm font-medium flex items-center gap-1.5">
+                <Truck className="h-3.5 w-3.5 text-muted-foreground" />
+                Cuenta para el envío
+                <span className="text-xs text-muted-foreground font-normal">
+                  {paymentMode === "account" ? "(opcional, si es diferente a la cuenta principal)" : ""}
+                </span>
+              </Label>
+              <Select
+                value={shippingAccountId ? String(shippingAccountId) : "none"}
+                onValueChange={(v) => setShippingAccountId(v === "none" ? null : Number(v))}
+                disabled={isCreating}
+              >
+                <SelectTrigger className="h-11 w-full">
+                  <SelectValue placeholder="Misma cuenta / tarjeta" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">
+                    {paymentMode === "credit_card" ? "Incluir en tarjeta" : "Misma cuenta principal"}
+                  </SelectItem>
+                  {accounts.map((a) => (
+                    <SelectItem key={a.id} value={String(a.id)}>
+                      <div className="flex items-center justify-between gap-8 w-full">
+                        <span>{a.name}</span>
+                        <span className="text-xs text-muted-foreground font-mono">
+                          {format(Number(a.balance))}
+                        </span>
+                      </div>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {shippingAccountId && (
+                <p className="text-xs text-muted-foreground">
+                  Se debitarán {isUSD ? `${format(shippingPerUnit * totalUnits)} (≈)` : format(ship)} de esta cuenta por el envío.
+                </p>
+              )}
+            </div>
+          )}
 
           {/* Resumen total */}
           {totalUnits > 0 && totalCost > 0 && (

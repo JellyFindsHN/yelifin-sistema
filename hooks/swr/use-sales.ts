@@ -56,6 +56,7 @@ export type Sale = {
   sale_number:    string;
   customer_id:    number | null;
   customer_name:  string | null;
+  customer_phone: string | null;
   subtotal:       number;
   discount:       number;
   shipping_cost:  number;

@@ -18,8 +18,6 @@ import { useAccounts } from "@/hooks/swr/use-accounts";
 import { useCustomers } from "@/hooks/swr/use-costumers";
 import { useSupplies } from "@/hooks/swr/use-supplies";
 import { useEvents } from "@/hooks/swr/use-events";
-import { useCreditCards } from "@/hooks/swr/use-credit-cards";
-import { useCurrency } from "@/hooks/swr/use-currency";
 
 import { PosProductGrid } from "@/components/sales/pos/product-grid";
 import { CartPanel, DiscountType } from "@/components/sales/pos/cart-panel";
@@ -57,17 +55,13 @@ function NewSaleContent() {
   const { customers } = useCustomers();
   const { supplies } = useSupplies();
   const { mutate: mutateEvents } = useEvents();
-  const { creditCards } = useCreditCards();
-  const { currency: nativeCurrency } = useCurrency();
+
 
   // ── Estado principal ───────────────────────────────────────────────
   const [search, setSearch] = useState("");
   const [cart, setCart] = useState<CartItem[]>([]);
   const [customerId, setCustomerId] = useState<number | null>(null);
   const [accountId, setAccountId] = useState<number | null>(null);
-  const [creditCardId, setCreditCardId] = useState<number | null>(null);
-  const [saleCardCurrency, setSaleCardCurrency] = useState<string>(nativeCurrency);
-  const [exchangeRate, setExchangeRate] = useState<number>(0);
   const [notes, setNotes] = useState("");
   const [discountType, setDiscountType] = useState<DiscountType>("none");
   const [globalDiscount, setGlobalDiscount] = useState(0);
@@ -227,18 +221,10 @@ function NewSaleContent() {
   // ── Checkout ───────────────────────────────────────────────────────
   const handleCheckout = async () => {
     if (cart.length === 0) return toast.error("El carrito está vacío");
-
-    const isCreditCard = !!creditCardId;
-
-    if (!isCreditCard && !accountId) return toast.error("Selecciona una cuenta de destino");
-    if (isCreditCard && !creditCardId) return toast.error("Selecciona una tarjeta de crédito");
-    if (isCreditCard && saleCardCurrency === "USD" && (!exchangeRate || exchangeRate <= 0))
-      return toast.error("Ingresa la tasa de cambio para ventas en USD");
+    if (!accountId) return toast.error("Selecciona una cuenta de destino");
 
     const account = accounts.find((a) => Number(a.id) === Number(accountId));
-    const paymentMethod = isCreditCard
-      ? "CREDIT_CARD"
-      : (ACCOUNT_TYPE_TO_PAYMENT[account?.type ?? "OTHER"] ?? "OTHER");
+    const paymentMethod = ACCOUNT_TYPE_TO_PAYMENT[account?.type ?? "OTHER"] ?? "OTHER";
 
     try {
       const result = await createSale({
@@ -254,10 +240,7 @@ function NewSaleContent() {
         shipping_cost: shippingCost > 0 ? shippingCost : undefined,
         tax_rate: taxRate > 0 ? taxRate : undefined,
         payment_method: paymentMethod as any,
-        account_id: isCreditCard ? undefined : accountId,
-        ...(isCreditCard && { credit_card_id: creditCardId }),
-        ...(isCreditCard && { sale_currency: saleCardCurrency }),
-        ...(isCreditCard && saleCardCurrency === "USD" && { exchange_rate: exchangeRate }),
+        account_id: accountId,
         notes: notes || undefined,
         status: isPending ? "PENDING" : "COMPLETED",
         supplies_used: suppliesUsed.length > 0
@@ -296,15 +279,12 @@ function NewSaleContent() {
   };
 
   const baseOptionsProps = {
-    customers, accounts, creditCards, hasSupplies,
-    customerId, accountId, creditCardId, saleCardCurrency, exchangeRate,
+    customers, accounts, hasSupplies,
+    customerId, accountId,
     notes, grandTotal, shippingCost,
     isCreating, isPending,
     onCustomerChange: setCustomerId,
     onAccountChange: setAccountId,
-    onCreditCardChange: setCreditCardId,
-    onSaleCardCurrencyChange: setSaleCardCurrency,
-    onExchangeRateChange: setExchangeRate,
     onNotesChange: setNotes,
     onShippingCostChange: setShippingCost,
     onIsPendingChange: setIsPending,

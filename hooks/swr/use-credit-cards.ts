@@ -37,6 +37,12 @@ export type CreditCardTransaction = {
   created_at: string;
 };
 
+export type AllCardTransaction = CreditCardTransaction & {
+  credit_card_id: number;
+  card_name: string;
+  last_four: string | null;
+};
+
 export type CreateCreditCardInput = {
   name: string;
   last_four?: string;
@@ -135,6 +141,36 @@ export function useCreditCardTransactions(
   return {
     transactions: (data?.data ?? []) as CreditCardTransaction[],
     totals: data?.totals ?? { charges_local: 0, charges_usd: 0, payments_local: 0, payments_usd: 0, count: 0 },
+    isLoading,
+    error: error?.message ?? null,
+    mutate,
+  };
+}
+
+export function useAllCreditCardTransactions(params?: {
+  month?: number;
+  year?: number;
+  date?: string;
+  card_id?: number;
+}) {
+  const { firebaseUser } = useAuth();
+  const authFetch = useAuthFetch();
+
+  const query = new URLSearchParams();
+  if (params?.month)   query.set('month',   String(params.month));
+  if (params?.year)    query.set('year',    String(params.year));
+  if (params?.date)    query.set('date',    params.date);
+  if (params?.card_id) query.set('card_id', String(params.card_id));
+  const qs = query.toString();
+
+  const { data, isLoading, error, mutate } = useSWR(
+    firebaseUser ? `/api/credit-card-transactions${qs ? `?${qs}` : ''}` : null,
+    (url: string) => authFetch(url),
+    { revalidateOnFocus: false, dedupingInterval: 60_000 }
+  );
+
+  return {
+    transactions: (data?.data ?? []) as AllCardTransaction[],
     isLoading,
     error: error?.message ?? null,
     mutate,

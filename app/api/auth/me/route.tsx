@@ -2,6 +2,7 @@
 import { NextRequest } from "next/server";
 import { adminAuth } from "@/lib/firebase-admin";
 import { neon } from "@neondatabase/serverless";
+import { verifyAuth, createErrorResponse, isAuthSuccess } from "@/lib/auth";
 
 const sql = neon(process.env.DATABASE_URL!);
 
@@ -154,5 +155,63 @@ export async function GET(request: NextRequest) {
       { error: "Error al obtener información del usuario" },
       { status: 500 }
     );
+  }
+}
+
+// ── PATCH /api/auth/me — actualizar perfil ─────────────────────────────
+export async function PATCH(request: NextRequest) {
+  const auth = await verifyAuth(request);
+  if (!isAuthSuccess(auth)) return createErrorResponse(auth.error, auth.status);
+
+  try {
+    const { userId } = auth.data;
+    const body = await request.json() as Record<string, unknown>;
+
+    const has = (k: string) => k in body;
+
+    // ── Tabla users: display_name ───────────────────────────────────
+    if (has("display_name")) {
+      const val = typeof body.display_name === "string" ? body.display_name.trim() || null : null;
+      await sql`
+        UPDATE users SET display_name = ${val}, updated_at = NOW()
+        WHERE id = ${userId}
+      `;
+    }
+
+    // ── Tabla user_profile: campos del negocio ──────────────────────
+    const patchProfile = has("business_name") || has("business_logo_url") ||
+                         has("timezone") || has("currency") || has("locale");
+
+    if (patchProfile) {
+      // Obtener valores actuales para no pisar lo que no llegó
+      const [current] = await sql`
+        SELECT business_name, business_logo_url, timezone, currency, locale
+        FROM user_profile WHERE user_id = ${userId}
+      `;
+
+      const business_name     = has("business_name")     ? (body.business_name     as string | null) : current?.business_name;
+      const business_logo_url = has("business_logo_url") ? (body.business_logo_url as string | null) : current?.business_logo_url;
+      const timezone          = has("timezone")          ? (body.timezone          as string)        : current?.timezone;
+      const currency          = has("currency")          ? (body.currency          as string)        : current?.currency;
+      const locale            = has("locale")            ? (body.locale            as string)        : current?.locale;
+
+      await sql`
+        UPDATE user_profile
+        SET
+          business_name     = ${business_name     ?? null},
+          business_logo_url = ${business_logo_url ?? null},
+          timezone          = ${timezone          ?? "America/Tegucigalpa"},
+          currency          = ${currency          ?? "HNL"},
+          locale            = ${locale            ?? "es-HN"},
+          updated_at        = NOW()
+        WHERE user_id = ${userId}
+      `;
+    }
+
+    return Response.json({ message: "Perfil actualizado exitosamente" }, { status: 200 });
+
+  } catch (error: any) {
+    console.error("PATCH /api/auth/me:", error);
+    return createErrorResponse("Error al actualizar el perfil", 500);
   }
 }

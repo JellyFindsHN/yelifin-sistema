@@ -161,6 +161,9 @@ export default function InvoicePage({ params }: Props) {
               <p className="text-sm font-semibold text-gray-900">
                 {sale.customer_name ?? "Cliente general"}
               </p>
+              {sale.customer_phone && (
+                <p className="text-sm text-gray-500 mt-0.5">{sale.customer_phone}</p>
+              )}
             </div>
           </div>
 
@@ -241,10 +244,10 @@ export default function InvoicePage({ params }: Props) {
           </div>
 
           {/* Notes */}
-          {sale.notes && (
+          {sale.notes?.trim() && (
             <div className="px-10 py-5 border-b border-gray-100">
               <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1.5">
-                Notas
+                Detalle
               </p>
               <p className="text-sm text-gray-700">{sale.notes}</p>
             </div>

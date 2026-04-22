@@ -27,6 +27,7 @@ import {
   Layers,
   FileText,
   Printer,
+  NotebookPen
 } from "lucide-react";
 
 import { useSale, usePatchSale } from "@/hooks/swr/use-sales";
@@ -109,76 +110,74 @@ export default function SaleDetailPage({ params }: Props) {
   };
 
   return (
-    <div className="space-y-6 max-w-3xl mx-auto">
+    <div className="space-y-6 max-w-3xl mx-auto mb-5">
 
       {/* Header */}
-      <div className="flex items-center gap-3">
-        <Button variant="ghost" size="icon" onClick={() => router.back()}>
-          <ArrowLeft className="h-4 w-4" />
-        </Button>
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2 flex-wrap">
-            <h1 className="text-2xl font-bold tracking-tight font-mono">
-              {sale.sale_number}
-            </h1>
-
-            {isCompleted && (
-              <Badge
-                className="bg-green-100 text-green-700 border-green-200 gap-1"
-                variant="outline"
-              >
-                <CheckCircle className="h-3 w-3" />
-                Completada
-              </Badge>
-            )}
-
-            {isPending && (
-              <Badge
-                className="bg-amber-100 text-amber-700 border-amber-200 gap-1"
-                variant="outline"
-              >
-                <Clock className="h-3 w-3" />
-                Pendiente de pago
-              </Badge>
-            )}
-
-            {taxRate > 0 && (
-              <Badge
-                className="bg-amber-100 text-amber-700 border-amber-200"
-                variant="outline"
-              >
-                ISV {taxRate}% incluido
-              </Badge>
-            )}
+      <div className="space-y-2">
+        <div className="flex items-center gap-3">
+          <Button variant="ghost" size="icon" asChild className="shrink-0">
+            <Link href="/sales">
+              <ArrowLeft className="h-4 w-4" />
+            </Link>
+          </Button>
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2 flex-wrap">
+              <h1 className="text-2xl font-bold tracking-tight font-mono">
+                {sale.sale_number}
+              </h1>
+              {isCompleted && (
+                <Badge className="bg-green-100 text-green-700 border-green-200 gap-1" variant="outline">
+                  <CheckCircle className="h-3 w-3" />
+                  Completada
+                </Badge>
+              )}
+              {isPending && (
+                <Badge className="bg-amber-100 text-amber-700 border-amber-200 gap-1" variant="outline">
+                  <Clock className="h-3 w-3" />
+                  Pendiente de pago
+                </Badge>
+              )}
+              {taxRate > 0 && (
+                <Badge className="bg-amber-100 text-amber-700 border-amber-200" variant="outline">
+                  ISV {taxRate}% incluido
+                </Badge>
+              )}
+            </div>
+            <p className="text-muted-foreground text-sm">
+              {formatInTZ(sale.sold_at, tz, {
+                day: "numeric",
+                month: "short",
+                year: "numeric",
+              })}
+            </p>
           </div>
-          <p className="text-muted-foreground text-sm">
-            {formatInTZ(sale.sold_at, tz, {
-              day: "numeric",
-              month: "short",
-              year: "numeric",
-            })}
-          </p>
+
+          {/* Botones factura/ticket — solo visibles en sm+ */}
+          <div className="hidden sm:flex gap-2 shrink-0">
+            <Button variant="outline" size="sm" className="gap-1.5 text-xs" asChild>
+              <Link href={`/sales/${sale.id}/invoice`}>
+                <FileText className="h-3.5 w-3.5" />
+                Factura PDF
+              </Link>
+            </Button>
+            <Button variant="outline" size="sm" className="gap-1.5 text-xs" asChild>
+              <Link href={`/sales/${sale.id}/receipt`}>
+                <Printer className="h-3.5 w-3.5" />
+                Ticket
+              </Link>
+            </Button>
+          </div>
         </div>
 
-        {/* Invoice / Receipt actions */}
-        <div className="flex gap-2 shrink-0">
-          <Button
-            variant="outline"
-            size="sm"
-            className="gap-1.5 text-xs"
-            asChild
-          >
+        {/* Botones factura/ticket en móvil — segunda fila */}
+        <div className="flex sm:hidden gap-2 pl-11">
+          <Button variant="outline" size="sm" className="gap-1.5 text-xs flex-1" asChild>
             <Link href={`/sales/${sale.id}/invoice`}>
               <FileText className="h-3.5 w-3.5" />
               Factura PDF
             </Link>
           </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            className="gap-1.5 text-xs"
-            asChild
-          >
+          <Button variant="outline" size="sm" className="gap-1.5 text-xs flex-1" asChild>
             <Link href={`/sales/${sale.id}/receipt`}>
               <Printer className="h-3.5 w-3.5" />
               Ticket
@@ -482,9 +481,14 @@ export default function SaleDetailPage({ params }: Props) {
       {/* Notas */}
       {sale.notes && (
         <Card>
-          <CardContent className="p-4">
-            <p className="text-xs text-muted-foreground mb-1">Notas</p>
-            <p className="text-sm">{sale.notes}</p>
+          <CardHeader>
+          <CardTitle className="text-base flex items-center gap-2">
+            <NotebookPen className="h-4 w-4" />
+            Notas
+          </CardTitle>
+        </CardHeader>
+          <CardContent className="p-4 pt-0 pb-0">
+            <p className="text-md">{sale.notes}</p>
           </CardContent>
         </Card>
       )}

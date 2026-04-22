@@ -19,6 +19,7 @@ export type PurchaseItem = {
 export type CreatePurchaseInput = {
   account_id?: number;
   credit_card_id?: number;
+  shipping_account_id?: number;
   currency: 'USD' | 'HNL';
   exchange_rate: number;
   shipping: number;
@@ -32,6 +33,8 @@ export type Purchase = {
   id: number;
   account_id: number | null;
   account_name: string | null;
+  shipping_account_id: number | null;
+  shipping_account_name: string | null;
   currency: string;
   exchange_rate: number;
   subtotal: number;
@@ -99,13 +102,13 @@ export function useCreatePurchase() {
 export function useConfirmPurchaseArrival(id: number | null) {
   const authFetch = useAuthFetch();
   const [isConfirming, setIsConfirming] = useState(false);
-  const confirmArrival = async (shipping?: number) => {
+  const confirmArrival = async (shipping?: number, shipping_account_id?: number) => {
     if (!id) throw new Error('ID requerido');
     setIsConfirming(true);
     try {
       return await authFetch(`${KEY}/${id}`, {
         method: 'PATCH',
-        body: JSON.stringify({ shipping }),
+        body: JSON.stringify({ shipping, shipping_account_id }),
       });
     } finally {
       setIsConfirming(false);

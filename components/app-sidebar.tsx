@@ -75,6 +75,16 @@ const secondaryNav = [
   },
 ]
 
+const adminNav = [
+  {
+    title: "Administración", url: "/admin", icon: Shield,
+    submenu: [
+      { title: "Resumen",   url: "/admin" },
+      { title: "Usuarios",  url: "/admin/users" },
+    ],
+  },
+]
+
 const settingsNav = [
   {
     title: "Configuración", url: "/settings", icon: Settings,
@@ -244,6 +254,15 @@ export function AppSidebar() {
               {!isCollapsed && <SidebarGroupLabel>Análisis</SidebarGroupLabel>}
               <SidebarGroupContent>
                 <SidebarMenu>{renderNav(secondaryNav)}</SidebarMenu>
+              </SidebarGroupContent>
+            </SidebarGroup>
+          )}
+
+          {isAdmin && (
+            <SidebarGroup>
+              {!isCollapsed && <SidebarGroupLabel>Admin</SidebarGroupLabel>}
+              <SidebarGroupContent>
+                <SidebarMenu>{renderNav(adminNav)}</SidebarMenu>
               </SidebarGroupContent>
             </SidebarGroup>
           )}

@@ -8,35 +8,36 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Loader2, TrendingUp, TrendingDown } from "lucide-react";
+import { Loader2, TrendingUp, TrendingDown, Layers } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/use-auth";
-import { Product } from "@/types";
+import { Product, ProductVariant } from "@/types";
 
 type AdjustType = "in" | "out";
 
 type Props = {
   product:      Product | null;
+  variant?:     ProductVariant | null; // si se pasa, el ajuste es solo para esta variante
   open:         boolean;
   onOpenChange: (open: boolean) => void;
   onSuccess:    () => void;
 };
 
-export function AdjustInventoryDialog({ product, open, onOpenChange, onSuccess }: Props) {
+export function AdjustInventoryDialog({ product, variant, open, onOpenChange, onSuccess }: Props) {
   const { firebaseUser } = useAuth();
 
-  const [type,       setType]       = useState<AdjustType>("in");
-  const [quantity,   setQuantity]   = useState<string>("1");
-  const [notes,      setNotes]      = useState("");
-  const [isLoading,  setIsLoading]  = useState(false);
-  const [unitCost,   setUnitCost]   = useState< string>('0');
+  const [type,      setType]      = useState<AdjustType>("in");
+  const [quantity,  setQuantity]  = useState<string>("1");
+  const [notes,     setNotes]     = useState("");
+  const [isLoading, setIsLoading] = useState(false);
+  const [unitCost,  setUnitCost]  = useState<string>("0");
 
   const handleClose = () => {
     setType("in");
     setQuantity("1");
     setNotes("");
-    setUnitCost('0');
+    setUnitCost("0");
     onOpenChange(false);
   };
 
@@ -55,6 +56,7 @@ export function AdjustInventoryDialog({ product, open, onOpenChange, onSuccess }
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
         body: JSON.stringify({
           product_id: product!.id,
+          variant_id: variant?.id ?? undefined,
           type,
           quantity:   qty,
           notes:      notes.trim(),
@@ -81,6 +83,8 @@ export function AdjustInventoryDialog({ product, open, onOpenChange, onSuccess }
   };
 
   if (!product) return null;
+
+  const targetName = variant ? variant.variant_name : product.name;
 
   return (
     <Dialog open={open} onOpenChange={(v) => !v && handleClose()}>
@@ -115,6 +119,12 @@ export function AdjustInventoryDialog({ product, open, onOpenChange, onSuccess }
             <div>
               <DialogTitle className="text-lg font-bold">Ajuste de inventario</DialogTitle>
               <p className="text-sm text-muted-foreground truncate max-w-65">{product.name}</p>
+              {variant && (
+                <div className="flex items-center gap-1 mt-0.5">
+                  <Layers className="h-3 w-3 text-muted-foreground" />
+                  <p className="text-xs text-muted-foreground">{variant.variant_name}</p>
+                </div>
+              )}
             </div>
           </div>
         </DialogHeader>
@@ -175,6 +185,7 @@ export function AdjustInventoryDialog({ product, open, onOpenChange, onSuccess }
                 disabled={isLoading}
               />
             </div>
+
             {type === "in" && (
               <div className="space-y-2">
                 <Label className="text-sm font-medium">
@@ -185,7 +196,7 @@ export function AdjustInventoryDialog({ product, open, onOpenChange, onSuccess }
                   min="0"
                   step="0.01"
                   value={unitCost}
-                  onChange={(e) => setUnitCost((e.target.value === "" ? "" : e.target.value))}
+                  onChange={(e) => setUnitCost(e.target.value === "" ? "" : e.target.value)}
                   className="h-11 text-base"
                   disabled={isLoading}
                 />
@@ -208,7 +219,7 @@ export function AdjustInventoryDialog({ product, open, onOpenChange, onSuccess }
                 disabled={isLoading}
               />
               <p className="text-xs text-muted-foreground">
-                Este ajuste no genera ningún movimiento financiero, solo afecta el inventario. <br/>
+                Este ajuste no genera ningún movimiento financiero, solo afecta el inventario{variant ? ` de ${targetName}` : ""}. <br/>
                 {type === "in"
                   && "Al agregar el costo unitario recalculará el costo promedio y el valor del inventario."
                 }

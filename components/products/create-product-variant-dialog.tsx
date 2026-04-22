@@ -1,7 +1,7 @@
 // components/products/create-product-variant-dialog.tsx
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
@@ -23,12 +23,14 @@ import { useCurrency } from "@/hooks/swr/use-currency";
 import { storage } from "@/lib/firebase";
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { ProductImageUpload } from "./product-image-upload";
+import { ExistingForm, ExistingFormValue, defaultExistingForm } from "./inventory-section/existing-form";
+import { Boxes, ChevronDown, ChevronUp } from "lucide-react";
 
 // ── Schema ─────────────────────────────────────────────────────────────
 
 const schema = z.object({
   variant_name:   z.string().min(1, "El nombre de la variante es requerido"),
-  sku:            z.string().optional(),
+  sku:            z.string().min(1, "El SKU es requerido"),
   price_override: z.coerce.number().min(0, "El precio debe ser mayor o igual a 0").optional()
                     .or(z.literal("")),
 });
@@ -40,18 +42,20 @@ type FormData = z.infer<typeof schema>;
 type AttributePair = { key: string; value: string };
 
 type Props = {
-  open:         boolean;
-  onOpenChange: (open: boolean) => void;
-  productId:    number;
-  productName:  string;
-  basePrice:    number;
-  onSuccess:    () => void;
+  open:          boolean;
+  onOpenChange:  (open: boolean) => void;
+  productId:     number;
+  productName:   string;
+  basePrice:     number;
+  baseSku?:      string;
+  variantCount?: number;
+  onSuccess:     () => void;
 };
 
 // ── Componente ─────────────────────────────────────────────────────────
 
 export function CreateProductVariantDialog({
-  open, onOpenChange, productId, productName, basePrice, onSuccess,
+  open, onOpenChange, productId, productName, basePrice, baseSku, variantCount = 0, onSuccess,
 }: Props) {
   const { firebaseUser }              = useAuth();
   const { createVariant, isCreating } = useCreateVariant(productId);
@@ -62,6 +66,8 @@ export function CreateProductVariantDialog({
   const [attributes,       setAttributes]       = useState<AttributePair[]>([
     { key: "", value: "" },
   ]);
+  const [inventoryOpen,    setInventoryOpen]    = useState(false);
+  const [inventoryData,    setInventoryData]    = useState<ExistingFormValue>(defaultExistingForm());
 
   const {
     register, handleSubmit, reset, watch,
@@ -73,6 +79,14 @@ export function CreateProductVariantDialog({
 
   const priceOverrideValue = watch("price_override");
   const hasCustomPrice     = priceOverrideValue !== "" && priceOverrideValue !== undefined;
+
+  // Auto-rellenar SKU al abrir
+  useEffect(() => {
+    if (open && baseSku) {
+      const seq = String(variantCount + 1).padStart(3, "0");
+      reset((prev) => ({ ...prev, sku: `${baseSku}-${seq}` }));
+    }
+  }, [open, baseSku, variantCount, reset]);
 
   // ── Atributos dinámicos ────────────────────────────────────────────
 
@@ -129,7 +143,7 @@ export function CreateProductVariantDialog({
           ? Object.fromEntries(filledAttrs.map((a) => [a.key.trim(), a.value.trim()]))
           : null;
 
-      await createVariant({
+      const newVariant = await createVariant({
         variant_name:   data.variant_name.trim(),
         sku:            data.sku?.trim() || undefined,
         price_override: data.price_override !== "" && data.price_override !== undefined && Number(data.price_override) > 0
@@ -139,7 +153,37 @@ export function CreateProductVariantDialog({
         image_url,
       });
 
-      toast.success("Variante creada exitosamente");
+      // Registrar inventario inicial si se configuró
+      if (inventoryOpen && Number(inventoryData.quantity) >= 1) {
+        try {
+          const token = await firebaseUser?.getIdToken();
+          const res = await fetch("/api/inventory/existing", {
+            method:  "POST",
+            headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+            body: JSON.stringify({
+              product_id:   productId,
+              variant_id:   newVariant.id,
+              quantity:     Number(inventoryData.quantity),
+              unit_cost:    inventoryData.unit_cost || 0,
+              purchased_at: inventoryData.purchased_at
+                ? new Date(inventoryData.purchased_at + "T00:00:00-06:00").toISOString()
+                : undefined,
+              notes: inventoryData.notes?.trim() || "Inventario inicial de variante",
+            }),
+          });
+          if (!res.ok) {
+            const err = await res.json();
+            toast.warning(`Variante creada, pero el inventario no se pudo registrar: ${err.error ?? "Error desconocido"}`);
+          } else {
+            toast.success("Variante e inventario inicial registrados");
+          }
+        } catch {
+          toast.warning("Variante creada, pero el inventario inicial no se pudo registrar.");
+        }
+      } else {
+        toast.success("Variante creada exitosamente");
+      }
+
       handleClose();
       onSuccess();
     } catch (error: any) {
@@ -153,6 +197,8 @@ export function CreateProductVariantDialog({
     setImageFile(null);
     setAttributes([{ key: "", value: "" }]);
     setIsUploadingImage(false);
+    setInventoryOpen(false);
+    setInventoryData(defaultExistingForm());
     onOpenChange(false);
   };
 
@@ -225,7 +271,7 @@ export function CreateProductVariantDialog({
 
             {/* SKU */}
             <div className="space-y-2">
-              <FieldLabel icon={<Hash className="h-3.5 w-3.5" />} label="SKU" optional />
+              <FieldLabel icon={<Hash className="h-3.5 w-3.5" />} label="SKU" required />
               <Input
                 {...register("sku")}
                 placeholder="Ej: CAM-NEG-M"
@@ -327,6 +373,43 @@ export function CreateProductVariantDialog({
               <p className="text-xs text-muted-foreground">
                 Ej: Color → Rojo, Talla → M, Material → Algodón
               </p>
+            </div>
+
+            {/* Inventario inicial */}
+            <div className="rounded-xl border overflow-hidden">
+              <button
+                type="button"
+                onClick={() => setInventoryOpen((v) => !v)}
+                disabled={isLoading}
+                className="w-full flex items-center justify-between px-4 py-3 hover:bg-muted/50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <div className="flex items-center gap-2.5 text-sm font-medium">
+                  <div className={cn(
+                    "h-7 w-7 rounded-lg flex items-center justify-center transition-colors",
+                    inventoryOpen ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground",
+                  )}>
+                    <Boxes className="h-4 w-4" />
+                  </div>
+                  <span>Agregar inventario inicial</span>
+                  {!inventoryOpen && (
+                    <span className="text-xs text-muted-foreground font-normal">opcional</span>
+                  )}
+                </div>
+                {inventoryOpen
+                  ? <ChevronUp   className="h-4 w-4 text-muted-foreground shrink-0" />
+                  : <ChevronDown className="h-4 w-4 text-muted-foreground shrink-0" />
+                }
+              </button>
+
+              {inventoryOpen && (
+                <div className="border-t bg-muted/10 px-4 pb-4 pt-4">
+                  <ExistingForm
+                    value={inventoryData}
+                    onChange={setInventoryData}
+                    disabled={isLoading}
+                  />
+                </div>
+              )}
             </div>
 
           </form>

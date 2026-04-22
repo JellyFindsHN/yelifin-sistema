@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
-  CreditCard, Plus, ChevronRight, Pencil, Trash2,
+  CreditCard, Plus, ChevronRight, Trash2,
   CalendarDays, DollarSign,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -58,7 +58,7 @@ export default function CreditCardsPage() {
       {/* Resumen de deuda total */}
       {(totalDebtLocal > 0 || totalDebtUsd > 0) && !isLoading && (
         <Card className="border-destructive/30 bg-destructive/5">
-          <CardContent className="p-4">
+          <CardContent className="p-4 pt-0 pb-0">
             <p className="text-xs font-medium text-muted-foreground mb-2">Deuda total en tarjetas</p>
             <div className="flex flex-wrap gap-4">
               {totalDebtLocal > 0 && (

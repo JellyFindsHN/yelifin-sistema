@@ -3,6 +3,7 @@
 
 import { useMemo } from "react";
 import { useRouter } from "next/navigation";
+import Image from "next/image";
 
 import { useMe } from "@/hooks/swr/use-me";
 import { Button } from "@/components/ui/button";
@@ -14,6 +15,7 @@ import {
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
+import { Building2, ImageIcon } from "lucide-react";
 
 export default function ProfilePage() {
   const router = useRouter();
@@ -238,43 +240,46 @@ export default function ProfilePage() {
           {/* Datos del negocio */}
           <Card>
             <CardHeader className="pb-3">
-              <CardTitle className="text-base md:text-lg">
+              <CardTitle className="text-base md:text-lg flex items-center gap-2">
+                <Building2 className="h-4 w-4 text-muted-foreground" />
                 Datos de tu negocio
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4 text-sm">
-              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                <div className="space-y-1">
-                  <span className="text-xs text-muted-foreground">
-                    Nombre del negocio
-                  </span>
-                  <p className="font-medium">
+              {/* Logo + nombre */}
+              <div className="flex items-center gap-4">
+                <div className="h-14 w-14 rounded-xl border bg-muted/40 flex items-center justify-center shrink-0 overflow-hidden">
+                  {profile.business_logo_url ? (
+                    <Image
+                      src={profile.business_logo_url}
+                      alt="Logo"
+                      width={56}
+                      height={56}
+                      className="object-contain w-full h-full"
+                      unoptimized
+                    />
+                  ) : (
+                    <ImageIcon className="h-6 w-6 text-muted-foreground/40" />
+                  )}
+                </div>
+                <div>
+                  <p className="font-semibold">
                     {profile.business_name || "Sin definir"}
                   </p>
-                </div>
-                <div className="space-y-1">
-                  <span className="text-xs text-muted-foreground">
-                    Moneda
-                  </span>
-                  <p className="font-medium">
-                    {profile.currency}
+                  <p className="text-xs text-muted-foreground">
+                    {profile.business_logo_url ? "Logo configurado" : "Sin logo"}
                   </p>
                 </div>
-                <div className="space-y-1">
-                  <span className="text-xs text-muted-foreground">
-                    Zona horaria
-                  </span>
-                  <p className="font-medium text-xs md:text-sm">
-                    {profile.timezone}
-                  </p>
+              </div>
+
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <div className="space-y-0.5">
+                  <span className="text-xs text-muted-foreground">Moneda</span>
+                  <p className="font-medium">{profile.currency}</p>
                 </div>
-                <div className="space-y-1">
-                  <span className="text-xs text-muted-foreground">
-                    Idioma
-                  </span>
-                  <p className="font-medium">
-                    {profile.locale}
-                  </p>
+                <div className="space-y-0.5">
+                  <span className="text-xs text-muted-foreground">Zona horaria</span>
+                  <p className="font-medium text-xs md:text-sm">{profile.timezone}</p>
                 </div>
               </div>
 
@@ -283,7 +288,6 @@ export default function ProfilePage() {
               <div className="flex flex-wrap gap-2">
                 <Button
                   size="sm"
-                  variant="outline"
                   onClick={() => router.push("/settings/organization")}
                 >
                   Editar datos del negocio

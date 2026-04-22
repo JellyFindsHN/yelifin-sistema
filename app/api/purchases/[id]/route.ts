@@ -20,11 +20,11 @@ export async function PATCH(request: NextRequest, { params }: Params) {
     if (isNaN(purchaseId)) return createErrorResponse("ID inválido", 400);
 
     const body = await request.json();
-    const { shipping: newShipping } = body;
+    const { shipping: newShipping, shipping_account_id: bodyShippingAccId } = body;
 
     // ── Validar que la compra existe y está PENDING ─────────────────
     const [purchase] = await sql`
-      SELECT id, account_id, status, shipping, subtotal, total, purchased_at, notes
+      SELECT id, account_id, shipping_account_id, status, shipping, subtotal, total, purchased_at, notes
       FROM purchase_batches
       WHERE id = ${purchaseId} AND user_id = ${userId}
     `;
@@ -49,6 +49,7 @@ export async function PATCH(request: NextRequest, { params }: Params) {
       ? Math.max(0, Number(newShipping))
       : oldShipping;
     const shippingDelta = shippingFinal - oldShipping;
+    const occurredAt    = purchase.purchased_at ?? new Date().toISOString();
 
     const totalUnits = items.reduce((acc: number, i: any) => acc + Number(i.quantity), 0);
 
@@ -65,6 +66,13 @@ export async function PATCH(request: NextRequest, { params }: Params) {
     });
 
     const newTotal = Number(purchase.total) + shippingDelta;
+
+    // Cuenta que absorbe el delta de envío: body override > stored > main account
+    const shippingAccId = bodyShippingAccId
+      ? Number(bodyShippingAccId)
+      : purchase.shipping_account_id
+        ? Number(purchase.shipping_account_id)
+        : null;
 
     await sql`BEGIN`;
     try {
@@ -88,25 +96,85 @@ export async function PATCH(request: NextRequest, { params }: Params) {
           WHERE id = ${purchaseId} AND user_id = ${userId}
         `;
 
-        // Ajustar la transacción financiera existente
-        await sql`
-          UPDATE transactions
-          SET amount = ${newTotal}
-          WHERE reference_type = 'PURCHASE'
+        if (shippingAccId) {
+          // El envío tiene cuenta dedicada — buscar tx existente o crearla
+          const [existingShippingTx] = await sql`
+            SELECT id FROM transactions
+            WHERE reference_type = 'PURCHASE_SHIPPING'
+              AND reference_id   = ${purchaseId}
+              AND user_id        = ${userId}
+          `;
+          if (existingShippingTx) {
+            await sql`
+              UPDATE transactions
+              SET amount = amount + ${shippingDelta}
+              WHERE id = ${existingShippingTx.id}
+            `;
+            await sql`
+              UPDATE accounts
+              SET balance = balance - ${shippingDelta}
+              WHERE id = ${shippingAccId} AND user_id = ${userId}
+            `;
+          } else {
+            // No existía tx de envío — crearla con el monto final
+            await sql`
+              INSERT INTO transactions (
+                user_id, account_id, type, amount,
+                description, reference_type, reference_id, occurred_at
+              ) VALUES (
+                ${userId}, ${shippingAccId}, 'EXPENSE', ${shippingFinal},
+                'Pago de envío', 'PURCHASE_SHIPPING', ${purchaseId}, ${occurredAt}
+              )
+            `;
+            await sql`
+              UPDATE accounts
+              SET balance = balance - ${shippingFinal}
+              WHERE id = ${shippingAccId} AND user_id = ${userId}
+            `;
+          }
+        } else if (purchase.account_id) {
+          // Envío incluido en la transacción principal
+          await sql`
+            UPDATE transactions
+            SET amount = ${newTotal}
+            WHERE reference_type = 'PURCHASE'
+              AND reference_id   = ${purchaseId}
+              AND user_id        = ${userId}
+          `;
+          await sql`
+            UPDATE accounts
+            SET balance = balance - ${shippingDelta}
+            WHERE id = ${purchase.account_id} AND user_id = ${userId}
+          `;
+        }
+        // Para compras CC sin shipping_account: no ajustamos la CC (edge case)
+      } else if (shippingAccId && shippingFinal > 0) {
+        // El envío no cambió pero el usuario seleccionó cuenta de envío — asegurar que la tx exista
+        const [existingShippingTx] = await sql`
+          SELECT id FROM transactions
+          WHERE reference_type = 'PURCHASE_SHIPPING'
             AND reference_id   = ${purchaseId}
             AND user_id        = ${userId}
         `;
-
-        // Ajustar el balance de la cuenta (debitar más o devolver)
-        await sql`
-          UPDATE accounts
-          SET balance = balance - ${shippingDelta}
-          WHERE id = ${purchase.account_id} AND user_id = ${userId}
-        `;
+        if (!existingShippingTx) {
+          await sql`
+            INSERT INTO transactions (
+              user_id, account_id, type, amount,
+              description, reference_type, reference_id, occurred_at
+            ) VALUES (
+              ${userId}, ${shippingAccId}, 'EXPENSE', ${shippingFinal},
+              'Pago de envío', 'PURCHASE_SHIPPING', ${purchaseId}, ${occurredAt}
+            )
+          `;
+          await sql`
+            UPDATE accounts
+            SET balance = balance - ${shippingFinal}
+            WHERE id = ${shippingAccId} AND user_id = ${userId}
+          `;
+        }
       }
 
       // 2. Insertar inventory_batches y movements
-      const occurredAt = purchase.purchased_at ?? new Date().toISOString();
       for (const item of updatedItems) {
         await sql`
           INSERT INTO inventory_batches (

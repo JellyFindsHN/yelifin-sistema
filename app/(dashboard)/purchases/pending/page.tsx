@@ -22,7 +22,7 @@ export default function PendingPurchasesPage() {
   const router = useRouter();
   const { purchases, isLoading, mutate: mutatePurchases } = usePurchases();
   const { mutate: mutateInventory } = useInventory();
-  const { mutate: mutateAccounts }  = useAccounts();
+  const { accounts, mutate: mutateAccounts } = useAccounts();
   const { format } = useCurrency();
 
   const [selected, setSelected] = useState<Purchase | null>(null);
@@ -96,6 +96,7 @@ export default function PendingPurchasesPage() {
       {/* Dialog de confirmación */}
       <ConfirmPurchaseArrivalDialog
         purchase={selected}
+        accounts={accounts}
         open={!!selected}
         onOpenChange={(open) => !open && setSelected(null)}
         onSuccess={handleSuccess}

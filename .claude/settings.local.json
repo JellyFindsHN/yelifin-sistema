@@ -7,7 +7,11 @@
       "Bash(git checkout *)",
       "Bash(git show *)",
       "Bash(git add *)",
-      "Bash(git commit -m ' *)"
+      "Bash(git commit -m ' *)",
+      "Bash(grep -E \"\\\\.\\(ts|tsx|js\\)$\")",
+      "Bash(npm install *)",
+      "Bash(npx tsc *)",
+      "Bash(xargs grep *)"
     ]
   }
 }

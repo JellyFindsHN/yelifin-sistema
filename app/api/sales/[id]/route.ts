@@ -27,8 +27,9 @@ export async function GET(request: NextRequest, { params }: Params) {
     const [sale] = await sql`
       SELECT
         s.*,
-        c.name AS customer_name,
-        a.name AS account_name
+        c.name  AS customer_name,
+        c.phone AS customer_phone,
+        a.name  AS account_name
       FROM sales s
       LEFT JOIN customers c ON c.id = s.customer_id
       LEFT JOIN accounts  a ON a.id = s.account_id

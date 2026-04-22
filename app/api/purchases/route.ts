@@ -14,7 +14,7 @@ export async function POST(request: NextRequest) {
     const body       = await request.json();
 
     const {
-      account_id, credit_card_id, currency, exchange_rate,
+      account_id, credit_card_id, shipping_account_id, currency, exchange_rate,
       shipping, notes, purchased_at, items,
       status = "COMPLETED",
     } = body;
@@ -53,9 +53,10 @@ export async function POST(request: NextRequest) {
     }
 
     // ── Validar productos y variantes ───────────────────────────────
+    const productInfoMap = new Map<number, { name: string; sku: string | null }>();
     for (const item of items) {
       const [product] = await sql`
-        SELECT id, name, is_service FROM products
+        SELECT id, name, sku, is_service FROM products
         WHERE id = ${item.product_id} AND user_id = ${userId} AND is_active = TRUE
       `;
       if (!product)
@@ -65,6 +66,7 @@ export async function POST(request: NextRequest) {
           `"${product.name}" es un servicio y no puede tener compras de inventario`,
           400
         );
+      productInfoMap.set(item.product_id, { name: product.name, sku: product.sku ?? null });
 
       if (item.variant_id) {
         const [variant] = await sql`
@@ -84,34 +86,51 @@ export async function POST(request: NextRequest) {
 
     // ── Calcular costos ─────────────────────────────────────────────
     const rate          = Number(exchange_rate) || 1;
-    const shippingTotal = Number(shipping)      || 0;
+    const shippingTotal = Number(shipping)      || 0; // siempre en moneda local
     const curr          = currency || "HNL";
+    const isUsd         = curr === "USD";
     const totalUnits    = items.reduce((acc: number, i: any) => acc + Number(i.quantity), 0);
 
+    // Shipping ingresado en moneda local — distribuir por unidad directamente
+    const shippingPerUnitLocal = totalUnits > 0 ? shippingTotal / totalUnits : 0;
+
     const processedItems = items.map((item: any) => {
-      const unitCostUsd     = Number(item.unit_cost_usd);
-      const unitCostHnl     = curr === "USD" ? unitCostUsd * rate : unitCostUsd;
-      const shippingPerUnit = totalUnits > 0 ? shippingTotal / totalUnits : 0;
-      const finalUnitCost   = unitCostHnl + shippingPerUnit;
-      const totalCost       = finalUnitCost * Number(item.quantity);
+      const qty                = Number(item.quantity);
+      const unitCostInCurrency = Number(item.unit_cost_usd); // en moneda de compra (USD o HNL)
+      const unitCostLocal      = isUsd ? unitCostInCurrency * rate : unitCostInCurrency;
+      const finalUnitCostLocal = unitCostLocal + shippingPerUnitLocal;
 
       return {
-        product_id:    Number(item.product_id),
-        variant_id:    item.variant_id ? Number(item.variant_id) : null,
-        quantity:      Number(item.quantity),
-        unit_cost_usd: unitCostUsd,
-        unit_cost:     finalUnitCost,
-        total_cost:    totalCost,
+        product_id:        Number(item.product_id),
+        variant_id:        item.variant_id ? Number(item.variant_id) : null,
+        quantity:          qty,
+        unit_cost_usd:     unitCostInCurrency,       // en moneda de compra
+        unit_cost:         finalUnitCostLocal,        // en moneda local (para COGS)
+        total_cost:        finalUnitCostLocal * qty,  // en moneda local
+        total_in_currency: unitCostInCurrency * qty,  // en moneda de compra, sin envío
       };
     });
 
-    const subtotal   = processedItems.reduce((acc: number, i: any) => acc + i.total_cost, 0);
-    const total      = subtotal;
-    const occurredAt = purchased_at ?? new Date().toISOString();
+    // totalInCurrency: sólo productos en moneda de compra (para CC)
+    // totalLocal: productos + envío en moneda local (para cuentas)
+    const totalInCurrency = processedItems.reduce((acc: number, i: any) => acc + i.total_in_currency, 0);
+    const totalLocal      = processedItems.reduce((acc: number, i: any) => acc + i.total_cost, 0);
+    const productsLocal   = totalLocal - shippingTotal;
+    const subtotal        = totalLocal;
+    const total           = totalLocal;
+    const occurredAt      = purchased_at ?? new Date().toISOString();
 
-    const txDescription = processedItems.length === 1
-      ? `Compra — producto #${processedItems[0].product_id}`
-      : `Compra de ${processedItems.length} productos`;
+    // ¿Se paga el envío desde una cuenta separada?
+    const shippingAccId      = shipping_account_id ? Number(shipping_account_id) : null;
+    const hasShippingAccount = !!shippingAccId && shippingTotal > 0;
+
+    let txDescription: string;
+    if (processedItems.length === 1) {
+      const info = productInfoMap.get(processedItems[0].product_id);
+      txDescription = `Compra — ${info?.name ?? 'producto'}${info?.sku ? ` (${info.sku})` : ''}`;
+    } else {
+      txDescription = `Compra de ${processedItems.length} productos`;
+    }
 
     // ── Transacción atómica ─────────────────────────────────────────
     await sql`BEGIN`;
@@ -119,11 +138,12 @@ export async function POST(request: NextRequest) {
       // 1. Crear purchase_batch
       const [batch] = await sql`
         INSERT INTO purchase_batches (
-          user_id, account_id, currency, exchange_rate,
+          user_id, account_id, shipping_account_id, currency, exchange_rate,
           subtotal, shipping, tax, total,
           is_paid, purchased_at, notes, status
         ) VALUES (
-          ${userId}, ${isCreditCard ? null : account_id}, ${curr}, ${rate},
+          ${userId}, ${isCreditCard ? null : account_id}, ${shippingAccId},
+          ${curr}, ${rate},
           ${subtotal}, ${shippingTotal}, ${0}, ${total},
           ${false}, ${occurredAt}, ${notes ?? null}, ${status}
         )
@@ -171,9 +191,9 @@ export async function POST(request: NextRequest) {
 
       // 3. Movimiento financiero
       if (isCreditCard) {
-        // Cargo a tarjeta de crédito
-        const isUsd = curr === "USD";
-        const amountLocal = isUsd ? total * rate : total;
+        // CC se carga solo por los productos; el envío va a cuenta separada (si aplica)
+        const ccAmount      = totalInCurrency; // siempre productos en moneda de compra
+        const ccAmountLocal = hasShippingAccount ? productsLocal : totalLocal;
         await sql`
           INSERT INTO credit_card_transactions (
             user_id, credit_card_id, type, description,
@@ -181,15 +201,49 @@ export async function POST(request: NextRequest) {
             occurred_at
           ) VALUES (
             ${userId}, ${Number(credit_card_id)}, 'CHARGE', ${txDescription},
-            ${total}, ${curr}, ${isUsd ? rate : null}, ${amountLocal},
+            ${ccAmount}, ${curr}, ${isUsd ? rate : null}, ${ccAmountLocal},
             ${occurredAt}
           )
         `;
         if (isUsd) {
-          await sql`UPDATE credit_cards SET balance_usd = balance_usd + ${total}, updated_at = NOW() WHERE id = ${Number(credit_card_id)} AND user_id = ${userId}`;
+          await sql`UPDATE credit_cards SET balance_usd = balance_usd + ${ccAmount}, updated_at = NOW() WHERE id = ${Number(credit_card_id)} AND user_id = ${userId}`;
         } else {
-          await sql`UPDATE credit_cards SET balance = balance + ${total}, updated_at = NOW() WHERE id = ${Number(credit_card_id)} AND user_id = ${userId}`;
+          await sql`UPDATE credit_cards SET balance = balance + ${ccAmount}, updated_at = NOW() WHERE id = ${Number(credit_card_id)} AND user_id = ${userId}`;
         }
+        if (hasShippingAccount) {
+          await sql`
+            INSERT INTO transactions (
+              user_id, account_id, type, amount,
+              description, reference_type, reference_id, occurred_at
+            ) VALUES (
+              ${userId}, ${shippingAccId}, 'EXPENSE', ${shippingTotal},
+              ${'Pago de envío'}, 'PURCHASE_SHIPPING', ${purchaseBatchId}, ${occurredAt}
+            )
+          `;
+          await sql`UPDATE accounts SET balance = balance - ${shippingTotal} WHERE id = ${shippingAccId} AND user_id = ${userId}`;
+        }
+      } else if (hasShippingAccount) {
+        // Productos desde cuenta principal; envío desde cuenta separada
+        await sql`
+          INSERT INTO transactions (
+            user_id, account_id, type, amount,
+            description, reference_type, reference_id, occurred_at
+          ) VALUES (
+            ${userId}, ${account_id}, 'EXPENSE', ${productsLocal},
+            ${txDescription}, 'PURCHASE', ${purchaseBatchId}, ${occurredAt}
+          )
+        `;
+        await sql`UPDATE accounts SET balance = balance - ${productsLocal} WHERE id = ${account_id} AND user_id = ${userId}`;
+        await sql`
+          INSERT INTO transactions (
+            user_id, account_id, type, amount,
+            description, reference_type, reference_id, occurred_at
+          ) VALUES (
+            ${userId}, ${shippingAccId}, 'EXPENSE', ${shippingTotal},
+            ${'Pago de envío'}, 'PURCHASE_SHIPPING', ${purchaseBatchId}, ${occurredAt}
+          )
+        `;
+        await sql`UPDATE accounts SET balance = balance - ${shippingTotal} WHERE id = ${shippingAccId} AND user_id = ${userId}`;
       } else {
         await sql`
           INSERT INTO transactions (
@@ -242,6 +296,8 @@ export async function GET(request: NextRequest) {
         pb.id,
         pb.account_id,
         a.name   AS account_name,
+        pb.shipping_account_id,
+        sa.name  AS shipping_account_name,
         pb.currency,
         pb.exchange_rate,
         pb.subtotal,
@@ -254,10 +310,11 @@ export async function GET(request: NextRequest) {
         pb.created_at,
         COUNT(pbi.id)::int AS items_count
       FROM purchase_batches pb
-      LEFT JOIN accounts            a   ON a.id   = pb.account_id
+      LEFT JOIN accounts             a  ON a.id  = pb.account_id
+      LEFT JOIN accounts             sa ON sa.id = pb.shipping_account_id
       LEFT JOIN purchase_batch_items pbi ON pbi.purchase_batch_id = pb.id
       WHERE pb.user_id = ${userId}
-      GROUP BY pb.id, a.name
+      GROUP BY pb.id, a.name, sa.name
       ORDER BY pb.purchased_at DESC
     `;
 
