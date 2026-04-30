@@ -15,7 +15,7 @@ import { SearchBar } from "@/components/shared/search-bar";
 import { useProducts } from "@/hooks/swr/use-products";
 import { useCreateSale, CartItem } from "@/hooks/swr/use-sales";
 import { useAccounts } from "@/hooks/swr/use-accounts";
-import { useCustomers } from "@/hooks/swr/use-costumers";
+import { useCustomers, useLoyaltyPolicies, computeLoyaltyTier } from "@/hooks/swr/use-costumers";
 import { useSupplies } from "@/hooks/swr/use-supplies";
 import { useEvents } from "@/hooks/swr/use-events";
 
@@ -48,11 +48,12 @@ function NewSaleContent() {
   const eventId = eventIdParam ? Number(eventIdParam) : null;
   const backHref = eventId ? "/events" : "/sales";
 
-  const { inventory } = useInventory();
+  const { inventory, mutate: mutateInventory } = useInventory();
   const { products } = useProducts();
   const { createSale, isCreating } = useCreateSale();
   const { accounts } = useAccounts();
   const { customers } = useCustomers();
+  const { policies: loyaltyPolicies } = useLoyaltyPolicies();
   const { supplies } = useSupplies();
   const { mutate: mutateEvents } = useEvents();
 
@@ -104,8 +105,8 @@ function NewSaleContent() {
         p.name.toLowerCase().includes(search.toLowerCase()) ||
         (p.sku?.toLowerCase().includes(search.toLowerCase()) ?? false);
  
-      // Mostrar si: servicio, tiene variantes, o tiene stock
-      const hasStock = p.is_service || p.variants.length > 0 || (p.stock ?? 0) > 0;
+      // Mostrar si: servicio, o tiene stock disponible (incluye variantes)
+      const hasStock = p.is_service || (p.stock ?? 0) > 0;
  
       return matchesSearch && hasStock;
     }),
@@ -208,6 +209,15 @@ function NewSaleContent() {
   const removeSupply = (id: number) =>
     setSuppliesUsed((prev) => prev.filter((s) => s.supply_id !== id));
 
+  // ── Fidelización ──────────────────────────────────────────────────
+  const selectedCustomer = customers.find((c) => c.id === customerId) ?? null;
+  const loyaltyTier = useMemo(
+    () => selectedCustomer && loyaltyPolicies.length > 0
+      ? computeLoyaltyTier(selectedCustomer, loyaltyPolicies)
+      : null,
+    [selectedCustomer, loyaltyPolicies]
+  );
+
   // ── Cálculos TAX-INCLUSIVE ─────────────────────────────────────────
   const subtotal = cart.reduce((acc, i) => acc + i.unit_price * i.quantity, 0);
   const itemDiscounts = cart.reduce((acc, i) => acc + i.discount, 0);
@@ -256,6 +266,7 @@ function NewSaleContent() {
           ? `Venta ${result.data.sale_number} guardada como pendiente`
           : `Venta ${result.data.sale_number} registrada`
       );
+      mutateInventory();
       setCart([]);
       router.push(backHref);
     } catch (err: any) {
@@ -283,6 +294,7 @@ function NewSaleContent() {
     customerId, accountId,
     notes, grandTotal, shippingCost,
     isCreating, isPending,
+    loyaltyTier,
     onCustomerChange: setCustomerId,
     onAccountChange: setAccountId,
     onNotesChange: setNotes,
@@ -290,6 +302,11 @@ function NewSaleContent() {
     onIsPendingChange: setIsPending,
     onCheckout: handleCheckout,
     onOpenSupplies: () => setSuppliesOpen(true),
+    onApplyLoyaltyDiscount: (pct: number) => {
+      setDiscountType("global");
+      setGlobalDiscount(pct);
+      toast.success(`Descuento de fidelización ${pct}% aplicado`);
+    },
   };
 
   const mobileOptionsProps = baseOptionsProps;
@@ -410,6 +427,10 @@ function NewSaleContent() {
         variantsStock={
           inventory.find((i) => i.product_id === variantPickerProduct?.id)
             ?.variants_stock ?? []
+        }
+        baseStock={
+          inventory.find((i) => i.product_id === variantPickerProduct?.id)
+            ?.base_stock ?? 0
         }
         onSelect={(product, variant) => {
           addItemToCart(product, variant);

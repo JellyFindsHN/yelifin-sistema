@@ -32,6 +32,7 @@ import {
   Tooltip, TooltipContent, TooltipProvider, TooltipTrigger,
 } from "@/components/ui/tooltip"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
+import { ThemeToggle } from "@/components/theme-toggle"
 
 // ── Nav config ──────────────────────────────────────────────────────────
 const mainNav = [
@@ -277,7 +278,8 @@ export function AppSidebar() {
         </SidebarContent>
 
         {/* ── Footer ── */}
-        <SidebarFooter className="border-t border-sidebar-border p-3">
+        <SidebarFooter className="border-t border-sidebar-border p-3 gap-1">
+          <ThemeToggle isCollapsed={isCollapsed} />
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <button className={`flex w-full items-center rounded-lg p-2 hover:bg-sidebar-accent transition-colors ${isCollapsed ? "justify-center" : "gap-3"}`}>

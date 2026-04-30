@@ -1,51 +1,81 @@
 // app/(dashboard)/customers/page.tsx
 "use client";
 
-import { useState } from "react";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
+import { useState, useMemo } from "react";
+import { Button }   from "@/components/ui/button";
+import { Badge }    from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
-import { Search, Users, TrendingUp, ShoppingCart, Pencil, Trash2 } from "lucide-react";
-import { useCustomers, Customer } from "@/hooks/swr/use-costumers";
-import { useCurrency } from "@/hooks/swr/use-currency";
-import { CreateCustomerDialog } from "@/components/customers/create-customer-dialog";
-import { EditCustomerDialog }   from "@/components/customers/edit-customer-dialog";
-import { DeleteCustomerDialog } from "@/components/customers/delete-customer-dialog";
-import { Fab } from "@/components/ui/fab";
-import { SearchBar } from "@/components/shared/search-bar";
+import {
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem,
+  DropdownMenuSeparator, DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Users, TrendingUp, ShoppingCart,
+  MoreHorizontal, Pencil, Trash2, Eye, Star,
+} from "lucide-react";
+import {
+  useCustomers, useLoyaltyPolicies, computeLoyaltyTier,
+  TIER_COLOR_CLASSES,
+  type Customer,
+} from "@/hooks/swr/use-costumers";
+import { useCurrency }             from "@/hooks/swr/use-currency";
+import { CreateCustomerDialog }    from "@/components/customers/create-customer-dialog";
+import { EditCustomerDialog }      from "@/components/customers/edit-customer-dialog";
+import { DeleteCustomerDialog }    from "@/components/customers/delete-customer-dialog";
+import { CustomerSummarySheet }    from "@/components/customers/customer-summary-sheet";
+import { LoyaltyPoliciesDialog }   from "@/components/customers/loyalty-policies-dialog";
+import { Fab }                     from "@/components/ui/fab";
+import { SearchBar }               from "@/components/shared/search-bar";
+import { cn }                      from "@/lib/utils";
 
 export default function CustomersPage() {
   const { customers, isLoading, mutate } = useCustomers();
-  const { format }                        = useCurrency();
+  const { policies }                     = useLoyaltyPolicies();
+  const { format }                       = useCurrency();
 
   const [search,          setSearch]          = useState("");
   const [createOpen,      setCreateOpen]      = useState(false);
+  const [loyaltyOpen,     setLoyaltyOpen]     = useState(false);
   const [editCustomer,    setEditCustomer]    = useState<Customer | null>(null);
   const [deleteCustomer,  setDeleteCustomer]  = useState<Customer | null>(null);
+  const [summaryCustomer, setSummaryCustomer] = useState<Customer | null>(null);
 
-  const filtered = customers.filter((c) =>
-    c.name.toLowerCase().includes(search.toLowerCase()) ||
-    (c.email?.toLowerCase().includes(search.toLowerCase()) ?? false) ||
-    (c.phone?.includes(search) ?? false)
+  const filtered = useMemo(
+    () => customers.filter((c) =>
+      c.name.toLowerCase().includes(search.toLowerCase()) ||
+      (c.email?.toLowerCase().includes(search.toLowerCase()) ?? false) ||
+      (c.phone?.includes(search) ?? false)
+    ),
+    [customers, search]
   );
 
-  const totalSpent  = customers.reduce((acc, c) => acc + Number(c.total_spent), 0);
+  const totalSpent  = customers.reduce((acc, c) => acc + Number(c.total_spent),  0);
   const totalOrders = customers.reduce((acc, c) => acc + Number(c.total_orders), 0);
 
   return (
     <div className="space-y-5 pb-24">
 
       {/* Header */}
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight">Clientes</h1>
-        <p className="text-muted-foreground text-sm">
-          {isLoading ? "Cargando..." : `${customers.length} cliente${customers.length !== 1 ? "s" : ""}`}
-        </p>
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight">Clientes</h1>
+          <p className="text-muted-foreground text-sm">
+            {isLoading ? "Cargando..." : `${customers.length} cliente${customers.length !== 1 ? "s" : ""}`}
+          </p>
+        </div>
+       {/* <Button
+          variant="outline"
+          size="sm"
+          className="gap-1.5 shrink-0"
+          onClick={() => setLoyaltyOpen(true)}
+        >
+          <Star className="h-3.5 w-3.5 text-amber-500" />
+          Fidelización
+        </Button>*/}
       </div>
 
       {/* Stats */}
@@ -71,9 +101,7 @@ export default function CustomersPage() {
       </div>
 
       {/* Búsqueda */}
-      <div className="relative">
-        <SearchBar value={search} onChange={setSearch} placeholder="Buscar por nombre, email o teléfono..."/>
-      </div>
+      <SearchBar value={search} onChange={setSearch} placeholder="Buscar por nombre, email o teléfono..." />
 
       {/* Tabla — desktop */}
       <Card className="hidden md:block">
@@ -86,7 +114,7 @@ export default function CustomersPage() {
                 <TableHead>Email</TableHead>
                 <TableHead>Órdenes</TableHead>
                 <TableHead className="text-right">Total gastado</TableHead>
-                <TableHead className="text-right">Acciones</TableHead>
+                <TableHead className="w-10" />
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -105,29 +133,43 @@ export default function CustomersPage() {
                   </TableCell>
                 </TableRow>
               ) : (
-                filtered.map((customer) => (
-                  <TableRow key={customer.id}>
-                    <TableCell className="font-medium">{customer.name}</TableCell>
-                    <TableCell className="text-muted-foreground">{customer.phone ?? "—"}</TableCell>
-                    <TableCell className="text-muted-foreground">{customer.email ?? "—"}</TableCell>
-                    <TableCell>
-                      <Badge variant="secondary">{customer.total_orders}</Badge>
-                    </TableCell>
-                    <TableCell className="text-right font-medium">
-                      {format(Number(customer.total_spent))}
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <div className="flex justify-end gap-1">
-                        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setEditCustomer(customer)}>
-                          <Pencil className="h-3.5 w-3.5" />
-                        </Button>
-                        <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-destructive" onClick={() => setDeleteCustomer(customer)}>
-                          <Trash2 className="h-3.5 w-3.5" />
-                        </Button>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))
+                filtered.map((customer) => {
+                  const tier       = computeLoyaltyTier(customer, policies);
+                  const tierColors = tier ? (TIER_COLOR_CLASSES[tier.color] ?? TIER_COLOR_CLASSES.amber) : null;
+                  return (
+                    <TableRow
+                      key={customer.id}
+                      className="cursor-pointer hover:bg-muted/30 transition-colors"
+                      onClick={() => setSummaryCustomer(customer)}
+                    >
+                      <TableCell>
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="font-medium">{customer.name}</span>
+                          {tier && tierColors && (
+                            <span className={cn("inline-flex items-center gap-0.5 text-[10px] font-medium px-1.5 py-0.5 rounded-full border", tierColors.bg, tierColors.text, tierColors.border)}>
+                              <Star className="h-2.5 w-2.5" />{tier.tier_name}
+                            </span>
+                          )}
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-muted-foreground">{customer.phone ?? "—"}</TableCell>
+                      <TableCell className="text-muted-foreground">{customer.email ?? "—"}</TableCell>
+                      <TableCell>
+                        <Badge variant="secondary">{customer.total_orders}</Badge>
+                      </TableCell>
+                      <TableCell className="text-right font-medium">
+                        {format(Number(customer.total_spent))}
+                      </TableCell>
+                      <TableCell onClick={(e) => e.stopPropagation()}>
+                        <ActionsDropdown
+                          onView={()   => setSummaryCustomer(customer)}
+                          onEdit={()   => setEditCustomer(customer)}
+                          onDelete={() => setDeleteCustomer(customer)}
+                        />
+                      </TableCell>
+                    </TableRow>
+                  );
+                })
               )}
             </TableBody>
           </Table>
@@ -137,9 +179,7 @@ export default function CustomersPage() {
       {/* Cards — móvil */}
       <div className="space-y-2 md:hidden">
         {isLoading ? (
-          Array.from({ length: 4 }).map((_, i) => (
-            <Skeleton key={i} className="h-16 w-full rounded-xl" />
-          ))
+          Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-16 w-full rounded-xl" />)
         ) : filtered.length === 0 ? (
           <Card>
             <CardContent className="flex flex-col items-center justify-center py-12">
@@ -148,67 +188,117 @@ export default function CustomersPage() {
             </CardContent>
           </Card>
         ) : (
-          filtered.map((customer) => (
-            <Card className="pb-1 pt-1" key={customer.id}>
-              <CardContent className="px-3.5 py-2.5">
-                <div className="flex items-center justify-between gap-2">
-                  {/* Info */}
-                  <div className="min-w-0 flex-1">
-                    <p className="font-medium text-sm truncate">{customer.name}</p>
-                    <p className="text-xs text-muted-foreground truncate">
-                      {customer.phone
-                        ? customer.phone
-                        : customer.email
-                        ? customer.email
-                        : "Sin contacto"}
-                    </p>
+          filtered.map((customer) => {
+            const tier       = computeLoyaltyTier(customer, policies);
+            const tierColors = tier ? (TIER_COLOR_CLASSES[tier.color] ?? TIER_COLOR_CLASSES.amber) : null;
+            return (
+              <Card
+                key={customer.id}
+                className="pb-1 pt-1 cursor-pointer hover:bg-muted/20 transition-colors"
+                onClick={() => setSummaryCustomer(customer)}
+              >
+                <CardContent className="px-3.5 py-2.5">
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <p className="font-medium text-sm">{customer.name}</p>
+                        {tier && tierColors && (
+                          <span className={cn("inline-flex items-center gap-0.5 text-[10px] font-medium px-1.5 py-0.5 rounded-full border", tierColors.bg, tierColors.text, tierColors.border)}>
+                            <Star className="h-2.5 w-2.5" />{tier.tier_name}
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-xs text-muted-foreground truncate">
+                        {customer.phone ?? customer.email ?? "Sin contacto"}
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-3 shrink-0 text-right">
+                      <div>
+                        <p className="text-xs text-muted-foreground">Órdenes</p>
+                        <p className="text-sm font-bold">{customer.total_orders}</p>
+                      </div>
+                      <div>
+                        <p className="text-xs text-muted-foreground">Gastado</p>
+                        <p className="text-sm font-bold text-primary">{format(Number(customer.total_spent))}</p>
+                      </div>
+                      <div onClick={(e) => e.stopPropagation()}>
+                        <ActionsDropdown
+                          onView={()   => setSummaryCustomer(customer)}
+                          onEdit={()   => setEditCustomer(customer)}
+                          onDelete={() => setDeleteCustomer(customer)}
+                        />
+                      </div>
+                    </div>
                   </div>
-
-                  {/* Stats inline */}
-                  <div className="flex items-center gap-3 shrink-0 text-right">
-                    <div>
-                      <p className="text-xs text-muted-foreground">Órdenes</p>
-                      <p className="text-sm font-bold">{customer.total_orders}</p>
-                    </div>
-                    <div>
-                      <p className="text-xs text-muted-foreground">Gastado</p>
-                      <p className="text-sm font-bold text-primary">{format(Number(customer.total_spent))}</p>
-                    </div>
-                    <div className="flex gap-0.5">
-                      <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setEditCustomer(customer)}>
-                        <Pencil className="h-3 w-3" />
-                      </Button>
-                      <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive hover:text-destructive" onClick={() => setDeleteCustomer(customer)}>
-                        <Trash2 className="h-3 w-3" />
-                      </Button>
-                    </div>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          ))
+                </CardContent>
+              </Card>
+            );
+          })
         )}
       </div>
 
       {/* Modales */}
-      <CreateCustomerDialog open={createOpen} onOpenChange={setCreateOpen} onSuccess={() => mutate()} />
+      <CustomerSummarySheet
+        customer={summaryCustomer}
+        open={!!summaryCustomer}
+        onOpenChange={(o) => !o && setSummaryCustomer(null)}
+        onEdit={(c)   => { setSummaryCustomer(null); setEditCustomer(c); }}
+        onDelete={(c) => { setSummaryCustomer(null); setDeleteCustomer(c); }}
+      />
+      <LoyaltyPoliciesDialog open={loyaltyOpen} onOpenChange={setLoyaltyOpen} />
+      <CreateCustomerDialog  open={createOpen}  onOpenChange={setCreateOpen}  onSuccess={() => mutate()} />
       <EditCustomerDialog
         customer={editCustomer}
         open={!!editCustomer}
-        onOpenChange={(open) => !open && setEditCustomer(null)}
+        onOpenChange={(o) => !o && setEditCustomer(null)}
         onSuccess={() => mutate()}
       />
       <DeleteCustomerDialog
         customer={deleteCustomer}
         open={!!deleteCustomer}
-        onOpenChange={(open) => !open && setDeleteCustomer(null)}
+        onOpenChange={(o) => !o && setDeleteCustomer(null)}
         onSuccess={() => mutate()}
       />
+
       <Fab
         actions={[
           { label: "Nuevo cliente", icon: Users, onClick: () => setCreateOpen(true) },
+          { label: "Fidelización",  icon: Star,  onClick: () => setLoyaltyOpen(true) },
         ]}
       />
     </div>
+  );
+}
+
+function ActionsDropdown({
+  onView, onEdit, onDelete,
+}: {
+  onView:   () => void;
+  onEdit:   () => void;
+  onDelete: () => void;
+}) {
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button variant="ghost" size="icon" className="h-8 w-8">
+          <MoreHorizontal className="h-4 w-4" />
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="w-44">
+        <DropdownMenuItem onClick={onView} className="gap-2 cursor-pointer">
+          <Eye className="h-4 w-4" /> Ver resumen
+        </DropdownMenuItem>
+        <DropdownMenuItem onClick={onEdit} className="gap-2 cursor-pointer">
+          <Pencil className="h-4 w-4" /> Editar
+        </DropdownMenuItem>
+        <DropdownMenuSeparator />
+        <DropdownMenuItem
+          onClick={onDelete}
+          className="gap-2 cursor-pointer text-destructive focus:text-destructive"
+        >
+          <Trash2 className="h-4 w-4" /> Eliminar
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }

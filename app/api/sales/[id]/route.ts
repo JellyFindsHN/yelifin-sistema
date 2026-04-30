@@ -145,8 +145,10 @@ export async function PATCH(request: NextRequest, { params }: Params) {
     // ── CANCEL ───────────────────────────────────────────────────────
     if (action === "cancel") {
       const items = await sql`
-        SELECT product_id, variant_id, quantity FROM sale_items
-        WHERE sale_id = ${saleId} AND user_id = ${userId}
+        SELECT si.product_id, si.variant_id, si.quantity, p.is_service
+        FROM sale_items si
+        JOIN products p ON p.id = si.product_id
+        WHERE si.sale_id = ${saleId} AND si.user_id = ${userId}
       `;
 
       await sql`BEGIN`;
@@ -233,7 +235,8 @@ export async function PATCH(request: NextRequest, { params }: Params) {
         tax_rate,
         notes,
         customer_id,
-        account_id,   // ← ahora se lee del body
+        account_id,
+        supplies_used,
       } = body;
 
       if (!newItems || !Array.isArray(newItems) || newItems.length === 0)
@@ -419,6 +422,7 @@ export async function PATCH(request: NextRequest, { params }: Params) {
           discount: data.discount,
           line_total: data.unit_price * data.quantity - data.discount,
           delta,
+          isService,
         });
       }
 
@@ -433,6 +437,33 @@ export async function PATCH(request: NextRequest, { params }: Params) {
       const taxAmount      = taxRateNum > 0 ? taxableBase * taxRateNum / (100 + taxRateNum) : 0;
       const grandTotal     = taxableBase + shippingAmount;
       const finalAccountId = account_id ?? sale.account_id;
+
+      // Validar y normalizar suministros nuevos (si se envían)
+      type NormalizedSupply = { supply_id: number; quantity: number; unit_cost: number; line_total: number };
+      const normalizedNewSupplies: NormalizedSupply[] = [];
+      if (Array.isArray(supplies_used) && supplies_used.length > 0) {
+        for (const s of supplies_used) {
+          const supply_id = Number(s.supply_id);
+          const quantity  = Number(s.quantity);
+          const unit_cost = Number(s.unit_cost);
+          if (!supply_id || quantity <= 0)
+            return createErrorResponse("Datos de suministro inválidos", 400);
+          const [supply] = await sql`
+            SELECT id FROM supplies WHERE id = ${supply_id} AND user_id = ${userId}
+          `;
+          if (!supply)
+            return createErrorResponse(`Suministro #${supply_id} no encontrado`, 404);
+          normalizedNewSupplies.push({ supply_id, quantity, unit_cost, line_total: quantity * unit_cost });
+        }
+      }
+
+      // Suministros actuales de la venta (para calcular deltas)
+      const currentSupplies = Array.isArray(supplies_used)
+        ? await sql`
+            SELECT supply_id, quantity FROM sale_supplies
+            WHERE sale_id = ${saleId} AND user_id = ${userId}
+          `
+        : [];
 
       await sql`BEGIN`;
       try {
@@ -470,16 +501,6 @@ export async function PATCH(request: NextRequest, { params }: Params) {
               remaining -= take;
             }
 
-            await sql`
-              INSERT INTO inventory_movements (
-                user_id, movement_type, product_id, variant_id,
-                quantity, reference_type, reference_id
-              ) VALUES (
-                ${userId}, 'OUT', ${item.product_id}, ${item.variant_id},
-                ${item.delta}, 'SALE_EDITED', ${saleId}
-              )
-            `;
-
           } else if (item.delta < 0) {
             // Se redujo cantidad → devolver al último batch de la variante
             const [lastBatch] = item.variant_id !== null
@@ -504,16 +525,6 @@ export async function PATCH(request: NextRequest, { params }: Params) {
                 WHERE id = ${lastBatch.id} AND user_id = ${userId}
               `;
             }
-
-            await sql`
-              INSERT INTO inventory_movements (
-                user_id, movement_type, product_id, variant_id,
-                quantity, reference_type, reference_id
-              ) VALUES (
-                ${userId}, 'IN', ${item.product_id}, ${item.variant_id},
-                ${Math.abs(item.delta)}, 'SALE_EDITED', ${saleId}
-              )
-            `;
           }
         }
 
@@ -549,15 +560,66 @@ export async function PATCH(request: NextRequest, { params }: Params) {
             `;
           }
 
-          await sql`
-            INSERT INTO inventory_movements (
-              user_id, movement_type, product_id, variant_id,
-              quantity, reference_type, reference_id
-            ) VALUES (
-              ${userId}, 'IN', ${productId}, ${variantId},
-              ${current.quantity}, 'SALE_EDITED', ${saleId}
-            )
-          `;
+          // DELETE the original SALE movement for this removed item
+          if (variantId !== null) {
+            await sql`
+              DELETE FROM inventory_movements
+              WHERE user_id        = ${userId}
+                AND reference_type = 'SALE'
+                AND reference_id   = ${saleId}
+                AND product_id     = ${productId}
+                AND variant_id     = ${variantId}
+            `;
+          } else {
+            await sql`
+              DELETE FROM inventory_movements
+              WHERE user_id        = ${userId}
+                AND reference_type = 'SALE'
+                AND reference_id   = ${saleId}
+                AND product_id     = ${productId}
+                AND variant_id     IS NULL
+            `;
+          }
+        }
+
+        // Sync SALE movements: UPDATE for existing items, INSERT for new items
+        for (const item of processedItems) {
+          if (item.isService) continue;
+          const wasInOriginal = currentMap.has(itemKey(item.product_id, item.variant_id));
+
+          if (wasInOriginal) {
+            if (item.variant_id !== null) {
+              await sql`
+                UPDATE inventory_movements
+                SET quantity = ${item.quantity}
+                WHERE user_id        = ${userId}
+                  AND reference_type = 'SALE'
+                  AND reference_id   = ${saleId}
+                  AND product_id     = ${item.product_id}
+                  AND variant_id     = ${item.variant_id}
+              `;
+            } else {
+              await sql`
+                UPDATE inventory_movements
+                SET quantity = ${item.quantity}
+                WHERE user_id        = ${userId}
+                  AND reference_type = 'SALE'
+                  AND reference_id   = ${saleId}
+                  AND product_id     = ${item.product_id}
+                  AND variant_id     IS NULL
+              `;
+            }
+          } else {
+            await sql`
+              INSERT INTO inventory_movements (
+                user_id, movement_type, product_id, variant_id,
+                quantity, reference_type, reference_id
+              ) VALUES (
+                ${userId}, 'OUT', ${item.product_id}, ${item.variant_id},
+                ${item.quantity}, 'SALE', ${saleId}
+              )
+            `;
+          }
         }
 
         // Reemplazar sale_items
@@ -591,6 +653,66 @@ export async function PATCH(request: NextRequest, { params }: Params) {
             updated_at    = CURRENT_TIMESTAMP
           WHERE id = ${saleId} AND user_id = ${userId}
         `;
+
+        // Ajustar suministros solo si se enviaron en el body
+        if (Array.isArray(supplies_used)) {
+          const currentSupplyMap = new Map<number, number>();
+          for (const s of currentSupplies) {
+            currentSupplyMap.set(Number(s.supply_id), Number(s.quantity));
+          }
+          const newSupplyMap = new Map<number, NormalizedSupply>();
+          for (const s of normalizedNewSupplies) {
+            newSupplyMap.set(s.supply_id, s);
+          }
+
+          // Añadidos o con cantidad modificada
+          for (const [supplyId, newData] of newSupplyMap.entries()) {
+            const currentQty = currentSupplyMap.get(supplyId) ?? 0;
+            const delta = newData.quantity - currentQty;
+            if (delta > 0) {
+              await sql`
+                UPDATE supplies SET stock = GREATEST(0, stock - ${delta})
+                WHERE id = ${supplyId} AND user_id = ${userId}
+              `;
+              await sql`
+                INSERT INTO supply_movements (user_id, movement_type, supply_id, quantity, reference_type, reference_id)
+                VALUES (${userId}, 'OUT', ${supplyId}, ${delta}, 'SALE_EDITED', ${saleId})
+              `;
+            } else if (delta < 0) {
+              await sql`
+                UPDATE supplies SET stock = stock + ${Math.abs(delta)}
+                WHERE id = ${supplyId} AND user_id = ${userId}
+              `;
+              await sql`
+                INSERT INTO supply_movements (user_id, movement_type, supply_id, quantity, reference_type, reference_id)
+                VALUES (${userId}, 'IN', ${supplyId}, ${Math.abs(delta)}, 'SALE_EDITED', ${saleId})
+              `;
+            }
+          }
+
+          // Eliminados del carrito
+          for (const [supplyId, currentQty] of currentSupplyMap.entries()) {
+            if (!newSupplyMap.has(supplyId)) {
+              await sql`
+                UPDATE supplies SET stock = stock + ${currentQty}
+                WHERE id = ${supplyId} AND user_id = ${userId}
+              `;
+              await sql`
+                INSERT INTO supply_movements (user_id, movement_type, supply_id, quantity, reference_type, reference_id)
+                VALUES (${userId}, 'IN', ${supplyId}, ${currentQty}, 'SALE_EDITED', ${saleId})
+              `;
+            }
+          }
+
+          // Reemplazar sale_supplies
+          await sql`DELETE FROM sale_supplies WHERE sale_id = ${saleId} AND user_id = ${userId}`;
+          for (const s of normalizedNewSupplies) {
+            await sql`
+              INSERT INTO sale_supplies (user_id, sale_id, supply_id, quantity, unit_cost, line_total)
+              VALUES (${userId}, ${saleId}, ${s.supply_id}, ${s.quantity}, ${s.unit_cost}, ${s.line_total})
+            `;
+          }
+        }
 
         await sql`COMMIT`;
         return Response.json({

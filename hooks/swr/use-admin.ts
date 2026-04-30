@@ -26,6 +26,7 @@ function useAuthFetch() {
 
 export type AdminUserRow = {
   id:                    number;
+  firebase_uid:          string;
   email:                 string;
   display_name:          string | null;
   is_active:             boolean;
@@ -41,10 +42,11 @@ export type AdminUserRow = {
   plan_name:             string | null;
   plan_slug:             string | null;
   price_usd:             number | null;
+  last_sign_in_time:     string | null;
+  last_refresh_time:     string | null;
 };
 
 export type AdminUserDetail = AdminUserRow & {
-  firebase_uid:          string;
   photo_url:             string | null;
   timezone:              string;
   locale:                string;

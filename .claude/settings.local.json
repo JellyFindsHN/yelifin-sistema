@@ -12,7 +12,11 @@
       "Bash(npm install *)",
       "Bash(npx tsc *)",
       "Bash(xargs grep *)",
-      "Bash(pnpm install *)"
+      "Bash(pnpm install *)",
+      "Bash(grep -E \"\\\\.tsx$\")",
+      "Bash(node scripts/migrate-loyalty.mjs)",
+      "Bash(del \"C:\\\\Users\\\\DEVSLS\\\\Documents\\\\GitHub\\\\yelifin-sistema\\\\scripts\\\\migrate-loyalty.mjs\")",
+      "Bash(exit 0)"
     ]
   }
 }

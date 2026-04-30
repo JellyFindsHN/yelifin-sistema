@@ -2,6 +2,7 @@
 import { NextRequest } from "next/server";
 import { neon } from "@neondatabase/serverless";
 import { verifyAdmin, createErrorResponse, isAuthSuccess } from "@/lib/auth";
+import { adminAuth } from "@/lib/firebase-admin";
 
 const sql = neon(process.env.DATABASE_URL!);
 
@@ -20,6 +21,7 @@ export async function GET(request: NextRequest) {
     const users = await sql`
       SELECT
         u.id,
+        u.firebase_uid,
         u.email,
         u.display_name,
         u.is_active,
@@ -65,7 +67,20 @@ export async function GET(request: NextRequest) {
       AND (${status} = 'all' OR us.status = ${status})
     `;
 
-    return Response.json({ data: users, total, page, pages: Math.ceil(total / limit) });
+    const fbResults = await Promise.allSettled(
+      users.map((u: any) => adminAuth.getUser(u.firebase_uid))
+    );
+
+    const enriched = users.map((u: any, i: number) => {
+      const fb = fbResults[i].status === "fulfilled" ? (fbResults[i] as PromiseFulfilledResult<any>).value : null;
+      return {
+        ...u,
+        last_sign_in_time: fb?.metadata?.lastSignInTime ?? null,
+        last_refresh_time: fb?.metadata?.lastRefreshTime ?? null,
+      };
+    });
+
+    return Response.json({ data: enriched, total, page, pages: Math.ceil(total / limit) });
   } catch (error) {
     console.error("GET /api/admin/users:", error);
     return createErrorResponse("Error al obtener usuarios", 500);

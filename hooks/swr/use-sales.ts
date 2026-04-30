@@ -38,7 +38,7 @@ export type CancelSaleInput  = { action: 'cancel' };
 
 export type EditSaleInput = {
   action:          'edit';
-  items:           { product_id: number; quantity: number; unit_price: number; discount: number }[];
+  items:           { product_id: number; variant_id?: number | null; quantity: number; unit_price: number; discount: number }[];
   discount?:       number;
   shipping_cost?:  number;
   tax_rate?:       number;
@@ -183,16 +183,33 @@ export function useSale(id: number | null) {
 }
 
 export function useCreateSale() {
-  const authFetch              = useAuthFetch();
+  const authFetch                  = useAuthFetch();
+  const { mutate: globalMutate }   = useSWRConfig();
   const [isCreating, setIsCreating] = useState(false);
 
   const createSale = async (input: CreateSaleInput) => {
     setIsCreating(true);
     try {
-      return await authFetch(KEY, {
+      const result = await authFetch(KEY, {
         method: 'POST',
         body:   JSON.stringify(input),
       });
+
+      await globalMutate(
+        (key) =>
+          typeof key === 'string' && (
+            key.startsWith('/api/sales') ||
+            key.startsWith('/api/accounts') ||
+            key.startsWith('/api/finances') ||
+            key.startsWith('/api/dashboard') ||
+            key.startsWith('/api/inventory') ||
+            key.startsWith('/api/products')
+          ),
+        undefined,
+        { revalidate: true }
+      );
+
+      return result;
     } finally {
       setIsCreating(false);
     }
@@ -222,7 +239,9 @@ export function usePatchSale(id: number | null) {
             key.startsWith('/api/sales') ||
             key.startsWith('/api/accounts') ||
             key.startsWith('/api/finances') ||
-            key.startsWith('/api/dashboard')
+            key.startsWith('/api/dashboard') ||
+            key.startsWith('/api/inventory') ||
+            key.startsWith('/api/products')
           ),
         undefined,
         { revalidate: true }

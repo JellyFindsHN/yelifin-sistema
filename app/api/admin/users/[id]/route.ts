@@ -2,6 +2,7 @@
 import { NextRequest } from "next/server";
 import { neon } from "@neondatabase/serverless";
 import { verifyAdmin, createErrorResponse, isAuthSuccess } from "@/lib/auth";
+import { adminAuth } from "@/lib/firebase-admin";
 
 const sql = neon(process.env.DATABASE_URL!);
 
@@ -60,6 +61,19 @@ export async function GET(request: NextRequest, { params }: Params) {
 
     if (!user) return createErrorResponse("Usuario no encontrado", 404);
 
+    // Firebase metadata (last sign in / last token refresh)
+    let firebaseMeta: { last_sign_in_time: string | null; last_refresh_time: string | null } = {
+      last_sign_in_time: null,
+      last_refresh_time: null,
+    };
+    try {
+      const fbUser = await adminAuth.getUser(user.firebase_uid);
+      firebaseMeta = {
+        last_sign_in_time: fbUser.metadata.lastSignInTime ?? null,
+        last_refresh_time: fbUser.metadata.lastRefreshTime ?? null,
+      };
+    } catch { /* usuario puede no existir en Firebase */ }
+
     // Totales de actividad
     const [activity] = await sql`
       SELECT
@@ -68,7 +82,7 @@ export async function GET(request: NextRequest, { params }: Params) {
         (SELECT COUNT(*) FROM transactions WHERE user_id = ${userId})::int AS total_transactions
     `;
 
-    return Response.json({ user, activity });
+    return Response.json({ user: { ...user, ...firebaseMeta }, activity });
   } catch (error) {
     console.error("GET /api/admin/users/[id]:", error);
     return createErrorResponse("Error al obtener usuario", 500);

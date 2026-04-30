@@ -23,7 +23,7 @@ import {
 import {
   ArrowLeft, Building2, Mail, Calendar, ShoppingCart,
   Package, ReceiptText, Crown, AlertTriangle, CheckCircle2,
-  XCircle, Loader2, Save,
+  XCircle, Loader2, Save, Clock, RefreshCw,
 } from "lucide-react";
 
 const STATUS_LABEL: Record<string, string> = {
@@ -135,6 +135,16 @@ export default function AdminUserDetailPage({ params }: { params: Promise<{ id: 
             {user.display_name  && <InfoRow icon={<Building2 className="h-3.5 w-3.5"/>} label="Nombre" value={user.display_name} />}
             <InfoRow icon={<Calendar className="h-3.5 w-3.5"/>} label="Registrado"
               value={new Date(user.created_at).toLocaleDateString("es-HN", { day: "numeric", month: "long", year: "numeric" })}
+            />
+            <InfoRow icon={<Clock className="h-3.5 w-3.5"/>} label="Último inicio de sesión"
+              value={user.last_sign_in_time
+                ? new Date(user.last_sign_in_time).toLocaleString("es-HN", { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })
+                : "—"}
+            />
+            <InfoRow icon={<RefreshCw className="h-3.5 w-3.5"/>} label="Último token renovado"
+              value={user.last_refresh_time
+                ? new Date(user.last_refresh_time).toLocaleString("es-HN", { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })
+                : "—"}
             />
             <InfoRow icon={<Building2 className="h-3.5 w-3.5"/>} label="Moneda" value={user.currency} />
             <InfoRow icon={<Building2 className="h-3.5 w-3.5"/>} label="Zona horaria" value={user.timezone} />

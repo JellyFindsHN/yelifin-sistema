@@ -17,17 +17,13 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import {
-  Loader2,
-  User,
-  Wallet,
-  FlaskConical,
-  Truck,
-  ArrowLeft,
-  Clock,
+  Loader2, User, Wallet, FlaskConical, Truck, ArrowLeft, Clock, Star,
 } from "lucide-react";
 import { useCurrency } from "@/hooks/swr/use-currency";
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import { SearchableSelect } from "@/components/shared/SearchableSelect";
+import { TIER_COLOR_CLASSES, type LoyaltyPolicy } from "@/hooks/swr/use-costumers";
+import { cn } from "@/lib/utils";
 
 type Props = {
   customers: any[];
@@ -48,6 +44,8 @@ type Props = {
   onCheckout: () => void;
   onOpenSupplies: () => void;
   onBack?: () => void;
+  loyaltyTier?: LoyaltyPolicy | null;
+  onApplyLoyaltyDiscount?: (pct: number) => void;
 };
 
 export function SaleOptionsPanel({
@@ -69,6 +67,8 @@ export function SaleOptionsPanel({
   onCheckout,
   onOpenSupplies,
   onBack,
+  loyaltyTier,
+  onApplyLoyaltyDiscount,
 }: Props) {
   const { format, symbol } = useCurrency();
 
@@ -121,6 +121,35 @@ export function SaleOptionsPanel({
               className="h-8 text-sm w-full"
             />
           </div>
+
+          {/* Sugerencia de fidelización */}
+          {loyaltyTier && (() => {
+            const colors = TIER_COLOR_CLASSES[loyaltyTier.color] ?? TIER_COLOR_CLASSES.amber;
+            return (
+              <div className={cn("rounded-xl border px-3 py-2.5 flex items-center gap-2.5", colors.border, colors.bg)}>
+                <Star className={cn("h-3.5 w-3.5 shrink-0", colors.text)} />
+                <div className="flex-1 min-w-0">
+                  <p className={cn("text-[11px] font-semibold leading-tight", colors.text)}>
+                    Cliente {loyaltyTier.tier_name}
+                  </p>
+                  <p className="text-[10px] text-muted-foreground leading-tight mt-0.5">
+                    Descuento sugerido: {loyaltyTier.discount_pct}%
+                  </p>
+                </div>
+                {onApplyLoyaltyDiscount && (
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    className={cn("h-7 text-xs shrink-0 border", colors.border, colors.text)}
+                    onClick={() => onApplyLoyaltyDiscount(Number(loyaltyTier.discount_pct))}
+                  >
+                    Aplicar
+                  </Button>
+                )}
+              </div>
+            );
+          })()}
 
           {/* Cuenta destino */}
           <div className="space-y-1.5">

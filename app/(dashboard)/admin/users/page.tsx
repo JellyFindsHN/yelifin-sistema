@@ -16,9 +16,22 @@ import {
 } from "@/components/ui/table";
 import {
   ArrowLeft, Search, ChevronLeft, ChevronRight,
-  CheckCircle2, XCircle, UserCircle,
+  CheckCircle2, XCircle, Clock,
 } from "lucide-react";
 import { useDebounce } from "@/hooks/use-debounce";
+
+function relativeTime(date: string | null): string {
+  if (!date) return "—";
+  const diff = Date.now() - new Date(date).getTime();
+  const mins  = Math.floor(diff / 60_000);
+  if (mins < 1)    return "hace un momento";
+  if (mins < 60)   return `hace ${mins}m`;
+  const hours = Math.floor(mins / 60);
+  if (hours < 24)  return `hace ${hours}h`;
+  const days  = Math.floor(hours / 24);
+  if (days < 30)   return `hace ${days}d`;
+  return new Date(date).toLocaleDateString("es-HN", { day: "numeric", month: "short", year: "numeric" });
+}
 
 const STATUS_LABEL: Record<string, string> = {
   TRIAL:     "Prueba",
@@ -110,6 +123,7 @@ export default function AdminUsersPage() {
               <TableHead>Estado</TableHead>
               <TableHead>Activo</TableHead>
               <TableHead>Registrado</TableHead>
+              <TableHead>Último acceso</TableHead>
               <TableHead className="w-16" />
             </TableRow>
           </TableHeader>
@@ -117,14 +131,14 @@ export default function AdminUsersPage() {
             {isLoading ? (
               Array.from({ length: 5 }).map((_, i) => (
                 <TableRow key={i}>
-                  {Array.from({ length: 6 }).map((_, j) => (
+                  {Array.from({ length: 7 }).map((_, j) => (
                     <TableCell key={j}><Skeleton className="h-4 w-full" /></TableCell>
                   ))}
                 </TableRow>
               ))
             ) : users.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={6} className="text-center py-12 text-muted-foreground">
+                <TableCell colSpan={7} className="text-center py-12 text-muted-foreground">
                   No se encontraron usuarios
                 </TableCell>
               </TableRow>
@@ -158,6 +172,14 @@ export default function AdminUsersPage() {
                     {new Date(u.created_at).toLocaleDateString("es-HN", {
                       day: "numeric", month: "short", year: "numeric",
                     })}
+                  </TableCell>
+                  <TableCell>
+                    <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                      <Clock className="h-3 w-3 shrink-0" />
+                      <span title={u.last_refresh_time ?? u.last_sign_in_time ?? "—"}>
+                        {relativeTime(u.last_refresh_time ?? u.last_sign_in_time)}
+                      </span>
+                    </div>
                   </TableCell>
                   <TableCell>
                     <Button variant="ghost" size="sm" className="text-xs">Ver</Button>
@@ -201,8 +223,9 @@ export default function AdminUsersPage() {
                         {STATUS_LABEL[u.subscription_status] ?? u.subscription_status}
                       </Badge>
                     )}
-                    <span className="text-xs text-muted-foreground ml-auto">
-                      {new Date(u.created_at).toLocaleDateString("es-HN", { day: "numeric", month: "short", year: "2-digit" })}
+                    <span className="flex items-center gap-1 text-xs text-muted-foreground ml-auto">
+                      <Clock className="h-3 w-3" />
+                      {relativeTime(u.last_refresh_time ?? u.last_sign_in_time)}
                     </span>
                   </div>
                 </div>

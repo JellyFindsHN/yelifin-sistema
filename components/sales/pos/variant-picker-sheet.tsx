@@ -17,26 +17,17 @@ type Props = {
   open:            boolean;
   onOpenChange:    (v: boolean) => void;
   product:         Product | null;
-  // Stock por variante — viene de useInventory si está disponible
   variantsStock?:  VariantStock[];
-  // null = producto base, ProductVariant = variante específica
+  baseStock?:      number | null;
   onSelect:        (product: Product, variant: ProductVariant | null) => void;
 };
 
 export function VariantPickerSheet({
-  open, onOpenChange, product, variantsStock = [], onSelect,
+  open, onOpenChange, product, variantsStock = [], baseStock = null, onSelect,
 }: Props) {
   const { format } = useCurrency();
 
   if (!product) return null;
-
-  // Stock del producto base
-  const baseStock = variantsStock.length > 0
-    ? null  // si hay datos de inventory, el base_stock viene del item padre
-    : (product.stock ?? 0) - product.variants.reduce((acc, v) => {
-        const vs = variantsStock.find((s) => s.variant_id === v.id);
-        return acc + Number(vs?.stock ?? 0);
-      }, 0);
 
   const getVariantStock = (variantId: number): number | null => {
     const vs = variantsStock.find((s) => s.variant_id === variantId);

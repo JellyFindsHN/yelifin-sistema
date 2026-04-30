@@ -80,9 +80,13 @@ function TypeBadge({ m }: { m: Movement }) {
     );
   }
   if (m.reference_type === "SALE_EDITED") {
-    return (
+    return m.movement_type === "OUT" ? (
       <Badge className="bg-yellow-100 text-yellow-700 border-yellow-200 gap-1" variant="outline">
-        <FilePen className="h-3 w-3" /> Edición
+        <FilePen className="h-3 w-3" /> Edición +
+      </Badge>
+    ) : (
+      <Badge className="bg-orange-100 text-orange-700 border-orange-200 gap-1" variant="outline">
+        <FilePen className="h-3 w-3" /> Edición −
       </Badge>
     );
   }

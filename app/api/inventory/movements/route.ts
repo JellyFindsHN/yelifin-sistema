@@ -99,7 +99,10 @@ export async function GET(request: NextRequest) {
           WHEN im.reference_type = 'SALE'
           THEN ROUND((si.line_total - (si.unit_cost * im.quantity))::numeric, 2)
         END AS profit,
-        CASE WHEN im.reference_type = 'SALE' THEN s.sale_number     END AS sale_number,
+        COALESCE(
+          CASE WHEN im.reference_type = 'SALE'        THEN s.sale_number END,
+          CASE WHEN im.reference_type = 'SALE_EDITED' THEN se.sale_number END
+        ) AS sale_number,
         CASE WHEN im.reference_type = 'SALE' THEN c.name            END AS customer_name
 
       FROM inventory_movements im
@@ -139,6 +142,12 @@ export async function GET(request: NextRequest) {
         )
       LEFT JOIN sales     s ON s.id  = si.sale_id
       LEFT JOIN customers c ON c.id  = s.customer_id
+
+      -- SALE_EDITED: direct join to get sale_number (sale still exists when edited)
+      LEFT JOIN sales se
+        ON  im.reference_type = 'SALE_EDITED'
+        AND se.id             = im.reference_id
+        AND se.user_id        = im.user_id
 
       WHERE im.user_id    = ${userId}
         AND im.created_at >= ${startISO}::timestamptz

@@ -97,8 +97,8 @@ function EditSaleContent() {
   const { accounts } = useAccounts();
   const { customers } = useCustomers();
   const { supplies } = useSupplies();
-  const { inventory } = useInventory();
-  const { editSale, confirmSale, isPatching } = usePatchSale(saleId);
+  const { inventory, mutate: mutateInventory } = useInventory();
+  const { editSale, confirmSale, cancelSale, isPatching } = usePatchSale(saleId);
 
   const [cart, setCart] = useState<CartItem[]>([]);
   const [discountType, setDiscountType] =
@@ -115,6 +115,7 @@ function EditSaleContent() {
 
   const [search, setSearch] = useState("");
   const [initialized, setInitialized] = useState(false);
+  const [initialQuantities, setInitialQuantities] = useState<Map<string, number>>(new Map());
 
   const [suppliesUsed, setSuppliesUsed] = useState<SupplyUsed[]>(
     []
@@ -202,6 +203,12 @@ function EditSaleContent() {
 
     setCart(mappedCart);
 
+    const initQtyMap = new Map<string, number>();
+    mappedCart.forEach((i) =>
+      initQtyMap.set(`${i.product_id}-${i.variant_id ?? "base"}`, i.quantity)
+    );
+    setInitialQuantities(initQtyMap);
+
     setTaxRate(Number(sale.tax_rate ?? 0));
     setShippingCost(Number(sale.shipping_cost ?? 0));
     setNotes(sale.notes ?? "");
@@ -242,7 +249,7 @@ function EditSaleContent() {
   const availableProducts = useMemo(
     () =>
       products.filter((p) => {
-        const hasStock = p.is_service || p.variants.length > 0 || (p.stock ?? 0) > 0;
+        const hasStock = p.is_service || (p.stock ?? 0) > 0;
         if (!hasStock) return false;
         if (!search.trim()) return true;
         const q = search.toLowerCase();
@@ -281,8 +288,12 @@ function EditSaleContent() {
         (i) => cartKey(i.product_id, i.variant_id) === key
       );
       if (existing) {
-        if (!product.is_service && existing.quantity >= stockAvail) {
-          toast.error(`Stock máximo: ${stockAvail} unidades`);
+        // El inventario ya fue descontado al crear la venta pendiente,
+        // por lo que el máximo real es: stockAvail (restante) + initialQty (reservado en esta venta)
+        const initialQty = initialQuantities.get(key) ?? 0;
+        const effectiveMax = stockAvail + initialQty;
+        if (!product.is_service && existing.quantity >= effectiveMax) {
+          toast.error(`Stock máximo: ${effectiveMax} unidades`);
           return prev;
         }
         return prev.map((i) =>
@@ -290,6 +301,11 @@ function EditSaleContent() {
             ? { ...i, quantity: i.quantity + 1 }
             : i
         );
+      }
+      // Item nuevo en el edit (no estaba en la venta original)
+      if (!product.is_service && stockAvail <= 0) {
+        toast.error(`Sin stock disponible`);
+        return prev;
       }
       return [
         ...prev,
@@ -310,16 +326,42 @@ function EditSaleContent() {
   const cartKey = (productId: number, variantId?: number | null) =>
     `${productId}-${variantId ?? "base"}`;
 
-  const updateQuantity = (id: number, delta: number, variantId?: number | null) =>
-    setCart((prev) =>
-      prev
-        .map((i) =>
-          cartKey(i.product_id, i.variant_id) === cartKey(id, variantId)
-            ? { ...i, quantity: i.quantity + delta }
-            : i
-        )
-        .filter((i) => i.quantity > 0)
-    );
+  const updateQuantity = (id: number, delta: number, variantId?: number | null) => {
+    if (delta > 0) {
+      const key      = cartKey(id, variantId);
+      const invItem  = inventory.find((i) => i.product_id === id);
+      const stockAvail = variantId
+        ? Number(invItem?.variants_stock.find((v) => v.variant_id === variantId)?.stock ?? 0)
+        : Number(invItem?.base_stock ?? 0);
+      const initialQty   = initialQuantities.get(key) ?? 0;
+      const effectiveMax = stockAvail + initialQty;
+
+      setCart((prev) => {
+        const item = prev.find((i) => cartKey(i.product_id, i.variant_id) === key);
+        if (item && item.quantity >= effectiveMax) {
+          toast.error(`Stock máximo: ${effectiveMax} unidades`);
+          return prev;
+        }
+        return prev
+          .map((i) =>
+            cartKey(i.product_id, i.variant_id) === key
+              ? { ...i, quantity: i.quantity + delta }
+              : i
+          )
+          .filter((i) => i.quantity > 0);
+      });
+    } else {
+      setCart((prev) =>
+        prev
+          .map((i) =>
+            cartKey(i.product_id, i.variant_id) === cartKey(id, variantId)
+              ? { ...i, quantity: i.quantity + delta }
+              : i
+          )
+          .filter((i) => i.quantity > 0)
+      );
+    }
+  };
 
   const removeFromCart = (id: number, variantId?: number | null) =>
     setCart((prev) =>
@@ -392,6 +434,7 @@ function EditSaleContent() {
       const payload: any = {
         items: cart.map((i) => ({
           product_id: i.product_id,
+          variant_id: i.variant_id ?? undefined,
           quantity: i.quantity,
           unit_price: i.unit_price,
           discount:
@@ -418,6 +461,7 @@ function EditSaleContent() {
       };
 
       await editSale(payload);
+      mutateInventory();
       toast.success("Venta actualizada");
       router.push("/sales");
     } catch (err: any) {
@@ -438,6 +482,7 @@ function EditSaleContent() {
       await editSale({
         items: cart.map((i) => ({
           product_id: i.product_id,
+          variant_id: i.variant_id ?? undefined,
           quantity: i.quantity,
           unit_price: i.unit_price,
           discount: discountType === "per_item" ? i.discount : 0,
@@ -461,6 +506,7 @@ function EditSaleContent() {
       // 2. Luego completar la venta (cambiar status)
       await confirmSale();
 
+      mutateInventory();
       toast.success("Venta completada");
       router.push("/sales");
     } catch (err: any) {
@@ -475,7 +521,8 @@ function EditSaleContent() {
     setConfirmCancelOpen(false);
 
     try {
-      await editSale({ status: "CANCELLED" } as any);
+      await cancelSale();
+      mutateInventory();
       toast.success("Venta cancelada");
       router.push("/sales");
     } catch (err: any) {
@@ -749,6 +796,10 @@ function EditSaleContent() {
         variantsStock={
           inventory.find((i) => i.product_id === variantPickerProduct?.id)
             ?.variants_stock ?? []
+        }
+        baseStock={
+          inventory.find((i) => i.product_id === variantPickerProduct?.id)
+            ?.base_stock ?? 0
         }
         onSelect={(product, variant) => {
           addItemToCart(product, variant);

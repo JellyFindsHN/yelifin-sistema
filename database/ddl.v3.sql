@@ -617,3 +617,24 @@ ALTER TABLE purchase_batches
 ALTER TABLE transactions DROP CONSTRAINT IF EXISTS transactions_reference_type_check;
 ALTER TABLE transactions ADD CONSTRAINT transactions_reference_type_check
   CHECK (reference_type IN ('SALE','PURCHASE','SUPPLY_PURCHASE','EVENT','OTHER','CREDIT_CARD_PAYMENT','PURCHASE_SHIPPING'));
+
+-- =========================
+-- FIDELIZACIÓN DE CLIENTES
+-- =========================
+
+CREATE TABLE IF NOT EXISTS loyalty_policies (
+  id           BIGSERIAL PRIMARY KEY,
+  user_id      BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  tier_name    VARCHAR(50) NOT NULL,
+  color        VARCHAR(20) NOT NULL DEFAULT 'amber',
+  min_orders   INT CHECK (min_orders IS NULL OR min_orders >= 0),
+  min_spent    NUMERIC(12,2) CHECK (min_spent IS NULL OR min_spent >= 0),
+  discount_pct NUMERIC(5,2) NOT NULL DEFAULT 0 CHECK (discount_pct >= 0 AND discount_pct <= 100),
+  is_active    BOOLEAN NOT NULL DEFAULT TRUE,
+  sort_order   INT NOT NULL DEFAULT 0,
+  created_at   TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at   TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE(user_id, tier_name)
+);
+
+CREATE INDEX IF NOT EXISTS idx_loyalty_policies_user ON loyalty_policies(user_id);

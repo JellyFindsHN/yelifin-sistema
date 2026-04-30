@@ -115,3 +115,143 @@ export function useDeleteCustomer() {
 
   return { deleteCustomer, isDeleting };
 }
+
+// ── Loyalty ────────────────────────────────────────────────────────────
+
+export type LoyaltyPolicy = {
+  id:           number;
+  user_id:      number;
+  tier_name:    string;
+  color:        string;
+  min_orders:   number | null;
+  min_spent:    number | null;
+  discount_pct: number;
+  is_active:    boolean;
+  sort_order:   number;
+  created_at:   string;
+};
+
+export type CustomerSummary = Customer & {
+  last_purchase_at: string | null;
+  avg_order_value:  number;
+};
+
+export type RecentSale = {
+  id:            number;
+  sale_number:   string;
+  total:         number;
+  sold_at:       string;
+  status:        string;
+  discount:      number;
+  shipping_cost: number;
+};
+
+export const TIER_COLORS = [
+  { value: "amber",  label: "Bronce"    },
+  { value: "slate",  label: "Plata"     },
+  { value: "yellow", label: "Oro"       },
+  { value: "blue",   label: "Platino"   },
+  { value: "green",  label: "Esmeralda" },
+  { value: "purple", label: "Amatista"  },
+  { value: "red",    label: "Rubí"      },
+];
+
+export const TIER_COLOR_CLASSES: Record<string, { bg: string; text: string; border: string; dot: string }> = {
+  amber:  { bg: "bg-amber-100",  text: "text-amber-700",  border: "border-amber-300",  dot: "bg-amber-500"  },
+  slate:  { bg: "bg-slate-100",  text: "text-slate-600",  border: "border-slate-300",  dot: "bg-slate-400"  },
+  yellow: { bg: "bg-yellow-100", text: "text-yellow-700", border: "border-yellow-300", dot: "bg-yellow-400" },
+  blue:   { bg: "bg-blue-100",   text: "text-blue-700",   border: "border-blue-300",   dot: "bg-blue-500"   },
+  green:  { bg: "bg-green-100",  text: "text-green-700",  border: "border-green-300",  dot: "bg-green-500"  },
+  purple: { bg: "bg-purple-100", text: "text-purple-700", border: "border-purple-300", dot: "bg-purple-500" },
+  red:    { bg: "bg-red-100",    text: "text-red-700",    border: "border-red-300",    dot: "bg-red-500"    },
+};
+
+export function computeLoyaltyTier(
+  customer: Pick<Customer, "total_orders" | "total_spent">,
+  policies: LoyaltyPolicy[]
+): LoyaltyPolicy | null {
+  const qualifying = policies
+    .filter((p) => {
+      if (!p.is_active) return false;
+      const meetsOrders = p.min_orders == null || Number(customer.total_orders) >= p.min_orders;
+      const meetsSpent  = p.min_spent  == null || Number(customer.total_spent)  >= Number(p.min_spent);
+      return meetsOrders && meetsSpent;
+    })
+    .sort((a, b) => Number(b.discount_pct) - Number(a.discount_pct));
+  return qualifying[0] ?? null;
+}
+
+export function useCustomerSummary(id: number | null) {
+  const { firebaseUser } = useAuth();
+  const authFetch = useAuthFetch();
+  const { data, isLoading, error, mutate } = useSWR(
+    firebaseUser && id ? `/api/customers/${id}/summary` : null,
+    (url: string) => authFetch(url),
+    { revalidateOnFocus: false }
+  );
+  return {
+    customer:    (data?.customer    ?? null) as CustomerSummary | null,
+    recentSales: (data?.recentSales ?? [])   as RecentSale[],
+    isLoading,
+    error:       (error as any)?.message ?? null,
+    mutate,
+  };
+}
+
+export function useLoyaltyPolicies() {
+  const { firebaseUser } = useAuth();
+  const authFetch = useAuthFetch();
+  const { data, isLoading, error, mutate } = useSWR(
+    firebaseUser ? "/api/customers/loyalty" : null,
+    (url: string) => authFetch(url),
+    { revalidateOnFocus: false, dedupingInterval: 30_000 }
+  );
+  return {
+    policies:  (data?.data ?? []) as LoyaltyPolicy[],
+    isLoading,
+    error:     (error as any)?.message ?? null,
+    mutate,
+  };
+}
+
+export function useCreateLoyaltyPolicy() {
+  const authFetch = useAuthFetch();
+  const [isSaving, setIsSaving] = useState(false);
+  const create = async (payload: Omit<LoyaltyPolicy, "id" | "user_id" | "created_at">) => {
+    setIsSaving(true);
+    try {
+      return await authFetch("/api/customers/loyalty", { method: "POST", body: JSON.stringify(payload) });
+    } finally {
+      setIsSaving(false);
+    }
+  };
+  return { create, isSaving };
+}
+
+export function useUpdateLoyaltyPolicy() {
+  const authFetch = useAuthFetch();
+  const [isSaving, setIsSaving] = useState(false);
+  const update = async (id: number, payload: Partial<Omit<LoyaltyPolicy, "id" | "user_id" | "created_at">>) => {
+    setIsSaving(true);
+    try {
+      return await authFetch(`/api/customers/loyalty/${id}`, { method: "PATCH", body: JSON.stringify(payload) });
+    } finally {
+      setIsSaving(false);
+    }
+  };
+  return { update, isSaving };
+}
+
+export function useDeleteLoyaltyPolicy() {
+  const authFetch = useAuthFetch();
+  const [isDeleting, setIsDeleting] = useState(false);
+  const remove = async (id: number) => {
+    setIsDeleting(true);
+    try {
+      return await authFetch(`/api/customers/loyalty/${id}`, { method: "DELETE" });
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+  return { remove, isDeleting };
+}
