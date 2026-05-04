@@ -6,7 +6,8 @@
     "build": "next build",
     "dev": "next dev",
     "lint": "eslint .",
-    "start": "next start"
+    "start": "next start",
+    "test": "jest --config jest.config.ts"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.10.0",
@@ -69,13 +70,16 @@
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4.2.2",
+    "@types/jest": "^30.0.0",
     "@types/node": "^22.19.17",
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",
     "@types/ws": "^8.18.1",
     "install": "^0.13.0",
+    "jest": "^30.3.0",
     "postcss": "^8.5.9",
     "tailwindcss": "^4.2.2",
+    "ts-jest": "^29.4.9",
     "tw-animate-css": "1.3.3",
     "typescript": "^5.9.3",
     "ws": "^8.20.0"

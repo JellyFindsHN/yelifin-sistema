@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useMemo } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -24,7 +24,11 @@ import {
 import {
   ArrowDownCircle, ArrowUpCircle, ArrowLeftRight, SlidersHorizontal,
   TrendingUp, TrendingDown, MoreVertical, Pencil, Trash2, CreditCard,
+  Banknote, Building2, Wallet,
 } from "lucide-react";
+import {
+  PieChart, Pie, Cell, Tooltip, Legend, ResponsiveContainer,
+} from "recharts";
 import {
   useTransactions, useTransactionPeriods, useDeleteTransaction,
   Transaction,
@@ -107,6 +111,7 @@ type Row =
 // ── Page ───────────────────────────────────────────────────────────────
 export default function TransactionsPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { mutate: globalMutate } = useSWRConfig();
   const now = new Date();
 
@@ -114,12 +119,16 @@ export default function TransactionsPage() {
   const [selectedYear,  setSelectedYear]  = useState(now.getFullYear());
   const [selectedMonth, setSelectedMonth] = useState(now.getMonth() + 1);
   const [specificDate,  setSpecificDate]  = useState("");
-  const [sourceFilter,  setSourceFilter]  = useState("all"); // "all" | "cc-{id}" | account_id
+  const [sourceFilter,  setSourceFilter]  = useState<string>(() => {
+    const accountId = searchParams.get("account_id");
+    return accountId ? accountId : "all";
+  }); // "all" | "cc-{id}" | account_id
   const [typeFilter,    setTypeFilter]    = useState("all");
   const [modalOpen,     setModalOpen]     = useState(false);
 
-  const [editingTx,  setEditingTx]  = useState<Transaction | null>(null);
-  const [deletingTx, setDeletingTx] = useState<Transaction | null>(null);
+  const [editingTx,     setEditingTx]     = useState<Transaction | null>(null);
+  const [deletingTx,    setDeletingTx]    = useState<Transaction | null>(null);
+  const [analyticsTab,  setAnalyticsTab]  = useState<"expense" | "income">("expense");
 
   const { deleteTransaction, isDeleting } = useDeleteTransaction();
 
@@ -181,6 +190,41 @@ export default function TransactionsPage() {
         new Date(a.data.occurred_at).getTime()
     );
   }, [transactions, ccTxs, typeFilter, isCardFilter, isAccountFilter]);
+
+  const PIE_COLORS = ["#6366f1","#f59e0b","#10b981","#3b82f6","#ec4899","#8b5cf6","#f97316","#14b8a6"];
+
+  const categoryData = useMemo(() => {
+    const expenseMap = new Map<string, number>();
+    const incomeMap  = new Map<string, number>();
+
+    for (const row of rows) {
+      if (row._src === "account") {
+        const t = row.data;
+        const label = t.category?.trim() || "Sin categoría";
+        if (t.type === "EXPENSE") {
+          expenseMap.set(label, (expenseMap.get(label) ?? 0) + Number(t.amount));
+        } else if (t.type === "INCOME") {
+          incomeMap.set(label, (incomeMap.get(label) ?? 0) + Number(t.amount));
+        }
+      } else {
+        const t = row.data;
+        const label = t.category?.trim() || "Sin categoría";
+        if (t.type === "CHARGE") {
+          expenseMap.set(label, (expenseMap.get(label) ?? 0) + Number(t.amount));
+        } else {
+          incomeMap.set(label, (incomeMap.get(label) ?? 0) + Number(t.amount));
+        }
+      }
+    }
+
+    const toArr = (map: Map<string, number>) =>
+      [...map.entries()]
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 8)
+        .map(([name, value]) => ({ name, value }));
+
+    return { expenses: toArr(expenseMap), income: toArr(incomeMap) };
+  }, [rows]);
 
   const handleTransactionClick = (t: Transaction) => {
     if (t.reference_type === "SALE" && t.reference_id) {
@@ -470,6 +514,67 @@ export default function TransactionsPage() {
         ))}
       </div>
 
+      {/* Banner de cuenta/tarjeta seleccionada */}
+      {sourceFilter !== "all" && (() => {
+        if (isAccountFilter) {
+          const selectedAccount = accounts.find((a) => String(a.id) === sourceFilter);
+          if (!selectedAccount) return null;
+          const BANNER_ICONS: Record<string, React.ElementType> = {
+            CASH: Banknote, BANK: Building2, WALLET: CreditCard, OTHER: Wallet,
+          };
+          const Icon = BANNER_ICONS[selectedAccount.type] ?? Wallet;
+          const ACCOUNT_TYPE_LABELS: Record<string, string> = {
+            CASH: "Efectivo", BANK: "Banco", WALLET: "Billetera digital", OTHER: "Otro",
+          };
+          return (
+            <Card className="bg-muted/40">
+              <CardContent className="p-3 flex items-center gap-3">
+                <div className="h-9 w-9 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
+                  <Icon className="h-4 w-4 text-primary" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-semibold">{selectedAccount.name}</p>
+                  <p className="text-xs text-muted-foreground">{ACCOUNT_TYPE_LABELS[selectedAccount.type] ?? "Cuenta"}</p>
+                </div>
+                <p className="text-sm font-bold shrink-0">{format(Number(selectedAccount.balance))}</p>
+              </CardContent>
+            </Card>
+          );
+        }
+        if (isCardFilter) {
+          const selectedCard = creditCards.find((c) => c.id === selectedCardId);
+          if (!selectedCard) return null;
+          return (
+            <Card className="bg-muted/40">
+              <CardContent className="p-3 flex items-center gap-3">
+                <div className="h-9 w-9 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
+                  <CreditCard className="h-4 w-4 text-primary" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-1.5">
+                    <p className="text-sm font-semibold">{selectedCard.name}</p>
+                    {selectedCard.last_four && (
+                      <Badge variant="outline" className="font-mono text-[10px]">···· {selectedCard.last_four}</Badge>
+                    )}
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    {selectedCard.balance > 0 && (
+                      <span className="text-destructive">{format(Number(selectedCard.balance))}</span>
+                    )}
+                    {selectedCard.balance > 0 && selectedCard.balance_usd > 0 && " · "}
+                    {selectedCard.balance_usd > 0 && (
+                      <span className="text-destructive">${Number(selectedCard.balance_usd).toFixed(2)} USD</span>
+                    )}
+                    {selectedCard.balance === 0 && selectedCard.balance_usd === 0 && "Sin deuda"}
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
+          );
+        }
+        return null;
+      })()}
+
       {/* Filtros */}
       <div className="space-y-2.5">
         <div className="grid grid-cols-2 rounded-lg border overflow-hidden">
@@ -564,6 +669,62 @@ export default function TransactionsPage() {
           </Select>
         </div>
       </div>
+
+      {/* Analíticas por categoría */}
+      {!isLoading && rows.length > 0 && (
+        <Card className="pt-1 pb-1">
+          <CardContent className="p-3">
+            <div className="flex items-center justify-between mb-3">
+              <p className="text-sm font-semibold">Por categoría</p>
+              <div className="grid grid-cols-2 rounded-lg border overflow-hidden text-xs">
+                {(["expense", "income"] as const).map((tab, i) => (
+                  <button
+                    key={tab}
+                    onClick={() => setAnalyticsTab(tab)}
+                    className={`px-3 py-1.5 font-medium transition-colors ${i > 0 ? "border-l" : ""} ${
+                      analyticsTab === tab ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-muted"
+                    }`}
+                  >
+                    {tab === "expense" ? "Egresos" : "Ingresos"}
+                  </button>
+                ))}
+              </div>
+            </div>
+            {(analyticsTab === "expense" ? categoryData.expenses : categoryData.income).length === 0 ? (
+              <p className="text-sm text-muted-foreground text-center py-6">Sin datos</p>
+            ) : (
+              <ResponsiveContainer width="100%" height={220}>
+                <PieChart>
+                  <Pie
+                    data={analyticsTab === "expense" ? categoryData.expenses : categoryData.income}
+                    dataKey="value"
+                    nameKey="name"
+                    cx="50%"
+                    cy="45%"
+                    innerRadius={52}
+                    outerRadius={80}
+                    paddingAngle={2}
+                  >
+                    {(analyticsTab === "expense" ? categoryData.expenses : categoryData.income).map((_, i) => (
+                      <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />
+                    ))}
+                  </Pie>
+                  <Tooltip
+                    formatter={(v: number) => format(v)}
+                    contentStyle={{ fontSize: 12, borderRadius: 8, border: "1px solid hsl(var(--border))", backgroundColor: "hsl(var(--card))" }}
+                  />
+                  <Legend
+                    iconType="circle"
+                    iconSize={8}
+                    wrapperStyle={{ fontSize: 11, paddingTop: 8 }}
+                    formatter={(value) => value.length > 18 ? value.slice(0, 18) + "…" : value}
+                  />
+                </PieChart>
+              </ResponsiveContainer>
+            )}
+          </CardContent>
+        </Card>
+      )}
 
       {/* Cards — móvil */}
       <div className="space-y-2.5 lg:hidden">

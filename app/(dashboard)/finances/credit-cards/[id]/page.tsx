@@ -13,17 +13,32 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import {
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem,
+  DropdownMenuSeparator, DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import {
   CreditCard, ArrowLeft, Banknote, ShoppingBag,
-  CalendarDays, TrendingUp, TrendingDown, DollarSign,
+  CalendarDays, TrendingUp, DollarSign, Tag,
+  MoreVertical, Pencil, Trash2,
 } from "lucide-react";
 import {
   useCreditCard,
   useCreditCardTransactions,
+  useUpdateCCTransactionCategory,
+  useDeleteCCTransaction,
   CreditCardTransaction,
 } from "@/hooks/swr/use-credit-cards";
 import { useAccounts } from "@/hooks/swr/use-accounts";
 import { useCurrency } from "@/hooks/swr/use-currency";
+import { useTransactionCategories, TransactionCategory } from "@/hooks/swr/use-transaction-categories";
+import { toast } from "sonner";
 import { PayCreditCardDialog } from "@/components/credit-cards/pay-credit-card-dialog";
+import { EditCCTransactionDialog } from "@/components/credit-cards/edit-cc-transaction-dialog";
+import { Fab } from "@/components/ui/fab";
 
 const MONTH_NAMES = [
   "", "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
@@ -43,6 +58,8 @@ export default function CreditCardDetailPage({
   const [selectedMonth, setSelectedMonth] = useState<number>(now.getMonth() + 1);
   const [selectedYear, setSelectedYear] = useState<number>(now.getFullYear());
   const [payOpen, setPayOpen] = useState(false);
+  const [editingTxn, setEditingTxn] = useState<CreditCardTransaction | null>(null);
+  const [deletingTxn, setDeletingTxn] = useState<CreditCardTransaction | null>(null);
 
   const { creditCard, isLoading: loadingCard, mutate: mutateCard } = useCreditCard(cardId);
   const { transactions, totals, isLoading: loadingTxns, mutate: mutateTxns } = useCreditCardTransactions(cardId, {
@@ -51,11 +68,37 @@ export default function CreditCardDetailPage({
   });
   const { accounts } = useAccounts();
   const { format, currency } = useCurrency();
+  const { updateCategory } = useUpdateCCTransactionCategory();
+  const { deleteTransaction, isDeleting } = useDeleteCCTransaction();
+  const { categories: expenseCategories } = useTransactionCategories("EXPENSE");
 
   const handlePaySuccess = () => {
     mutateCard();
     mutateTxns();
     setPayOpen(false);
+  };
+
+  const handleCategoryChange = async (txId: number, category: string | null) => {
+    try {
+      await updateCategory(txId, category);
+      mutateTxns();
+      toast.success("Categoria actualizada");
+    } catch {
+      toast.error("Error al actualizar categoria");
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!deletingTxn) return;
+    try {
+      await deleteTransaction(deletingTxn.id);
+      toast.success("Cargo eliminado");
+      setDeletingTxn(null);
+      mutateCard();
+      mutateTxns();
+    } catch (e: any) {
+      toast.error(e.message || "Error al eliminar");
+    }
   };
 
   const years = [now.getFullYear(), now.getFullYear() - 1];
@@ -74,21 +117,12 @@ export default function CreditCardDetailPage({
             <div className="flex items-center gap-2 flex-wrap">
               <h1 className="text-xl font-bold tracking-tight">{creditCard?.name ?? "Tarjeta"}</h1>
               {creditCard?.last_four && (
-                <Badge variant="outline" className="font-mono text-xs">···· {creditCard.last_four}</Badge>
+                <Badge variant="outline" className="font-mono text-xs">.... {creditCard.last_four}</Badge>
               )}
             </div>
           )}
-          <p className="text-muted-foreground text-sm">Detalle de tarjeta de crédito</p>
+          <p className="text-muted-foreground text-sm">Detalle de tarjeta de credito</p>
         </div>
-        <Button
-          size="sm"
-          className="gap-1.5 shrink-0"
-          onClick={() => setPayOpen(true)}
-          disabled={loadingCard || (Number(creditCard?.balance ?? 0) === 0 && Number(creditCard?.balance_usd ?? 0) === 0)}
-        >
-          <Banknote className="h-3.5 w-3.5" />
-          Pagar
-        </Button>
       </div>
 
       {/* Card info */}
@@ -119,19 +153,19 @@ export default function CreditCardDetailPage({
             <div className="flex items-center gap-4 mt-3 flex-wrap">
               {creditCard.credit_limit && (
                 <p className="text-xs opacity-60">
-                  Límite: {format(Number(creditCard.credit_limit))}
+                  Limite: {format(Number(creditCard.credit_limit))}
                 </p>
               )}
               {creditCard.statement_closing_day && (
                 <p className="text-xs opacity-60 flex items-center gap-1">
                   <CalendarDays className="h-3 w-3" />
-                  Corte: día {creditCard.statement_closing_day}
+                  Corte: dia {creditCard.statement_closing_day}
                 </p>
               )}
               {creditCard.payment_due_day && (
                 <p className="text-xs opacity-60 flex items-center gap-1">
                   <CalendarDays className="h-3 w-3" />
-                  Pago: día {creditCard.payment_due_day}
+                  Pago: dia {creditCard.payment_due_day}
                 </p>
               )}
             </div>
@@ -139,7 +173,7 @@ export default function CreditCardDetailPage({
         </Card>
       )}
 
-      {/* Filtro de período */}
+      {/* Filtro de periodo */}
       <div className="grid grid-cols-2 gap-2">
         <Select value={String(selectedMonth)} onValueChange={(v) => setSelectedMonth(Number(v))}>
           <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
@@ -157,7 +191,7 @@ export default function CreditCardDetailPage({
         </Select>
       </div>
 
-      {/* Totales del período */}
+      {/* Totales del periodo */}
       {!loadingTxns && (
         <div className="grid grid-cols-2 gap-2">
           <Card className="pt-1 pb-1">
@@ -184,7 +218,7 @@ export default function CreditCardDetailPage({
       {/* Movimientos */}
       <div>
         <p className="text-sm font-semibold mb-2.5">
-          Movimientos — {MONTH_NAMES[selectedMonth]} {selectedYear}
+          Movimientos - {MONTH_NAMES[selectedMonth]} {selectedYear}
         </p>
         <Card className="pt-1 pb-1">
           <CardContent className="p-0">
@@ -204,18 +238,37 @@ export default function CreditCardDetailPage({
             ) : transactions.length === 0 ? (
               <div className="py-10 flex flex-col items-center justify-center gap-1">
                 <CreditCard className="h-8 w-8 text-muted-foreground/30" />
-                <p className="text-sm text-muted-foreground">Sin movimientos en este período</p>
+                <p className="text-sm text-muted-foreground">Sin movimientos en este periodo</p>
               </div>
             ) : (
               <div className="divide-y">
                 {transactions.map((txn) => (
-                  <CreditCardTxnRow key={txn.id} txn={txn} format={format} currency={currency} />
+                  <CreditCardTxnRow
+                    key={txn.id}
+                    txn={txn}
+                    format={format}
+                    currency={currency}
+                    expenseCategories={expenseCategories}
+                    onCategoryChange={handleCategoryChange}
+                    onEdit={() => setEditingTxn(txn)}
+                    onDelete={() => setDeletingTxn(txn)}
+                  />
                 ))}
               </div>
             )}
           </CardContent>
         </Card>
       </div>
+
+      {(Number(creditCard?.balance ?? 0) > 0 || Number(creditCard?.balance_usd ?? 0) > 0) && (
+        <Fab
+          actions={[{
+            label: "Pagar tarjeta",
+            icon: Banknote,
+            onClick: () => setPayOpen(true),
+          }]}
+        />
+      )}
 
       <PayCreditCardDialog
         open={payOpen}
@@ -224,6 +277,36 @@ export default function CreditCardDetailPage({
         accounts={accounts}
         onSuccess={handlePaySuccess}
       />
+
+      <EditCCTransactionDialog
+        txn={editingTxn}
+        open={!!editingTxn}
+        onOpenChange={(v) => { if (!v) setEditingTxn(null); }}
+        onSuccess={() => { setEditingTxn(null); mutateCard(); mutateTxns(); }}
+        nativeCurrency={currency}
+        expenseCategories={expenseCategories}
+      />
+
+      <AlertDialog open={!!deletingTxn} onOpenChange={(v) => { if (!v) setDeletingTxn(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Eliminar cargo?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Se revertira el saldo de la tarjeta. Esta accion no se puede deshacer.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isDeleting}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDelete}
+              disabled={isDeleting}
+              className="bg-destructive hover:bg-destructive/90"
+            >
+              {isDeleting ? "Eliminando..." : "Eliminar"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
@@ -232,17 +315,26 @@ function CreditCardTxnRow({
   txn,
   format,
   currency,
+  expenseCategories,
+  onCategoryChange,
+  onEdit,
+  onDelete,
 }: {
   txn: CreditCardTransaction;
   format: (v: number) => string;
   currency: string;
+  expenseCategories: TransactionCategory[];
+  onCategoryChange: (id: number, category: string | null) => Promise<void>;
+  onEdit: () => void;
+  onDelete: () => void;
 }) {
-  const isCharge = txn.type === "CHARGE";
-  const isUsd = txn.currency === "USD";
+  const isCharge   = txn.type === "CHARGE";
+  const isUsd      = txn.currency === "USD";
+  const isEditable = txn.type === "CHARGE" && !txn.sale_id;
 
   return (
-    <div className="flex items-center gap-3 p-3.5">
-      <div className={`h-8 w-8 rounded-full flex items-center justify-center shrink-0 ${
+    <div className="flex items-start gap-3 p-3.5">
+      <div className={`h-8 w-8 rounded-full flex items-center justify-center shrink-0 mt-0.5 ${
         isCharge ? "bg-destructive/10" : "bg-green-100"
       }`}>
         {isCharge
@@ -267,7 +359,7 @@ function CreditCardTxnRow({
             </Link>
           )}
           {txn.account_name && (
-            <span className="text-xs text-muted-foreground">← {txn.account_name}</span>
+            <span className="text-xs text-muted-foreground">{"<-"} {txn.account_name}</span>
           )}
           {isUsd && txn.exchange_rate && (
             <span className="text-xs text-muted-foreground">
@@ -275,18 +367,65 @@ function CreditCardTxnRow({
             </span>
           )}
         </div>
+        {isCharge && (
+          <div className="mt-1">
+            <Select
+              value={txn.category ?? "__none__"}
+              onValueChange={async (val) => {
+                await onCategoryChange(txn.id, val === "__none__" ? null : val);
+              }}
+            >
+              <SelectTrigger className="h-6 text-[10px] w-36 border-dashed px-2">
+                <Tag className="h-2.5 w-2.5 mr-1 shrink-0" />
+                <SelectValue placeholder="Sin categoria" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="__none__">Sin categoria</SelectItem>
+                {expenseCategories.map((c) => (
+                  <SelectItem key={c.id} value={c.name}>{c.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        )}
       </div>
 
-      <div className="shrink-0 text-right">
-        <p className={`text-sm font-bold ${isCharge ? "text-destructive" : "text-green-600"}`}>
-          {isCharge ? "+" : "-"}
-          {isUsd
-            ? `$${Number(txn.amount).toFixed(2)}`
-            : format(Number(txn.amount))
-          }
-        </p>
-        {isUsd && (
-          <Badge variant="outline" className="text-[9px] mt-0.5">USD</Badge>
+      <div className="shrink-0 flex items-center gap-1">
+        <div className="text-right">
+          <p className={`text-sm font-bold ${isCharge ? "text-destructive" : "text-green-600"}`}>
+            {isCharge ? "+" : "-"}
+            {isUsd
+              ? `$${Number(txn.amount).toFixed(2)}`
+              : format(Number(txn.amount))
+            }
+          </p>
+          {isUsd && (
+            <Badge variant="outline" className="text-[9px] mt-0.5">USD</Badge>
+          )}
+        </div>
+
+        {isEditable && (
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" size="icon" className="h-7 w-7 shrink-0">
+                <MoreVertical className="h-4 w-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={onEdit}>
+                <Pencil className="h-4 w-4 mr-2" />
+                Editar
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem
+                className="text-destructive focus:text-destructive"
+                onClick={onDelete}
+              >
+                <Trash2 className="h-4 w-4 mr-2" />
+                Eliminar
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         )}
       </div>
     </div>

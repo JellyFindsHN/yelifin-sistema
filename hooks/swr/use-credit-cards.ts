@@ -33,6 +33,7 @@ export type CreditCardTransaction = {
   sale_number: string | null;
   account_transaction_id: number | null;
   account_name: string | null;
+  category: string | null;
   occurred_at: string;
   created_at: string;
 };
@@ -239,4 +240,65 @@ export function usePayCreditCard() {
   };
 
   return { payCreditCard, isPaying };
+}
+
+export function useUpdateCCTransactionCategory() {
+  const authFetch = useAuthFetch();
+  const [isUpdating, setIsUpdating] = useState(false);
+
+  const updateCategory = async (id: number, category: string | null) => {
+    setIsUpdating(true);
+    try {
+      return await authFetch(`/api/credit-card-transactions/${id}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ category }),
+      });
+    } finally {
+      setIsUpdating(false);
+    }
+  };
+
+  return { updateCategory, isUpdating };
+}
+
+export function useUpdateCCTransaction() {
+  const authFetch = useAuthFetch();
+  const [isUpdating, setIsUpdating] = useState(false);
+
+  const updateTransaction = async (id: number, data: {
+    description?: string;
+    category?: string | null;
+    occurred_at?: string;
+    amount?: number;
+    currency?: string;
+    exchange_rate?: number;
+  }) => {
+    setIsUpdating(true);
+    try {
+      return await authFetch(`/api/credit-card-transactions/${id}`, {
+        method: 'PATCH',
+        body: JSON.stringify(data),
+      });
+    } finally {
+      setIsUpdating(false);
+    }
+  };
+
+  return { updateTransaction, isUpdating };
+}
+
+export function useDeleteCCTransaction() {
+  const authFetch = useAuthFetch();
+  const [isDeleting, setIsDeleting] = useState(false);
+
+  const deleteTransaction = async (id: number) => {
+    setIsDeleting(true);
+    try {
+      return await authFetch(`/api/credit-card-transactions/${id}`, { method: 'DELETE' });
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
+  return { deleteTransaction, isDeleting };
 }

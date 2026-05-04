@@ -3,6 +3,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
@@ -15,9 +16,13 @@ import {
   Tooltip, ResponsiveContainer,
 } from "recharts";
 import {
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem,
+  DropdownMenuSeparator, DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
   Wallet, Banknote, CreditCard, TrendingUp, TrendingDown,
   ArrowUpCircle, ArrowDownCircle, ArrowLeftRight, ExternalLink,
-  Pencil, Trash2, Building2,
+  Pencil, Trash2, Building2, MoreVertical, ChevronRight,
 } from "lucide-react";
 import { useFinances, useFinancePeriods } from "@/hooks/swr/use-finances";
 import { useAccounts, Account } from "@/hooks/swr/use-accounts";
@@ -60,6 +65,7 @@ const REF_LABELS: Record<string, string> = {
 
 export default function FinancesPage() {
   const now = new Date();
+  const router = useRouter();
 
   const [selectedMonth, setSelectedMonth] = useState<number | undefined>(now.getMonth() + 1);
   const [selectedYear, setSelectedYear] = useState<number | undefined>(now.getFullYear());
@@ -191,7 +197,7 @@ export default function FinancesPage() {
       </div>
 
       <div>
-        <p className="text-sm font-semibold mb-2.5">Cuentas</p>
+        <p className="text-sm font-semibold mb-2.5">Cuentas y tarjetas</p>
         <Card className="pt-1 pb-1">
           <CardContent className="p-0">
             {isLoading ? (
@@ -207,7 +213,7 @@ export default function FinancesPage() {
                   </div>
                 ))}
               </div>
-            ) : (summary?.accounts ?? []).length === 0 ? (
+            ) : (summary?.accounts ?? []).length === 0 && creditCards.length === 0 ? (
               <div className="py-8 flex flex-col items-center justify-center">
                 <Wallet className="h-8 w-8 text-muted-foreground/30" />
                 <p className="text-sm text-muted-foreground mt-2">Sin cuentas creadas</p>
@@ -220,33 +226,82 @@ export default function FinancesPage() {
                   const fullAccount = accounts.find((a) => a.id === account.id);
                   return (
                     <div key={account.id} className="flex items-center gap-3 p-3.5">
-                      <div className="h-8 w-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
-                        <Icon className="h-4 w-4 text-primary" />
+                      <div
+                        className="flex items-center gap-3 flex-1 min-w-0 cursor-pointer hover:bg-muted/50 rounded-lg transition-colors -m-1 p-1"
+                        onClick={() => router.push(`/finances/transactions?account_id=${account.id}`)}
+                      >
+                        <div className="h-8 w-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
+                          <Icon className="h-4 w-4 text-primary" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium truncate">{account.name}</p>
+                          <Badge className={`text-[10px] mt-0.5 ${typeConfig.color}`} variant="outline">
+                            {typeConfig.label}
+                          </Badge>
+                        </div>
+                        <p className="text-sm font-bold shrink-0">{format(Number(account.balance))}</p>
                       </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium truncate">{account.name}</p>
-                        <Badge className={`text-[10px] mt-0.5 ${typeConfig.color}`} variant="outline">
-                          {typeConfig.label}
-                        </Badge>
-                      </div>
-                      <div className="flex items-center gap-1 shrink-0">
-                        <p className="text-sm font-bold">{format(Number(account.balance))}</p>
-                        <Button
-                          variant="ghost" size="icon" className="h-7 w-7"
-                          onClick={() => fullAccount && setEditAccount(fullAccount)}
-                        >
-                          <Pencil className="h-3 w-3" />
-                        </Button>
-                        <Button
-                          variant="ghost" size="icon" className="h-7 w-7 text-destructive hover:text-destructive"
-                          onClick={() => fullAccount && setDeleteAccount(fullAccount)}
-                        >
-                          <Trash2 className="h-3 w-3" />
-                        </Button>
-                      </div>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button
+                            variant="ghost" size="icon" className="h-7 w-7 shrink-0"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            <MoreVertical className="h-4 w-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem onClick={(e) => { e.stopPropagation(); fullAccount && setEditAccount(fullAccount); }}>
+                            <Pencil className="h-4 w-4 mr-2" />
+                            Editar
+                          </DropdownMenuItem>
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem
+                            className="text-destructive focus:text-destructive"
+                            onClick={(e) => { e.stopPropagation(); fullAccount && setDeleteAccount(fullAccount); }}
+                          >
+                            <Trash2 className="h-4 w-4 mr-2" />
+                            Eliminar
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
                     </div>
                   );
                 })}
+                {creditCards.map((card) => (
+                  <div key={`cc-${card.id}`} className="flex items-center gap-3 p-3.5">
+                    <div
+                      className="flex items-center gap-3 flex-1 min-w-0 cursor-pointer hover:bg-muted/50 rounded-lg transition-colors -m-1 p-1"
+                      onClick={() => router.push(`/finances/transactions?account_id=cc-${card.id}`)}
+                    >
+                      <div className="h-8 w-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
+                        <CreditCard className="h-4 w-4 text-primary" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <p className="text-sm font-medium truncate">{card.name}</p>
+                          {card.last_four && (
+                            <Badge variant="outline" className="font-mono text-[10px]">
+                              ···· {card.last_four}
+                            </Badge>
+                          )}
+                        </div>
+                        {card.balance > 0 ? (
+                          <p className="text-xs text-destructive font-medium mt-0.5">{format(Number(card.balance))}</p>
+                        ) : card.balance_usd > 0 ? (
+                          <p className="text-xs text-destructive font-medium mt-0.5">${Number(card.balance_usd).toFixed(2)} USD</p>
+                        ) : (
+                          <p className="text-xs text-muted-foreground mt-0.5">Sin deuda</p>
+                        )}
+                      </div>
+                    </div>
+                    <Link href={`/finances/credit-cards/${card.id}`} onClick={(e) => e.stopPropagation()}>
+                      <Button variant="ghost" size="icon" className="h-7 w-7 shrink-0">
+                        <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                      </Button>
+                    </Link>
+                  </div>
+                ))}
               </div>
             )}
           </CardContent>

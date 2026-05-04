@@ -583,7 +583,8 @@ CREATE TABLE IF NOT EXISTS credit_card_transactions (
   sale_id BIGINT REFERENCES sales(id) ON DELETE SET NULL,
   account_transaction_id BIGINT REFERENCES transactions(id) ON DELETE SET NULL,
   occurred_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  category VARCHAR(100);
 );
 
 CREATE INDEX IF NOT EXISTS idx_cc_transactions_user ON credit_card_transactions(user_id);

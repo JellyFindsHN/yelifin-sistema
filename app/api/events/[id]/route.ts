@@ -125,3 +125,79 @@ export async function GET(
     return createErrorResponse("Error al obtener evento", 500);
   }
 }
+
+export async function PUT(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const auth = await verifyAuth(request);
+  if (!isAuthSuccess(auth)) return createErrorResponse(auth.error, auth.status);
+
+  try {
+    const { userId } = auth.data;
+    const { id }     = await params;
+    const eventId    = Number(id);
+
+    const body = await request.json();
+    const { name, location, starts_at, ends_at, fixed_cost, notes } = body;
+
+    // Validaciones
+    if (name !== undefined && !String(name).trim())
+      return createErrorResponse("El nombre no puede estar vacío", 400);
+    if (starts_at && ends_at && new Date(starts_at) > new Date(ends_at))
+      return createErrorResponse("La fecha inicio debe ser antes o igual que la fecha fin", 400);
+
+    // Verificar que el evento pertenece al usuario
+    const [existing] = await sql`
+      SELECT id FROM events WHERE id = ${eventId} AND user_id = ${userId}
+    `;
+    if (!existing) return createErrorResponse("Evento no encontrado", 404);
+
+    // Normalizar: string vacío → null para campos opcionales
+    const locationVal  = location  !== undefined ? (location?.trim()  || null) : undefined;
+    const notesVal     = notes     !== undefined ? (notes?.trim()     || null) : undefined;
+
+    const [updated] = await sql`
+      UPDATE events SET
+        name       = COALESCE(${name?.trim() ?? null},  name),
+        location   = COALESCE(${locationVal  ?? null},  location),
+        starts_at  = COALESCE(${starts_at    ?? null},  starts_at),
+        ends_at    = COALESCE(${ends_at      ?? null},  ends_at),
+        fixed_cost = COALESCE(${fixed_cost   ?? null},  fixed_cost),
+        notes      = COALESCE(${notesVal     ?? null},  notes)
+      WHERE id = ${eventId} AND user_id = ${userId}
+      RETURNING *
+    `;
+
+    return Response.json({ data: updated });
+  } catch (error) {
+    console.error("PUT /api/events/[id]:", error);
+    return createErrorResponse("Error al actualizar evento", 500);
+  }
+}
+
+export async function DELETE(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const auth = await verifyAuth(request);
+  if (!isAuthSuccess(auth)) return createErrorResponse(auth.error, auth.status);
+
+  try {
+    const { userId } = auth.data;
+    const { id }     = await params;
+    const eventId    = Number(id);
+
+    const [existing] = await sql`
+      SELECT id FROM events WHERE id = ${eventId} AND user_id = ${userId}
+    `;
+    if (!existing) return createErrorResponse("Evento no encontrado", 404);
+
+    await sql`DELETE FROM events WHERE id = ${eventId} AND user_id = ${userId}`;
+
+    return Response.json({ success: true });
+  } catch (error) {
+    console.error("DELETE /api/events/[id]:", error);
+    return createErrorResponse("Error al eliminar evento", 500);
+  }
+}

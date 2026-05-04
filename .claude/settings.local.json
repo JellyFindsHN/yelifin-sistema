@@ -16,7 +16,17 @@
       "Bash(grep -E \"\\\\.tsx$\")",
       "Bash(node scripts/migrate-loyalty.mjs)",
       "Bash(del \"C:\\\\Users\\\\DEVSLS\\\\Documents\\\\GitHub\\\\yelifin-sistema\\\\scripts\\\\migrate-loyalty.mjs\")",
-      "Bash(exit 0)"
+      "Bash(exit 0)",
+      "Bash(npx jest *)",
+      "Bash(npm run *)",
+      "Bash(npx eslint *)",
+      "Bash(/c/Users/hmorales/Documents/GitHub/yelifin-sistema/node_modules/.bin/next lint *)",
+      "Bash(node_modules/.bin/next lint *)",
+      "PowerShell(cd \"C:\\\\Users\\\\hmorales\\\\Documents\\\\GitHub\\\\yelifin-sistema\"; node node_modules\\\\next\\\\dist\\\\bin\\\\next lint -- --dir . 2>&1 | Select-Object -First 80)",
+      "Bash(node node_modules/next/dist/bin/next lint)",
+      "Bash(git *)",
+      "Bash(grep -n \"Cuentas y tarjetas\\\\|ChevronRight\\\\|cc-\\\\${card\\\\|analyticsTab\\\\|categoryData\\\\|BarChart\\\\|Banner\\\\|selectedAccount\\\\|selectedCard\" \"C:/Users/hmorales/Documents/GitHub/yelifin-sistema/app/\\(dashboard\\)/finances/page.tsx\")",
+      "Bash(grep -v \"^$\")"
     ]
   }
 }

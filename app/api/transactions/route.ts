@@ -140,11 +140,12 @@ export async function POST(request: NextRequest) {
       const [ccTxn] = await sql`
         INSERT INTO credit_card_transactions (
           user_id, credit_card_id, type, description,
-          amount, currency, exchange_rate, amount_local, occurred_at
+          amount, currency, exchange_rate, amount_local, category, occurred_at
         ) VALUES (
           ${userId}, ${Number(credit_card_id)}, 'CHARGE',
           ${description ?? null},
           ${amt}, ${currency ?? "LOCAL"}, ${rateNum}, ${amountLocal},
+          ${category ?? null},
           ${occurredAt}
         )
         RETURNING id

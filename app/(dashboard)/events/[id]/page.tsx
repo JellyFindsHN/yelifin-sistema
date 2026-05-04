@@ -1,7 +1,7 @@
 // app/(dashboard)/events/[id]/page.tsx
 "use client";
 
-import { use } from "react";
+import { use, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
@@ -12,10 +12,12 @@ import { Separator } from "@/components/ui/separator";
 import {
   ArrowLeft, Calendar, MapPin, TrendingUp,
   TrendingDown, DollarSign, ShoppingCart,
-  Banknote, CreditCard, ArrowLeftRight, HelpCircle, Tag,
+  Banknote, CreditCard, ArrowLeftRight, HelpCircle, Tag, Pencil,
 } from "lucide-react";
-import { useCurrency } from "@/hooks/swr/use-currency";
-import { useEvent }    from "@/hooks/swr/use-events";
+import { useCurrency }       from "@/hooks/swr/use-currency";
+import { useEvent }          from "@/hooks/swr/use-events";
+import { Fab }               from "@/components/ui/fab";
+import { EditEventDialog }   from "@/components/events/edit-event-dialog";
 
 // ── Utils ──────────────────────────────────────────────────────────────
 const formatDate = (d: string) =>
@@ -44,10 +46,11 @@ const PAYMENT_CONFIG: Record<string, { label: string; icon: any }> = {
 type Props = { params: Promise<{ id: string }> };
 
 export default function EventDetailPage({ params }: Props) {
-  const { id }     = use(params);
-  const router     = useRouter();
-  const { format } = useCurrency();
-  const { event, isLoading } = useEvent(Number(id));
+  const { id }       = use(params);
+  const router       = useRouter();
+  const { format }   = useCurrency();
+  const { event, isLoading, mutate } = useEvent(Number(id));
+  const [editOpen, setEditOpen] = useState(false);
 
   if (isLoading) return <EventDetailSkeleton />;
 
@@ -93,15 +96,6 @@ export default function EventDetailPage({ params }: Props) {
             )}
           </div>
         </div>
-
-        {event.status !== "COMPLETED" && (
-          <Button size="sm" asChild className="shrink-0">
-            <Link href={`/sales/new?event_id=${event.id}`}>
-              <ShoppingCart className="h-3.5 w-3.5 mr-1.5" />
-              Nueva venta
-            </Link>
-          </Button>
-        )}
       </div>
 
       {/* ── Métricas principales ── */}
@@ -290,6 +284,28 @@ export default function EventDetailPage({ params }: Props) {
           </CardContent>
         </Card>
       )}
+
+      <Fab
+        actions={[
+          ...(event.status !== "COMPLETED" ? [{
+            label: "Nueva venta",
+            icon: ShoppingCart,
+            onClick: () => router.push(`/sales/new?event_id=${event.id}`),
+          }] : []),
+          {
+            label: "Editar evento",
+            icon: Pencil,
+            onClick: () => setEditOpen(true),
+          },
+        ]}
+      />
+
+      <EditEventDialog
+        event={event}
+        open={editOpen}
+        onOpenChange={setEditOpen}
+        onSuccess={() => { setEditOpen(false); mutate(); }}
+      />
 
     </div>
   );

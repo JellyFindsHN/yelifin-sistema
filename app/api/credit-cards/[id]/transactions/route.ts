@@ -51,6 +51,7 @@ export async function GET(
         cct.currency,
         cct.exchange_rate,
         cct.amount_local,
+        cct.category,
         cct.sale_id,
         cct.account_transaction_id,
         cct.occurred_at,
