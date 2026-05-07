@@ -26,7 +26,7 @@ import {
   Package, Warehouse, AlertTriangle, DollarSign,
   Plus, MoreVertical, Pencil, Trash2, PackagePlus,
   ShoppingCart, SlidersHorizontal, ArrowLeftRight,
-  ChevronDown, Layers, Box, Clock,
+  ChevronDown, Layers, Box, Clock, Download, Upload,
 } from "lucide-react";
 import Image from "next/image";
 import { toast } from "sonner";
@@ -50,6 +50,8 @@ import { CreateTransactionModal }     from "@/components/transactions/create-tra
 import { useAccounts }                from "@/hooks/swr/use-accounts";
 import { useCreditCards }             from "@/hooks/swr/use-credit-cards";
 import { usePurchases }               from "@/hooks/swr/use-purchases";
+import { BatchExportDialog }          from "@/components/inventory/BatchExportDialog";
+import { BatchImportDialog }          from "@/components/inventory/BatchImportDialog";
 
 // ── Helpers ────────────────────────────────────────────────────────────
 
@@ -80,6 +82,10 @@ export default function InventoryPage() {
   const [deleteProduct,    setDeleteProduct]    = useState<Product | null>(null);
   const [inventoryProduct, setInventoryProduct] = useState<Product | null>(null);
   const [adjustProduct,    setAdjustProduct]    = useState<Product | null>(null);
+
+  // Diálogos de carga masiva
+  const [batchExportOpen, setBatchExportOpen] = useState(false);
+  const [batchImportOpen, setBatchImportOpen] = useState(false);
 
   // Diálogos de variante
   const [variantProduct,      setVariantProduct]      = useState<Product | null>(null);
@@ -127,7 +133,6 @@ export default function InventoryPage() {
     return matchesSearch && matchesStock;
   });
 
-  console.log("InventoryPage render", { inventory, filtered, pendingPurchases });
   const handleSuccess = () => {
     mutateProducts();
     mutateInventory();
@@ -434,14 +439,16 @@ export default function InventoryPage() {
     <div className="space-y-4 pb-24">
 
       {/* Header */}
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight">Inventario</h1>
-        <p className="text-muted-foreground text-sm">
-          {loadingInventory
-            ? "Cargando..."
-            : `${stats.total_products} producto${stats.total_products !== 1 ? "s" : ""} · ${stats.total_stock} unidades`
-          }
-        </p>
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight">Inventario</h1>
+          <p className="text-muted-foreground text-sm">
+            {loadingInventory
+              ? "Cargando..."
+              : `${stats.total_products} producto${stats.total_products !== 1 ? "s" : ""} · ${stats.total_stock} unidades`
+            }
+          </p>
+        </div>
       </div>
 
       {/* Stats */}
@@ -729,9 +736,11 @@ export default function InventoryPage() {
       {/* FAB */}
       <Fab
         actions={[
-          { label: "Nueva transacción", icon: ArrowLeftRight, onClick: () => setTransactionOpen(true) },
-          { label: "Nueva venta",       icon: ShoppingCart,   onClick: () => router.push("/sales/new") },
-          { label: "Nuevo producto",    icon: Plus,           onClick: () => setCreateOpen(true) },
+          { label: "Nueva transacción",  icon: ArrowLeftRight, onClick: () => setTransactionOpen(true) },
+          { label: "Nueva venta",        icon: ShoppingCart,   onClick: () => router.push("/sales/new") },
+          { label: "Nuevo producto",     icon: Plus,           onClick: () => setCreateOpen(true) },
+          { label: "Exportar plantilla", icon: Download,       onClick: () => setBatchExportOpen(true) },
+          { label: "Cargar lote",        icon: Upload,         onClick: () => setBatchImportOpen(true) },
         ]}
       />
 
@@ -825,6 +834,17 @@ export default function InventoryPage() {
         accounts={accounts}
         creditCards={creditCards}
         onSuccess={() => setTransactionOpen(false)}
+      />
+
+      {/* ── Diálogos de carga masiva ─────────────────────────────── */}
+      <BatchExportDialog
+        open={batchExportOpen}
+        onOpenChange={setBatchExportOpen}
+      />
+      <BatchImportDialog
+        open={batchImportOpen}
+        onOpenChange={setBatchImportOpen}
+        onSuccess={handleSuccess}
       />
     </div>
   );
