@@ -1,0 +1,1 @@
+- [Bottom-sheet dialog layout pattern](feedback_dialog_layout.md) — never put `flex`/`max-h` on `DialogContent`; use an inner wrapper div for scroll layout

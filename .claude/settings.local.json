@@ -26,7 +26,12 @@
       "Bash(node node_modules/next/dist/bin/next lint)",
       "Bash(git *)",
       "Bash(grep -n \"Cuentas y tarjetas\\\\|ChevronRight\\\\|cc-\\\\${card\\\\|analyticsTab\\\\|categoryData\\\\|BarChart\\\\|Banner\\\\|selectedAccount\\\\|selectedCard\" \"C:/Users/hmorales/Documents/GitHub/yelifin-sistema/app/\\(dashboard\\)/finances/page.tsx\")",
-      "Bash(grep -v \"^$\")"
+      "Bash(grep -v \"^$\")",
+      "Bash(node -e \"const p=require\\('./package.json'\\); const d=p.dependencies||{}; const dd=p.devDependencies||{}; console.log\\('xlsx dep:', d['xlsx']\\); console.log\\('xlsx devDep:', dd['xlsx']\\); console.log\\('@types/xlsx dep:', dd['@types/xlsx']\\);\")",
+      "Bash(node -e \"const x=require\\('xlsx'\\); console.log\\('SSF.parse_date_code:', typeof x.SSF?.parse_date_code\\);\")",
+      "Bash(findstr /i \"batch\")",
+      "Bash(Select-String -Pattern \"inventory|BatchExport|BatchImport|inventory-batch\")",
+      "PowerShell(cd \"C:\\\\Users\\\\hmorales\\\\Documents\\\\GitHub\\\\yelifin-sistema\"; $out = & npx tsc --noEmit 2>&1 | Out-String; $out | Select-String -Pattern \"inventory|BatchExport|BatchImport|xlsx|XLSX|components.inventory\" -AllMatches | ForEach-Object { $_.Line })"
     ]
   }
 }

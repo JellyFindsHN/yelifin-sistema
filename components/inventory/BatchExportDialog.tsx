@@ -133,24 +133,22 @@ export function BatchExportDialog({ open, onOpenChange }: Props) {
       */}
       <DialogContent
         className={cn(
-          // Posición bottom-sheet en móvil
           "fixed bottom-0 left-0 right-0 top-auto translate-x-0 translate-y-0",
           "w-full max-w-full rounded-t-2xl rounded-b-none border-t border-x-0 border-b-0",
           "p-0",
-          // Centrado en desktop
           "sm:bottom-auto sm:left-1/2 sm:right-auto sm:top-1/2",
           "sm:-translate-x-1/2 sm:-translate-y-1/2",
-          "sm:w-full sm:max-w-lg sm:rounded-2xl sm:border",
-          // Animaciones
+          "sm:w-full sm:max-w-md lg:max-w-xl xl:max-w-xl",
+          "sm:rounded-2xl sm:border",
           "data-[state=open]:animate-in data-[state=closed]:animate-out",
           "data-[state=open]:slide-in-from-bottom sm:data-[state=open]:slide-in-from-bottom-[48%]",
           "data-[state=closed]:slide-out-to-bottom sm:data-[state=closed]:slide-out-to-bottom-[48%]",
-          "duration-300"
+          "duration-300",
         )}
         onInteractOutside={(e) => { if (isDownloading) e.preventDefault(); }}
       >
-        {/* Wrapper interno: aquí va el flex + max-height para el scroll */}
-        <div className="flex flex-col max-h-[88dvh] sm:max-h-[82vh] overflow-hidden">
+        {/* Wrapper interno: maneja el layout flex y la altura máxima para scroll correcto */}
+        <div className="flex flex-col max-h-[92dvh] sm:max-h-[88vh] overflow-hidden">
 
           {/* Handle móvil */}
           <div className="sm:hidden flex justify-center pt-3 pb-1 shrink-0">
@@ -263,7 +261,7 @@ export function BatchExportDialog({ open, onOpenChange }: Props) {
           </ScrollArea>
 
           {/* Footer */}
-          <div className="shrink-0 px-5 py-4 border-t bg-background flex items-center gap-3">
+          <div className="shrink-0 px-5 py-4 border-t bg-background flex gap-3">
             <Button
               type="button"
               variant="outline"

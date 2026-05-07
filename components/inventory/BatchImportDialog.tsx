@@ -40,17 +40,17 @@ async function parseExcelPreview(file: File): Promise<BatchPreviewRow[]> {
   });
 
   return raw.map((row, i): BatchPreviewRow => {
-    const sku             = String(row["sku"] ?? "").trim();
+    const sku = String(row["sku"] ?? "").trim();
     const nombre_producto = String(row["nombre_producto"] ?? "").trim();
-    const variante_id     = row["variante_id"] ? String(row["variante_id"]).trim() : null;
+    const variante_id = row["variante_id"] ? String(row["variante_id"]).trim() : null;
     const nombre_variante = row["nombre_variante"] ? String(row["nombre_variante"]).trim() : null;
-    const cantidad        = row["cantidad"];
+    const cantidad = row["cantidad"];
     const precio_unitario = row["precio_unitario"];
-    const moneda          = String(row["moneda"] ?? "").trim().toUpperCase();
-    const cuenta          = row["cuenta"] ? String(row["cuenta"]).trim() : null;
-    const tipo_cambio     = row["tipo_cambio"];
-    const fecha           = String(row["fecha"] ?? "").trim();
-    const notas           = row["notas"] ? String(row["notas"]).trim() : null;
+    const moneda = String(row["moneda"] ?? "").trim().toUpperCase();
+    const cuenta = row["cuenta"] ? String(row["cuenta"]).trim() : null;
+    const tipo_cambio = row["tipo_cambio"];
+    const fecha = String(row["fecha"] ?? "").trim();
+    const notas = row["notas"] ? String(row["notas"]).trim() : null;
 
     let valido = true;
     let error_local: string | undefined;
@@ -190,9 +190,9 @@ export function BatchImportDialog({ open, onOpenChange, onSuccess }: Props) {
     }
   };
 
-  const validCount   = preview.filter((r) => r.valido).length;
+  const validCount = preview.filter((r) => r.valido).length;
   const invalidCount = preview.filter((r) => !r.valido).length;
-  const PREVIEW_MAX  = 50;
+  const PREVIEW_MAX = 50;
 
   return (
     <Dialog open={open} onOpenChange={(v) => { if (!v) handleClose(); }}>
@@ -203,15 +203,16 @@ export function BatchImportDialog({ open, onOpenChange, onSuccess }: Props) {
           "p-0",
           "sm:bottom-auto sm:left-1/2 sm:right-auto sm:top-1/2",
           "sm:-translate-x-1/2 sm:-translate-y-1/2",
-          "sm:w-full sm:max-w-2xl sm:rounded-2xl sm:border",
+          "sm:w-full sm:max-w-md lg:max-w-xl xl:max-w-xl",
+          "sm:rounded-2xl sm:border",
           "data-[state=open]:animate-in data-[state=closed]:animate-out",
           "data-[state=open]:slide-in-from-bottom sm:data-[state=open]:slide-in-from-bottom-[48%]",
           "data-[state=closed]:slide-out-to-bottom sm:data-[state=closed]:slide-out-to-bottom-[48%]",
-          "duration-300"
+          "duration-300",
         )}
         onInteractOutside={(e) => { if (isProcessing) e.preventDefault(); }}
       >
-        {/* Wrapper interno: flex + max-height + overflow para scroll correcto */}
+        {/* Wrapper interno: maneja el layout flex y la altura máxima para scroll correcto */}
         <div className="flex flex-col max-h-[92dvh] sm:max-h-[88vh] overflow-hidden">
 
           {/* Handle móvil */}
@@ -248,7 +249,7 @@ export function BatchImportDialog({ open, onOpenChange, onSuccess }: Props) {
                   onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
                   onDragLeave={() => setDragOver(false)}
                   onClick={() => !isParsing && inputRef.current?.click()}
-                  onKeyDown={(e) => e.key === "Enter" && !isParsing && inputRef.current?.click()}
+                  onKeyDown={(e) => (e.key === "Enter" || e.key === " ") && !isParsing && inputRef.current?.click()}
                   className={cn(
                     "w-full max-w-sm rounded-2xl border-2 border-dashed p-10 flex flex-col items-center gap-4",
                     "cursor-pointer transition-colors",
@@ -302,7 +303,7 @@ export function BatchImportDialog({ open, onOpenChange, onSuccess }: Props) {
               <div className="shrink-0 px-5 py-3 border-b bg-muted/30 flex flex-wrap items-center gap-3">
                 <div className="flex items-center gap-1.5 text-sm">
                   <FileSpreadsheet className="h-4 w-4 text-muted-foreground" />
-                  <span className="font-medium truncate max-w-[180px]">{file?.name}</span>
+                  <span className="font-medium truncate max-w-45">{file?.name}</span>
                 </div>
                 <div className="flex items-center gap-2 ml-auto">
                   <Badge className="bg-green-100 text-green-700 border-green-200 gap-1">
@@ -347,7 +348,7 @@ export function BatchImportDialog({ open, onOpenChange, onSuccess }: Props) {
                             {row.sku || "—"}
                           </TableCell>
                           <TableCell className="text-sm">
-                            <p className="font-medium truncate max-w-[120px]">
+                            <p className="font-medium truncate max-w-30">
                               {row.nombre_producto || "—"}
                             </p>
                             {row.nombre_variante && (
@@ -361,7 +362,7 @@ export function BatchImportDialog({ open, onOpenChange, onSuccess }: Props) {
                             {row.precio_unitario != null ? String(row.precio_unitario) : "—"}
                           </TableCell>
                           <TableCell className="text-sm">{row.moneda || "—"}</TableCell>
-                          <TableCell className="text-xs text-muted-foreground truncate max-w-[100px]">
+                          <TableCell className="text-xs text-muted-foreground truncate max-w-25">
                             {row.cuenta || "—"}
                           </TableCell>
                           <TableCell className="text-xs text-muted-foreground">
@@ -375,7 +376,7 @@ export function BatchImportDialog({ open, onOpenChange, onSuccess }: Props) {
                             ) : (
                               <Badge
                                 variant="destructive"
-                                className="text-xs max-w-[96px] truncate"
+                                className="text-xs max-w-24 truncate"
                                 title={row.error_local}
                               >
                                 {row.error_local}
@@ -500,7 +501,6 @@ export function BatchImportDialog({ open, onOpenChange, onSuccess }: Props) {
                   </div>
                 )}
               </div>
-
               <div className="shrink-0 px-5 py-4 border-t bg-background flex gap-3">
                 {result.errores.length > 0 && (
                   <Button
@@ -521,8 +521,10 @@ export function BatchImportDialog({ open, onOpenChange, onSuccess }: Props) {
                   {result.errores.length > 0 ? "Cerrar" : "Finalizar"}
                 </Button>
               </div>
+
             </div>
           )}
+
 
         </div>
       </DialogContent>

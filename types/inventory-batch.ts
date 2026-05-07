@@ -6,23 +6,6 @@ export interface BatchExportRequest {
   productIds: number[];
 }
 
-// ── Estructura de cada fila del Excel (importación) ────────────────────
-
-export interface BatchImportRow {
-  fila: number;
-  sku: string;
-  nombre_producto: string;
-  variante_id: string | null;
-  nombre_variante: string | null;
-  cantidad: number;
-  precio_unitario: number;
-  moneda: string;
-  cuenta: string | null;
-  tipo_cambio: number;
-  fecha: string;
-  notas: string | null;
-}
-
 // ── Resultado del import ───────────────────────────────────────────────
 
 export interface BatchImportErrorDetail {
