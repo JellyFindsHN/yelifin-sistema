@@ -341,7 +341,7 @@ export function CreateProductVariantDialog({
 
               <div className="space-y-2">
                 {attributes.map((attr, index) => (
-                  <div key={index} className="flex items-center gap-2">
+                  <div key={`${attr.key}-${index}`} className="flex items-center gap-2">
                     <Input
                       value={attr.key}
                       onChange={(e) => updateAttribute(index, "key", e.target.value)}

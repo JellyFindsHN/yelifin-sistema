@@ -87,7 +87,7 @@ export default function InventoryReportPage() {
       {/* Stats */}
       {isLoading ? (
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-          {[1,2,3,4].map(i => <Skeleton key={i} className="h-20 rounded-xl" />)}
+          {[1,2,3,4].map(i => <Skeleton key={i} className="h-20 rounded-xl" />)}{/* skeleton - index key ok */}
         </div>
       ) : summary && (
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
@@ -184,9 +184,9 @@ export default function InventoryReportPage() {
                 </tr>
               </thead>
               <tbody>
-                {movements.map((m, i) => (
-                  <tr key={i} className="border-b last:border-0 hover:bg-muted/20 transition-colors">
-                    <td className="px-4 py-2.5 text-muted-foreground text-xs">
+                {movements.map((m) => (
+                  <tr key={`${m.product_name}-${m.created_at}-${m.movement_type}`} className="border-b last:border-0 hover:bg-muted/20 transition-colors">
+                    <td className="px-4 py-2.5 text-muted-foreground text-xs" suppressHydrationWarning>
                       {new Date(m.created_at).toLocaleDateString("es-HN", { day: "numeric", month: "short" })}
                     </td>
                     <td className="px-4 py-2.5">

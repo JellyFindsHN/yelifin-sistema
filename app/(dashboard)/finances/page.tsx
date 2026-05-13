@@ -391,7 +391,7 @@ export default function FinancesPage() {
                           {t.account_name}
                           {t.to_account_name && <span> → {t.to_account_name}</span>}
                           {" · "}
-                          {new Date(t.occurred_at).toLocaleTimeString("es-HN", { hour: "2-digit", minute: "2-digit" })}
+                          <span suppressHydrationWarning>{new Date(t.occurred_at).toLocaleTimeString("es-HN", { hour: "2-digit", minute: "2-digit" })}</span>
                         </p>
                       </div>
                       <p className={`text-sm font-bold shrink-0 ${cfg.color}`}>

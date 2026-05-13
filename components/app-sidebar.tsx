@@ -101,6 +101,105 @@ const settingsNav = [
   },
 ]
 
+// ── Icon-only item (collapsed) ─────────────────────────────────────────
+function CollapsedItem({
+  item,
+  isActive,
+  closeOnMobile,
+  pathname,
+}: {
+  item: any;
+  isActive: (url: string) => boolean;
+  closeOnMobile: () => void;
+  pathname: string;
+}) {
+  return (
+    <SidebarMenuItem>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <SidebarMenuButton
+            asChild
+            isActive={isActive(item.url)}
+            className="justify-center"
+          >
+            <Link href={item.submenu ? item.submenu[0].url : item.url} onClick={closeOnMobile}>
+              <item.icon className="h-4 w-4" />
+            </Link>
+          </SidebarMenuButton>
+        </TooltipTrigger>
+        <TooltipContent side="right" className="flex flex-col gap-0.5 py-2 px-3 bg-foreground text-background">
+          <span className="font-medium text-sm text-white">{item.title}</span>
+          {item.submenu && (
+            <div className="flex flex-col gap-0.5 mt-1">
+              {item.submenu.map((s: any) => (
+                <Link
+                  key={s.url}
+                  href={s.url}
+                  onClick={closeOnMobile}
+                  className={`text-xs transition-opacity text-white ${
+                    pathname === s.url
+                      ? "font-medium opacity-100"
+                      : "opacity-70 hover:opacity-100"
+                  }`}
+                >
+                  {s.title}
+                </Link>
+              ))}
+            </div>
+          )}
+        </TooltipContent>
+      </Tooltip>
+    </SidebarMenuItem>
+  )
+}
+
+// ── Full item (expanded) ───────────────────────────────────────────────
+function ExpandedItem({
+  item,
+  isActive,
+  closeOnMobile,
+  pathname,
+}: {
+  item: any;
+  isActive: (url: string) => boolean;
+  closeOnMobile: () => void;
+  pathname: string;
+}) {
+  return (
+    <SidebarMenuItem>
+      {item.submenu ? (
+        <Collapsible defaultOpen={isActive(item.url)} className="group/collapsible">
+          <CollapsibleTrigger asChild>
+            <SidebarMenuButton isActive={isActive(item.url)}>
+              <item.icon className="h-4 w-4" />
+              <span>{item.title}</span>
+              <ChevronDown className="ml-auto h-4 w-4 transition-transform group-data-[state=open]/collapsible:rotate-180" />
+            </SidebarMenuButton>
+          </CollapsibleTrigger>
+          <CollapsibleContent>
+            <SidebarMenuSub>
+              {item.submenu.map((sub: any) => (
+                <SidebarMenuSubItem key={sub.title}>
+                  <SidebarMenuSubButton asChild isActive={pathname === sub.url}>
+                    <Link href={sub.url} onClick={closeOnMobile}>{sub.title}</Link>
+                  </SidebarMenuSubButton>
+                </SidebarMenuSubItem>
+              ))}
+            </SidebarMenuSub>
+          </CollapsibleContent>
+        </Collapsible>
+      ) : (
+        <SidebarMenuButton asChild isActive={isActive(item.url)}>
+          <Link href={item.url} onClick={closeOnMobile}>
+            <item.icon className="h-4 w-4" />
+            <span>{item.title}</span>
+          </Link>
+        </SidebarMenuButton>
+      )}
+    </SidebarMenuItem>
+  )
+}
+
 // ── Component ───────────────────────────────────────────────────────────
 export function AppSidebar() {
   const pathname = usePathname()
@@ -139,86 +238,11 @@ export function AppSidebar() {
 
   const isAdmin = user?.subscription?.plan?.name === "Admin"
 
-  // ── Icon-only item (collapsed) ─────────────────────────────────────
-  const CollapsedItem = ({ item }: { item: any }) => (
-    <SidebarMenuItem>
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <SidebarMenuButton
-            asChild
-            isActive={isActive(item.url)}
-            className="justify-center"
-          >
-            <Link href={item.submenu ? item.submenu[0].url : item.url} onClick={closeOnMobile}>
-              <item.icon className="h-4 w-4" />
-            </Link>
-          </SidebarMenuButton>
-        </TooltipTrigger>
-        <TooltipContent side="right" className="flex flex-col gap-0.5 py-2 px-3 bg-foreground text-background">
-          <span className="font-medium text-sm text-white">{item.title}</span>
-          {item.submenu && (
-            <div className="flex flex-col gap-0.5 mt-1">
-              {item.submenu.map((s: any) => (
-                <Link
-                  key={s.url}
-                  href={s.url}
-                  onClick={closeOnMobile}
-                  className={`text-xs transition-opacity text-white ${
-                    pathname === s.url
-                      ? "font-medium opacity-100"
-                      : "opacity-70 hover:opacity-100"
-                  }`}
-                >
-                  {s.title}
-                </Link>
-              ))}
-            </div>
-          )}
-        </TooltipContent>
-      </Tooltip>
-    </SidebarMenuItem>
-  )
-
-  // ── Full item (expanded) ───────────────────────────────────────────
-  const ExpandedItem = ({ item }: { item: any }) => (
-    <SidebarMenuItem>
-      {item.submenu ? (
-        <Collapsible defaultOpen={isActive(item.url)} className="group/collapsible">
-          <CollapsibleTrigger asChild>
-            <SidebarMenuButton isActive={isActive(item.url)}>
-              <item.icon className="h-4 w-4" />
-              <span>{item.title}</span>
-              <ChevronDown className="ml-auto h-4 w-4 transition-transform group-data-[state=open]/collapsible:rotate-180" />
-            </SidebarMenuButton>
-          </CollapsibleTrigger>
-          <CollapsibleContent>
-            <SidebarMenuSub>
-              {item.submenu.map((sub: any) => (
-                <SidebarMenuSubItem key={sub.title}>
-                  <SidebarMenuSubButton asChild isActive={pathname === sub.url}>
-                    <Link href={sub.url} onClick={closeOnMobile}>{sub.title}</Link>
-                  </SidebarMenuSubButton>
-                </SidebarMenuSubItem>
-              ))}
-            </SidebarMenuSub>
-          </CollapsibleContent>
-        </Collapsible>
-      ) : (
-        <SidebarMenuButton asChild isActive={isActive(item.url)}>
-          <Link href={item.url} onClick={closeOnMobile}>
-            <item.icon className="h-4 w-4" />
-            <span>{item.title}</span>
-          </Link>
-        </SidebarMenuButton>
-      )}
-    </SidebarMenuItem>
-  )
-
   const renderNav = (items: any[]) =>
     items.map((item) =>
       isCollapsed
-        ? <CollapsedItem key={item.title} item={item} />
-        : <ExpandedItem  key={item.title} item={item} />
+        ? <CollapsedItem key={item.title} item={item} isActive={isActive} closeOnMobile={closeOnMobile} pathname={pathname} />
+        : <ExpandedItem  key={item.title} item={item} isActive={isActive} closeOnMobile={closeOnMobile} pathname={pathname} />
     )
 
   return (

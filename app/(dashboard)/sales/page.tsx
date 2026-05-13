@@ -365,7 +365,7 @@ export default function SalesPage() {
       {/* Cards móvil */}
       <div className="space-y-2 lg:hidden">
         {isLoading ? (
-          Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-24 w-full rounded-xl" />)
+          Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-24 w-full rounded-xl" />) /* skeleton - index key ok */
         ) : filtered.length === 0 ? (
           <Card>
             <CardContent className="flex flex-col items-center justify-center py-12">
@@ -463,6 +463,7 @@ export default function SalesPage() {
             </TableHeader>
             <TableBody>
               {isLoading ? (
+                /* skeleton - index key ok */
                 Array.from({ length: 5 }).map((_, i) => (
                   <TableRow key={i}>
                     {Array.from({ length: 11 }).map((__, j) => (

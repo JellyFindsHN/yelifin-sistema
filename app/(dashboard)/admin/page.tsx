@@ -2,7 +2,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useMe } from "@/hooks/swr/use-me";
+import { useAuth } from "@/hooks/use-auth";
 import { useAdminStats } from "@/hooks/swr/use-admin";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -31,12 +31,12 @@ const STATUS_COLOR: Record<string, string> = {
 
 export default function AdminPage() {
   const router = useRouter();
-  const { profile, isLoading: meLoading } = useMe();
+  const { user, loading } = useAuth();
   const { counts, planStats, recentUsers, isLoading } = useAdminStats();
 
-  // Redirect if not admin (plan slug is not "admin")
-  // The sidebar already hides the link, but guard here just in case
-  if (!meLoading && !profile) {
+  const isAdmin = user?.subscription?.plan?.name === "Admin";
+
+  if (!loading && !isAdmin) {
     router.replace("/dashboard");
     return null;
   }
@@ -57,7 +57,7 @@ export default function AdminPage() {
       {/* Stat cards */}
       {isLoading ? (
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-          {[1,2,3,4].map(i => <Skeleton key={i} className="h-24 rounded-xl" />)}
+          {[1,2,3,4].map(i => <Skeleton key={i} className="h-24 rounded-xl" />)}{/* skeleton - index key ok */}
         </div>
       ) : counts ? (
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
@@ -99,7 +99,7 @@ export default function AdminPage() {
           </CardHeader>
           <CardContent className="space-y-2">
             {isLoading ? (
-              <div className="space-y-2">{[1,2,3].map(i => <Skeleton key={i} className="h-8" />)}</div>
+              <div className="space-y-2">{[1,2,3].map(i => <Skeleton key={i} className="h-8" />)}{/* skeleton - index key ok */}</div>
             ) : planStats.length === 0 ? (
               <p className="text-sm text-muted-foreground">Sin datos</p>
             ) : (
@@ -150,7 +150,7 @@ export default function AdminPage() {
         </CardHeader>
         <CardContent>
           {isLoading ? (
-            <div className="space-y-2">{[1,2,3].map(i => <Skeleton key={i} className="h-12" />)}</div>
+            <div className="space-y-2">{[1,2,3].map(i => <Skeleton key={i} className="h-12" />)}{/* skeleton - index key ok */}</div>
           ) : (
             <div className="divide-y">
               {recentUsers.map((u) => (
@@ -171,7 +171,7 @@ export default function AdminPage() {
                         {STATUS_LABEL[(u as any).subscription_status] ?? (u as any).subscription_status}
                       </Badge>
                     )}
-                    <span className="text-xs text-muted-foreground">
+                    <span className="text-xs text-muted-foreground" suppressHydrationWarning>
                       {new Date(u.created_at).toLocaleDateString("es-HN", { day: "numeric", month: "short" })}
                     </span>
                     <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />

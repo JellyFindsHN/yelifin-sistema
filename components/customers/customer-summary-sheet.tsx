@@ -164,7 +164,7 @@ export function CustomerSummarySheet({ customer, open, onOpenChange, onEdit, onD
                       <div key={sale.id} className="flex items-center justify-between px-3.5 py-2.5 hover:bg-muted/30 transition-colors">
                         <div className="min-w-0">
                           <p className="text-sm font-medium">{sale.sale_number}</p>
-                          <p className="text-xs text-muted-foreground">
+                          <p className="text-xs text-muted-foreground" suppressHydrationWarning>
                             {new Date(sale.sold_at).toLocaleDateString("es-HN", { day: "numeric", month: "short", year: "numeric" })}
                           </p>
                         </div>
@@ -195,7 +195,7 @@ export function CustomerSummarySheet({ customer, open, onOpenChange, onEdit, onD
               {/* Registro */}
               <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
                 <Calendar className="h-3 w-3" />
-                Cliente desde {new Date(summary.created_at).toLocaleDateString("es-HN", { day: "numeric", month: "long", year: "numeric" })}
+                Cliente desde <span suppressHydrationWarning>{new Date(summary.created_at).toLocaleDateString("es-HN", { day: "numeric", month: "long", year: "numeric" })}</span>
               </div>
             </>
           ) : null}
@@ -229,7 +229,7 @@ function StatCard({ icon, label, value }: { icon: React.ReactNode; label: string
         {icon}
         <span className="text-[10px] font-medium text-muted-foreground uppercase tracking-wide">{label}</span>
       </div>
-      <p className="text-sm font-bold leading-tight break-all">{value}</p>
+      <p className="text-sm font-bold leading-tight break-all" suppressHydrationWarning>{value}</p>
     </div>
   );
 }

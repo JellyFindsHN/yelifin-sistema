@@ -108,7 +108,7 @@ export function ConfirmPurchaseArrivalDialog({
             Confirmar llegada
           </DialogTitle>
           <p className="text-xs text-muted-foreground">
-            Compra del {purchasedDate} · {purchase.items_count} producto{purchase.items_count !== 1 ? "s" : ""}
+            Compra del <span suppressHydrationWarning>{purchasedDate}</span> · {purchase.items_count} producto{purchase.items_count !== 1 ? "s" : ""}
           </p>
         </DialogHeader>
 

@@ -67,7 +67,7 @@ export function MobileSummary({ lowStock, recentSales, isLoading }: Props) {
                   >
                     <div className="min-w-0">
                       <p className="font-mono text-sm font-medium">{sale.sale_number}</p>
-                      <p className="text-xs text-muted-foreground truncate">
+                      <p className="text-xs text-muted-foreground truncate" suppressHydrationWarning>
                         {sale.customer_name ?? "Anónimo"} · {formatDateFull(sale.sold_at)}
                       </p>
                     </div>

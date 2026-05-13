@@ -108,6 +108,49 @@ type Row =
   | { _src: "account"; data: Transaction }
   | { _src: "cc"; data: AllCardTransaction };
 
+// ── Module-level Actions menu (solo transacciones de cuenta) ──────────
+function ActionsMenu({
+  t,
+  isEditable,
+  onEdit,
+  onDelete,
+}: {
+  t: Transaction;
+  isEditable: (t: Transaction) => boolean;
+  onEdit: (t: Transaction) => void;
+  onDelete: (t: Transaction) => void;
+}) {
+  if (!isEditable(t)) return <div className="w-8" />;
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-8 w-8 shrink-0"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <MoreVertical className="h-4 w-4" />
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end">
+        <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onEdit(t); }}>
+          <Pencil className="h-4 w-4 mr-2" />
+          Editar
+        </DropdownMenuItem>
+        <DropdownMenuSeparator />
+        <DropdownMenuItem
+          className="text-destructive focus:text-destructive"
+          onClick={(e) => { e.stopPropagation(); onDelete(t); }}
+        >
+          <Trash2 className="h-4 w-4 mr-2" />
+          Eliminar
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
+
 // ── Page ───────────────────────────────────────────────────────────────
 export default function TransactionsPage() {
   const router = useRouter();
@@ -257,39 +300,6 @@ export default function TransactionsPage() {
 
   const isEditable = (t: Transaction) => t.reference_type === "OTHER" || !t.reference_type;
 
-  // ── Actions menu (solo transacciones de cuenta) ────────────────────
-  const ActionsMenu = ({ t }: { t: Transaction }) => {
-    if (!isEditable(t)) return <div className="w-8" />;
-    return (
-      <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-8 w-8 shrink-0"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <MoreVertical className="h-4 w-4" />
-          </Button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="end">
-          <DropdownMenuItem onClick={(e) => { e.stopPropagation(); setEditingTx(t); }}>
-            <Pencil className="h-4 w-4 mr-2" />
-            Editar
-          </DropdownMenuItem>
-          <DropdownMenuSeparator />
-          <DropdownMenuItem
-            className="text-destructive focus:text-destructive"
-            onClick={(e) => { e.stopPropagation(); setDeletingTx(t); }}
-          >
-            <Trash2 className="h-4 w-4 mr-2" />
-            Eliminar
-          </DropdownMenuItem>
-        </DropdownMenuContent>
-      </DropdownMenu>
-    );
-  };
-
   // ── Row renderers ──────────────────────────────────────────────────
   const renderMobileCard = (row: Row, i: number) => {
     if (row._src === "account") {
@@ -329,7 +339,7 @@ export default function TransactionsPage() {
                         {cfg.label}
                       </Badge>
                     </div>
-                    <ActionsMenu t={t} />
+                    <ActionsMenu t={t} isEditable={isEditable} onEdit={setEditingTx} onDelete={setDeletingTx} />
                   </div>
                 </div>
               </div>
@@ -426,7 +436,7 @@ export default function TransactionsPage() {
             {cfg.sign}{format(Number(t.amount))}
           </TableCell>
           <TableCell>
-            <ActionsMenu t={t} />
+            <ActionsMenu t={t} isEditable={isEditable} onEdit={setEditingTx} onDelete={setDeletingTx} />
           </TableCell>
         </TableRow>
       );
@@ -705,8 +715,8 @@ export default function TransactionsPage() {
                     outerRadius={80}
                     paddingAngle={2}
                   >
-                    {(analyticsTab === "expense" ? categoryData.expenses : categoryData.income).map((_, i) => (
-                      <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />
+                    {(analyticsTab === "expense" ? categoryData.expenses : categoryData.income).map((cat, i) => (
+                      <Cell key={cat.name} fill={PIE_COLORS[i % PIE_COLORS.length]} />
                     ))}
                   </Pie>
                   <Tooltip

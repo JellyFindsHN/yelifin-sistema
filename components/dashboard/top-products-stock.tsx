@@ -33,8 +33,8 @@ export function TopProductsStock({ topProducts, lowStock, isLoading }: Props) {
                 <YAxis dataKey="name" type="category" tick={{ fontSize: 11 }} tickLine={false} axisLine={false} width={110} />
                 <Tooltip contentStyle={{ backgroundColor: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: "8px" }} />
                 <Bar dataKey="units_sold" radius={[0, 4, 4, 0]} name="Unidades">
-                  {topProducts.map((_: any, i: number) => (
-                    <Cell key={i} fill={CHART_COLORS[i % CHART_COLORS.length]} />
+                  {topProducts.map((p: any, i: number) => (
+                    <Cell key={p.name} fill={CHART_COLORS[i % CHART_COLORS.length]} />
                   ))}
                 </Bar>
               </BarChart>
@@ -53,7 +53,7 @@ export function TopProductsStock({ topProducts, lowStock, isLoading }: Props) {
         </CardHeader>
         <CardContent className="px-4 pb-4">
           {isLoading ? (
-            <div className="space-y-2">{Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-11 w-full" />)}</div>
+            <div className="space-y-2">{Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-11 w-full" />)}{/* skeleton - index key ok */}</div>
           ) : !lowStock.length ? (
             <p className="text-sm text-muted-foreground text-center py-8">Sin alertas de stock</p>
           ) : (

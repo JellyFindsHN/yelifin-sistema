@@ -40,7 +40,11 @@ type FormData = z.infer<typeof schema>;
 
 // ── Tipos ──────────────────────────────────────────────────────────────
 
-type AttributePair = { key: string; value: string };
+function uid() {
+  return Math.random().toString(36).slice(2, 9);
+}
+
+type AttributePair = { id: string; key: string; value: string };
 
 type Props = {
   open:          boolean;
@@ -80,7 +84,7 @@ export function EditProductVariantDialog({
   const [imagePreview,     setImagePreview]      = useState<string | null>(null);
   const [isUploadingImage, setIsUploadingImage]  = useState(false);
   const [attributes,       setAttributes]        = useState<AttributePair[]>([
-    { key: "", value: "" },
+    { id: uid(), key: "", value: "" },
   ]);
 
   const {
@@ -108,10 +112,10 @@ export function EditProductVariantDialog({
 
       if (variant.attributes && Object.keys(variant.attributes).length > 0) {
         setAttributes(
-          Object.entries(variant.attributes).map(([key, value]) => ({ key, value }))
+          Object.entries(variant.attributes).map(([key, value]) => ({ id: uid(), key, value }))
         );
       } else {
-        setAttributes([{ key: "", value: "" }]);
+        setAttributes([{ id: uid(), key: "", value: "" }]);
       }
     }
   }, [variant, open, reset, baseSku, variantIndex]);
@@ -119,20 +123,20 @@ export function EditProductVariantDialog({
   // ── Atributos dinámicos ────────────────────────────────────────────
 
   const addAttribute = () => {
-    setAttributes((prev) => [...prev, { key: "", value: "" }]);
+    setAttributes((prev) => [...prev, { id: uid(), key: "", value: "" }]);
   };
 
-  const removeAttribute = (index: number) => {
-    setAttributes((prev) => prev.filter((_, i) => i !== index));
+  const removeAttribute = (id: string) => {
+    setAttributes((prev) => prev.filter((attr) => attr.id !== id));
   };
 
   const updateAttribute = (
-    index: number,
+    id: string,
     field: "key" | "value",
     value: string
   ) => {
     setAttributes((prev) =>
-      prev.map((attr, i) => (i === index ? { ...attr, [field]: value } : attr))
+      prev.map((attr) => (attr.id === id ? { ...attr, [field]: value } : attr))
     );
   };
 
@@ -336,18 +340,18 @@ export function EditProductVariantDialog({
               </div>
 
               <div className="space-y-2">
-                {attributes.map((attr, index) => (
-                  <div key={index} className="flex items-center gap-2">
+                {attributes.map((attr) => (
+                  <div key={attr.id} className="flex items-center gap-2">
                     <Input
                       value={attr.key}
-                      onChange={(e) => updateAttribute(index, "key", e.target.value)}
+                      onChange={(e) => updateAttribute(attr.id, "key", e.target.value)}
                       placeholder="Ej: Color"
                       disabled={isLoading}
                       className="h-10 text-sm flex-1"
                     />
                     <Input
                       value={attr.value}
-                      onChange={(e) => updateAttribute(index, "value", e.target.value)}
+                      onChange={(e) => updateAttribute(attr.id, "value", e.target.value)}
                       placeholder="Ej: Rojo"
                       disabled={isLoading}
                       className="h-10 text-sm flex-1"
@@ -356,7 +360,7 @@ export function EditProductVariantDialog({
                       type="button"
                       variant="ghost"
                       size="icon"
-                      onClick={() => removeAttribute(index)}
+                      onClick={() => removeAttribute(attr.id)}
                       disabled={isLoading || attributes.length === 1}
                       className="h-10 w-10 shrink-0 text-muted-foreground hover:text-destructive"
                     >

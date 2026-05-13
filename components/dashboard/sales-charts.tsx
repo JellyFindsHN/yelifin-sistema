@@ -111,8 +111,8 @@ export function SalesCharts({ salesChart, paymentMethods, periodLabel, isLoading
                     fontWeight: 600
                   }}
                 >
-                  {paymentMethods.map((_: any, i: number) => (
-                    <Cell key={i} fill={CHART_COLORS[i % CHART_COLORS.length]} />
+                  {paymentMethods.map((pm: any, i: number) => (
+                    <Cell key={pm.name} fill={CHART_COLORS[i % CHART_COLORS.length]} />
                   ))}
                 </Pie>
                 <Tooltip

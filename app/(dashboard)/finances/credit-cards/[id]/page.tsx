@@ -348,7 +348,7 @@ function CreditCardTxnRow({
           {txn.description || (isCharge ? "Compra" : "Pago de tarjeta")}
         </p>
         <div className="flex items-center gap-2 flex-wrap">
-          <p className="text-xs text-muted-foreground">
+          <p className="text-xs text-muted-foreground" suppressHydrationWarning>
             {new Date(txn.occurred_at).toLocaleDateString("es-HN", {
               day: "numeric", month: "short", year: "numeric",
             })}

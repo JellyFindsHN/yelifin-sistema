@@ -87,7 +87,7 @@ export function ReportShell({
 
         <div className="flex-1 min-w-0">
           <h1 className="text-2xl font-bold tracking-tight">{title}</h1>
-          {subtitle && <p className="text-sm text-muted-foreground">{subtitle}</p>}
+          {subtitle && <p className="text-sm text-muted-foreground" suppressHydrationWarning>{subtitle}</p>}
         </div>
 
         {/* Export buttons */}

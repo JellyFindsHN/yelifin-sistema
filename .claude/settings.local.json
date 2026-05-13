@@ -26,7 +26,11 @@
       "Bash(node node_modules/next/dist/bin/next lint)",
       "Bash(git *)",
       "Bash(grep -n \"Cuentas y tarjetas\\\\|ChevronRight\\\\|cc-\\\\${card\\\\|analyticsTab\\\\|categoryData\\\\|BarChart\\\\|Banner\\\\|selectedAccount\\\\|selectedCard\" \"C:/Users/hmorales/Documents/GitHub/yelifin-sistema/app/\\(dashboard\\)/finances/page.tsx\")",
-      "Bash(grep -v \"^$\")"
+      "Bash(grep -v \"^$\")",
+      "Bash(curl -s \"http://localhost:3000/admin\")",
+      "Bash(npx react-doctor@latest . --verbose)",
+      "Bash(Select-String -Pattern \"\\(Nested component|Array index as key|hydration mismatch|Rendering hydration\\)\" -Context 3)",
+      "Bash(npx react-doctor@latest .)"
     ]
   }
 }

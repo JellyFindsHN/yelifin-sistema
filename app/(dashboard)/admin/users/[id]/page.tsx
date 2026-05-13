@@ -192,13 +192,13 @@ export default function AdminUserDetailPage({ params }: { params: Promise<{ id: 
             {user.current_period_end && (
               <div className="space-y-0.5">
                 <p className="text-xs text-muted-foreground">Vence</p>
-                <p>{new Date(user.current_period_end).toLocaleDateString("es-HN", { day: "numeric", month: "short", year: "numeric" })}</p>
+                <p suppressHydrationWarning>{new Date(user.current_period_end).toLocaleDateString("es-HN", { day: "numeric", month: "short", year: "numeric" })}</p>
               </div>
             )}
             {user.trial_end_date && (
               <div className="space-y-0.5">
                 <p className="text-xs text-muted-foreground">Fin de prueba</p>
-                <p>{new Date(user.trial_end_date).toLocaleDateString("es-HN", { day: "numeric", month: "short", year: "numeric" })}</p>
+                <p suppressHydrationWarning>{new Date(user.trial_end_date).toLocaleDateString("es-HN", { day: "numeric", month: "short", year: "numeric" })}</p>
               </div>
             )}
           </div>
@@ -337,7 +337,7 @@ function InfoRow({ icon, label, value }: { icon: React.ReactNode; label: string;
       <span className="text-muted-foreground mt-0.5 shrink-0">{icon}</span>
       <div className="min-w-0">
         <span className="text-xs text-muted-foreground">{label}: </span>
-        <span className="font-medium break-all">{value}</span>
+        <span className="font-medium break-all" suppressHydrationWarning>{value}</span>
       </div>
     </div>
   );

@@ -526,6 +526,7 @@ export default function MovementsPage() {
             </TableHeader>
             <TableBody>
               {isLoading ? (
+                /* skeleton - index key ok */
                 Array.from({ length: 6 }).map((_, i) => (
                   <TableRow key={i}>
                     {Array.from({ length: 7 }).map((_, j) => (
@@ -562,6 +563,7 @@ export default function MovementsPage() {
       {/* ── Cards — móvil ────────────────────────────────────────── */}
       <div className="space-y-3 md:hidden">
         {isLoading ? (
+          /* skeleton - index key ok */
           Array.from({ length: 4 }).map((_, i) => (
             <Skeleton key={i} className="h-32 w-full rounded-xl" />
           ))

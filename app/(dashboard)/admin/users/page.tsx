@@ -168,7 +168,7 @@ export default function AdminUsersPage() {
                       ? <CheckCircle2 className="h-4 w-4 text-green-600" />
                       : <XCircle    className="h-4 w-4 text-destructive" />}
                   </TableCell>
-                  <TableCell className="text-xs text-muted-foreground">
+                  <TableCell className="text-xs text-muted-foreground" suppressHydrationWarning>
                     {new Date(u.created_at).toLocaleDateString("es-HN", {
                       day: "numeric", month: "short", year: "numeric",
                     })}

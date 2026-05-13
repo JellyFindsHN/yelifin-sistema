@@ -110,7 +110,7 @@ export default function SalesReportPage() {
       {/* Stats */}
       {isLoading ? (
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-          {[1,2,3,4].map(i => <Skeleton key={i} className="h-20 rounded-xl" />)}
+          {[1,2,3,4].map(i => <Skeleton key={i} className="h-20 rounded-xl" />)}{/* skeleton - index key ok */}
         </div>
       ) : summary && (
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
@@ -165,8 +165,8 @@ export default function SalesReportPage() {
                 </tr>
               </thead>
               <tbody>
-                {byProduct.map((p, i) => (
-                  <tr key={i} className="border-b last:border-0 hover:bg-muted/20 transition-colors">
+                {byProduct.map((p) => (
+                  <tr key={`${p.product_name}-${p.sku}`} className="border-b last:border-0 hover:bg-muted/20 transition-colors">
                     <td className="px-4 py-2.5 font-medium max-w-[200px] truncate">{p.product_name}</td>
                     <td className="px-4 py-2.5 text-muted-foreground hidden sm:table-cell">{p.sku || "—"}</td>
                     <td className="px-4 py-2.5 text-right">{p.qty_sold}</td>

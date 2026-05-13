@@ -225,7 +225,7 @@ export default function ProfilePage() {
               </div>
 
               <div className="pt-1">
-                <span className="text-xs text-muted-foreground">
+                <span className="text-xs text-muted-foreground" suppressHydrationWarning>
                   Cuenta creada el{" "}
                   {new Date(user.created_at).toLocaleDateString("es-HN", {
                     year: "numeric",
@@ -352,7 +352,7 @@ export default function ProfilePage() {
                       <span className="text-xs text-muted-foreground">
                         Período actual
                       </span>
-                      <p className="text-xs">
+                      <p className="text-xs" suppressHydrationWarning>
                         Del{" "}
                         {new Date(
                           subscription.current_period_start
