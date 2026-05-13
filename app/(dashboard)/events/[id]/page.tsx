@@ -154,6 +154,12 @@ export default function EventDetailPage({ params }: Props) {
             <span className="text-muted-foreground">Ventas brutas</span>
             <span className="font-medium">{format(summary.total_sales)}</span>
           </div>
+          {Object.entries(summary.by_account ?? {}).map(([accountName, amount]) => (
+            <div key={accountName} className="flex justify-between text-xs text-muted-foreground pl-4">
+              <span>{accountName}</span>
+              <span>{format(amount as number)}</span>
+            </div>
+          ))}
           {summary.total_tax > 0 && (
             <div className="flex justify-between text-amber-600">
               <span>ISV incluido (pagado al SAR)</span>

@@ -40,14 +40,16 @@ export async function GET(
         s.payment_method,
         s.sold_at,
         c.name AS customer_name,
+        a.name AS account_name,
         COUNT(si.id)::int AS items_count,
         COALESCE(SUM(si.line_total - (si.unit_cost * si.quantity)), 0)
           - COALESCE(s.tax, 0) AS profit
       FROM sales s
       LEFT JOIN customers c   ON c.id = s.customer_id
+      LEFT JOIN accounts  a   ON a.id = s.account_id
       LEFT JOIN sale_items si ON si.sale_id = s.id AND si.user_id = s.user_id
       WHERE s.event_id = ${eventId} AND s.user_id = ${userId}
-      GROUP BY s.id, c.name
+      GROUP BY s.id, c.name, a.name
       ORDER BY s.sold_at ASC
     `;
 
@@ -70,6 +72,12 @@ export async function GET(
     const txExpenses    = expenses.reduce((acc: number, e: any) => acc + Number(e.amount), 0);
     const totalExpenses = fixedCost + txExpenses;
     const netProfit     = totalProfit - totalExpenses;
+
+    const byAccount: Record<string, number> = {};
+    for (const s of sales) {
+      const name = (s.account_name as string) ?? "Sin cuenta";
+      byAccount[name] = (byAccount[name] ?? 0) + Number(s.total);
+    }
 
     const now    = new Date();
     const start  = new Date(event.starts_at);
@@ -95,6 +103,7 @@ export async function GET(
           net_profit:     netProfit,      // ganancia final
           roi:            totalExpenses > 0 ? (netProfit / totalExpenses) * 100 : 0,
           sales_count:    sales.length,
+          by_account:     byAccount,
         },
         sales:    sales.map((s: any) => ({
           id:             Number(s.id),
@@ -108,6 +117,7 @@ export async function GET(
           payment_method: s.payment_method ?? "OTHER",
           sold_at:        String(s.sold_at),
           customer_name:  s.customer_name ?? null,
+          account_name:   s.account_name ?? null,
           items_count:    Number(s.items_count),
           profit:         Number(s.profit),
         })),

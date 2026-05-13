@@ -30,6 +30,7 @@ export interface EventDetail extends Event {
     net_profit:     number;
     roi:            number;
     sales_count:    number;
+    by_account:     Record<string, number>;
   };
   sales: {
     id:             number;
@@ -43,6 +44,7 @@ export interface EventDetail extends Event {
     payment_method: string;
     sold_at:        string;
     customer_name:  string | null;
+    account_name:   string | null;
     items_count:    number;
     profit:         number;
   }[];
