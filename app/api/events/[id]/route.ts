@@ -65,13 +65,15 @@ export async function GET(
     `;
 
     // ── Totales ────────────────────────────────────────────────────────
-    const totalSales    = sales.reduce((acc: number, s: any) => acc + Number(s.total), 0);
-    const totalTax      = sales.reduce((acc: number, s: any) => acc + Number(s.tax ?? 0), 0);
-    const totalProfit   = sales.reduce((acc: number, s: any) => acc + Number(s.profit), 0);
-    const fixedCost     = Number(event.fixed_cost ?? 0);
-    const txExpenses    = expenses.reduce((acc: number, e: any) => acc + Number(e.amount), 0);
-    const totalExpenses = fixedCost + txExpenses;
-    const netProfit     = totalProfit - totalExpenses;
+    const totalSales      = sales.reduce((acc: number, s: any) => acc + Number(s.total), 0);
+    const totalTax        = sales.reduce((acc: number, s: any) => acc + Number(s.tax ?? 0), 0);
+    const totalProfit     = sales.reduce((acc: number, s: any) => acc + Number(s.profit), 0);
+    const fixedCost       = Number(event.fixed_cost ?? 0);
+    const txExpenses      = expenses.reduce((acc: number, e: any) => acc + Number(e.amount), 0);
+    const totalExpenses   = fixedCost + txExpenses;
+    const netProfit       = totalProfit - totalExpenses;
+    const totalCogs       = totalSales - totalTax - totalProfit;
+    const totalInvestment = totalCogs + totalExpenses;
 
     const byAccount: Record<string, number> = {};
     for (const s of sales) {
@@ -101,7 +103,7 @@ export async function GET(
           total_profit:   totalProfit,    // ganancia bruta de ventas (sin ISV, sin costos evento)
           total_expenses: totalExpenses,  // costos fijos + gastos extra
           net_profit:     netProfit,      // ganancia final
-          roi:            totalExpenses > 0 ? (netProfit / totalExpenses) * 100 : 0,
+          roi:            totalInvestment > 0 ? (totalSales / totalInvestment) * 100 : 0,
           sales_count:    sales.length,
           by_account:     byAccount,
         },

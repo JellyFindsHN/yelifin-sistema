@@ -23,15 +23,35 @@ export async function GET(request: NextRequest) {
         e.fixed_cost,
         e.notes,
         e.created_at,
-        COALESCE(SUM(t.amount) FILTER (WHERE t.type = 'INCOME'),  0) AS total_sales,
-        COALESCE(SUM(t.amount) FILTER (WHERE t.type = 'EXPENSE'), 0) AS total_tx_expenses
+        COALESCE(s_agg.total_sales,       0) AS total_sales,
+        COALESCE(s_agg.total_profit,      0) AS total_profit,
+        COALESCE(t_agg.total_tx_expenses, 0) AS total_tx_expenses
       FROM events e
-      LEFT JOIN transactions t
-        ON  t.reference_type = 'EVENT'
-        AND t.reference_id   = e.id
-        AND t.user_id        = e.user_id
+
+      LEFT JOIN LATERAL (
+        SELECT
+          SUM(s.total)             AS total_sales,
+          SUM(COALESCE(s.tax, 0)) AS total_tax,
+          SUM(
+            (SELECT COALESCE(SUM(si.line_total - si.unit_cost * si.quantity), 0)
+             FROM sale_items si
+             WHERE si.sale_id = s.id AND si.user_id = s.user_id)
+            - COALESCE(s.tax, 0)
+          ) AS total_profit
+        FROM sales s
+        WHERE s.event_id = e.id AND s.user_id = e.user_id
+      ) s_agg ON true
+
+      LEFT JOIN LATERAL (
+        SELECT COALESCE(SUM(t.amount), 0) AS total_tx_expenses
+        FROM transactions t
+        WHERE t.reference_type = 'EVENT'
+          AND t.reference_id   = e.id
+          AND t.type           = 'EXPENSE'
+          AND t.user_id        = e.user_id
+      ) t_agg ON true
+
       WHERE e.user_id = ${userId}
-      GROUP BY e.id
       ORDER BY e.starts_at DESC
     `;
 
@@ -40,11 +60,15 @@ export async function GET(request: NextRequest) {
     const events = rows.map((e) => {
       const start         = new Date(e.starts_at);
       const end           = new Date(e.ends_at);
-      const totalSales    = Number(e.total_sales);
-      const fixedCost     = Number(e.fixed_cost);
-      const txExpenses    = Number(e.total_tx_expenses);
-      const totalExpenses = fixedCost + txExpenses;
-      const netProfit     = totalSales - totalExpenses;
+      const totalSales      = Number(e.total_sales);
+      const totalTax        = Number(e.total_tax);
+      const totalProfit     = Number(e.total_profit);
+      const fixedCost       = Number(e.fixed_cost);
+      const txExpenses      = Number(e.total_tx_expenses);
+      const totalExpenses   = fixedCost + txExpenses;
+      const netProfit       = totalProfit - totalExpenses;
+      const totalCogs       = totalSales - totalTax - totalProfit;
+      const totalInvestment = totalCogs + totalExpenses;
 
       const status =
         now < start  ? "PLANNED" :
@@ -63,7 +87,7 @@ export async function GET(request: NextRequest) {
         total_sales:    totalSales,
         total_expenses: totalExpenses,
         net_profit:     netProfit,
-        roi:            totalExpenses > 0 ? (netProfit / totalExpenses) * 100 : 0,
+        roi:            totalInvestment > 0 ? (totalSales / totalInvestment) * 100 : 0,
       };
     });
 
