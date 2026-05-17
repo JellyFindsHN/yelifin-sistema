@@ -2,6 +2,11 @@
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 
+export const metadata = {
+  title: "Política de Privacidad — Konta",
+  description: "Política de privacidad y tratamiento de datos personales de Konta.",
+};
+
 export default function PrivacyPage() {
   return (
     <div className="min-h-screen bg-background">
@@ -14,88 +19,103 @@ export default function PrivacyPage() {
             <ArrowLeft className="h-4 w-4" />
             Volver al inicio
           </Link>
-          <span className="text-lg font-semibold"></span>
+          <span className="text-lg font-semibold">Konta</span>
         </div>
       </header>
 
       <main className="container mx-auto max-w-3xl px-4 py-10 md:py-16 space-y-8">
         <section className="space-y-2">
-          <h1 className="text-3xl font-bold tracking-tight">
-            Política de privacidad
-          </h1>
+          <h1 className="text-3xl font-bold tracking-tight">Política de Privacidad</h1>
           <p className="text-sm text-muted-foreground">
-            Última actualización: 27 de febrero de 2026
+            Última actualización: 17 de mayo de 2026
           </p>
         </section>
 
         <section className="space-y-4 text-sm leading-relaxed md:text-base">
+
           <p>
-            Esta Política de privacidad explica cómo  recopila, utiliza y
-            protege la información asociada a tu cuenta y al uso de la
-            plataforma.
+            Esta Política de Privacidad explica cómo Konta recopila, utiliza, almacena y protege la información asociada a tu cuenta y al uso de la plataforma Konta.
           </p>
 
-          <h2 className="text-lg font-semibold mt-6">1. Información que recopilamos</h2>
+          <h2 className="text-lg font-semibold mt-6">1. Quiénes Somos</h2>
           <p>
-            Recopilamos datos como tu nombre, correo electrónico, nombre del
-            negocio y la información que registras en el sistema (productos,
-            ventas, clientes, cuentas, etc.). También podemos registrar datos
-            técnicos básicos como tipo de navegador, dirección IP aproximada y
-            fechas de acceso para fines de seguridad y estadísticas.
+            Konta opera la plataforma Konta, un sistema de gestión empresarial en la nube para emprendedores y pequeños negocios, disponible en hikonta.com.
           </p>
 
-          <h2 className="text-lg font-semibold mt-6">2. Uso de la información</h2>
+          <h2 className="text-lg font-semibold mt-6">2. Información que Recopilamos</h2>
+          <p><strong>Información que nos proporcionas:</strong> nombre, correo electrónico, nombre de tu negocio y cualquier dato que ingreses voluntariamente al sistema (productos, ventas, clientes, transacciones, etc.).</p>
+          <p className="mt-2"><strong>Información de uso:</strong> fecha y hora de acceso, dirección IP, tipo de dispositivo y navegador, y acciones realizadas dentro del Servicio, con fines de seguridad y mejora del sistema.</p>
+          <p className="mt-2"><strong>Autenticación:</strong> gestionada mediante Firebase Authentication de Google. No almacenamos contraseñas directamente.</p>
+
+          <h2 className="text-lg font-semibold mt-6">3. Uso de la Información</h2>
           <p>
-            Usamos tus datos para operar la plataforma, mostrarte reportes,
-            mejorar el servicio, ofrecer soporte técnico y, de forma opcional,
-            enviarte comunicaciones relacionadas con tu cuenta o novedades del
-            producto.
+            Usamos tu información para: (a) prestar y mantener el Servicio; (b) gestionar tu cuenta y suscripción; (c) enviarte comunicaciones relacionadas con el Servicio; (d) mejorar funcionalidades usando datos agregados y anonimizados; (e) cumplir con obligaciones legales y fiscales aplicables en Honduras.
+          </p>
+          <p className="mt-2">
+            <strong>No vendemos ni cedemos tu información personal a terceros con fines comerciales o publicitarios.</strong>
           </p>
 
-          <h2 className="text-lg font-semibold mt-6">3. Compartir datos con terceros</h2>
-          <p>
-            No vendemos tu información. Solo compartimos datos con proveedores
-            estrictamente necesarios para operar el servicio (por ejemplo,
-            infraestructura en la nube, autenticación o pasarelas de pago), y
-            siempre bajo acuerdos de confidencialidad y seguridad.
+          <h2 className="text-lg font-semibold mt-6">4. Proveedores de Servicios</h2>
+          <p>Para operar el Servicio utilizamos:</p>
+          <ul className="list-disc list-inside space-y-1 mt-2">
+            <li><strong>Firebase (Google LLC):</strong> autenticación de usuarios.</li>
+            <li><strong>Neon:</strong> almacenamiento de base de datos (PostgreSQL).</li>
+            <li><strong>Vercel:</strong> alojamiento y despliegue de la plataforma.</li>
+          </ul>
+          <p className="mt-2">
+            Estos proveedores solo acceden a los datos necesarios para prestar sus servicios y están obligados a mantener la confidencialidad de tu información.
           </p>
 
-          <h2 className="text-lg font-semibold mt-6">4. Seguridad</h2>
+          <h2 className="text-lg font-semibold mt-6">5. Almacenamiento y Seguridad</h2>
           <p>
-            Aplicamos medidas razonables para proteger tu información, como
-            conexiones cifradas y controles de acceso. Aun así, ningún sistema
-            es 100% infalible, por lo que recomendamos utilizar contraseñas
-            seguras y no compartir tus credenciales.
+            Tus datos se almacenan en servidores con infraestructura que cumple estándares internacionales de seguridad. Implementamos medidas técnicas razonables para proteger tu información contra acceso no autorizado, alteración o destrucción.
+          </p>
+          <p className="mt-2">
+            Sin embargo, ningún sistema es 100% seguro. Te recomendamos mantener tus propias copias de seguridad de la información crítica de tu negocio.
           </p>
 
-          <h2 className="text-lg font-semibold mt-6">5. Tus derechos</h2>
+          <h2 className="text-lg font-semibold mt-6">6. Retención de Datos</h2>
           <p>
-            Puedes solicitar la actualización o eliminación de tu cuenta y de
-            los datos asociados, salvo que exista alguna obligación legal para
-            conservarlos por más tiempo (por ejemplo, requisitos fiscales en tu
-            país).
+            Conservamos tu información mientras tu cuenta esté activa. Tras la cancelación, podemos retener ciertos datos hasta 90 días por razones de seguridad y cumplimiento legal, tras lo cual serán eliminados o anonimizados permanentemente.
           </p>
 
-          <h2 className="text-lg font-semibold mt-6">6. Cambios en esta política</h2>
+          <h2 className="text-lg font-semibold mt-6">7. Tus Derechos</h2>
           <p>
-            Podemos actualizar esta Política de privacidad ocasionalmente. Te
-            notificaremos dentro de la aplicación si realizamos cambios
-            importantes.
+            Tienes derecho a: (a) acceder a tu información personal; (b) solicitar la corrección de datos inexactos; (c) solicitar la eliminación de tu cuenta y datos asociados; (d) oponerte al tratamiento en casos previstos por la ley. Para ejercer estos derechos, contáctanos a través del soporte disponible en la plataforma.
           </p>
 
-          <h2 className="text-lg font-semibold mt-6">7. Contacto</h2>
+          <h2 className="text-lg font-semibold mt-6">8. Cookies</h2>
           <p>
-            Si tienes preguntas sobre la privacidad de tus datos en ,
-            puedes escribirnos a través del canal de soporte disponible en la
-            plataforma.
+            Usamos únicamente cookies de sesión estrictamente necesarias para el funcionamiento de la autenticación. No utilizamos cookies de seguimiento publicitario ni compartimos datos de navegación con redes publicitarias.
+          </p>
+
+          <h2 className="text-lg font-semibold mt-6">9. Menores de Edad</h2>
+          <p>
+            El Servicio no está dirigido a personas menores de 18 años. No recopilamos intencionalmente información de menores. Si detectamos que un menor ha creado una cuenta, la eliminaremos de inmediato.
+          </p>
+
+          <h2 className="text-lg font-semibold mt-6">10. Cambios a Esta Política</h2>
+          <p>
+            Podemos actualizar esta Política periódicamente. Te notificaremos cambios significativos con al menos 15 días de anticipación mediante correo electrónico o aviso dentro del Servicio. El uso continuado después de los cambios constituye aceptación de la nueva Política.
+          </p>
+
+          <h2 className="text-lg font-semibold mt-6">11. Ley Aplicable</h2>
+          <p>
+            Esta Política se rige por las leyes de la República de Honduras, incluyendo las disposiciones aplicables en materia de protección de datos personales.
+          </p>
+
+          <h2 className="text-lg font-semibold mt-6">12. Contacto</h2>
+          <p>
+            Para preguntas o solicitudes relacionadas con esta Política, contáctanos a través de los canales de soporte habilitados dentro del Servicio.
           </p>
         </section>
 
-        <div className="pt-6">
-          <Link href="/register">
-            <span className="inline-flex items-center gap-2 text-sm font-medium text-primary hover:underline">
-              Crear cuenta y comenzar la prueba
-            </span>
+        <div className="pt-6 flex flex-wrap gap-4 text-sm">
+          <Link href="/terms" className="text-primary hover:underline">
+            Términos de Uso →
+          </Link>
+          <Link href="/register" className="text-primary hover:underline">
+            Crear cuenta y comenzar la prueba →
           </Link>
         </div>
       </main>

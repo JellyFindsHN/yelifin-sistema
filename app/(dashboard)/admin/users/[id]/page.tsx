@@ -225,7 +225,7 @@ export default function AdminUserDetailPage({ params }: { params: Promise<{ id: 
                 <SelectContent>
                   {plans.map((p) => (
                     <SelectItem key={p.id} value={String(p.id)}>
-                      {p.name} {p.price_usd > 0 ? `· $${p.price_usd}` : "· Gratis"}
+                      {p.name} {p.price_usd > 0 ? `· $${p.price_usd} USD` : "· Gratis"}
                     </SelectItem>
                   ))}
                 </SelectContent>

@@ -35,7 +35,7 @@ export default function Home() {
           </div>
           <div className="grid grid-cols-3 gap-4 sm:gap-8 pt-8 sm:pt-12 max-w-2xl mx-auto">
             {[
-              { value: "$9.99", label: "Por mes" },
+              { value: "$11.99", label: "Por mes" },
               { value: "24/7",  label: "Disponible" },
               { value: "Cloud", label: "En la nube" },
             ].map((s) => (
@@ -61,20 +61,20 @@ export default function Home() {
             <div className="text-center mb-6 sm:mb-8">
               <h3 className="text-xl sm:text-2xl font-bold mb-2">Plan Profesional</h3>
               <div className="flex items-baseline justify-center gap-2">
-                <span className="text-4xl sm:text-5xl font-bold text-primary">$9.99</span>
+                <span className="text-4xl sm:text-5xl font-bold text-primary">$11.99</span>
                 <span className="text-muted-foreground">USD/mes</span>
               </div>
-              <p className="text-sm text-muted-foreground mt-2">Facturación mensual</p>
+              <p className="text-sm text-muted-foreground mt-2">ISV incluido · Facturación mensual</p>
             </div>
             <ul className="space-y-3 sm:space-y-4 mb-6 sm:mb-8">
               {[
-                "Inventario ilimitado con método FIFO",
-                "Punto de venta completo",
-                "Gestión de clientes y lealtad",
-                "Control financiero multi-cuenta",
-                "Gestión de eventos y ferias",
-                "Reportes y análisis detallados",
-                "Soporte prioritario en español",
+                "Inventario sin límite, siempre organizado",
+                "Registra ventas en segundos",
+                "Fideliza a tus mejores clientes",
+                "Controla tus cuentas y gastos",
+                "Organiza tus ferias y eventos",
+                "Ve cómo crece tu negocio",
+                "Soporte en español cuando lo necesitas",
               ].map((item) => (
                 <li key={item} className="flex items-start gap-3">
                   <CheckCircle2 className="w-5 h-5 text-primary shrink-0 mt-0.5" />
@@ -105,12 +105,12 @@ export default function Home() {
         </div>
         <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-8">
           {[
-            { icon: Package,      bg: "bg-primary/10",     color: "text-primary",      title: "Gestión de Inventario",    desc: "Control preciso con método FIFO, variantes de productos, alertas de stock bajo y seguimiento por lotes." },
-            { icon: ShoppingCart, bg: "bg-emerald-500/10", color: "text-emerald-600",  title: "Punto de Venta",           desc: "Interfaz rápida e intuitiva para registrar ventas, aplicar descuentos y gestionar clientes leales." },
-            { icon: TrendingUp,   bg: "bg-primary/10",     color: "text-primary",      title: "Análisis de Rentabilidad", desc: "Conoce tus ganancias reales por producto, cliente y período. Toma decisiones basadas en datos." },
-            { icon: Users,        bg: "bg-orange-500/10",  color: "text-orange-600",   title: "Base de Clientes",         desc: "Programa de lealtad automático con descuentos progresivos y historial completo de compras." },
-            { icon: DollarSign,   bg: "bg-amber-500/10",   color: "text-amber-600",    title: "Control Financiero",       desc: "Gestiona múltiples cuentas bancarias, efectivo y registra todos tus gastos operativos." },
-            { icon: Calendar,     bg: "bg-rose-500/10",    color: "text-rose-600",     title: "Gestión de Eventos",       desc: "Planifica y analiza ferias y eventos con seguimiento de inventario, gastos y ROI específico." },
+            { icon: Package,      bg: "bg-primary/10",     color: "text-primary",      title: "Tu inventario bajo control",  desc: "Sabe exactamente cuánto tienes de cada producto, cuándo se está acabando y cuánto pagaste por ello. Sin hojas de Excel, sin sorpresas." },
+            { icon: ShoppingCart, bg: "bg-emerald-500/10", color: "text-emerald-600",  title: "Vende más rápido",            desc: "Registra una venta en segundos, aplica descuentos y agrega el cliente al momento. Así de simple." },
+            { icon: TrendingUp,   bg: "bg-primary/10",     color: "text-primary",      title: "¿Estás ganando dinero?",      desc: "Ve cuánto ganas realmente, qué productos te dejan más y en qué época del año vendes mejor. La respuesta siempre a la mano." },
+            { icon: Users,        bg: "bg-orange-500/10",  color: "text-orange-600",   title: "Clientes que regresan",       desc: "Premia a quienes más te compran con descuentos automáticos. Conoce a tus mejores clientes y cuida esa relación." },
+            { icon: DollarSign,   bg: "bg-amber-500/10",   color: "text-amber-600",    title: "El dinero del negocio, claro", desc: "¿Cuánto hay en caja, en el banco, cuánto salió esta semana? Todo en un solo lugar, siempre actualizado." },
+            { icon: Calendar,     bg: "bg-rose-500/10",    color: "text-rose-600",     title: "Ferias y eventos sin estrés", desc: "Prepara lo que llevas, controla las ventas del evento y ve cuánto ganaste cuando termina. Sin perder nada." },
           ].map((f) => (
             <div key={f.title} className="bg-card p-6 sm:p-8 rounded-2xl border hover:shadow-xl hover:border-primary/50 transition-all">
               <div className={`w-12 h-12 ${f.bg} rounded-xl flex items-center justify-center mb-4`}>
@@ -129,7 +129,7 @@ export default function Home() {
           <h2 className="text-3xl sm:text-4xl font-bold mb-8 sm:mb-12 text-center">¿Por qué elegir Konta?</h2>
           <div className="grid sm:grid-cols-2 gap-4 sm:gap-6">
             {[
-              { title: "Precio Justo",               desc: "Solo $9.99/mes con todo incluido" },
+              { title: "Precio Justo",               desc: "Solo $11.99 USD/mes, ISV incluido, con todo incluido" },
               { title: "Fácil de Usar",              desc: "Interfaz intuitiva diseñada para emprendedores" },
               { title: "Acceso desde Cualquier Lugar", desc: "Web y móvil, siempre disponible" },
               { title: "Seguro y Confiable",         desc: "Tus datos protegidos en la nube" },
@@ -174,13 +174,15 @@ export default function Home() {
               <span className="text-lg sm:text-xl font-bold">Konta</span>
             </div>
             <p className="text-muted-foreground text-xs sm:text-sm text-center">
-              © 2026 hiKonta. Sistema de gestión para emprendedores.
+              © 2026 Konta. Sistema de gestión para emprendedores.
             </p>
             <div className="flex flex-wrap justify-center gap-4 sm:gap-6 text-xs sm:text-sm text-muted-foreground">
-              <Link href="/login"    className="hover:text-primary transition-colors">Iniciar Sesión</Link>
-              <Link href="/register" className="hover:text-primary transition-colors">Registrarse</Link>
-              <Link href="#pricing"  className="hover:text-primary transition-colors">Precios</Link>
-              <Link href="#features" className="hover:text-primary transition-colors">Características</Link>
+              <Link href="/login"      className="hover:text-primary transition-colors">Iniciar Sesión</Link>
+              <Link href="/register"   className="hover:text-primary transition-colors">Registrarse</Link>
+              <Link href="#pricing"    className="hover:text-primary transition-colors">Precios</Link>
+              <Link href="#features"   className="hover:text-primary transition-colors">Características</Link>
+              <Link href="/terms"   className="hover:text-primary transition-colors">Términos de Uso</Link>
+              <Link href="/privacy" className="hover:text-primary transition-colors">Privacidad</Link>
             </div>
           </div>
         </div>

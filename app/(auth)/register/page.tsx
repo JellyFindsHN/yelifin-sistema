@@ -77,9 +77,9 @@ export default function RegisterPage() {
                   </div>
                 </div>
                 <div className="bg-primary-foreground/10 backdrop-blur-sm rounded-xl p-4">
-                  <div className="text-3xl font-bold">$9.99</div>
+                  <div className="text-3xl font-bold">$11.99</div>
                   <div className="text-sm text-primary-foreground/80">
-                    luego al mes, plan Pro
+                    USD/mes plan Pro · ISV inc.
                   </div>
                 </div>
               </div>

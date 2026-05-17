@@ -18,7 +18,7 @@ INSERT INTO subscription_plans (name, slug, description, price_usd, billing_inte
   'Pro',
   'pro',
   'Plan profesional con acceso completo a todas las funciones.',
-  9.99, 'MONTHLY', NULL, NULL, 2048
+  11.99, 'MONTHLY', NULL, NULL, 2048  -- $11.99 USD/mes · ISV incluido
 );
 
 -- =========================
