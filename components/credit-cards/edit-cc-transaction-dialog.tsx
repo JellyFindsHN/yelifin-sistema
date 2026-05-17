@@ -18,6 +18,7 @@ import { Loader2, Pencil } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { CreditCardTransaction, useUpdateCCTransaction } from "@/hooks/swr/use-credit-cards";
+import { localDateToISO, toLocalDateInput } from "@/lib/date-utils";
 import { TransactionCategory } from "@/hooks/swr/use-transaction-categories";
 
 const schema = z.object({
@@ -34,7 +35,6 @@ const schema = z.object({
 
 type FormData = z.infer<typeof schema>;
 
-const toDateInput = (iso: string) => iso.split("T")[0];
 
 type Props = {
   txn:                CreditCardTransaction | null;
@@ -72,7 +72,7 @@ export function EditCCTransactionDialog({
       reset({
         description:   txn.description ?? "",
         category:      txn.category ?? "",
-        occurred_at:   toDateInput(txn.occurred_at),
+        occurred_at:   toLocalDateInput(txn.occurred_at),
         amount:        Number(txn.amount),
         currency:      txn.currency,
         exchange_rate: txn.exchange_rate ? Number(txn.exchange_rate) : undefined,
@@ -88,7 +88,7 @@ export function EditCCTransactionDialog({
       await updateTransaction(txn.id, {
         description:   data.description || undefined,
         category:      data.category || null,
-        occurred_at:   new Date(data.occurred_at).toISOString(),
+        occurred_at:   localDateToISO(data.occurred_at),
         amount:        data.amount,
         currency:      data.currency,
         exchange_rate: data.currency === "USD" ? data.exchange_rate : undefined,

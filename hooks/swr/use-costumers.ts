@@ -46,22 +46,46 @@ function useAuthFetch() {
   };
 }
 
-export function useCustomers() {
+export type CustomerFilters = {
+  search?: string;
+  page?:   number;
+  limit?:  number;
+};
+
+export type CustomerStats = {
+  total_customers: number;
+  total_spent:     number;
+  total_orders:    number;
+};
+
+export function useCustomers(filters?: CustomerFilters) {
   const { firebaseUser } = useAuth();
   const authFetch = useAuthFetch();
 
+  const params = new URLSearchParams();
+  if (filters?.search) params.set("search", filters.search);
+  if (filters?.page)   params.set("page",   String(filters.page));
+  if (filters?.limit)  params.set("limit",  String(filters.limit));
+
+  const url = params.toString() ? `${KEY}?${params.toString()}` : KEY;
+
   const { data, isLoading, error, mutate } = useSWR(
-    firebaseUser ? KEY : null,
-    (url: string) => authFetch(url),
-     {
-      revalidateOnFocus:    false,
-      dedupingInterval:     5 * 60_000,
-    }
+    firebaseUser ? url : null,
+    (u: string) => authFetch(u),
+    { revalidateOnFocus: false, dedupingInterval: 5 * 60_000 }
   );
 
   return {
-    customers: (data?.data ?? []) as Customer[],
-    total: data?.total ?? 0,
+    customers:  (data?.data ?? []) as Customer[],
+    total:      (data?.total      ?? 0) as number,
+    page:       (data?.page       ?? 1) as number,
+    totalPages: (data?.totalPages ?? 1) as number,
+    limit:      (data?.limit      ?? 25) as number,
+    stats: (data?.stats ?? {
+      total_customers: 0,
+      total_spent:     0,
+      total_orders:    0,
+    }) as CustomerStats,
     isLoading,
     error: error?.message ?? null,
     mutate,

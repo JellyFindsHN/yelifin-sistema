@@ -7,28 +7,29 @@ import { Input }   from "@/components/ui/input";
 import { Label }   from "@/components/ui/label";
 import { Loader2, FileSpreadsheet, FileText, ArrowLeft } from "lucide-react";
 import { useRouter } from "next/navigation";
+import { toLocalDateInput } from "@/lib/date-utils";
 
 // ── Date presets ───────────────────────────────────────────────────────
 
 export function thisMonth()   {
   const n = new Date();
   return {
-    from: new Date(n.getFullYear(), n.getMonth(), 1).toISOString().slice(0, 10),
-    to:   new Date(n.getFullYear(), n.getMonth() + 1, 0).toISOString().slice(0, 10),
+    from: toLocalDateInput(new Date(n.getFullYear(), n.getMonth(), 1)),
+    to:   toLocalDateInput(new Date(n.getFullYear(), n.getMonth() + 1, 0)),
   };
 }
 export function lastMonth()   {
   const n = new Date();
   return {
-    from: new Date(n.getFullYear(), n.getMonth() - 1, 1).toISOString().slice(0, 10),
-    to:   new Date(n.getFullYear(), n.getMonth(), 0).toISOString().slice(0, 10),
+    from: toLocalDateInput(new Date(n.getFullYear(), n.getMonth() - 1, 1)),
+    to:   toLocalDateInput(new Date(n.getFullYear(), n.getMonth(), 0)),
   };
 }
 export function thisYear()    {
   const n = new Date();
   return {
-    from: new Date(n.getFullYear(), 0, 1).toISOString().slice(0, 10),
-    to:   new Date(n.getFullYear(), 11, 31).toISOString().slice(0, 10),
+    from: toLocalDateInput(new Date(n.getFullYear(), 0, 1)),
+    to:   toLocalDateInput(new Date(n.getFullYear(), 11, 31)),
   };
 }
 

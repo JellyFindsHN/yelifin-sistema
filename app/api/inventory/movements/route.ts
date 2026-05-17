@@ -18,6 +18,11 @@ export async function GET(request: NextRequest) {
     const year      = searchParams.get("year");
     const productId = searchParams.get("product_id");
     const variantId = searchParams.get("variant_id");
+    const search    = searchParams.get("search")?.trim() || null;
+    const typeParam = searchParams.get("type") || null;
+    const page      = Math.max(1, Number(searchParams.get("page"))  || 1);
+    const limit     = Math.min(100, Math.max(1, Number(searchParams.get("limit")) || 25));
+    const offset    = (page - 1) * limit;
 
     const now = new Date();
     let startISO: string;
@@ -38,6 +43,43 @@ export async function GET(request: NextRequest) {
       startISO = new Date(now.getFullYear(), now.getMonth(),     1).toISOString();
       endISO   = new Date(now.getFullYear(), now.getMonth() + 1, 1).toISOString();
     }
+
+    // Mapeo type param → condición SQL
+    const typeMovement  = typeParam === "IN"  ? "IN"  : typeParam === "OUT" ? "OUT" : null;
+    const typeReference =
+      typeParam === "IN"         ? "PURCHASE"       :
+      typeParam === "OUT"        ? "SALE"            :
+      typeParam === "ADJUSTMENT" ? "ADJUSTMENT"      :
+      typeParam === "INITIAL"    ? "INITIAL"         :
+      typeParam === "CANCELLED"  ? "SALE_CANCELLED"  : null;
+
+    const [{ count }] = await sql`
+      SELECT COUNT(*)::int AS count
+      FROM inventory_movements im
+      JOIN products p ON p.id = im.product_id
+      LEFT JOIN product_variants pv ON pv.id = im.variant_id AND pv.user_id = im.user_id
+      LEFT JOIN sales s2
+        ON  im.reference_type = 'SALE'
+        AND s2.id             = im.reference_id
+        AND s2.user_id        = im.user_id
+      LEFT JOIN customers c2 ON c2.id = s2.customer_id
+      WHERE im.user_id    = ${userId}
+        AND im.created_at >= ${startISO}::timestamptz
+        AND im.created_at <  ${endISO}::timestamptz
+        ${productId ? sql`AND im.product_id = ${Number(productId)}` : sql``}
+        ${variantId ? sql`AND im.variant_id = ${Number(variantId)}` : sql``}
+        ${typeMovement  ? sql`AND im.movement_type  = ${typeMovement}`  : sql``}
+        ${typeReference ? sql`AND im.reference_type = ${typeReference}` : sql``}
+        ${search ? sql`AND (
+          p.name          ILIKE ${"%" + search + "%"} OR
+          p.sku           ILIKE ${"%" + search + "%"} OR
+          pv.variant_name ILIKE ${"%" + search + "%"} OR
+          pv.sku          ILIKE ${"%" + search + "%"} OR
+          c2.name         ILIKE ${"%" + search + "%"} OR
+          s2.sale_number  ILIKE ${"%" + search + "%"} OR
+          im.notes        ILIKE ${"%" + search + "%"}
+        )` : sql``}
+    `;
 
     const movements = await sql`
       SELECT
@@ -154,12 +196,32 @@ export async function GET(request: NextRequest) {
         AND im.created_at <  ${endISO}::timestamptz
         ${productId ? sql`AND im.product_id = ${Number(productId)}` : sql``}
         ${variantId ? sql`AND im.variant_id = ${Number(variantId)}` : sql``}
+        ${typeMovement  ? sql`AND im.movement_type  = ${typeMovement}`  : sql``}
+        ${typeReference ? sql`AND im.reference_type = ${typeReference}` : sql``}
+        ${search ? sql`AND (
+          p.name          ILIKE ${"%" + search + "%"} OR
+          p.sku           ILIKE ${"%" + search + "%"} OR
+          pv.variant_name ILIKE ${"%" + search + "%"} OR
+          pv.sku          ILIKE ${"%" + search + "%"} OR
+          c.name          ILIKE ${"%" + search + "%"} OR
+          s.sale_number   ILIKE ${"%" + search + "%"} OR
+          im.notes        ILIKE ${"%" + search + "%"}
+        )` : sql``}
 
       ORDER BY im.created_at DESC
-      LIMIT 500
+      LIMIT  ${limit}
+      OFFSET ${offset}
     `;
 
-    return Response.json({ data: movements, total: movements.length });
+    const totalPages = Math.ceil(count / limit);
+
+    return Response.json({
+      data:       movements,
+      total:      count,
+      page,
+      totalPages,
+      limit,
+    });
 
   } catch (error) {
     console.error("GET /api/inventory/movements:", error);

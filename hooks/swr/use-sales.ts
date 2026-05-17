@@ -99,10 +99,22 @@ export type SaleDetail = Sale & {
 export type SalesPreset = 'today' | '7d' | 'this_month' | 'last_month' | 'all';
 
 export type SalesFilters = {
-  preset?:  SalesPreset;
-  from?:    string;
-  to?:      string;
-  payment?: 'all' | 'CASH' | 'CARD' | 'TRANSFER' | 'MIXED' | 'OTHER';
+  preset?:     SalesPreset;
+  from?:       string;
+  to?:         string;
+  payment?:    'all' | 'CASH' | 'CARD' | 'TRANSFER' | 'MIXED' | 'OTHER';
+  search?:     string;
+  status?:     'all' | 'COMPLETED' | 'PENDING';
+  account_id?: string;
+  page?:       number;
+  limit?:      number;
+};
+
+export type SalesStats = {
+  total_revenue:   number;
+  total_profit:    number;
+  pending_count:   number;
+  completed_count: number;
 };
 
 function buildQuery(filters?: SalesFilters) {
@@ -116,6 +128,11 @@ function buildQuery(filters?: SalesFilters) {
   } else {
     sp.set('payment', 'all');
   }
+  if (filters?.search)                              sp.set('search',     filters.search);
+  if (filters?.status && filters.status !== 'all') sp.set('status',     filters.status);
+  if (filters?.account_id && filters.account_id !== 'all') sp.set('account_id', filters.account_id);
+  if (filters?.page)                                sp.set('page',       String(filters.page));
+  if (filters?.limit)                               sp.set('limit',      String(filters.limit));
   const q = sp.toString();
   return q ? `${KEY}?${q}` : KEY;
 }
@@ -157,10 +174,19 @@ export function useSales(filters?: SalesFilters) {
   );
 
   return {
-    sales:    (data?.data ?? []) as Sale[],
-    total:    data?.total ?? 0,
+    sales:      (data?.data ?? []) as Sale[],
+    total:      (data?.total      ?? 0)  as number,
+    page:       (data?.page       ?? 1)  as number,
+    totalPages: (data?.totalPages ?? 1)  as number,
+    limit:      (data?.limit      ?? 25) as number,
+    stats:      (data?.stats ?? {
+      total_revenue:   0,
+      total_profit:    0,
+      pending_count:   0,
+      completed_count: 0,
+    }) as SalesStats,
     isLoading,
-    error:    error?.message ?? null,
+    error:      error?.message ?? null,
     mutate,
   };
 }

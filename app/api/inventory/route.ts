@@ -10,8 +10,64 @@ export async function GET(request: NextRequest) {
   if (!isAuthSuccess(auth)) return createErrorResponse(auth.error, auth.status);
 
   try {
-    const { userId } = auth.data;
+    const { userId }       = auth.data;
+    const { searchParams } = new URL(request.url);
 
+    const search      = searchParams.get("search")?.trim() || null;
+    const stockFilter = searchParams.get("stock") || null;
+    const page        = Math.max(1, Number(searchParams.get("page"))  || 1);
+    const limit       = Math.min(100, Math.max(1, Number(searchParams.get("limit")) || 25));
+    const offset      = (page - 1) * limit;
+
+    // ── Stats globales (sin filtros) ──────────────────────────────────
+    const [statsRow] = await sql`
+      SELECT
+        COUNT(p.id)::int AS total_products,
+        COUNT(p.id) FILTER (WHERE NOT p.is_service)::int AS total_physical,
+        COALESCE(SUM(ib.qty_available) FILTER (WHERE NOT p.is_service), 0)::numeric AS total_stock,
+        COALESCE(SUM(ib.qty_available * ib.unit_cost) FILTER (WHERE NOT p.is_service), 0)::numeric AS total_value,
+        COUNT(DISTINCT p.id) FILTER (
+          WHERE NOT p.is_service
+            AND EXISTS (
+              SELECT 1 FROM inventory_batches ib2
+              WHERE ib2.product_id = p.id AND ib2.user_id = p.user_id
+                AND ib2.qty_available > 0
+            )
+            AND (SELECT COALESCE(SUM(qty_available), 0) FROM inventory_batches WHERE product_id = p.id AND user_id = p.user_id) < 10
+        )::int AS low_stock,
+        COUNT(DISTINCT p.id) FILTER (
+          WHERE NOT p.is_service
+            AND (SELECT COALESCE(SUM(qty_available), 0) FROM inventory_batches WHERE product_id = p.id AND user_id = p.user_id) = 0
+        )::int AS out_of_stock
+      FROM products p
+      LEFT JOIN inventory_batches ib ON ib.product_id = p.id AND ib.user_id = p.user_id
+      WHERE p.user_id = ${userId} AND p.is_active = TRUE
+    `;
+
+    // ── Filtros dinámicos ─────────────────────────────────────────────
+    const searchCondition = search
+      ? sql`AND (p.name ILIKE ${'%' + search + '%'} OR p.sku ILIKE ${'%' + search + '%'})`
+      : sql``;
+
+    const stockCondition =
+      stockFilter === "services" ? sql`AND p.is_service = TRUE` :
+      stockFilter === "ok"       ? sql`AND (p.is_service = TRUE OR (SELECT COALESCE(SUM(qty_available),0) FROM inventory_batches WHERE product_id=p.id AND user_id=p.user_id) >= 10)` :
+      stockFilter === "low"      ? sql`AND p.is_service = FALSE AND (SELECT COALESCE(SUM(qty_available),0) FROM inventory_batches WHERE product_id=p.id AND user_id=p.user_id) > 0 AND (SELECT COALESCE(SUM(qty_available),0) FROM inventory_batches WHERE product_id=p.id AND user_id=p.user_id) < 10` :
+      stockFilter === "out"      ? sql`AND p.is_service = FALSE AND (SELECT COALESCE(SUM(qty_available),0) FROM inventory_batches WHERE product_id=p.id AND user_id=p.user_id) = 0` :
+                                   sql``;
+
+    // ── Count para paginación ─────────────────────────────────────────
+    const [{ count }] = await sql`
+      SELECT COUNT(DISTINCT p.id)::int AS count
+      FROM products p
+      WHERE p.user_id = ${userId} AND p.is_active = TRUE
+      ${searchCondition}
+      ${stockCondition}
+    `;
+
+    const totalPages = Math.max(1, Math.ceil(count / limit));
+
+    // ── Data paginada ─────────────────────────────────────────────────
     const inventory = await sql`
       SELECT
         p.id             AS product_id,
@@ -21,15 +77,12 @@ export async function GET(request: NextRequest) {
         p.image_url,
         p.price,
 
-        -- Stock total (base + todas las variantes)
         COALESCE(SUM(ib.qty_available), 0)::numeric AS stock,
 
-        -- Stock solo del producto base (variant_id IS NULL)
         COALESCE(SUM(
           CASE WHEN ib.variant_id IS NULL THEN ib.qty_available ELSE 0 END
         ), 0)::numeric AS base_stock,
 
-        -- Costo promedio del producto base
         CASE
           WHEN SUM(CASE WHEN ib.variant_id IS NULL THEN ib.qty_available ELSE 0 END) > 0
           THEN ROUND(
@@ -39,14 +92,12 @@ export async function GET(request: NextRequest) {
           ELSE 0
         END AS base_avg_unit_cost,
 
-        -- Valor total del producto base
         ROUND(
           COALESCE(SUM(
             CASE WHEN ib.variant_id IS NULL THEN ib.qty_available * ib.unit_cost ELSE 0 END
           ), 0), 2
         ) AS base_total_value,
 
-        -- Costo promedio y valor total sobre todo el stock
         CASE
           WHEN SUM(ib.qty_available) > 0
           THEN ROUND(
@@ -58,20 +109,19 @@ export async function GET(request: NextRequest) {
           COALESCE(SUM(ib.qty_available * ib.unit_cost), 0), 2
         ) AS total_value,
 
-        -- Stock desglosado por variante
         (
           SELECT COALESCE(
             json_agg(
               json_build_object(
-                'variant_id',    pv.id,
-                'variant_name',  pv.variant_name,
-                'sku',           pv.sku,
-                'attributes',    pv.attributes,
+                'variant_id',     pv.id,
+                'variant_name',   pv.variant_name,
+                'sku',            pv.sku,
+                'attributes',     pv.attributes,
                 'price_override', pv.price_override,
-                'image_url',     pv.image_url,
-                'stock',         COALESCE(vib.stock, 0),
-                'avg_unit_cost', COALESCE(vib.avg_cost, 0),
-                'total_value',   COALESCE(vib.total_val, 0)
+                'image_url',      pv.image_url,
+                'stock',          COALESCE(vib.stock, 0),
+                'avg_unit_cost',  COALESCE(vib.avg_cost, 0),
+                'total_value',    COALESCE(vib.total_val, 0)
               ) ORDER BY pv.id
             ),
             '[]'::json
@@ -102,26 +152,26 @@ export async function GET(request: NextRequest) {
        AND ib.user_id    = p.user_id
       WHERE p.user_id   = ${userId}
         AND p.is_active = TRUE
+      ${searchCondition}
+      ${stockCondition}
       GROUP BY p.id
       ORDER BY p.name ASC
+      LIMIT ${limit} OFFSET ${offset}
     `;
 
-    const physical = inventory.filter((i: any) => !i.is_service);
-
-    const totalStock = physical.reduce((acc: number, i: any) => acc + Number(i.stock), 0);
-    const totalValue = physical.reduce((acc: number, i: any) => acc + Number(i.total_value), 0);
-    const lowStock   = physical.filter((i: any) => Number(i.stock) > 0 && Number(i.stock) < 10).length;
-    const outOfStock = physical.filter((i: any) => Number(i.stock) === 0).length;
-
     return Response.json({
-      data: inventory,
+      data:       inventory,
+      total:      count,
+      page,
+      totalPages,
+      limit,
       stats: {
-        total_products: inventory.length,
-        total_physical: physical.length,
-        total_stock:    totalStock,
-        total_value:    totalValue,
-        low_stock:      lowStock,
-        out_of_stock:   outOfStock,
+        total_products: statsRow.total_products,
+        total_physical: statsRow.total_physical,
+        total_stock:    Number(statsRow.total_stock),
+        total_value:    Number(statsRow.total_value),
+        low_stock:      statsRow.low_stock,
+        out_of_stock:   statsRow.out_of_stock,
       },
     });
 

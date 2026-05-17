@@ -14,9 +14,10 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
 
     const accountId = searchParams.get("account_id");
-    const month = searchParams.get("month");
-    const year = searchParams.get("year");
-    const date = searchParams.get("date");
+    const month     = searchParams.get("month");
+    const year      = searchParams.get("year");
+    const date      = searchParams.get("date");
+    const type      = searchParams.get("type") || null; // INCOME | EXPENSE | TRANSFER | null
 
     const now = new Date();
     let startISO: string;
@@ -61,6 +62,7 @@ export async function GET(request: NextRequest) {
         AND t.occurred_at >= ${startISO}::timestamptz
         AND t.occurred_at <  ${endISO}::timestamptz
         ${accountId ? sql`AND (t.account_id = ${Number(accountId)} OR t.to_account_id = ${Number(accountId)})` : sql``}
+        ${type ? sql`AND t.type = ${type}` : sql``}
       ORDER BY t.occurred_at DESC
       LIMIT 500
     `;

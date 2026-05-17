@@ -23,6 +23,7 @@ import { Loader2, ShoppingBag, Wallet } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { useCreateSupplyPurchase, Supply } from "@/hooks/swr/use-supplies";
+import { localDateToISO, toLocalDateInput } from "@/lib/date-utils";
 import { useAccounts } from "@/hooks/swr/use-accounts";
 
 const formatCurrency = (v: number) =>
@@ -52,7 +53,7 @@ export function AddSupplyPurchaseDialog({
   const [quantity, setQuantity] = useState("1");
   const [unitCost, setUnitCost] = useState("");
   const [purchasedAt, setPurchasedAt] = useState(
-    new Date().toISOString().split("T")[0]
+    toLocalDateInput(new Date())
   );
 
   const qty = Number(quantity) || 0;
@@ -64,7 +65,7 @@ export function AddSupplyPurchaseDialog({
       setAccountId("");
       setQuantity("1");
       setUnitCost(supply.unit_cost > 0 ? String(supply.unit_cost) : "");
-      setPurchasedAt(new Date().toISOString().split("T")[0]);
+      setPurchasedAt(toLocalDateInput(new Date()));
     }
   }, [open, supply]);
 
@@ -81,7 +82,7 @@ export function AddSupplyPurchaseDialog({
     try {
       await createSupplyPurchase({
         account_id: Number(accountId),
-        purchased_at: purchasedAt,
+        purchased_at: localDateToISO(purchasedAt),
         items: [{ supply_id: supply.id, quantity: qty, unit_cost: cost }],
       });
 

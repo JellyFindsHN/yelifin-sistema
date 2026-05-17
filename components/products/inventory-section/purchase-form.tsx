@@ -10,6 +10,7 @@ import {
 } from "@/components/ui/select";
 import { Calculator, Wallet } from "lucide-react";
 import { useAccounts } from "@/hooks/swr/use-accounts";
+import { toLocalDateInput } from "@/lib/date-utils";
 import { useCurrency } from "@/hooks/swr/use-currency";
 
 const TASA_DEFAULT = 24.89;
@@ -41,7 +42,7 @@ export const defaultPurchaseForm = (): PurchaseFormValue => ({
   quantity:      "1",
   unit_cost:     0,
   shipping:      0,
-  purchased_at:  new Date().toISOString().split("T")[0],
+  purchased_at:  toLocalDateInput(new Date()),
   notes:         "",
 });
 

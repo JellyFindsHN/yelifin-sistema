@@ -24,6 +24,7 @@ import { useAccounts } from "@/hooks/swr/use-accounts";
 import { useCreditCards } from "@/hooks/swr/use-credit-cards";
 import { useCurrency } from "@/hooks/swr/use-currency";
 import { Product } from "@/types";
+import { localDateToISO, toLocalDateInput } from "@/lib/date-utils";
 
 const TASA_DEFAULT = 24.89;
 
@@ -131,7 +132,7 @@ export function AddInventoryDialog({ product, open, onOpenChange, onSuccess }: P
         currency:      "USD",
         exchange_rate: TASA_DEFAULT,
         shipping:      0,
-        purchased_at:  new Date().toISOString().split("T")[0],
+        purchased_at:  toLocalDateInput(new Date()),
       });
     }
   }, [open, reset]);
@@ -181,7 +182,7 @@ export function AddInventoryDialog({ product, open, onOpenChange, onSuccess }: P
         notes:         data.notes,
         status:        isPending ? "PENDING" : "COMPLETED",
         purchased_at:  data.purchased_at
-          ? new Date(data.purchased_at + "T00:00:00-06:00").toISOString()
+          ? localDateToISO(data.purchased_at)
           : new Date().toISOString(),
         items: items.map((item) => ({
           product_id:    product.id,

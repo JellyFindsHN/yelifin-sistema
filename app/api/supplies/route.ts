@@ -5,7 +5,7 @@ import { verifyAuth, createErrorResponse, isAuthSuccess } from "@/lib/auth";
 
 const sql = neon(process.env.DATABASE_URL!);
 
-// GET /api/supplies?search=...
+// GET /api/supplies?search=...&page=1&limit=15
 export async function GET(request: NextRequest) {
   const auth = await verifyAuth(request);
   if (!isAuthSuccess(auth)) return createErrorResponse(auth.error, auth.status);
@@ -14,6 +14,16 @@ export async function GET(request: NextRequest) {
     const { userId } = auth.data;
     const { searchParams } = new URL(request.url);
     const search = (searchParams.get("search") ?? "").trim().toLowerCase();
+    const page  = Math.max(1, Number(searchParams.get("page")  ?? 1));
+    const limit = Math.min(100, Math.max(1, Number(searchParams.get("limit") ?? 15)));
+    const offset = (page - 1) * limit;
+
+    const [{ count }] = await sql`
+      SELECT COUNT(*)::int AS count
+      FROM supplies
+      WHERE user_id = ${userId}
+        AND (${search} = '' OR LOWER(name) LIKE ${"%" + search + "%"})
+    `;
 
     const supplies = await sql`
       SELECT
@@ -29,9 +39,16 @@ export async function GET(request: NextRequest) {
       WHERE user_id = ${userId}
         AND (${search} = '' OR LOWER(name) LIKE ${"%" + search + "%"})
       ORDER BY created_at DESC
+      LIMIT ${limit} OFFSET ${offset}
     `;
 
-    return Response.json({ data: supplies, total: supplies.length });
+    return Response.json({
+      data: supplies,
+      total: count,
+      page,
+      totalPages: Math.max(1, Math.ceil(count / limit)),
+      limit,
+    });
   } catch (error) {
     console.error(" GET /api/supplies:", error);
     return createErrorResponse("Error al obtener suministros", 500);

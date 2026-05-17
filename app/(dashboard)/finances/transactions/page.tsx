@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -26,6 +26,10 @@ import {
   TrendingUp, TrendingDown, MoreVertical, Pencil, Trash2, CreditCard,
   Banknote, Building2, Wallet,
 } from "lucide-react";
+import {
+  Pagination, PaginationContent, PaginationItem,
+  PaginationLink, PaginationNext, PaginationPrevious, PaginationEllipsis,
+} from "@/components/ui/pagination";
 import {
   PieChart, Pie, Cell, Tooltip, Legend, ResponsiveContainer,
 } from "recharts";
@@ -168,6 +172,8 @@ export default function TransactionsPage() {
   }); // "all" | "cc-{id}" | account_id
   const [typeFilter,    setTypeFilter]    = useState("all");
   const [modalOpen,     setModalOpen]     = useState(false);
+  const [page,          setPage]          = useState(1);
+  const pageLimit = 15;
 
   const [editingTx,     setEditingTx]     = useState<Transaction | null>(null);
   const [deletingTx,    setDeletingTx]    = useState<Transaction | null>(null);
@@ -185,8 +191,16 @@ export default function TransactionsPage() {
   const selectedCardId  = isCardFilter ? Number(sourceFilter.replace("cc-", "")) : undefined;
   const isAccountFilter = !isCardFilter && sourceFilter !== "all";
 
+  // Para account transactions: type se envía al server solo cuando aplica
+  // (TRANSFER no existe en CC, INCOME/EXPENSE se mapean en client para CC)
+  const accountTypeFilter =
+    typeFilter === "INCOME" || typeFilter === "EXPENSE" || typeFilter === "TRANSFER"
+      ? typeFilter
+      : undefined;
+
   const { transactions, totals, isLoading: loadingAcc, mutate } = useTransactions({
     account_id: isAccountFilter ? Number(sourceFilter) : undefined,
+    type: accountTypeFilter,
     ...periodParams,
   });
 
@@ -212,18 +226,25 @@ export default function TransactionsPage() {
     ? formatDate(specificDate)
     : `${MONTH_NAMES[selectedMonth]} ${selectedYear}`;
 
+  // Reset page on filter changes
+  useEffect(() => { setPage(1); }, [
+    typeFilter, sourceFilter, filterMode,
+    selectedMonth, selectedYear, specificDate,
+  ]);
+
   // ── Merge & filter ─────────────────────────────────────────────────
   const rows = useMemo<Row[]>(() => {
+    // account transactions ya vienen filtradas por type desde el server
     const accRows: Row[] = (isCardFilter ? [] : transactions)
-      .filter((t) => typeFilter === "all" || t.type === typeFilter)
       .map((t) => ({ _src: "account" as const, data: t }));
 
+    // CC transactions se filtran client-side
     const ccRows: Row[] = (isAccountFilter ? [] : ccTxs)
       .filter((t) => {
-        if (typeFilter === "all") return true;
+        if (typeFilter === "all" || typeFilter === "TRANSFER") return typeFilter !== "TRANSFER";
         if (typeFilter === "EXPENSE") return t.type === "CHARGE";
         if (typeFilter === "INCOME")  return t.type === "PAYMENT";
-        return false;
+        return true;
       })
       .map((t) => ({ _src: "cc" as const, data: t }));
 
@@ -233,6 +254,11 @@ export default function TransactionsPage() {
         new Date(a.data.occurred_at).getTime()
     );
   }, [transactions, ccTxs, typeFilter, isCardFilter, isAccountFilter]);
+
+  // ── Paginación client-side de rows ─────────────────────────────────
+  const totalRows  = rows.length;
+  const totalPages = Math.max(1, Math.ceil(totalRows / pageLimit));
+  const pagedRows  = rows.slice((page - 1) * pageLimit, page * pageLimit);
 
   const PIE_COLORS = ["#6366f1","#f59e0b","#10b981","#3b82f6","#ec4899","#8b5cf6","#f97316","#14b8a6"];
 
@@ -752,7 +778,7 @@ export default function TransactionsPage() {
             </CardContent>
           </Card>
         ) : (
-          rows.map((row, i) => renderMobileCard(row, i))
+          pagedRows.map((row, i) => renderMobileCard(row, i))
         )}
       </div>
 
@@ -787,12 +813,57 @@ export default function TransactionsPage() {
                   </TableCell>
                 </TableRow>
               ) : (
-                rows.map((row) => renderDesktopRow(row))
+                pagedRows.map((row) => renderDesktopRow(row))
               )}
             </TableBody>
           </Table>
         </CardContent>
       </Card>
+
+      {/* Paginación */}
+      {totalPages > 1 && (
+        <div className="flex flex-col items-center gap-2 sm:flex-row sm:justify-between">
+          <p className="text-sm text-muted-foreground order-2 sm:order-1">
+            {totalRows} transacción{totalRows !== 1 ? "es" : ""} · página {page} de {totalPages}
+          </p>
+          <Pagination className="order-1 sm:order-2 w-auto mx-0 justify-end">
+            <PaginationContent>
+              <PaginationItem>
+                <PaginationPrevious
+                  onClick={() => setPage((p) => Math.max(1, p - 1))}
+                  aria-disabled={page === 1}
+                  className={page === 1 ? "pointer-events-none opacity-50" : "cursor-pointer"}
+                />
+              </PaginationItem>
+              {Array.from({ length: totalPages }, (_, i) => i + 1)
+                .filter((p) => p === 1 || p === totalPages || (p >= page - 1 && p <= page + 1))
+                .reduce<(number | "…")[]>((acc, p, i, arr) => {
+                  if (i > 0 && (p as number) - (arr[i - 1] as number) > 1) acc.push("…");
+                  acc.push(p);
+                  return acc;
+                }, [])
+                .map((p, i) =>
+                  p === "…" ? (
+                    <PaginationItem key={`ellipsis-${i}`}><PaginationEllipsis /></PaginationItem>
+                  ) : (
+                    <PaginationItem key={p}>
+                      <PaginationLink isActive={p === page} onClick={() => setPage(p as number)} className="cursor-pointer">
+                        {p}
+                      </PaginationLink>
+                    </PaginationItem>
+                  )
+                )}
+              <PaginationItem>
+                <PaginationNext
+                  onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                  aria-disabled={page === totalPages}
+                  className={page === totalPages ? "pointer-events-none opacity-50" : "cursor-pointer"}
+                />
+              </PaginationItem>
+            </PaginationContent>
+          </Pagination>
+        </div>
+      )}
 
       {/* FAB */}
       <Fab

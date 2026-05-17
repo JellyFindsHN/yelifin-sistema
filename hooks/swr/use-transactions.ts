@@ -73,6 +73,7 @@ export function useTransactions(filters?: {
   month?: number;
   year?: number;
   date?: string;
+  type?: string;
 }) {
   const { firebaseUser } = useAuth();
   const authFetch = useAuthFetch();
@@ -82,6 +83,7 @@ export function useTransactions(filters?: {
   if (filters?.month)      params.set("month",      String(filters.month));
   if (filters?.year)       params.set("year",        String(filters.year));
   if (filters?.date)       params.set("date",        filters.date);
+  if (filters?.type && filters.type !== "all") params.set("type", filters.type);
 
   const url = `${KEY}?${params.toString()}`;
 

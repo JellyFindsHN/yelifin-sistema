@@ -25,6 +25,7 @@ import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 
 import { ProductImageUpload } from "./product-image-upload";
 import { InventorySection, InventorySectionValue } from "./inventory-section";
+import { localDateToISO } from "@/lib/date-utils";
 
 const schema = z.object({
   name:        z.string().min(1, "El nombre es requerido"),
@@ -113,7 +114,7 @@ export function CreateProductDialog({ open, onOpenChange, onSuccess }: Props) {
           exchange_rate: d.exchange_rate,
           shipping:      d.shipping,
           notes:         d.notes || undefined,
-          purchased_at:  new Date(d.purchased_at).toISOString(),
+          purchased_at:  localDateToISO(d.purchased_at),
           items: [{
             product_id:    productId,
             quantity:      Number(d.quantity),
@@ -132,7 +133,7 @@ export function CreateProductDialog({ open, onOpenChange, onSuccess }: Props) {
             product_id:   productId,
             quantity:     Number(d.quantity),
             unit_cost:    d.unit_cost || undefined,
-            purchased_at: d.purchased_at || undefined,
+            purchased_at: d.purchased_at ? localDateToISO(d.purchased_at) : undefined,
             notes:        d.notes || undefined,
           }),
         });

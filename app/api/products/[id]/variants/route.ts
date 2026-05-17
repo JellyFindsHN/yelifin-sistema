@@ -41,17 +41,17 @@ export async function POST(request: NextRequest, { params }: Params) {
       }
     }
 
-    // Verificar SKU duplicado en variantes del mismo usuario
-    if (sku) {
-      const [skuConflict] = await sql`
-        SELECT id FROM product_variants
-        WHERE user_id = ${userId}
-          AND sku     = ${sku}
-        LIMIT 1
-      `;
-      if (skuConflict) {
-        return createErrorResponse("Ya existe una variante con este SKU", 409);
-      }
+    const finalSku = sku?.trim()
+      || `VAR-${Date.now().toString(36).toUpperCase()}${Math.random().toString(36).slice(2, 5).toUpperCase()}`;
+
+    const [skuConflict] = await sql`
+      SELECT id FROM product_variants
+      WHERE user_id = ${userId}
+        AND sku     = ${finalSku}
+      LIMIT 1
+    `;
+    if (skuConflict) {
+      return createErrorResponse("Ya existe una variante con este SKU", 409);
     }
 
     const [variant] = await sql`
@@ -68,7 +68,7 @@ export async function POST(request: NextRequest, { params }: Params) {
         ${userId},
         ${productId},
         ${variant_name.trim()},
-        ${sku            ?? null},
+        ${finalSku},
         ${attributes     ? JSON.stringify(attributes) : null},
         ${price_override !== undefined && price_override !== null && Number(price_override) > 0
             ? Number(price_override)

@@ -16,6 +16,7 @@ import { Loader2, ArrowDownCircle, ArrowUpCircle, ArrowLeftRight } from "lucide-
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { useUpdateTransaction, Transaction } from "@/hooks/swr/use-transactions";
+import { localDateToISO, toLocalDateInput } from "@/lib/date-utils";
 import { useCurrency } from "@/hooks/swr/use-currency";
 import { useTransactionCategories } from "@/hooks/swr/use-transaction-categories";
 
@@ -50,7 +51,7 @@ export function EditTransactionModal({
   const [category,    setCategory]    = useState(transaction.category ?? "");
   const [description, setDescription] = useState(transaction.description ?? "");
   const [occurredAt,  setOccurredAt]  = useState(
-    new Date(transaction.occurred_at).toISOString().split("T")[0]
+    toLocalDateInput(transaction.occurred_at)
   );
 
   // Sincronizar si cambia la transacción (ej: se abre con otra tx)
@@ -60,7 +61,7 @@ export function EditTransactionModal({
     setAmount(String(transaction.amount));
     setCategory(transaction.category ?? "");
     setDescription(transaction.description ?? "");
-    setOccurredAt(new Date(transaction.occurred_at).toISOString().split("T")[0]);
+    setOccurredAt(toLocalDateInput(transaction.occurred_at));
   }, [transaction]);
 
   const { categories } = useTransactionCategories(type);
@@ -82,7 +83,7 @@ export function EditTransactionModal({
         to_account_id: type === "TRANSFER" ? Number(toAccountId) : undefined,
         category:      category    || undefined,
         description:   description || undefined,
-        occurred_at:   new Date(occurredAt + "T00:00:00-06:00").toISOString(),
+        occurred_at:   localDateToISO(occurredAt),
       });
 
       toast.success("Transacción actualizada");

@@ -121,6 +121,58 @@ export async function GET(request: NextRequest) {
 
     const { fromDateISO, toDateISO, payment } = resolveRange(searchParams, tz);
 
+    const search    = searchParams.get("search")?.trim()   || null;
+    const status    = searchParams.get("status")           || null;
+    const accountId = searchParams.get("account_id")       || null;
+    const page      = Math.max(1, Number(searchParams.get("page"))  || 1);
+    const limit     = Math.min(100, Math.max(1, Number(searchParams.get("limit")) || 25));
+    const offset    = (page - 1) * limit;
+
+    // ── Stats (sin filtro de status, para los summary cards) ─────────
+    const [statsRow] = await sql`
+      SELECT
+        COALESCE(SUM(s.total) FILTER (WHERE s.status = 'COMPLETED'), 0)   AS total_revenue,
+        COALESCE(
+          SUM(
+            CASE WHEN s.status = 'COMPLETED'
+              THEN COALESCE(prof.profit, 0) - COALESCE(s.tax, 0)
+              ELSE 0
+            END
+          ), 0
+        )                                                                   AS total_profit,
+        COUNT(*) FILTER (WHERE s.status = 'PENDING')::int                  AS pending_count,
+        COUNT(*) FILTER (WHERE s.status = 'COMPLETED')::int                AS completed_count
+      FROM sales s
+      LEFT JOIN customers c ON c.id = s.customer_id
+      LEFT JOIN (
+        SELECT sale_id, SUM(line_total - unit_cost * quantity) AS profit
+        FROM sale_items GROUP BY sale_id
+      ) prof ON prof.sale_id = s.id
+      WHERE s.user_id = ${userId}
+        AND (${fromDateISO}::timestamptz IS NULL OR s.sold_at >= ${fromDateISO})
+        AND (${toDateISO}::timestamptz   IS NULL OR s.sold_at <= ${toDateISO})
+        AND (${payment}::text            IS NULL OR s.payment_method = ${payment})
+        AND (${search}::text             IS NULL OR s.sale_number ILIKE ${'%' + (search ?? '') + '%'} OR c.name ILIKE ${'%' + (search ?? '') + '%'} OR s.notes ILIKE ${'%' + (search ?? '') + '%'})
+        AND (${accountId}::text          IS NULL OR s.account_id::text = ${accountId})
+    `;
+
+    // ── Count para paginación (incluye filtro de status) ─────────────
+    const [{ count }] = await sql`
+      SELECT COUNT(s.id)::int AS count
+      FROM sales s
+      LEFT JOIN customers c ON c.id = s.customer_id
+      WHERE s.user_id = ${userId}
+        AND (${fromDateISO}::timestamptz IS NULL OR s.sold_at >= ${fromDateISO})
+        AND (${toDateISO}::timestamptz   IS NULL OR s.sold_at <= ${toDateISO})
+        AND (${payment}::text            IS NULL OR s.payment_method = ${payment})
+        AND (${search}::text             IS NULL OR s.sale_number ILIKE ${'%' + (search ?? '') + '%'} OR c.name ILIKE ${'%' + (search ?? '') + '%'} OR s.notes ILIKE ${'%' + (search ?? '') + '%'})
+        AND (${accountId}::text          IS NULL OR s.account_id::text = ${accountId})
+        AND (${status}::text             IS NULL OR s.status = ${status})
+    `;
+
+    const totalPages = Math.max(1, Math.ceil(count / limit));
+
+    // ── Data paginada ─────────────────────────────────────────────────
     const sales = await sql`
       SELECT
         s.id,
@@ -154,11 +206,27 @@ export async function GET(request: NextRequest) {
         AND (${fromDateISO}::timestamptz IS NULL OR s.sold_at >= ${fromDateISO})
         AND (${toDateISO}::timestamptz   IS NULL OR s.sold_at <= ${toDateISO})
         AND (${payment}::text            IS NULL OR s.payment_method = ${payment})
+        AND (${search}::text             IS NULL OR s.sale_number ILIKE ${'%' + (search ?? '') + '%'} OR c.name ILIKE ${'%' + (search ?? '') + '%'} OR s.notes ILIKE ${'%' + (search ?? '') + '%'})
+        AND (${accountId}::text          IS NULL OR s.account_id::text = ${accountId})
+        AND (${status}::text             IS NULL OR s.status = ${status})
       GROUP BY s.id, c.name, a.name
       ORDER BY s.sold_at DESC
+      LIMIT ${limit} OFFSET ${offset}
     `;
 
-    return Response.json({ data: sales, total: sales.length });
+    return Response.json({
+      data:       sales,
+      total:      count,
+      page,
+      totalPages,
+      limit,
+      stats: {
+        total_revenue:   Number(statsRow.total_revenue),
+        total_profit:    Number(statsRow.total_profit),
+        pending_count:   statsRow.pending_count,
+        completed_count: statsRow.completed_count,
+      },
+    });
   } catch (error) {
     console.error("GET /api/sales:", error);
     return createErrorResponse("Error al obtener ventas", 500);

@@ -31,6 +31,7 @@ import {
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { useCreateTransaction } from "@/hooks/swr/use-transactions";
+import { localDateToISO, toLocalDateInput } from "@/lib/date-utils";
 import { useCurrency } from "@/hooks/swr/use-currency";
 import { useTransactionCategories } from "@/hooks/swr/use-transaction-categories";
 import { CreditCard as CreditCardType } from "@/hooks/swr/use-credit-cards";
@@ -75,7 +76,7 @@ export function CreateTransactionModal({
   const [category, setCategory] = useState("");
   const [description, setDescription] = useState("");
   const [occurredAt, setOccurredAt] = useState(
-    new Date().toISOString().split("T")[0],
+    toLocalDateInput(new Date()),
   );
 
   const showCreditCardOption = type === "EXPENSE" && creditCards.length > 0;
@@ -97,7 +98,7 @@ export function CreateTransactionModal({
     setAmount("");
     setCategory("");
     setDescription("");
-    setOccurredAt(new Date().toISOString().split("T")[0]);
+    setOccurredAt(toLocalDateInput(new Date()));
   };
 
   const handleClose = () => {
@@ -143,7 +144,7 @@ export function CreateTransactionModal({
         amount: Number(amount),
         category: category || undefined,
         description: description || undefined,
-        occurred_at: new Date(occurredAt).toISOString(),
+        occurred_at: localDateToISO(occurredAt),
       } as any);
 
       toast.success("Transacción registrada exitosamente");

@@ -2,6 +2,7 @@
 "use client";
 
 import { useForm } from "react-hook-form";
+import { localDateToISO } from "@/lib/date-utils";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import {
@@ -56,8 +57,8 @@ export function CreateEventDialog({ open, onOpenChange, onSuccess }: Props) {
       await createEvent({
         name:       data.name,
         location:   data.location   || undefined,
-        starts_at:  new Date(data.starts_at).toISOString(),
-        ends_at:    new Date(data.ends_at).toISOString(),
+        starts_at:  localDateToISO(data.starts_at),
+        ends_at:    localDateToISO(data.ends_at),
         fixed_cost: data.fixed_cost || 0,
         notes:      data.notes      || undefined,
       });

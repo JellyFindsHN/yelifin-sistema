@@ -2,6 +2,7 @@
 "use client";
 
 import { useEffect } from "react";
+import { localDateToISO, toLocalDateInput } from "@/lib/date-utils";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
@@ -33,7 +34,6 @@ const schema = z.object({
 type FormData = z.infer<typeof schema>;
 
 // Convert ISO → "YYYY-MM-DD" for date input
-const toDateInput = (iso: string) => iso.split("T")[0];
 
 type Props = {
   event:        Event | null;
@@ -56,8 +56,8 @@ export function EditEventDialog({ event, open, onOpenChange, onSuccess }: Props)
       reset({
         name:       event.name,
         location:   event.location ?? "",
-        starts_at:  toDateInput(event.starts_at),
-        ends_at:    toDateInput(event.ends_at),
+        starts_at:  toLocalDateInput(event.starts_at),
+        ends_at:    toLocalDateInput(event.ends_at),
         fixed_cost: event.fixed_cost,
         notes:      event.notes ?? "",
       });
@@ -72,8 +72,8 @@ export function EditEventDialog({ event, open, onOpenChange, onSuccess }: Props)
       await updateEvent(event.id, {
         name:       data.name,
         location:   data.location   || undefined,
-        starts_at:  new Date(data.starts_at).toISOString(),
-        ends_at:    new Date(data.ends_at).toISOString(),
+        starts_at:  localDateToISO(data.starts_at),
+        ends_at:    localDateToISO(data.ends_at),
         fixed_cost: data.fixed_cost || 0,
         notes:      data.notes      || undefined,
       });

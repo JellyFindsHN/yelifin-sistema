@@ -1,7 +1,7 @@
 // app/(dashboard)/inventory/page.tsx
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -26,14 +26,19 @@ import {
   Package, Warehouse, AlertTriangle, DollarSign,
   Plus, MoreVertical, Pencil, Trash2, PackagePlus,
   ShoppingCart, SlidersHorizontal, ArrowLeftRight,
-  ChevronDown, Layers, Box, Clock,
+  ChevronDown, Layers, Box, Clock, X,
 } from "lucide-react";
+import {
+  Pagination, PaginationContent, PaginationItem,
+  PaginationLink, PaginationNext, PaginationPrevious, PaginationEllipsis,
+} from "@/components/ui/pagination";
 import Image from "next/image";
 import { toast } from "sonner";
 import { SearchBar } from "@/components/shared/search-bar"
 import { cn } from "@/lib/utils";
 
 import { useInventory, VariantStock } from "@/hooks/swr/use-inventory";
+import { useDebounce } from "@/hooks/use-debounce";
 import { useProducts, useDeleteVariant } from "@/hooks/swr/use-products";
 import { Fab } from "@/components/ui/fab";
 import { Product, ProductVariant } from "@/types";
@@ -171,7 +176,7 @@ function BaseTableRow({
   format,
 }: {
   item: InventoryItem;
-  format: (v: number | string) => string;
+  format: (v: number) => string;
 }) {
   return (
     <TableRow className="bg-muted/20 hover:bg-muted/30">
@@ -216,7 +221,7 @@ function VariantTableRow({
 }: {
   variantStock: VariantStock;
   product: Product;
-  format: (v: number | string) => string;
+  format: (v: number) => string;
   findVariant: (product: Product, variantId: number) => ProductVariant | null;
   setAdjustVariant: (v: { product: Product; variant: ProductVariant } | null) => void;
   setEditVariant: (v: { product: Product; variant: ProductVariant } | null) => void;
@@ -289,7 +294,7 @@ function BaseCard({
   format,
 }: {
   item: InventoryItem;
-  format: (v: number | string) => string;
+  format: (v: number) => string;
 }) {
   return (
     <div className="rounded-lg border bg-muted/20 overflow-hidden">
@@ -343,7 +348,7 @@ function VariantCard({
 }: {
   variantStock: VariantStock;
   product: Product;
-  format: (v: number | string) => string;
+  format: (v: number) => string;
   findVariant: (product: Product, variantId: number) => ProductVariant | null;
   setAdjustVariant: (v: { product: Product; variant: ProductVariant } | null) => void;
   setEditVariant: (v: { product: Product; variant: ProductVariant } | null) => void;
@@ -426,12 +431,25 @@ function VariantCard({
 
 export default function InventoryPage() {
   const router = useRouter();
-  const { inventory, stats, isLoading: loadingInventory, mutate: mutateInventory } = useInventory();
-  const { products, mutate: mutateProducts } = useProducts();
-  const { deleteVariant, isDeleting: isDeletingVariant } = useDeleteVariant();
 
   const [search,      setSearch]      = useState("");
   const [stockFilter, setStockFilter] = useState("all");
+  const [page,        setPage]        = useState(1);
+  const pageLimit = 15;
+
+  const debouncedSearch = useDebounce(search, 300);
+
+  useEffect(() => { setPage(1); }, [debouncedSearch, stockFilter]);
+
+  const { inventory, stats, total, totalPages, isLoading: loadingInventory, mutate: mutateInventory } = useInventory({
+    search: debouncedSearch || undefined,
+    stock:  stockFilter !== "all" ? stockFilter : undefined,
+    page,
+    limit:  pageLimit,
+  });
+  const { products, mutate: mutateProducts } = useProducts();
+  const { deleteVariant, isDeleting: isDeletingVariant } = useDeleteVariant();
+
   const [expanded,    setExpanded]    = useState<Set<number>>(new Set());
 
   // Diálogos de producto
@@ -455,7 +473,6 @@ export default function InventoryPage() {
 
   const pendingPurchases = purchases.filter((p) => p.status === "PENDING");
 
-
   const findProduct = (productId: number): Product | null =>
     products.find((p) => p.id === productId) ?? null;
 
@@ -470,25 +487,8 @@ export default function InventoryPage() {
     });
   };
 
-  const filtered = inventory.filter((item) => {
-    const matchesSearch =
-      item.product_name.toLowerCase().includes(search.toLowerCase()) ||
-      (item.sku?.toLowerCase().includes(search.toLowerCase()) ?? false);
+  const hasFilters = search || stockFilter !== "all";
 
-    const stock = Number(item.stock);
-    const matchesStock =
-      stockFilter === "all"      ? true :
-      stockFilter === "in_stock" ? stock > 0 || item.is_service :
-      stockFilter === "out"      ? stock == 0 && !item.is_service :
-      stockFilter === "low"      ? stock > 0 && stock < 10 :
-      stockFilter === "ok"       ? stock >= 10 || item.is_service :
-      stockFilter === "services" ? item.is_service :
-      true;
-
-    return matchesSearch && matchesStock;
-  });
-
-  console.log("InventoryPage render", { inventory, filtered, pendingPurchases });
   const handleSuccess = () => {
     mutateProducts();
     mutateInventory();
@@ -584,6 +584,15 @@ export default function InventoryPage() {
             <SelectItem value="out">Agotados</SelectItem>
           </SelectContent>
         </Select>
+        {hasFilters && (
+          <Button
+            variant="ghost" size="sm"
+            className="gap-1.5 text-muted-foreground shrink-0"
+            onClick={() => { setSearch(""); setStockFilter("all"); setPage(1); }}
+          >
+            <X className="h-3.5 w-3.5" /> Limpiar
+          </Button>
+        )}
       </div>
 
       {/* ── Tabla — desktop ──────────────────────────────────────── */}
@@ -611,14 +620,14 @@ export default function InventoryPage() {
                     ))}
                   </TableRow>
                 ))
-              ) : filtered.length === 0 ? (
+              ) : inventory.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={7} className="text-center py-12 text-muted-foreground">
-                    Agrega productos para visualizarlos aquí
+                    {hasFilters ? "No se encontraron productos" : "Agrega productos para visualizarlos aquí"}
                   </TableCell>
                 </TableRow>
               ) : (
-                filtered.map((item) => {
+                inventory.map((item) => {
                   const product     = findProduct(item.product_id);
                   const hasVariants = item.variants_stock.length > 0 && !item.is_service;
                   const isExpanded  = expanded.has(item.product_id);
@@ -719,15 +728,17 @@ export default function InventoryPage() {
           Array.from({ length: 4 }).map((_, i) => (
             <Skeleton key={i} className="h-28 w-full rounded-xl" />
           ))
-        ) : filtered.length === 0 ? (
+        ) : inventory.length === 0 ? (
           <Card>
             <CardContent className="flex flex-col items-center justify-center py-12">
               <Package className="h-10 w-10 text-muted-foreground/40" />
-              <p className="mt-3 text-sm text-muted-foreground">No se encontraron productos</p>
+              <p className="mt-3 text-sm text-muted-foreground">
+                {hasFilters ? "No se encontraron productos" : "Agrega productos para visualizarlos aquí"}
+              </p>
             </CardContent>
           </Card>
         ) : (
-          filtered.map((item) => {
+          inventory.map((item) => {
             const product     = findProduct(item.product_id);
             const hasVariants = item.variants_stock.length > 0 && !item.is_service;
             const isExpanded  = expanded.has(item.product_id);
@@ -833,6 +844,62 @@ export default function InventoryPage() {
           })
         )}
       </div>
+
+      {/* Paginación */}
+      {totalPages > 1 && (
+        <div className="flex flex-col items-center gap-2 sm:flex-row sm:justify-between">
+          <p className="text-sm text-muted-foreground order-2 sm:order-1">
+            {total} producto{total !== 1 ? "s" : ""} · página {page} de {totalPages}
+          </p>
+          <Pagination className="order-1 sm:order-2 w-auto mx-0 justify-end">
+            <PaginationContent>
+              <PaginationItem>
+                <PaginationPrevious
+                  onClick={() => setPage((p) => Math.max(1, p - 1))}
+                  aria-disabled={page === 1}
+                  className={page === 1 ? "pointer-events-none opacity-50" : "cursor-pointer"}
+                />
+              </PaginationItem>
+
+              {Array.from({ length: totalPages }, (_, i) => i + 1)
+                .filter((p) =>
+                  p === 1 || p === totalPages ||
+                  (p >= page - 1 && p <= page + 1)
+                )
+                .reduce<(number | "…")[]>((acc, p, i, arr) => {
+                  if (i > 0 && (p as number) - (arr[i - 1] as number) > 1) acc.push("…");
+                  acc.push(p);
+                  return acc;
+                }, [])
+                .map((p, i) =>
+                  p === "…" ? (
+                    <PaginationItem key={`ellipsis-${i}`}>
+                      <PaginationEllipsis />
+                    </PaginationItem>
+                  ) : (
+                    <PaginationItem key={p}>
+                      <PaginationLink
+                        isActive={p === page}
+                        onClick={() => setPage(p as number)}
+                        className="cursor-pointer"
+                      >
+                        {p}
+                      </PaginationLink>
+                    </PaginationItem>
+                  )
+                )}
+
+              <PaginationItem>
+                <PaginationNext
+                  onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                  aria-disabled={page === totalPages}
+                  className={page === totalPages ? "pointer-events-none opacity-50" : "cursor-pointer"}
+                />
+              </PaginationItem>
+            </PaginationContent>
+          </Pagination>
+        </div>
+      )}
 
       {/* FAB */}
       <Fab

@@ -13,6 +13,7 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import { Loader2, Receipt } from "lucide-react";
+import { localDateToISO, toLocalDateInput } from "@/lib/date-utils";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { Event } from "@/hooks/swr/use-events";
@@ -47,12 +48,12 @@ export function AddExpenseDialog({ event, open, onOpenChange, onSuccess }: Props
   const [amount,      setAmount]      = useState("");
   const [category,    setCategory]    = useState("");
   const [description, setDescription] = useState("");
-  const [occurredAt,  setOccurredAt]  = useState(new Date().toISOString().split("T")[0]);
+  const [occurredAt,  setOccurredAt]  = useState(toLocalDateInput(new Date()));
   const [isLoading,   setIsLoading]   = useState(false);
 
   const resetForm = () => {
     setAccountId(""); setAmount(""); setCategory("");
-    setDescription(""); setOccurredAt(new Date().toISOString().split("T")[0]);
+    setDescription(""); setOccurredAt(toLocalDateInput(new Date()));
   };
 
   const handleClose = () => { resetForm(); onOpenChange(false); };
@@ -76,7 +77,7 @@ export function AddExpenseDialog({ event, open, onOpenChange, onSuccess }: Props
           description:    description || undefined,
           reference_type: "EVENT",
           reference_id:   event.id,
-          occurred_at:    new Date(occurredAt).toISOString(),
+          occurred_at:    localDateToISO(occurredAt),
         }),
       });
       if (!res.ok) {

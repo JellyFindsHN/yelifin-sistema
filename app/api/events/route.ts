@@ -24,6 +24,7 @@ export async function GET(request: NextRequest) {
         e.notes,
         e.created_at,
         COALESCE(s_agg.total_sales,       0) AS total_sales,
+        COALESCE(s_agg.total_tax,         0) AS total_tax,
         COALESCE(s_agg.total_profit,      0) AS total_profit,
         COALESCE(t_agg.total_tx_expenses, 0) AS total_tx_expenses
       FROM events e

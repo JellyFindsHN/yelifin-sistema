@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useState, useEffect } from "react";
 import { useCurrency } from "@/hooks/swr/use-currency";
 import { useRouter } from "next/navigation";
 
@@ -13,6 +13,10 @@ import { Skeleton } from "@/components/ui/skeleton";
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
+import {
+  Pagination, PaginationContent, PaginationItem,
+  PaginationLink, PaginationNext, PaginationPrevious, PaginationEllipsis,
+} from "@/components/ui/pagination";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
@@ -30,6 +34,7 @@ import { SearchBar } from "@/components/shared/search-bar";
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 
 import { useSales, usePatchSale, useDeleteSale, Sale } from "@/hooks/swr/use-sales";
+import { useDebounce } from "@/hooks/use-debounce";
 import { useAccounts } from "@/hooks/swr/use-accounts";
 
 // ── Utils ──────────────────────────────────────────────────────────────
@@ -165,54 +170,36 @@ export default function SalesPage() {
   const [accountFilter,  setAccountFilter]  = useState<string>("all");
   const [search,         setSearch]         = useState("");
   const [statusFilter,   setStatusFilter]   = useState<StatusFilter>("all");
+  const [page,           setPage]           = useState(1);
+  const pageLimit = 15;
+
+  const debouncedSearch = useDebounce(search, 300);
+
+  useEffect(() => { setPage(1); }, [
+    debouncedSearch, statusFilter, accountFilter,
+    paymentFilter, preset, dateFrom, dateTo,
+  ]);
 
   // Delete
   const [deletingSale,   setDeletingSale]   = useState<Sale | null>(null);
   const { deleteSale,    isDeleting }       = useDeleteSale();
 
-  const { sales, isLoading, mutate } = useSales({
+  const { sales, stats, total, totalPages, isLoading, mutate } = useSales({
     preset,
-    from:    dateFrom || undefined,
-    to:      dateTo   || undefined,
-    payment: paymentFilter,
+    from:       dateFrom    || undefined,
+    to:         dateTo      || undefined,
+    payment:    paymentFilter,
+    search:     debouncedSearch || undefined,
+    status:     statusFilter !== "all" ? statusFilter : undefined,
+    account_id: accountFilter !== "all" ? accountFilter : undefined,
+    page,
+    limit:      pageLimit,
   });
 
   const { accounts } = useAccounts();
 
-  const filteredForStats = useMemo(() => {
-    const q = search.trim().toLowerCase();
-    return sales.filter((s) => {
-      const matchSearch  = !q ||
-        s.sale_number.toLowerCase().includes(q) ||
-        (s.customer_name?.toLowerCase().includes(q) ?? false) ||
-        ((s as any).notes?.toLowerCase().includes(q) ?? false);
-      const matchAccount = accountFilter === "all" || String(s.account_id) === accountFilter;
-      return matchSearch && matchAccount;
-    });
-  }, [sales, search, accountFilter]);
-
-  const filtered = useMemo(() =>
-    statusFilter === "all"
-      ? filteredForStats
-      : filteredForStats.filter((s) => s.status === statusFilter),
-  [filteredForStats, statusFilter]);
-
-  const totalRevenue = useMemo(() =>
-    filteredForStats.filter((s) => s.status === "COMPLETED")
-      .reduce((acc, s) => acc + Number(s.total), 0),
-  [filteredForStats]);
-
-  const totalProfit = useMemo(() =>
-    filteredForStats.filter((s) => s.status === "COMPLETED")
-      .reduce((acc, s) => acc + Number(s.net_profit), 0),
-  [filteredForStats]);
-
-  const pendingCount = useMemo(() =>
-    filteredForStats.filter((s) => s.status === "PENDING").length,
-  [filteredForStats]);
-
   const hasFilters   = dateFrom || dateTo || paymentFilter !== "all" || accountFilter !== "all" || statusFilter !== "all" || search;
-  const clearAll     = () => { setDateFrom(""); setDateTo(""); setSearch(""); setPaymentFilter("all"); setAccountFilter("all"); setStatusFilter("all"); setPreset("this_month"); };
+  const clearAll     = () => { setDateFrom(""); setDateTo(""); setSearch(""); setPaymentFilter("all"); setAccountFilter("all"); setStatusFilter("all"); setPreset("this_month"); setPage(1); };
   const onChangePreset = (v: Preset) => { setPreset(v); setDateFrom(""); setDateTo(""); };
   const onManualFrom   = (v: string)  => { setDateFrom(v); setPreset("all"); };
   const onManualTo     = (v: string)  => { setDateTo(v);   setPreset("all"); };
@@ -241,9 +228,9 @@ export default function SalesPage() {
           <h1 className="text-2xl font-bold tracking-tight">Ventas</h1>
           <p className="text-muted-foreground text-sm">
             {activePeriodLabel}
-            {pendingCount > 0 && (
+            {stats.pending_count > 0 && (
               <span className="ml-1.5 text-amber-600 font-medium">
-                · {pendingCount} pendiente{pendingCount !== 1 ? "s" : ""}
+                · {stats.pending_count} pendiente{stats.pending_count !== 1 ? "s" : ""}
               </span>
             )}
           </p>
@@ -251,7 +238,7 @@ export default function SalesPage() {
         <div className="text-right shrink-0 sm:hidden">
           {isLoading
             ? <Skeleton className="h-8 w-10 ml-auto" />
-            : <p className="text-3xl font-bold">{filtered.length}</p>
+            : <p className="text-3xl font-bold">{total}</p>
           }
           <p className="text-xs text-muted-foreground">registros</p>
         </div>
@@ -267,8 +254,8 @@ export default function SalesPage() {
             </div>
             {isLoading ? <Skeleton className="h-6 w-12" /> : (
               <div className="flex items-baseline gap-1.5">
-                <p className="text-lg font-bold">{filtered.filter((s) => s.status === "COMPLETED").length}</p>
-                {pendingCount > 0 && <span className="text-xs text-amber-600">{pendingCount} pend.</span>}
+                <p className="text-lg font-bold">{stats.completed_count}</p>
+                {stats.pending_count > 0 && <span className="text-xs text-amber-600">{stats.pending_count} pend.</span>}
               </div>
             )}
           </CardContent>
@@ -281,7 +268,7 @@ export default function SalesPage() {
             </div>
             {isLoading
               ? <Skeleton className="h-6 w-20" />
-              : <p className="text-base font-bold sm:text-lg truncate">{format(totalRevenue)}</p>
+              : <p className="text-base font-bold sm:text-lg truncate">{format(stats.total_revenue)}</p>
             }
           </CardContent>
         </Card>
@@ -293,10 +280,10 @@ export default function SalesPage() {
             </div>
             {isLoading ? <Skeleton className="h-6 w-20" /> : (
               <div className="flex items-baseline gap-1.5">
-                <p className="text-base font-bold text-green-600 sm:text-lg truncate">{format(totalProfit)}</p>
-                {totalRevenue > 0 && (
+                <p className="text-base font-bold text-green-600 sm:text-lg truncate">{format(stats.total_profit)}</p>
+                {stats.total_revenue > 0 && (
                   <span className="text-xs text-muted-foreground shrink-0">
-                    {((totalProfit / totalRevenue) * 100).toFixed(0)}%
+                    {((stats.total_profit / stats.total_revenue) * 100).toFixed(0)}%
                   </span>
                 )}
               </div>
@@ -366,7 +353,7 @@ export default function SalesPage() {
       <div className="space-y-2 lg:hidden">
         {isLoading ? (
           Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-24 w-full rounded-xl" />) /* skeleton - index key ok */
-        ) : filtered.length === 0 ? (
+        ) : sales.length === 0 ? (
           <Card>
             <CardContent className="flex flex-col items-center justify-center py-12">
               <Receipt className="h-10 w-10 text-muted-foreground/40" />
@@ -374,7 +361,7 @@ export default function SalesPage() {
             </CardContent>
           </Card>
         ) : (
-          filtered.map((sale) => {
+          sales.map((sale) => {
             const payment   = paymentConfig[sale.payment_method] ?? paymentConfig.OTHER;
             const PayIcon   = payment.icon;
             const taxRate   = getTaxRate(sale.tax_rate);
@@ -471,14 +458,14 @@ export default function SalesPage() {
                     ))}
                   </TableRow>
                 ))
-              ) : filtered.length === 0 ? (
+              ) : sales.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={11} className="text-center py-12 text-muted-foreground">
                     Aún no se han registrado ventas en este período
                   </TableCell>
                 </TableRow>
               ) : (
-                filtered.map((sale) => {
+                sales.map((sale) => {
                   const payment   = paymentConfig[sale.payment_method] ?? paymentConfig.OTHER;
                   const PayIcon   = payment.icon;
                   const taxRate   = getTaxRate(sale.tax_rate);
@@ -543,6 +530,62 @@ export default function SalesPage() {
           </Table>
         </CardContent>
       </Card>
+
+      {/* Paginación */}
+      {totalPages > 1 && (
+        <div className="flex flex-col items-center gap-2 sm:flex-row sm:justify-between">
+          <p className="text-sm text-muted-foreground order-2 sm:order-1">
+            {total} venta{total !== 1 ? "s" : ""} · página {page} de {totalPages}
+          </p>
+          <Pagination className="order-1 sm:order-2 w-auto mx-0 justify-end">
+            <PaginationContent>
+              <PaginationItem>
+                <PaginationPrevious
+                  onClick={() => setPage((p) => Math.max(1, p - 1))}
+                  aria-disabled={page === 1}
+                  className={page === 1 ? "pointer-events-none opacity-50" : "cursor-pointer"}
+                />
+              </PaginationItem>
+
+              {Array.from({ length: totalPages }, (_, i) => i + 1)
+                .filter((p) =>
+                  p === 1 || p === totalPages ||
+                  (p >= page - 1 && p <= page + 1)
+                )
+                .reduce<(number | "…")[]>((acc, p, i, arr) => {
+                  if (i > 0 && (p as number) - (arr[i - 1] as number) > 1) acc.push("…");
+                  acc.push(p);
+                  return acc;
+                }, [])
+                .map((p, i) =>
+                  p === "…" ? (
+                    <PaginationItem key={`ellipsis-${i}`}>
+                      <PaginationEllipsis />
+                    </PaginationItem>
+                  ) : (
+                    <PaginationItem key={p}>
+                      <PaginationLink
+                        isActive={p === page}
+                        onClick={() => setPage(p as number)}
+                        className="cursor-pointer"
+                      >
+                        {p}
+                      </PaginationLink>
+                    </PaginationItem>
+                  )
+                )}
+
+              <PaginationItem>
+                <PaginationNext
+                  onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                  aria-disabled={page === totalPages}
+                  className={page === totalPages ? "pointer-events-none opacity-50" : "cursor-pointer"}
+                />
+              </PaginationItem>
+            </PaginationContent>
+          </Pagination>
+        </div>
+      )}
 
       <Fab actions={[{ label: "Nueva venta", icon: ShoppingCart, onClick: () => router.push("/sales/new") }]} />
 

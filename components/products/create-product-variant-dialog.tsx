@@ -25,6 +25,7 @@ import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { ProductImageUpload } from "./product-image-upload";
 import { ExistingForm, ExistingFormValue, defaultExistingForm } from "./inventory-section/existing-form";
 import { Boxes, ChevronDown, ChevronUp } from "lucide-react";
+import { localDateToISO } from "@/lib/date-utils";
 
 // ── Schema ─────────────────────────────────────────────────────────────
 
@@ -166,7 +167,7 @@ export function CreateProductVariantDialog({
               quantity:     Number(inventoryData.quantity),
               unit_cost:    inventoryData.unit_cost || 0,
               purchased_at: inventoryData.purchased_at
-                ? new Date(inventoryData.purchased_at + "T00:00:00-06:00").toISOString()
+                ? localDateToISO(inventoryData.purchased_at)
                 : undefined,
               notes: inventoryData.notes?.trim() || "Inventario inicial de variante",
             }),

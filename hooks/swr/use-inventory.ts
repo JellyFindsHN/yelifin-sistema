@@ -47,9 +47,20 @@ export type InventoryStats = {
   out_of_stock:   number;
 };
 
+export type InventoryFilters = {
+  search?: string;
+  stock?:  string;
+  page?:   number;
+  limit?:  number;
+};
+
 type InventoryResponse = {
-  data:  InventoryItem[];
-  stats: InventoryStats;
+  data:       InventoryItem[];
+  stats:      InventoryStats;
+  total:      number;
+  page:       number;
+  totalPages: number;
+  limit:      number;
 };
 
 function useAuthFetch() {
@@ -68,18 +79,26 @@ function useAuthFetch() {
   };
 }
 
-export function useInventory() {
+export function useInventory(filters?: InventoryFilters) {
   const { firebaseUser } = useAuth();
   const authFetch = useAuthFetch();
 
+  const params = new URLSearchParams();
+  if (filters?.search) params.set('search', filters.search);
+  if (filters?.stock && filters.stock !== 'all') params.set('stock', filters.stock);
+  if (filters?.page)  params.set('page',  String(filters.page));
+  if (filters?.limit) params.set('limit', String(filters.limit));
+
+  const url = `${KEY}?${params.toString()}`;
+
   const { data, error, isLoading, mutate } = useSWR<InventoryResponse>(
-    firebaseUser ? KEY : null,
-    (url: string) => authFetch(url),
+    firebaseUser ? url : null,
+    (u: string) => authFetch(u),
     { dedupingInterval: 5 * 60_000 }
   );
 
   return {
-    inventory: data?.data ?? [],
+    inventory:  data?.data ?? [],
     stats: data?.stats ?? {
       total_products: 0,
       total_physical: 0,
@@ -88,6 +107,10 @@ export function useInventory() {
       low_stock:      0,
       out_of_stock:   0,
     },
+    total:      data?.total      ?? 0,
+    page:       data?.page       ?? 1,
+    totalPages: data?.totalPages ?? 1,
+    limit:      data?.limit      ?? 25,
     isLoading,
     error:  error?.message ?? null,
     mutate,

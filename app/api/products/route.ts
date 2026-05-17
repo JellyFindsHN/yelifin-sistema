@@ -117,16 +117,17 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    if (sku) {
-      const [existing] = await sql`
-        SELECT id FROM products
-        WHERE user_id = ${userId}
-          AND sku     = ${sku}
-        LIMIT 1
-      `;
-      if (existing) {
-        return createErrorResponse("Ya existe un producto con este SKU", 409);
-      }
+    const finalSku = sku?.trim()
+      || `PRD-${Date.now().toString(36).toUpperCase()}${Math.random().toString(36).slice(2, 5).toUpperCase()}`;
+
+    const [existing] = await sql`
+      SELECT id FROM products
+      WHERE user_id = ${userId}
+        AND sku     = ${finalSku}
+      LIMIT 1
+    `;
+    if (existing) {
+      return createErrorResponse("Ya existe un producto con este SKU", 409);
     }
 
     const [product] = await sql`
@@ -135,7 +136,7 @@ export async function POST(request: NextRequest) {
         ${userId},
         ${name.trim()},
         ${description  ?? null},
-        ${sku          ?? null},
+        ${finalSku},
         ${null},
         ${Number(price)},
         ${image_url    ?? null},

@@ -121,27 +121,27 @@ export default function AdminUserDetailPage({ params }: { params: Promise<{ id: 
       </div>
 
       {/* Info + actividad */}
-      <div className="grid gap-4 sm:grid-cols-2">
+      <div className="grid gap-3 sm:grid-cols-2">
         {/* Datos del usuario */}
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-sm flex items-center gap-2 text-muted-foreground font-medium">
-              <Building2 className="h-4 w-4" /> Información
+        <Card className="pt-1 pb-1">
+          <CardHeader className="px-3.5 pt-3 pb-2">
+            <CardTitle className="text-xs font-medium text-muted-foreground flex items-center gap-1.5">
+              <Building2 className="h-3.5 w-3.5" /> Información
             </CardTitle>
           </CardHeader>
-          <CardContent className="space-y-3 text-sm">
+          <CardContent className="px-3.5 pb-3 space-y-2.5 text-sm">
             <InfoRow icon={<Mail className="h-3.5 w-3.5"/>} label="Email" value={user.email} />
             {user.business_name && <InfoRow icon={<Building2 className="h-3.5 w-3.5"/>} label="Negocio" value={user.business_name} />}
             {user.display_name  && <InfoRow icon={<Building2 className="h-3.5 w-3.5"/>} label="Nombre" value={user.display_name} />}
             <InfoRow icon={<Calendar className="h-3.5 w-3.5"/>} label="Registrado"
               value={new Date(user.created_at).toLocaleDateString("es-HN", { day: "numeric", month: "long", year: "numeric" })}
             />
-            <InfoRow icon={<Clock className="h-3.5 w-3.5"/>} label="Último inicio de sesión"
+            <InfoRow icon={<Clock className="h-3.5 w-3.5"/>} label="Último acceso"
               value={user.last_sign_in_time
                 ? new Date(user.last_sign_in_time).toLocaleString("es-HN", { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })
                 : "—"}
             />
-            <InfoRow icon={<RefreshCw className="h-3.5 w-3.5"/>} label="Último token renovado"
+            <InfoRow icon={<RefreshCw className="h-3.5 w-3.5"/>} label="Token renovado"
               value={user.last_refresh_time
                 ? new Date(user.last_refresh_time).toLocaleString("es-HN", { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })
                 : "—"}
@@ -151,71 +151,75 @@ export default function AdminUserDetailPage({ params }: { params: Promise<{ id: 
           </CardContent>
         </Card>
 
-        {/* Actividad */}
-        {activity && (
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-sm flex items-center gap-2 text-muted-foreground font-medium">
-                <ReceiptText className="h-4 w-4" /> Actividad
+        <div className="space-y-3">
+          {/* Actividad */}
+          {activity && (
+            <Card className="pt-1 pb-1">
+              <CardHeader className="px-3.5 pt-3 pb-2">
+                <CardTitle className="text-xs font-medium text-muted-foreground flex items-center gap-1.5">
+                  <ReceiptText className="h-3.5 w-3.5" /> Actividad
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="px-3.5 pb-3 space-y-2">
+                <ActivityStat icon={<ShoppingCart className="h-3.5 w-3.5 text-primary"/>}    label="Ventas"         value={activity.total_sales} />
+                <ActivityStat icon={<Package      className="h-3.5 w-3.5 text-amber-600"/>}  label="Productos"      value={activity.total_products} />
+                <ActivityStat icon={<ReceiptText  className="h-3.5 w-3.5 text-green-600"/>}  label="Transacciones"  value={activity.total_transactions} />
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Suscripción — vista */}
+          <Card className="pt-1 pb-1">
+            <CardHeader className="px-3.5 pt-3 pb-2">
+              <CardTitle className="text-xs font-medium text-muted-foreground flex items-center gap-1.5">
+                <Crown className="h-3.5 w-3.5" /> Suscripción
               </CardTitle>
             </CardHeader>
-            <CardContent className="space-y-3">
-              <ActivityStat icon={<ShoppingCart className="h-4 w-4 text-primary"/>} label="Ventas" value={activity.total_sales} />
-              <ActivityStat icon={<Package      className="h-4 w-4 text-amber-600"/>} label="Productos" value={activity.total_products} />
-              <ActivityStat icon={<ReceiptText  className="h-4 w-4 text-green-600"/>} label="Transacciones" value={activity.total_transactions} />
+            <CardContent className="px-3.5 pb-3 text-sm space-y-2.5">
+              <div className="flex items-center justify-between">
+                <span className="text-xs text-muted-foreground">Plan</span>
+                <span className="font-semibold text-xs">{user.plan_name ?? "Sin plan"}</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-xs text-muted-foreground">Estado</span>
+                {user.subscription_status ? (
+                  <Badge className={`${STATUS_COLOR[user.subscription_status] ?? ""} border text-[10px] py-0`}>
+                    {STATUS_LABEL[user.subscription_status] ?? user.subscription_status}
+                  </Badge>
+                ) : <span className="text-xs text-muted-foreground">—</span>}
+              </div>
+              {user.current_period_end && (
+                <div className="flex items-center justify-between">
+                  <span className="text-xs text-muted-foreground">Vence</span>
+                  <span className="text-xs" suppressHydrationWarning>
+                    {new Date(user.current_period_end).toLocaleDateString("es-HN", { day: "numeric", month: "short", year: "numeric" })}
+                  </span>
+                </div>
+              )}
+              {user.trial_end_date && (
+                <div className="flex items-center justify-between">
+                  <span className="text-xs text-muted-foreground">Fin de prueba</span>
+                  <span className="text-xs" suppressHydrationWarning>
+                    {new Date(user.trial_end_date).toLocaleDateString("es-HN", { day: "numeric", month: "short", year: "numeric" })}
+                  </span>
+                </div>
+              )}
             </CardContent>
           </Card>
-        )}
+        </div>
       </div>
 
-      {/* Suscripción — vista */}
-      <Card>
-        <CardHeader className="pb-3">
-          <CardTitle className="text-sm flex items-center gap-2 text-muted-foreground font-medium">
-            <Crown className="h-4 w-4" /> Suscripción actual
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="text-sm space-y-3">
-          <div className="flex flex-wrap gap-3">
-            <div className="space-y-0.5">
-              <p className="text-xs text-muted-foreground">Plan</p>
-              <p className="font-semibold">{user.plan_name ?? "Sin plan"}</p>
-            </div>
-            <div className="space-y-0.5">
-              <p className="text-xs text-muted-foreground">Estado</p>
-              {user.subscription_status ? (
-                <Badge className={`${STATUS_COLOR[user.subscription_status] ?? ""} border text-xs`}>
-                  {STATUS_LABEL[user.subscription_status] ?? user.subscription_status}
-                </Badge>
-              ) : <p className="text-muted-foreground">—</p>}
-            </div>
-            {user.current_period_end && (
-              <div className="space-y-0.5">
-                <p className="text-xs text-muted-foreground">Vence</p>
-                <p suppressHydrationWarning>{new Date(user.current_period_end).toLocaleDateString("es-HN", { day: "numeric", month: "short", year: "numeric" })}</p>
-              </div>
-            )}
-            {user.trial_end_date && (
-              <div className="space-y-0.5">
-                <p className="text-xs text-muted-foreground">Fin de prueba</p>
-                <p suppressHydrationWarning>{new Date(user.trial_end_date).toLocaleDateString("es-HN", { day: "numeric", month: "short", year: "numeric" })}</p>
-              </div>
-            )}
-          </div>
-        </CardContent>
-      </Card>
-
       {/* Editar suscripción */}
-      <Card>
-        <CardHeader className="pb-3">
-          <CardTitle className="text-base">Editar suscripción</CardTitle>
+      <Card className="pt-1 pb-1">
+        <CardHeader className="px-3.5 pt-3 pb-2">
+          <CardTitle className="text-xs font-medium text-muted-foreground">Editar suscripción</CardTitle>
         </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="grid gap-4 sm:grid-cols-2">
+        <CardContent className="px-3.5 pb-3 space-y-3">
+          <div className="grid gap-3 sm:grid-cols-2">
             <div className="space-y-1.5">
-              <Label>Plan</Label>
+              <Label className="text-xs">Plan</Label>
               <Select value={planId} onValueChange={setPlanId} disabled={isSaving}>
-                <SelectTrigger className="h-10">
+                <SelectTrigger className="h-9 text-sm">
                   <SelectValue placeholder="Seleccionar plan" />
                 </SelectTrigger>
                 <SelectContent>
@@ -229,9 +233,9 @@ export default function AdminUserDetailPage({ params }: { params: Promise<{ id: 
             </div>
 
             <div className="space-y-1.5">
-              <Label>Estado</Label>
+              <Label className="text-xs">Estado</Label>
               <Select value={subStatus} onValueChange={setSubStatus} disabled={isSaving}>
-                <SelectTrigger className="h-10">
+                <SelectTrigger className="h-9 text-sm">
                   <SelectValue placeholder="Estado" />
                 </SelectTrigger>
                 <SelectContent>
@@ -245,43 +249,31 @@ export default function AdminUserDetailPage({ params }: { params: Promise<{ id: 
             </div>
 
             <div className="space-y-1.5">
-              <Label>Fin del período</Label>
-              <Input
-                type="date"
-                value={periodEndDate}
-                onChange={(e) => setPeriodEndDate(e.target.value)}
-                disabled={isSaving}
-                className="h-10"
-              />
+              <Label className="text-xs">Fin del período</Label>
+              <Input type="date" value={periodEndDate} onChange={(e) => setPeriodEndDate(e.target.value)} disabled={isSaving} className="h-9 text-sm" />
             </div>
 
             <div className="space-y-1.5">
-              <Label>Fin de prueba</Label>
-              <Input
-                type="date"
-                value={trialEndDate}
-                onChange={(e) => setTrialEndDate(e.target.value)}
-                disabled={isSaving}
-                className="h-10"
-              />
+              <Label className="text-xs">Fin de prueba</Label>
+              <Input type="date" value={trialEndDate} onChange={(e) => setTrialEndDate(e.target.value)} disabled={isSaving} className="h-9 text-sm" />
             </div>
           </div>
 
-          <Button onClick={handleSaveSub} disabled={isSaving} className="gap-2">
-            {isSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+          <Button onClick={handleSaveSub} disabled={isSaving} size="sm" className="gap-2">
+            {isSaving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />}
             Guardar cambios
           </Button>
         </CardContent>
       </Card>
 
       {/* Zona de peligro */}
-      <Card className="border-destructive/30">
-        <CardHeader className="pb-3">
-          <CardTitle className="text-base flex items-center gap-2 text-destructive">
-            <AlertTriangle className="h-4 w-4" /> Zona de peligro
+      <Card className="border-destructive/30 pt-1 pb-1">
+        <CardHeader className="px-3.5 pt-3 pb-2">
+          <CardTitle className="text-xs font-medium text-destructive flex items-center gap-1.5">
+            <AlertTriangle className="h-3.5 w-3.5" /> Zona de peligro
           </CardTitle>
         </CardHeader>
-        <CardContent>
+        <CardContent className="px-3.5 pb-3">
           <div className="flex items-center justify-between gap-4">
             <div>
               <p className="text-sm font-medium">
@@ -295,11 +287,7 @@ export default function AdminUserDetailPage({ params }: { params: Promise<{ id: 
             </div>
             <AlertDialog>
               <AlertDialogTrigger asChild>
-                <Button
-                  variant={user.is_active ? "destructive" : "outline"}
-                  size="sm"
-                  disabled={isSaving}
-                >
+                <Button variant={user.is_active ? "destructive" : "outline"} size="sm" disabled={isSaving}>
                   {user.is_active ? "Desactivar" : "Reactivar"}
                 </Button>
               </AlertDialogTrigger>
@@ -346,11 +334,11 @@ function InfoRow({ icon, label, value }: { icon: React.ReactNode; label: string;
 function ActivityStat({ icon, label, value }: { icon: React.ReactNode; label: string; value: number }) {
   return (
     <div className="flex items-center justify-between">
-      <div className="flex items-center gap-2 text-sm text-muted-foreground">
+      <div className="flex items-center gap-2 text-xs text-muted-foreground">
         {icon}
         <span>{label}</span>
       </div>
-      <span className="font-bold text-base">{value}</span>
+      <span className="font-bold text-sm">{value}</span>
     </div>
   );
 }

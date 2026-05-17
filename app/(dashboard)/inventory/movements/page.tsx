@@ -1,7 +1,7 @@
 // app/(dashboard)/inventory/movements/page.tsx
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -24,8 +24,13 @@ import { useProducts } from "@/hooks/swr/use-products";
 import { useMovementPeriods } from "@/hooks/swr/use-movements";
 import { useCurrency } from "@/hooks/swr/use-currency";
 import { Fab } from "@/components/ui/fab";
+import {
+  Pagination, PaginationContent, PaginationItem,
+  PaginationLink, PaginationNext, PaginationPrevious, PaginationEllipsis,
+} from "@/components/ui/pagination";
 import { SearchBar } from "@/components/shared/search-bar";
 import { SearchableSelect } from "@/components/shared/SearchableSelect";
+import { useDebounce } from "@/hooks/use-debounce";
 
 // ── Helpers ────────────────────────────────────────────────────────────
 
@@ -330,12 +335,25 @@ export default function MovementsPage() {
   const [specificDate,  setSpecificDate]  = useState("");
   const [productId,     setProductId]     = useState<number | undefined>();
   const [typeFilter,    setTypeFilter]    = useState("all");
+  const [page,          setPage]          = useState(1);
+  const pageLimit       = 10;
 
-  const { movements, isLoading } = useMovements({
+  const debouncedSearch = useDebounce(search, 300);
+
+  useEffect(() => { setPage(1); }, [
+    debouncedSearch, typeFilter, productId,
+    filterMode, selectedMonth, selectedYear, specificDate,
+  ]);
+
+  const { movements, isLoading, total, totalPages } = useMovements({
     date:       filterMode === "date"  ? specificDate || undefined : undefined,
     month:      filterMode === "month" ? selectedMonth             : undefined,
     year:       filterMode === "month" ? selectedYear              : undefined,
     product_id: productId,
+    search:     debouncedSearch || undefined,
+    type:       typeFilter !== "all" ? typeFilter : undefined,
+    page,
+    limit:      pageLimit,
   });
 
   const { products }              = useProducts();
@@ -346,28 +364,6 @@ export default function MovementsPage() {
     if (v == null) return "—";
     return formatCurrency(Number(v));
   };
-
-  const filtered = movements.filter((m) => {
-    const matchesSearch = !search ||
-      m.product_name.toLowerCase().includes(search.toLowerCase()) ||
-      (m.sku?.toLowerCase().includes(search.toLowerCase())           ?? false) ||
-      (m.variant_name?.toLowerCase().includes(search.toLowerCase())  ?? false) ||
-      (m.variant_sku?.toLowerCase().includes(search.toLowerCase())   ?? false) ||
-      (m.customer_name?.toLowerCase().includes(search.toLowerCase()) ?? false) ||
-      (m.sale_number?.toLowerCase().includes(search.toLowerCase())   ?? false) ||
-      (m.notes?.toLowerCase().includes(search.toLowerCase())         ?? false);
-
-    const matchesType =
-      typeFilter === "all"        ? true :
-      typeFilter === "IN"         ? m.movement_type === "IN" && m.reference_type === "PURCHASE" :
-      typeFilter === "OUT"        ? m.movement_type === "OUT" && m.reference_type === "SALE" :
-      typeFilter === "ADJUSTMENT" ? m.reference_type === "ADJUSTMENT" :
-      typeFilter === "INITIAL"    ? m.reference_type === "INITIAL" :
-      typeFilter === "CANCELLED"  ? m.reference_type === "SALE_CANCELLED" :
-      true;
-
-    return matchesSearch && matchesType;
-  });
 
   const availableYears     = [...new Set(periods.map((p) => p.year))].sort((a, b) => b - a);
   const monthsForYear      = (year: number) =>
@@ -388,6 +384,7 @@ export default function MovementsPage() {
     setSpecificDate("");
     setProductId(undefined);
     setTypeFilter("all");
+    setPage(1);
   };
 
   const periodLabel =
@@ -482,7 +479,7 @@ export default function MovementsPage() {
             onValueChange={(v) => setProductId(v === "all" ? undefined : Number(v))}
             items={products.map((p) => ({ value: p.id.toString(), label: p.name }))}
             defaultOption={{ value: "all", label: "Todos los productos" }}
-            className="w-full sm:w-48"
+            className="w-full sm:w-64"
           />
 
           <Select value={typeFilter} onValueChange={setTypeFilter}>
@@ -534,14 +531,14 @@ export default function MovementsPage() {
                     ))}
                   </TableRow>
                 ))
-              ) : filtered.length === 0 ? (
+              ) : movements.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={7} className="text-center py-12 text-muted-foreground">
                     No hay movimientos en este período
                   </TableCell>
                 </TableRow>
               ) : (
-                filtered.map((m) => (
+                movements.map((m) => (
                   <TableRow key={m.id}>
                     <TableCell><ProductCell m={m} /></TableCell>
                     <TableCell><TypeBadge m={m} /></TableCell>
@@ -567,7 +564,7 @@ export default function MovementsPage() {
           Array.from({ length: 4 }).map((_, i) => (
             <Skeleton key={i} className="h-32 w-full rounded-xl" />
           ))
-        ) : filtered.length === 0 ? (
+        ) : movements.length === 0 ? (
           <Card>
             <CardContent className="flex flex-col items-center justify-center py-12">
               <SlidersHorizontal className="h-10 w-10 text-muted-foreground/40" />
@@ -575,7 +572,7 @@ export default function MovementsPage() {
             </CardContent>
           </Card>
         ) : (
-          filtered.map((m) => (
+          movements.map((m) => (
             <Card key={m.id}>
               <CardContent className="pl-3.5">
                 <div className="flex items-center gap-3 mb-3">
@@ -612,6 +609,62 @@ export default function MovementsPage() {
           ))
         )}
       </div>
+
+      {/* Paginación */}
+      {totalPages > 1 && (
+        <div className="flex flex-col items-center gap-2 sm:flex-row sm:justify-between">
+          <p className="text-sm text-muted-foreground order-2 sm:order-1">
+            {total} movimiento{total !== 1 ? "s" : ""} · página {page} de {totalPages}
+          </p>
+          <Pagination className="order-1 sm:order-2 w-auto mx-0 justify-end">
+            <PaginationContent>
+              <PaginationItem>
+                <PaginationPrevious
+                  onClick={() => setPage((p) => Math.max(1, p - 1))}
+                  aria-disabled={page === 1}
+                  className={page === 1 ? "pointer-events-none opacity-50" : "cursor-pointer"}
+                />
+              </PaginationItem>
+
+              {Array.from({ length: totalPages }, (_, i) => i + 1)
+                .filter((p) =>
+                  p === 1 || p === totalPages ||
+                  (p >= page - 1 && p <= page + 1)
+                )
+                .reduce<(number | "…")[]>((acc, p, i, arr) => {
+                  if (i > 0 && (p as number) - (arr[i - 1] as number) > 1) acc.push("…");
+                  acc.push(p);
+                  return acc;
+                }, [])
+                .map((p, i) =>
+                  p === "…" ? (
+                    <PaginationItem key={`ellipsis-${i}`}>
+                      <PaginationEllipsis />
+                    </PaginationItem>
+                  ) : (
+                    <PaginationItem key={p}>
+                      <PaginationLink
+                        isActive={p === page}
+                        onClick={() => setPage(p as number)}
+                        className="cursor-pointer"
+                      >
+                        {p}
+                      </PaginationLink>
+                    </PaginationItem>
+                  )
+                )}
+
+              <PaginationItem>
+                <PaginationNext
+                  onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                  aria-disabled={page === totalPages}
+                  className={page === totalPages ? "pointer-events-none opacity-50" : "cursor-pointer"}
+                />
+              </PaginationItem>
+            </PaginationContent>
+          </Pagination>
+        </div>
+      )}
 
       {/* FAB */}
       <Fab
