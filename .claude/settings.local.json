@@ -30,7 +30,10 @@
       "Bash(curl -s \"http://localhost:3000/admin\")",
       "Bash(npx react-doctor@latest . --verbose)",
       "Bash(Select-String -Pattern \"\\(Nested component|Array index as key|hydration mismatch|Rendering hydration\\)\" -Context 3)",
-      "Bash(npx react-doctor@latest .)"
+      "Bash(npx react-doctor@latest .)",
+      "Bash(Get-ChildItem -Path \"C:\\\\Users\\\\DEVSLS\\\\Documents\\\\GitHub\\\\yelifin-sistema\" -Recurse -Include \"middleware.ts\", \"next.config.*\", \"auth.ts\", \"route.ts\")",
+      "Bash(Select-Object FullName)",
+      "Bash(node *)"
     ]
   }
 }

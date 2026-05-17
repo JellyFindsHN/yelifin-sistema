@@ -3,10 +3,27 @@ import { NextRequest, NextResponse } from "next/server";
 import { adminAuth } from "@/lib/firebase-admin";
 import { neon } from "@neondatabase/serverless";
 import { seedDefaultCategories } from "@/lib/seed-default-categories";
+import { rateLimit, getClientIP } from "@/lib/rate-limit";
 
 const sql = neon(process.env.DATABASE_URL!);
 
 export async function POST(req: NextRequest) {
+  // 3 registros por IP cada hora
+  const { allowed, retryAfterSec } = rateLimit(
+    `register:${getClientIP(req)}`,
+    3,
+    60 * 60 * 1000,
+  );
+  if (!allowed) {
+    return NextResponse.json(
+      { error: "Demasiados intentos de registro. Intenta más tarde." },
+      {
+        status: 429,
+        headers: { "Retry-After": String(retryAfterSec) },
+      },
+    );
+  }
+
   let firebaseUid: string | null = null;
 
   try {

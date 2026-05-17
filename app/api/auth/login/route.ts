@@ -2,10 +2,30 @@
 import { NextRequest, NextResponse } from "next/server";
 import { adminAuth } from "@/lib/firebase-admin";
 import { neon } from "@neondatabase/serverless";
+import { rateLimit, getClientIP } from "@/lib/rate-limit";
 
 const sql = neon(process.env.DATABASE_URL!);
 
 export async function POST(req: NextRequest) {
+  // 5 intentos por IP cada 15 minutos
+  const { allowed, remaining, retryAfterSec } = rateLimit(
+    `login:${getClientIP(req)}`,
+    5,
+    15 * 60 * 1000,
+  );
+  if (!allowed) {
+    return NextResponse.json(
+      { error: "Demasiados intentos. Espera unos minutos e intenta de nuevo." },
+      {
+        status: 429,
+        headers: {
+          "Retry-After": String(retryAfterSec),
+          "X-RateLimit-Remaining": "0",
+        },
+      },
+    );
+  }
+
   try {
     const { idToken } = await req.json();
 
@@ -49,17 +69,10 @@ export async function POST(req: NextRequest) {
       LIMIT 1
     `;
 
-    if (!user) {
+    if (!user || !user.is_active) {
       return NextResponse.json(
-        { error: "Usuario no encontrado" },
-        { status: 404 }
-      );
-    }
-
-    if (!user.is_active) {
-      return NextResponse.json(
-        { error: "Esta cuenta ha sido deshabilitada" },
-        { status: 403 }
+        { error: "Credenciales inválidas" },
+        { status: 401 }
       );
     }
 
