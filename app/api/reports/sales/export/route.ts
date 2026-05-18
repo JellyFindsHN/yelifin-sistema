@@ -450,109 +450,197 @@ function buildByDaySheet(byDay: any[], symbol: string): Record<string, any> {
   return ws;
 }
 
-// ── Hoja "Gráfico": minigráfico de barras por día + barras de productos ──
-function buildChartSheet(byDay: any[], byProduct: any[], symbol: string): Record<string, any> {
+// ── Canvas helpers ─────────────────────────────────────────────────────
+const CP  = "#1a56db";   // primary blue
+const CG  = "#059669";   // green
+const CGR = "#e5e7eb";   // grid
+const CTX = "#374151";   // text dark
+const CTS = "#9ca3af";   // text secondary
+const CBR = "#93c5fd";   // bar revenue (blue-300)
+const CBP = "#6ee7b7";   // bar profit  (emerald-300)
+
+function canvasShort(v: number): string {
+  if (v >= 1_000_000) return `${(v / 1_000_000).toFixed(1)}M`;
+  if (v >= 1_000)     return `${(v / 1_000).toFixed(0)}K`;
+  return String(Math.round(v));
+}
+
+async function pngRevenueByDay(byDay: any[], symbol: string): Promise<Buffer> {
+  const { createCanvas } = await import("@napi-rs/canvas");
+  const W = 960, H = 340;
+  const ML = 72, MR = 20, MT = 48, MB = 52;
+  const PW = W - ML - MR, PH = H - MT - MB;
+  const canvas = createCanvas(W, H);
+  const ctx    = canvas.getContext("2d");
+
+  ctx.fillStyle = "#ffffff";
+  ctx.fillRect(0, 0, W, H);
+
+  // Título
+  ctx.fillStyle = CP;
+  ctx.font = "bold 15px sans-serif";
+  ctx.textAlign = "left";
+  ctx.fillText("Ingresos y Utilidad por Día", ML, 28);
+
+  const maxV = byDay.reduce((m, d) => Math.max(m, d.revenue), 0);
+  if (maxV === 0) return canvas.encode("png");
+
+  const TICKS = 5;
+  for (let t = 0; t <= TICKS; t++) {
+    const y = MT + PH - (t / TICKS) * PH;
+    ctx.strokeStyle = t === 0 ? "#9ca3af" : CGR;
+    ctx.lineWidth   = t === 0 ? 1.2 : 0.8;
+    ctx.beginPath(); ctx.moveTo(ML, y); ctx.lineTo(ML + PW, y); ctx.stroke();
+    ctx.fillStyle   = CTS;
+    ctx.font        = "11px sans-serif";
+    ctx.textAlign   = "right";
+    ctx.fillText(canvasShort((t / TICKS) * maxV), ML - 6, y + 4);
+  }
+
+  const n  = byDay.length;
+  const GW = PW / n;
+  const BW = Math.min(GW * 0.38, 18);
+  const GAP = 2;
+
+  byDay.forEach((d, i) => {
+    const cx   = ML + i * GW + GW / 2;
+    const hRev = Math.max((d.revenue / maxV) * PH, 1);
+    const hPrf = Math.max((d.profit  / maxV) * PH, 0);
+
+    ctx.fillStyle = CBR;
+    ctx.fillRect(cx - BW - GAP, MT + PH - hRev, BW, hRev);
+    ctx.fillStyle = CBP;
+    ctx.fillRect(cx + GAP,       MT + PH - hPrf, BW, hPrf);
+
+    const step = n > 20 ? Math.ceil(n / 15) : n > 10 ? 2 : 1;
+    if (i % step === 0) {
+      const dt = new Date(d.date + "T12:00:00");
+      ctx.fillStyle  = CTS;
+      ctx.font       = "9px sans-serif";
+      ctx.textAlign  = "center";
+      ctx.fillText(`${dt.getDate()}/${dt.getMonth() + 1}`, cx, MT + PH + 16);
+    }
+  });
+
+  // Leyenda
+  const LY = H - 14;
+  ctx.fillStyle = CBR; ctx.fillRect(ML, LY - 11, 14, 11);
+  ctx.fillStyle = CTX; ctx.font = "11px sans-serif"; ctx.textAlign = "left";
+  ctx.fillText("Ingresos", ML + 18, LY - 1);
+  ctx.fillStyle = CBP; ctx.fillRect(ML + 100, LY - 11, 14, 11);
+  ctx.fillStyle = CTX;
+  ctx.fillText("Utilidad", ML + 118, LY - 1);
+
+  return canvas.encode("png");
+}
+
+async function pngProductsHorizontal(byProduct: any[], symbol: string): Promise<Buffer> {
+  const { createCanvas } = await import("@napi-rs/canvas");
+  const top10 = byProduct.slice(0, 10);
+  if (top10.length === 0) return (await import("@napi-rs/canvas")).createCanvas(1, 1).encode("png");
+
+  const LBL_W = 210, VAL_W = 90, MT = 48, MB = 30, ML = 16, MR = 16;
+  const ROW_H  = 38;
+  const BAR_W  = 580;
+  const W      = ML + LBL_W + BAR_W + VAL_W + MR;
+  const H      = MT + top10.length * ROW_H + MB;
+  const maxV   = top10[0].revenue;
+
+  const canvas = createCanvas(W, H);
+  const ctx    = canvas.getContext("2d");
+
+  ctx.fillStyle = "#ffffff";
+  ctx.fillRect(0, 0, W, H);
+
+  ctx.fillStyle = CP;
+  ctx.font = "bold 15px sans-serif";
+  ctx.textAlign = "left";
+  ctx.fillText("Top 10 Productos — Ingresos y Utilidad", ML, 28);
+
+  // Separador vertical entre etiquetas y barras
+  ctx.strokeStyle = "#d1d5db";
+  ctx.lineWidth   = 1;
+  ctx.beginPath();
+  ctx.moveTo(ML + LBL_W, MT - 6);
+  ctx.lineTo(ML + LBL_W, MT + top10.length * ROW_H);
+  ctx.stroke();
+
+  top10.forEach((p, i) => {
+    const y   = MT + i * ROW_H;
+    const midY = y + ROW_H / 2;
+
+    if (i % 2 === 1) {
+      ctx.fillStyle = "#f9fafb";
+      ctx.fillRect(ML, y, W - ML - MR, ROW_H);
+    }
+
+    // Nombre del producto
+    const name = p.product_name.length > 24 ? p.product_name.slice(0, 24) + "…" : p.product_name;
+    ctx.fillStyle  = CTX;
+    ctx.font       = "12px sans-serif";
+    ctx.textAlign  = "right";
+    ctx.fillText(name, ML + LBL_W - 8, midY + 4);
+
+    const wRev  = maxV > 0 ? (p.revenue / maxV) * BAR_W : 0;
+    const wProf = maxV > 0 ? (p.profit  / maxV) * BAR_W : 0;
+    const barX  = ML + LBL_W + 4;
+    const BH    = ROW_H * 0.42;
+    const barY  = midY - BH / 2;
+
+    // Barra ingreso
+    ctx.fillStyle = CBR;
+    ctx.fillRect(barX, barY, Math.max(wRev, 2), BH);
+    // Barra utilidad (más delgada, centrada)
+    ctx.fillStyle = CBP;
+    ctx.fillRect(barX, midY - BH * 0.28, Math.max(wProf, 1), BH * 0.55);
+
+    // Valor
+    ctx.fillStyle  = CP;
+    ctx.font       = "bold 11px sans-serif";
+    ctx.textAlign  = "left";
+    ctx.fillText(canvasShort(p.revenue), barX + wRev + 6, midY + 4);
+  });
+
+  // Leyenda
+  const LY = H - 10;
+  ctx.fillStyle = CBR; ctx.fillRect(ML, LY - 11, 14, 11);
+  ctx.fillStyle = CTX; ctx.font = "11px sans-serif"; ctx.textAlign = "left";
+  ctx.fillText("Ingresos", ML + 18, LY - 1);
+  ctx.fillStyle = CBP; ctx.fillRect(ML + 100, LY - 11, 14, 11);
+  ctx.fillStyle = CTX;
+  ctx.fillText("Utilidad", ML + 118, LY - 1);
+
+  return canvas.encode("png");
+}
+
+// ── Hoja "Gráfico": PNG reales incrustados ─────────────────────────────
+async function buildChartSheet(byDay: any[], byProduct: any[], symbol: string): Promise<Record<string, any>> {
   const ws: Record<string, any> = {};
-  let r = 1;
 
-  const chartDays = byDay.length > 31 ? byDay.slice(byDay.length - 31) : byDay;
-  const maxRev    = chartDays.reduce((m, d) => Math.max(m, d.revenue), 0);
-  const BAR_ROWS  = 12;
-  const N         = chartDays.length;
+  const [imgRevenue, imgProducts] = await Promise.all([
+    pngRevenueByDay(byDay, symbol),
+    pngProductsHorizontal(byProduct, symbol),
+  ]);
 
-  // ── Título ────────────────────────────────────────────────────────────
-  setCell(ws, 0, r, cell("GRÁFICO — Ingresos por día", { bold: true, sz: 13, fg: COLORS.primaryDark }));
-  merge(ws, 0, r - 1, N, r - 1);
-  r += 2;
+  // Posiciones en pixels: cada fila ~15px, cada col ~64px aprox.
+  // Gráfico ingresos: desde A1, 960x340px
+  // Gráfico productos: desde A26 (salto de ~25 filas ≈ 375px), 960x420px
+  (ws as any)["!images"] = [
+    {
+      "!pos": { r: 1,  c: 0, x: 0, y: 0, w: 960, h: 340 },
+      "!datatype": "base64",
+      "!content": imgRevenue.toString("base64"),
+    },
+    {
+      "!pos": { r: 26, c: 0, x: 0, y: 0, w: 960, h: byProduct.slice(0, 10).length * 38 + 80 },
+      "!datatype": "base64",
+      "!content": imgProducts.toString("base64"),
+    },
+  ];
 
-  if (N > 0 && maxRev > 0) {
-    // Eje Y (columna 0) + columnas de días (1..N)
-    const yTicks = [maxRev, maxRev * 0.75, maxRev * 0.5, maxRev * 0.25, 0];
-
-    for (let row = 0; row < BAR_ROWS; row++) {
-      const fraction   = row / (BAR_ROWS - 1);
-      const tickIdx    = Math.round(fraction * 4);
-      const showLabel  = row === 0 || row === Math.floor((BAR_ROWS - 1) / 2) || row === BAR_ROWS - 1;
-      const axisLabel  = showLabel ? shortVal(yTicks[tickIdx] ?? 0) : "";
-      setCell(ws, 0, r, cell(axisLabel, { sz: 8, fg: COLORS.textMid, align: "right" }));
-
-      for (let ci = 0; ci < N; ci++) {
-        const d         = chartDays[ci];
-        const barHeight = Math.round((d.revenue / maxRev) * BAR_ROWS);
-        const filled    = row >= (BAR_ROWS - barHeight);
-        setCell(ws, ci + 1, r, cell(
-          filled ? "█" : "",
-          filled
-            ? { sz: 12, fg: "1A56DB", bg: "DBEAFE", align: "center" }
-            : { bg: COLORS.white },
-        ));
-      }
-      r++;
-    }
-
-    // Etiquetas de fecha (dd/mm)
-    setCell(ws, 0, r, cell("", { bg: COLORS.altRow }));
-    for (let ci = 0; ci < N; ci++) {
-      const dt    = new Date(chartDays[ci].date + "T12:00:00");
-      const label = `${String(dt.getDate()).padStart(2, "0")}/${String(dt.getMonth() + 1).padStart(2, "0")}`;
-      setCell(ws, ci + 1, r, cell(label, { sz: 7, fg: COLORS.textMid, align: "center", bold: true, bg: COLORS.altRow }));
-    }
-    r++;
-
-    // Valores de ingreso (K/M)
-    setCell(ws, 0, r, cell(`(${symbol})`, { sz: 7, fg: COLORS.textMid, italic: true }));
-    for (let ci = 0; ci < N; ci++) {
-      setCell(ws, ci + 1, r, cell(shortVal(chartDays[ci].revenue), { sz: 7, fg: COLORS.primary, align: "center" }));
-    }
-    r += 3;
-  }
-
-  // ── Gráfico horizontal: Top 10 productos ────────────────────────────
-  const top10    = byProduct.slice(0, 10);
-  const maxPRev  = top10.length > 0 ? top10[0].revenue : 0;
-  const BAR_COLS = 20; // ancho máximo de barra en "caracteres"
-
-  if (top10.length > 0 && maxPRev > 0) {
-    setCell(ws, 0, r, cell("TOP 10 PRODUCTOS — Ingresos", { bold: true, sz: 13, fg: COLORS.primaryDark }));
-    merge(ws, 0, r - 1, BAR_COLS + 2, r - 1);
-    r += 2;
-
-    // Encabezado
-    setCell(ws, 0, r, cell("Producto",           { bold: true, sz: 9, fg: COLORS.primaryDark, bg: COLORS.altRow }));
-    setCell(ws, 1, r, cell("Barra de ingresos",  { bold: true, sz: 9, fg: COLORS.primaryDark, bg: COLORS.altRow, align: "center" }));
-    merge(ws, 1, r - 1, BAR_COLS, r - 1);
-    setCell(ws, BAR_COLS + 1, r, cell(`Ingresos (${symbol})`, { bold: true, sz: 9, fg: COLORS.primaryDark, bg: COLORS.altRow, align: "right" }));
-    setCell(ws, BAR_COLS + 2, r, cell("Margen %",              { bold: true, sz: 9, fg: COLORS.primaryDark, bg: COLORS.altRow, align: "center" }));
-    r++;
-
-    top10.forEach((p, idx) => {
-      const isAlt  = idx % 2 === 1;
-      const bg     = isAlt ? COLORS.altRow : COLORS.white;
-      const filled = Math.round((p.revenue / maxPRev) * BAR_COLS);
-      const empty  = BAR_COLS - filled;
-      const barStr = "█".repeat(Math.max(filled, 1)) + " ".repeat(empty);
-      const mc     = marginColor(p.margin_pct);
-      const name   = p.product_name.length > 28 ? p.product_name.slice(0, 28) + "…" : p.product_name;
-
-      setCell(ws, 0, r, cell(name, { bg, border: true, sz: 9 }));
-      setCell(ws, 1, r, cell(barStr, { bg: "DBEAFE", border: true, fg: "1A56DB", sz: 9 }));
-      merge(ws, 1, r - 1, BAR_COLS, r - 1);
-      setCell(ws, BAR_COLS + 1, r, cell(fmtHNL(p.revenue, symbol), { bg, border: true, align: "right", bold: true }));
-      setCell(ws, BAR_COLS + 2, r, cell(`${fmtN(p.margin_pct, 1)}%`, { bg: mc.bg, border: true, align: "center", bold: true, fg: mc.fg }));
-      r++;
-    });
-  }
-
-  // Anchos: col 0 = eje/producto (ancho fijo), cols 1..N/BAR_COLS = muy angostas
-  const totalCols = Math.max(N + 1, BAR_COLS + 3);
-  const colWidths: { wch: number }[] = [{ wch: 32 }]; // col 0
-  for (let i = 1; i < totalCols; i++) colWidths.push({ wch: N > 0 && i <= N ? 3.5 : 1.8 });
-  // Últimas dos columnas del gráfico de productos
-  if (totalCols >= BAR_COLS + 2) {
-    colWidths[BAR_COLS + 1] = { wch: 18 };
-    colWidths[BAR_COLS + 2] = { wch: 12 };
-  }
-  ws["!cols"] = colWidths;
+  // !ref necesario para que xlsx incluya la hoja
+  ws["!ref"] = "A1:P60";
+  ws["!cols"] = Array.from({ length: 16 }, () => ({ wch: 12 }));
 
   return ws;
 }
@@ -570,7 +658,7 @@ async function generateExcel(
   (wb as any).Props = { Title: "Reporte de Ventas — Konta", Author: "Konta SaaS" };
 
   const wsDashboard  = buildDashboardSheet(summary, byDay, symbol, from, to, periodLabel);
-  const wsGrafico    = buildChartSheet(byDay, byProduct, symbol);
+  const wsGrafico    = await buildChartSheet(byDay, byProduct, symbol);
   const wsProductos  = buildProductsSheet(byProduct, symbol);
   const wsDetalle    = buildDetailSheet(detail, symbol);
   const wsByDay      = buildByDaySheet(byDay, symbol);

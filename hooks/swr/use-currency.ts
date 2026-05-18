@@ -3,6 +3,7 @@
 
 import { useEffect, useState } from "react";
 import { useAuth } from "@/hooks/use-auth";
+import { usePrivacyMode } from "@/context/privacy-mode-context";
 
 const CACHE_KEY = "_currency";
 const DEFAULT   = "HNL";
@@ -18,7 +19,8 @@ const CURRENCY_SYMBOLS: Record<string, string> = {
 };
 
 export function useCurrency() {
-  const { firebaseUser } = useAuth();
+  const { firebaseUser }    = useAuth();
+  const { isPrivate }       = usePrivacyMode();
   const [currency, setCurrencyState] = useState<string>(() => {
     // Leer de localStorage inmediatamente (sin esperar al API)
     if (typeof window !== "undefined") {
@@ -54,15 +56,16 @@ export function useCurrency() {
 
   const symbol = CURRENCY_SYMBOLS[currency] ?? currency;
 
-  // Formateador listo para usar
-  const format = (value: number, opts?: Intl.NumberFormatOptions) =>
-    new Intl.NumberFormat("es-HN", {
+  const format = (value: number, opts?: Intl.NumberFormatOptions) => {
+    if (isPrivate) return "•••••";
+    return new Intl.NumberFormat("es-HN", {
       style:                 "currency",
       currency,
       minimumFractionDigits: 0,
       maximumFractionDigits: 2,
       ...opts,
     }).format(value);
+  };
 
   return { currency, symbol, format };
 }

@@ -4,15 +4,14 @@
 import { useState, useEffect } from "react";
 import { useInventoryReport } from "@/hooks/swr/use-reports";
 import { useCurrency }        from "@/hooks/swr/use-currency";
-import { exportToExcel, exportToPDF, fmtN } from "@/lib/export";
+import { useAuth }            from "@/hooks/use-auth";
+import { fmtN } from "@/lib/export";
 import { ReportShell, StatCard } from "@/components/reports/report-shell";
 import { PaginationControls } from "@/components/shared/pagination-controls";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge }    from "@/components/ui/badge";
 import { Button }   from "@/components/ui/button";
 import { Input }    from "@/components/ui/input";
-import { ArrowLeft } from "lucide-react";
-import { useRouter } from "next/navigation";
 
 const MOVE_LABEL: Record<string, string> = { IN: "Entrada", OUT: "Salida", ADJUST: "Ajuste" };
 const MOVE_COLOR: Record<string, string> = {
@@ -25,8 +24,8 @@ const PRODUCT_PAGE_SIZE  = 10;
 const MOVEMENT_PAGE_SIZE = 10;
 
 export default function InventoryReportPage() {
-  const router = useRouter();
   const { format, symbol }                          = useCurrency();
+  const { firebaseUser }                            = useAuth();
   const { summary, products, movements, isLoading } = useInventoryReport();
   const [search,       setSearch]       = useState("");
   const [tab,          setTab]          = useState<"stock" | "movements">("stock");
@@ -39,46 +38,25 @@ export default function InventoryReportPage() {
     !search || p.name.toLowerCase().includes(search.toLowerCase()) || p.sku.toLowerCase().includes(search.toLowerCase())
   );
 
-  // ── Exports ──────────────────────────────────────────────────────
-  const handleExcelExport = async () => {
-    await exportToExcel(`Inventario_${new Date().toISOString().slice(0, 10)}`, [
-      {
-        name: "Stock actual",
-        columns: ["Producto", "SKU", "Stock", `Precio (${symbol})`, `Costo promedio (${symbol})`, `Valor en inventario (${symbol})`, "Margen %"],
-        rows: products.map(p => [p.name, p.sku, p.stock, fmtN(p.price), fmtN(p.avg_cost), fmtN(p.stock_value), p.margin_pct != null ? fmtN(p.margin_pct, 1) + "%" : "—"]),
-      },
-      {
-        name: "Movimientos (30 días)",
-        columns: ["Fecha", "Tipo", "Producto", "SKU", "Cantidad", "Referencia", "Notas"],
-        rows: movements.map(m => [
-          new Date(m.created_at).toLocaleDateString("es-HN"),
-          MOVE_LABEL[m.movement_type] ?? m.movement_type,
-          m.product_name, m.sku, m.quantity, m.reference_type, m.notes ?? "",
-        ]),
-      },
-    ]);
-  };
-
+  // ── Exportación via servidor ──────────────────────────────────────
   const handlePDFExport = async () => {
-    await exportToPDF({
-      title:    "Reporte de Inventario",
-      subtitle: `Generado el ${new Date().toLocaleDateString("es-HN", { day: "numeric", month: "long", year: "numeric" })}`,
-      filename: `Inventario_${new Date().toISOString().slice(0, 10)}`,
-      landscape: true,
-      tables: [
-        {
-          title:   "Stock actual por producto",
-          columns: ["Producto", "SKU", "Stock", "Precio", "Costo prom.", "Valor inv.", "Margen"],
-          rows: products.map(p => [
-            p.name, p.sku, p.stock,
-            `${symbol} ${fmtN(p.price)}`,
-            `${symbol} ${fmtN(p.avg_cost)}`,
-            `${symbol} ${fmtN(p.stock_value)}`,
-            p.margin_pct != null ? fmtN(p.margin_pct, 1) + "%" : "—",
-          ]),
-        },
-      ],
+    const token = await firebaseUser?.getIdToken();
+    if (!token) return;
+
+    const res = await fetch("/api/reports/inventory/export", {
+      method:  "POST",
+      headers: { "Authorization": `Bearer ${token}`, "Content-Type": "application/json" },
+      body:    JSON.stringify({ symbol }),
     });
+    if (!res.ok) return;
+
+    const blob = await res.blob();
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement("a");
+    a.href     = url;
+    a.download = `Inventario_${new Date().toISOString().slice(0, 10)}.pdf`;
+    a.click();
+    URL.revokeObjectURL(url);
   };
 
   return (
@@ -88,7 +66,6 @@ export default function InventoryReportPage() {
       from="" to=""
       onFromChange={() => {}} onToChange={() => {}}
       showDateRange={false}
-      onExportExcel={handleExcelExport}
       onExportPDF={handlePDFExport}
       isLoading={isLoading}
     >

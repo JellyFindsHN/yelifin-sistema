@@ -49,8 +49,7 @@ export default function SalesReportPage() {
     URL.revokeObjectURL(url);
   }
 
-  const handleExcelExport = () => triggerExport("xlsx");
-  const handlePDFExport   = () => triggerExport("pdf");
+  const handlePDFExport = () => triggerExport("pdf");
 
   const marginPct = summary && summary.total_revenue > 0
     ? 100 * summary.gross_profit / summary.total_revenue
@@ -62,7 +61,6 @@ export default function SalesReportPage() {
       subtitle={periodLabel}
       from={from} to={to}
       onFromChange={setFrom} onToChange={setTo}
-      onExportExcel={handleExcelExport}
       onExportPDF={handlePDFExport}
       isLoading={isLoading}
     >

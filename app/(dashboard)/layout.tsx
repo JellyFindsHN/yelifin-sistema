@@ -6,6 +6,7 @@ import { useRequireAuth } from "@/hooks/use-require-auth";
 import { useOnboardingGuard } from "@/hooks/use-onboarding-guard";
 import { LoadingScreen } from "@/hooks/ui/loading-screen";
 import { SWRProvider } from "@/components/providers/swr-provider";
+import { PrivacyModeProvider } from "@/context/privacy-mode-context";
 import {
   SidebarProvider,
   SidebarInset,
@@ -26,6 +27,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
   return (
     <SWRProvider>
+      <PrivacyModeProvider>
       <SidebarProvider className="h-svh overflow-hidden">
         <AppSidebar />
 
@@ -48,6 +50,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           </main>
         </SidebarInset>
       </SidebarProvider>
+      </PrivacyModeProvider>
     </SWRProvider>
   );
 }

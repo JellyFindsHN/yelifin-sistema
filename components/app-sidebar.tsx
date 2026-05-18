@@ -32,7 +32,8 @@ import {
   Tooltip, TooltipContent, TooltipProvider, TooltipTrigger,
 } from "@/components/ui/tooltip"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
-import { ThemeToggle } from "@/components/theme-toggle"
+import { ThemeToggle }   from "@/components/theme-toggle"
+import { PrivacyToggle } from "@/components/privacy-toggle"
 
 // ── Nav config ──────────────────────────────────────────────────────────
 const mainNav = [
@@ -303,6 +304,7 @@ export function AppSidebar() {
 
         {/* ── Footer ── */}
         <SidebarFooter className="border-t border-sidebar-border p-3 gap-1">
+          <PrivacyToggle isCollapsed={isCollapsed} />
           <ThemeToggle isCollapsed={isCollapsed} />
           <DropdownMenu>
             <DropdownMenuTrigger asChild>

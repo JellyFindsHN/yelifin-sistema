@@ -4,7 +4,8 @@
 import { useState, useEffect } from "react";
 import { useProfitReport } from "@/hooks/swr/use-reports";
 import { useCurrency }     from "@/hooks/swr/use-currency";
-import { exportToExcel, exportToPDF, fmtN, fmtPct } from "@/lib/export";
+import { useAuth }         from "@/hooks/use-auth";
+import { fmtN, fmtPct } from "@/lib/export";
 import { ReportShell, StatCard, useDateRange } from "@/components/reports/report-shell";
 import { PaginationControls } from "@/components/shared/pagination-controls";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -18,6 +19,7 @@ const PRODUCT_PAGE_SIZE = 10;
 export default function ProfitReportPage() {
   const { from, to, setFrom, setTo } = useDateRange("year");
   const { format, symbol }           = useCurrency();
+  const { firebaseUser }             = useAuth();
   const { summary, byMonth, byProduct, expenses, isLoading } = useProfitReport(from, to);
   const [productPage, setProductPage] = useState(1);
 
@@ -25,65 +27,25 @@ export default function ProfitReportPage() {
 
   const periodLabel = `${new Date(from + "T12:00:00").toLocaleDateString("es-HN", { day: "numeric", month: "short", year: "numeric" })} — ${new Date(to + "T12:00:00").toLocaleDateString("es-HN", { day: "numeric", month: "short", year: "numeric" })}`;
 
-  // ── Exports ──────────────────────────────────────────────────────
-  const handleExcelExport = async () => {
-    await exportToExcel(`Rentabilidad_${from}_${to}`, [
-      {
-        name: "Resumen",
-        columns: ["Métrica", "Valor"],
-        rows: summary ? [
-          ["Ingresos brutos",   fmtN(summary.revenue)],
-          ["Costo mercancía",   fmtN(summary.cogs)],
-          ["Utilidad bruta",    fmtN(summary.gross_profit)],
-          ["Descuentos",        fmtN(summary.total_discount)],
-          ["Gastos del período",fmtN(expenses?.total_expenses ?? 0)],
-          ["Margen bruto %",    fmtPct(summary.margin_pct)],
-          ["Ventas procesadas", summary.total_sales],
-        ] : [],
-      },
-      {
-        name: "Por mes",
-        columns: ["Mes", "Ventas", `Ingresos (${symbol})`, `Costo (${symbol})`, `Utilidad (${symbol})`],
-        rows: byMonth.map(m => [m.month_label, m.sales_count, fmtN(m.revenue), fmtN(m.cogs), fmtN(m.profit)]),
-      },
-      {
-        name: "Por producto",
-        columns: ["Producto", "SKU", "Cant. vendida", `Ingresos (${symbol})`, `Costo (${symbol})`, `Utilidad (${symbol})`, "Margen %"],
-        rows: byProduct.map(p => [p.product_name, p.sku, p.qty_sold, fmtN(p.revenue), fmtN(p.cogs), fmtN(p.profit), fmtPct(p.margin_pct)]),
-      },
-    ]);
-  };
-
+  // ── Exportación via servidor ──────────────────────────────────────
   const handlePDFExport = async () => {
-    await exportToPDF({
-      title:     "Reporte de Rentabilidad",
-      subtitle:  periodLabel,
-      filename:  `Rentabilidad_${from}_${to}`,
-      landscape: true,
-      tables: [
-        {
-          title:   "Resumen",
-          columns: ["Métrica", "Valor"],
-          rows: summary ? [
-            ["Ingresos brutos",  `${symbol} ${fmtN(summary.revenue)}`],
-            ["Costo mercancía",  `${symbol} ${fmtN(summary.cogs)}`],
-            ["Utilidad bruta",   `${symbol} ${fmtN(summary.gross_profit)}`],
-            ["Margen bruto",     fmtPct(summary.margin_pct)],
-          ] : [],
-        },
-        {
-          title:   "Rentabilidad por producto",
-          columns: ["Producto", "SKU", "Cant.", "Ingresos", "Costo", "Utilidad", "Margen"],
-          rows: byProduct.slice(0, 40).map(p => [
-            p.product_name, p.sku || "—", p.qty_sold,
-            `${symbol} ${fmtN(p.revenue)}`,
-            `${symbol} ${fmtN(p.cogs)}`,
-            `${symbol} ${fmtN(p.profit)}`,
-            fmtPct(p.margin_pct),
-          ]),
-        },
-      ],
+    const token = await firebaseUser?.getIdToken();
+    if (!token) return;
+
+    const res = await fetch("/api/reports/profit/export", {
+      method:  "POST",
+      headers: { "Authorization": `Bearer ${token}`, "Content-Type": "application/json" },
+      body:    JSON.stringify({ from, to, symbol }),
     });
+    if (!res.ok) return;
+
+    const blob = await res.blob();
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement("a");
+    a.href     = url;
+    a.download = `Rentabilidad_${from}_${to}.pdf`;
+    a.click();
+    URL.revokeObjectURL(url);
   };
 
   return (
@@ -92,7 +54,6 @@ export default function ProfitReportPage() {
       subtitle={periodLabel}
       from={from} to={to}
       onFromChange={setFrom} onToChange={setTo}
-      onExportExcel={handleExcelExport}
       onExportPDF={handlePDFExport}
       isLoading={isLoading}
     >

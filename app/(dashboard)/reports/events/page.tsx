@@ -4,7 +4,8 @@
 import { useState, useEffect } from "react";
 import { useEventsReport } from "@/hooks/swr/use-reports";
 import { useCurrency }     from "@/hooks/swr/use-currency";
-import { exportToExcel, exportToPDF, fmtN } from "@/lib/export";
+import { useAuth }         from "@/hooks/use-auth";
+import { fmtN } from "@/lib/export";
 import { ReportShell, StatCard, useDateRange } from "@/components/reports/report-shell";
 import { PaginationControls } from "@/components/shared/pagination-controls";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -29,6 +30,7 @@ const EVENT_PAGE_SIZE = 10;
 export default function EventsReportPage() {
   const { from, to, setFrom, setTo } = useDateRange("year");
   const { format, symbol }           = useCurrency();
+  const { firebaseUser }             = useAuth();
   const { summary, events, isLoading } = useEventsReport(from, to);
   const [eventPage, setEventPage] = useState(1);
 
@@ -36,63 +38,25 @@ export default function EventsReportPage() {
 
   const periodLabel = `${new Date(from + "T12:00:00").toLocaleDateString("es-HN", { day: "numeric", month: "short", year: "numeric" })} — ${new Date(to + "T12:00:00").toLocaleDateString("es-HN", { day: "numeric", month: "short", year: "numeric" })}`;
 
-  // ── Exports ──────────────────────────────────────────────────────
-  const handleExcelExport = async () => {
-    await exportToExcel(`Eventos_${from}_${to}`, [
-      {
-        name: "Resumen",
-        columns: ["Métrica", "Valor"],
-        rows: summary ? [
-          ["Total eventos",       summary.total_events],
-          ["Total ventas",        summary.total_sales],
-          ["Ingresos totales",    fmtN(summary.total_revenue)],
-          ["Costo mercancía",     fmtN(summary.total_cogs)],
-          ["Utilidad bruta",      fmtN(summary.gross_profit)],
-          ["Gastos totales",      fmtN(summary.total_expenses)],
-          ["Utilidad neta",       fmtN(summary.net_profit)],
-        ] : [],
-      },
-      {
-        name: "Por evento",
-        columns: ["Evento", "Lugar", "Fecha inicio", "Ventas", `Ingresos (${symbol})`, `Costo merc. (${symbol})`, `Gastos fijos (${symbol})`, `Gastos extra (${symbol})`, `Utilidad neta (${symbol})`, "Estado"],
-        rows: events.map(e => [
-          e.name,
-          e.location,
-          new Date(e.starts_at).toLocaleDateString("es-HN", { day: "numeric", month: "short", year: "numeric" }),
-          e.sales_count,
-          fmtN(e.total_revenue),
-          fmtN(e.total_cogs),
-          fmtN(e.fixed_cost),
-          fmtN(e.extra_expenses),
-          fmtN(e.net_profit),
-          STATUS_LABEL[e.status] ?? e.status,
-        ]),
-      },
-    ]);
-  };
-
+  // ── Exportación via servidor ──────────────────────────────────────
   const handlePDFExport = async () => {
-    await exportToPDF({
-      title:     "Reporte de Eventos",
-      subtitle:  periodLabel,
-      filename:  `Eventos_${from}_${to}`,
-      landscape: true,
-      tables: [
-        {
-          title:   "Detalle por evento",
-          columns: ["Evento", "Fecha", "Ventas", "Ingresos", "Gastos", "Utilidad neta", "Estado"],
-          rows: events.map(e => [
-            e.name,
-            new Date(e.starts_at).toLocaleDateString("es-HN", { day: "numeric", month: "short", year: "numeric" }),
-            e.sales_count,
-            `${symbol} ${fmtN(e.total_revenue)}`,
-            `${symbol} ${fmtN(Number(e.fixed_cost) + Number(e.extra_expenses))}`,
-            `${symbol} ${fmtN(e.net_profit)}`,
-            STATUS_LABEL[e.status] ?? e.status,
-          ]),
-        },
-      ],
+    const token = await firebaseUser?.getIdToken();
+    if (!token) return;
+
+    const res = await fetch("/api/reports/events/export", {
+      method:  "POST",
+      headers: { "Authorization": `Bearer ${token}`, "Content-Type": "application/json" },
+      body:    JSON.stringify({ from, to, symbol }),
     });
+    if (!res.ok) return;
+
+    const blob = await res.blob();
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement("a");
+    a.href     = url;
+    a.download = `Eventos_${from}_${to}.pdf`;
+    a.click();
+    URL.revokeObjectURL(url);
   };
 
   // Chart data
@@ -113,7 +77,6 @@ export default function EventsReportPage() {
       subtitle={periodLabel}
       from={from} to={to}
       onFromChange={setFrom} onToChange={setTo}
-      onExportExcel={handleExcelExport}
       onExportPDF={handlePDFExport}
       isLoading={isLoading}
     >

@@ -162,33 +162,33 @@ export default function TransactionsPage() {
   const { mutate: globalMutate } = useSWRConfig();
   const now = new Date();
 
-  const [filterMode,    setFilterMode]    = useState<"month" | "date">("month");
-  const [selectedYear,  setSelectedYear]  = useState(now.getFullYear());
+  const [filterMode, setFilterMode] = useState<"month" | "date">("month");
+  const [selectedYear, setSelectedYear] = useState(now.getFullYear());
   const [selectedMonth, setSelectedMonth] = useState(now.getMonth() + 1);
-  const [specificDate,  setSpecificDate]  = useState("");
-  const [sourceFilter,  setSourceFilter]  = useState<string>(() => {
+  const [specificDate, setSpecificDate] = useState("");
+  const [sourceFilter, setSourceFilter] = useState<string>(() => {
     const accountId = searchParams.get("account_id");
     return accountId ? accountId : "all";
   }); // "all" | "cc-{id}" | account_id
-  const [typeFilter,    setTypeFilter]    = useState("all");
-  const [modalOpen,     setModalOpen]     = useState(false);
-  const [page,          setPage]          = useState(1);
+  const [typeFilter, setTypeFilter] = useState("all");
+  const [modalOpen, setModalOpen] = useState(false);
+  const [page, setPage] = useState(1);
   const pageLimit = 15;
 
-  const [editingTx,     setEditingTx]     = useState<Transaction | null>(null);
-  const [deletingTx,    setDeletingTx]    = useState<Transaction | null>(null);
-  const [analyticsTab,  setAnalyticsTab]  = useState<"expense" | "income">("expense");
+  const [editingTx, setEditingTx] = useState<Transaction | null>(null);
+  const [deletingTx, setDeletingTx] = useState<Transaction | null>(null);
+  const [analyticsTab, setAnalyticsTab] = useState<"expense" | "income">("expense");
 
   const { deleteTransaction, isDeleting } = useDeleteTransaction();
 
   const periodParams = {
     month: filterMode === "month" ? selectedMonth : undefined,
-    year:  filterMode === "month" ? selectedYear  : undefined,
-    date:  filterMode === "date" && specificDate ? specificDate : undefined,
+    year: filterMode === "month" ? selectedYear : undefined,
+    date: filterMode === "date" && specificDate ? specificDate : undefined,
   };
 
-  const isCardFilter    = sourceFilter.startsWith("cc-");
-  const selectedCardId  = isCardFilter ? Number(sourceFilter.replace("cc-", "")) : undefined;
+  const isCardFilter = sourceFilter.startsWith("cc-");
+  const selectedCardId = isCardFilter ? Number(sourceFilter.replace("cc-", "")) : undefined;
   const isAccountFilter = !isCardFilter && sourceFilter !== "all";
 
   // Para account transactions: type se envía al server solo cuando aplica
@@ -209,15 +209,15 @@ export default function TransactionsPage() {
     ...periodParams,
   });
 
-  const { periods }     = useTransactionPeriods();
-  const { accounts }    = useAccounts();
+  const { periods } = useTransactionPeriods();
+  const { accounts } = useAccounts();
   const { creditCards } = useCreditCards();
   const { format } = useCurrency();
 
   const isLoading = loadingAcc || loadingCC;
 
   const availableYears = [...new Set(periods.map((p) => p.year))].sort((a, b) => b - a);
-  const monthsForYear  = (y: number) =>
+  const monthsForYear = (y: number) =>
     periods.filter((p) => p.year === y).map((p) => p.month).sort((a, b) => b - a);
 
   const neto = totals.income - totals.expense;
@@ -243,7 +243,7 @@ export default function TransactionsPage() {
       .filter((t) => {
         if (typeFilter === "all" || typeFilter === "TRANSFER") return typeFilter !== "TRANSFER";
         if (typeFilter === "EXPENSE") return t.type === "CHARGE";
-        if (typeFilter === "INCOME")  return t.type === "PAYMENT";
+        if (typeFilter === "INCOME") return t.type === "PAYMENT";
         return true;
       })
       .map((t) => ({ _src: "cc" as const, data: t }));
@@ -256,15 +256,15 @@ export default function TransactionsPage() {
   }, [transactions, ccTxs, typeFilter, isCardFilter, isAccountFilter]);
 
   // ── Paginación client-side de rows ─────────────────────────────────
-  const totalRows  = rows.length;
+  const totalRows = rows.length;
   const totalPages = Math.max(1, Math.ceil(totalRows / pageLimit));
-  const pagedRows  = rows.slice((page - 1) * pageLimit, page * pageLimit);
+  const pagedRows = rows.slice((page - 1) * pageLimit, page * pageLimit);
 
-  const PIE_COLORS = ["#6366f1","#f59e0b","#10b981","#3b82f6","#ec4899","#8b5cf6","#f97316","#14b8a6"];
+  const PIE_COLORS = ["#6366f1", "#f59e0b", "#10b981", "#3b82f6", "#ec4899", "#8b5cf6", "#f97316", "#14b8a6"];
 
   const categoryData = useMemo(() => {
     const expenseMap = new Map<string, number>();
-    const incomeMap  = new Map<string, number>();
+    const incomeMap = new Map<string, number>();
 
     for (const row of rows) {
       if (row._src === "account") {
@@ -356,8 +356,8 @@ export default function TransactionsPage() {
                     </p>
                     <p className="text-xs text-muted-foreground">{formatDate(t.occurred_at)}</p>
                   </div>
-                  <div className="flex items-start gap-1 shrink-0">
-                    <div className="text-right">
+                  <div className="gap-1">
+                    <div className="text-right shrink-0">
                       <p className={`text-sm font-bold ${cfg.color}`}>
                         {cfg.sign}{format(Number(t.amount))}
                       </p>
@@ -529,26 +529,186 @@ export default function TransactionsPage() {
         </div>
       </div>
 
-      {/* Stats */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-        {[
-          { label: "Ingresos",  value: totals.income,  color: "text-green-600",   icon: TrendingUp },
-          { label: "Egresos",   value: totals.expense, color: "text-destructive", icon: TrendingDown },
-          { label: "Neto",      value: neto, color: neto >= 0 ? "text-green-600" : "text-destructive", icon: ArrowLeftRight },
-        ].map((s, index) => (
-          <Card key={s.label} className={index === 2 ? "col-span-2 sm:col-span-1" : ""}>
-            <CardContent className="pl-3">
-              <div className="flex items-center justify-between mb-1.5">
-                <span className="text-[11px] font-medium text-muted-foreground">{s.label}</span>
-                <s.icon className="h-3 w-3 text-muted-foreground shrink-0" />
+      <div className="grid grid-cols-1 md:grid-cols-[3fr_2fr] gap-4 w-full items-stretch">
+        <div className="flex flex-col gap-3">
+          {/* Stats */}
+          <div className="grid grid-cols-2 gap-2">
+            {[
+              { label: "Ingresos", value: totals.income, color: "text-green-600", icon: TrendingUp },
+              { label: "Egresos", value: totals.expense, color: "text-destructive", icon: TrendingDown },
+              { label: "Neto", value: neto, color: neto >= 0 ? "text-green-600" : "text-destructive", icon: ArrowLeftRight },
+            ].map((s, index) => (
+              <Card key={s.label} className={index === 2 ? "col-span-2" : ""}>
+                <CardContent className="pl-3">
+                  <div className="flex items-center justify-between mb-1.5">
+                    <span className="text-[11px] font-medium text-muted-foreground">{s.label}</span>
+                    <s.icon className="h-3 w-3 text-muted-foreground shrink-0" />
+                  </div>
+                  <div className={`text-sm font-bold ${s.color}`}>
+                    {isLoading ? <Skeleton className="h-4 w-16" /> : format(s.value)}
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+          {/* Filtros */}
+          <div className="flex-1 space-y-2.5">
+            <div className="grid grid-cols-2 rounded-lg border overflow-hidden">
+              {(["month", "date"] as const).map((mode, i) => (
+                <button
+                  key={mode}
+                  onClick={() => setFilterMode(mode)}
+                  className={`py-2 text-xs font-medium transition-colors ${i > 0 ? "border-l" : ""} ${filterMode === mode ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-muted"
+                    }`}
+                >
+                  {mode === "month" ? "Por mes" : "Fecha exacta"}
+                </button>
+              ))}
+            </div>
+
+            {filterMode === "month" ? (
+              <div className="grid grid-cols-2 gap-2">
+                <Select value={String(selectedMonth)} onValueChange={(v) => setSelectedMonth(Number(v))}>
+                  <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {monthsForYear(selectedYear).map((m) => (
+                      <SelectItem key={m} value={String(m)}>{MONTH_NAMES[m]}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Select
+                  value={String(selectedYear)}
+                  onValueChange={(v) => {
+                    const y = Number(v);
+                    setSelectedYear(y);
+                    const months = periods.filter((p) => p.year === y).map((p) => p.month);
+                    if (months.length && !months.includes(selectedMonth)) setSelectedMonth(months[0]);
+                  }}
+                >
+                  <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {availableYears.map((y) => (
+                      <SelectItem key={y} value={String(y)}>{y}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
-              <div className={`text-sm font-bold ${s.color}`}>
-                {isLoading ? <Skeleton className="h-4 w-16" /> : format(s.value)}
-              </div>
-            </CardContent>
-          </Card>
-        ))}
+            ) : (
+              <Input
+                type="date"
+                value={specificDate}
+                onChange={(e) => setSpecificDate(e.target.value)}
+                className="w-full"
+              />
+            )}
+
+            <div className="grid grid-cols-2 gap-2">
+              {/* Fuente: cuentas + tarjetas */}
+              <Select value={sourceFilter} onValueChange={setSourceFilter}>
+                <SelectTrigger className="w-full"><SelectValue placeholder="Fuente" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todas las fuentes</SelectItem>
+                  {accounts.length > 0 && (
+                    <>
+                      <div className="px-2 py-1 text-[10px] font-semibold text-muted-foreground uppercase tracking-wide">
+                        Cuentas
+                      </div>
+                      {accounts.map((a) => (
+                        <SelectItem key={a.id} value={String(a.id)}>{a.name}</SelectItem>
+                      ))}
+                    </>
+                  )}
+                  {creditCards.length > 0 && (
+                    <>
+                      <div className="px-2 py-1 text-[10px] font-semibold text-muted-foreground uppercase tracking-wide">
+                        Tarjetas de crédito
+                      </div>
+                      {creditCards.map((c) => (
+                        <SelectItem key={c.id} value={`cc-${c.id}`}>
+                          {c.name}{c.last_four ? ` ···· ${c.last_four}` : ""}
+                        </SelectItem>
+                      ))}
+                    </>
+                  )}
+                </SelectContent>
+              </Select>
+
+              <Select value={typeFilter} onValueChange={setTypeFilter}>
+                <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todos</SelectItem>
+                  <SelectItem value="INCOME">Ingresos / Pagos CC</SelectItem>
+                  <SelectItem value="EXPENSE">Egresos / Cargos CC</SelectItem>
+                  <SelectItem value="TRANSFER">Transferencias</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+        </div>
+        <div className="h-full">
+          {!isLoading && rows.length > 0 && (
+            <Card className="pt-1 pb-1 h-full">
+              <CardContent className="p-3">
+                <div className="flex items-center justify-between mb-3">
+                  <p className="text-sm font-semibold">Por categoría</p>
+                  <div className="grid grid-cols-2 rounded-lg border overflow-hidden text-xs">
+                    {(["expense", "income"] as const).map((tab, i) => (
+                      <button
+                        key={tab}
+                        onClick={() => setAnalyticsTab(tab)}
+                        className={`px-3 py-1.5 font-medium transition-colors ${i > 0 ? "border-l" : ""} ${analyticsTab === tab ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-muted"
+                          }`}
+                      >
+                        {tab === "expense" ? "Egresos" : "Ingresos"}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                {(analyticsTab === "expense" ? categoryData.expenses : categoryData.income).length === 0 ? (
+                  <p className="text-sm text-muted-foreground text-center py-6">Sin datos</p>
+                ) : (
+                  <ResponsiveContainer width="100%" height={220}>
+                    <PieChart>
+                      <Pie
+                        data={analyticsTab === "expense" ? categoryData.expenses : categoryData.income}
+                        dataKey="value"
+                        nameKey="name"
+                        cx="50%"
+                        cy="45%"
+                        innerRadius={52}
+                        outerRadius={80}
+                        paddingAngle={2}
+                      >
+                        {(analyticsTab === "expense" ? categoryData.expenses : categoryData.income).map((cat, i) => (
+                          <Cell key={cat.name} fill={PIE_COLORS[i % PIE_COLORS.length]} />
+                        ))}
+                      </Pie>
+                      <Tooltip
+                        formatter={(v: number) => format(v)}
+                        contentStyle={{ fontSize: 12, borderRadius: 8, border: "1px solid hsl(var(--border))", backgroundColor: "hsl(var(--card))", color: "hsl(var(--foreground))" }}
+                      />
+                      <Legend
+                        iconType="circle"
+                        iconSize={8}
+                        wrapperStyle={{ fontSize: 11, paddingTop: 8 }}
+                        formatter={(value) => (
+                          <span style={{ color: "hsl(var(--foreground))", fontSize: 11 }}>
+                            {value.length > 18 ? value.slice(0, 18) + "…" : value}
+                          </span>
+                        )}
+                      />
+                    </PieChart>
+                  </ResponsiveContainer>
+                )}
+              </CardContent>
+            </Card>
+          )}
+        </div>
+
+
       </div>
+
 
       {/* Banner de cuenta/tarjeta seleccionada */}
       {sourceFilter !== "all" && (() => {
@@ -610,157 +770,6 @@ export default function TransactionsPage() {
         }
         return null;
       })()}
-
-      {/* Filtros */}
-      <div className="space-y-2.5">
-        <div className="grid grid-cols-2 rounded-lg border overflow-hidden">
-          {(["month", "date"] as const).map((mode, i) => (
-            <button
-              key={mode}
-              onClick={() => setFilterMode(mode)}
-              className={`py-2 text-xs font-medium transition-colors ${i > 0 ? "border-l" : ""} ${
-                filterMode === mode ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-muted"
-              }`}
-            >
-              {mode === "month" ? "Por mes" : "Fecha exacta"}
-            </button>
-          ))}
-        </div>
-
-        {filterMode === "month" ? (
-          <div className="grid grid-cols-2 gap-2">
-            <Select value={String(selectedMonth)} onValueChange={(v) => setSelectedMonth(Number(v))}>
-              <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
-              <SelectContent>
-                {monthsForYear(selectedYear).map((m) => (
-                  <SelectItem key={m} value={String(m)}>{MONTH_NAMES[m]}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <Select
-              value={String(selectedYear)}
-              onValueChange={(v) => {
-                const y = Number(v);
-                setSelectedYear(y);
-                const months = periods.filter((p) => p.year === y).map((p) => p.month);
-                if (months.length && !months.includes(selectedMonth)) setSelectedMonth(months[0]);
-              }}
-            >
-              <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
-              <SelectContent>
-                {availableYears.map((y) => (
-                  <SelectItem key={y} value={String(y)}>{y}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-        ) : (
-          <Input
-            type="date"
-            value={specificDate}
-            onChange={(e) => setSpecificDate(e.target.value)}
-            className="w-full"
-          />
-        )}
-
-        <div className="grid grid-cols-2 gap-2">
-          {/* Fuente: cuentas + tarjetas */}
-          <Select value={sourceFilter} onValueChange={setSourceFilter}>
-            <SelectTrigger className="w-full"><SelectValue placeholder="Fuente" /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Todas las fuentes</SelectItem>
-              {accounts.length > 0 && (
-                <>
-                  <div className="px-2 py-1 text-[10px] font-semibold text-muted-foreground uppercase tracking-wide">
-                    Cuentas
-                  </div>
-                  {accounts.map((a) => (
-                    <SelectItem key={a.id} value={String(a.id)}>{a.name}</SelectItem>
-                  ))}
-                </>
-              )}
-              {creditCards.length > 0 && (
-                <>
-                  <div className="px-2 py-1 text-[10px] font-semibold text-muted-foreground uppercase tracking-wide">
-                    Tarjetas de crédito
-                  </div>
-                  {creditCards.map((c) => (
-                    <SelectItem key={c.id} value={`cc-${c.id}`}>
-                      {c.name}{c.last_four ? ` ···· ${c.last_four}` : ""}
-                    </SelectItem>
-                  ))}
-                </>
-              )}
-            </SelectContent>
-          </Select>
-
-          <Select value={typeFilter} onValueChange={setTypeFilter}>
-            <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Todos</SelectItem>
-              <SelectItem value="INCOME">Ingresos / Pagos CC</SelectItem>
-              <SelectItem value="EXPENSE">Egresos / Cargos CC</SelectItem>
-              <SelectItem value="TRANSFER">Transferencias</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-      </div>
-
-      {/* Analíticas por categoría */}
-      {!isLoading && rows.length > 0 && (
-        <Card className="pt-1 pb-1">
-          <CardContent className="p-3">
-            <div className="flex items-center justify-between mb-3">
-              <p className="text-sm font-semibold">Por categoría</p>
-              <div className="grid grid-cols-2 rounded-lg border overflow-hidden text-xs">
-                {(["expense", "income"] as const).map((tab, i) => (
-                  <button
-                    key={tab}
-                    onClick={() => setAnalyticsTab(tab)}
-                    className={`px-3 py-1.5 font-medium transition-colors ${i > 0 ? "border-l" : ""} ${
-                      analyticsTab === tab ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-muted"
-                    }`}
-                  >
-                    {tab === "expense" ? "Egresos" : "Ingresos"}
-                  </button>
-                ))}
-              </div>
-            </div>
-            {(analyticsTab === "expense" ? categoryData.expenses : categoryData.income).length === 0 ? (
-              <p className="text-sm text-muted-foreground text-center py-6">Sin datos</p>
-            ) : (
-              <ResponsiveContainer width="100%" height={220}>
-                <PieChart>
-                  <Pie
-                    data={analyticsTab === "expense" ? categoryData.expenses : categoryData.income}
-                    dataKey="value"
-                    nameKey="name"
-                    cx="50%"
-                    cy="45%"
-                    innerRadius={52}
-                    outerRadius={80}
-                    paddingAngle={2}
-                  >
-                    {(analyticsTab === "expense" ? categoryData.expenses : categoryData.income).map((cat, i) => (
-                      <Cell key={cat.name} fill={PIE_COLORS[i % PIE_COLORS.length]} />
-                    ))}
-                  </Pie>
-                  <Tooltip
-                    formatter={(v: number) => format(v)}
-                    contentStyle={{ fontSize: 12, borderRadius: 8, border: "1px solid hsl(var(--border))", backgroundColor: "hsl(var(--card))" }}
-                  />
-                  <Legend
-                    iconType="circle"
-                    iconSize={8}
-                    wrapperStyle={{ fontSize: 11, paddingTop: 8 }}
-                    formatter={(value) => value.length > 18 ? value.slice(0, 18) + "…" : value}
-                  />
-                </PieChart>
-              </ResponsiveContainer>
-            )}
-          </CardContent>
-        </Card>
-      )}
 
       {/* Cards — móvil */}
       <div className="space-y-2.5 lg:hidden">

@@ -2,10 +2,11 @@
 "use client";
 
 import { useState } from "react";
+import { usePrivacyMode } from "@/context/privacy-mode-context";
 import { Button }  from "@/components/ui/button";
 import { Input }   from "@/components/ui/input";
 import { Label }   from "@/components/ui/label";
-import { Loader2, FileSpreadsheet, FileText, ArrowLeft } from "lucide-react";
+import { Loader2, FileText, ArrowLeft } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { toLocalDateInput } from "@/lib/date-utils";
 
@@ -45,38 +46,33 @@ export function useDateRange(defaultPreset: "month" | "year" = "month") {
 // ── ReportShell ───────────────────────────────────────────────────────
 
 type Props = {
-  title:         string;
-  subtitle?:     string;
-  from:          string;
-  to:            string;
-  onFromChange:  (v: string) => void;
-  onToChange:    (v: string) => void;
+  title:          string;
+  subtitle?:      string;
+  from:           string;
+  to:             string;
+  onFromChange:   (v: string) => void;
+  onToChange:     (v: string) => void;
   showDateRange?: boolean;
-  onExportExcel: () => Promise<void>;
-  onExportPDF:   () => Promise<void>;
-  isLoading?:    boolean;
-  children:      React.ReactNode;
+  onExportExcel?: () => Promise<void>;
+  onExportPDF:    () => Promise<void>;
+  isLoading?:     boolean;
+  children:       React.ReactNode;
 };
 
 export function ReportShell({
   title, subtitle, from, to, onFromChange, onToChange,
-  showDateRange = true, onExportExcel, onExportPDF,
+  showDateRange = true, onExportPDF,
   isLoading, children,
 }: Props) {
   const router = useRouter();
-  const [exportingXls, setExportingXls] = useState(false);
   const [exportingPDF, setExportingPDF] = useState(false);
 
-  const handleXls = async () => {
-    setExportingXls(true);
-    try { await onExportExcel(); } finally { setExportingXls(false); }
-  };
   const handlePDF = async () => {
     setExportingPDF(true);
     try { await onExportPDF(); } finally { setExportingPDF(false); }
   };
 
-  const busy = isLoading || exportingXls || exportingPDF;
+  const busy = isLoading || exportingPDF;
 
   return (
     <div className="space-y-5 pb-10">
@@ -93,18 +89,6 @@ export function ReportShell({
 
         {/* Export buttons */}
         <div className="flex gap-2 shrink-0">
-          <Button
-            variant="outline" size="sm"
-            className="gap-1.5"
-            onClick={handleXls}
-            disabled={busy}
-          >
-            {exportingXls
-              ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
-              : <FileSpreadsheet className="h-3.5 w-3.5 text-green-600" />
-            }
-            Excel
-          </Button>
           <Button
             variant="outline" size="sm"
             className="gap-1.5"
@@ -163,6 +147,7 @@ export function ReportShell({
 export function StatCard({
   label, value, sub, accent,
 }: { label: string; value: string; sub?: string; accent?: "green" | "red" | "blue" | "amber" }) {
+  const { isPrivate } = usePrivacyMode();
   const colors = {
     green: "border-green-200 bg-green-50/60 dark:bg-green-950/20",
     red:   "border-red-200   bg-red-50/60   dark:bg-red-950/20",
@@ -172,8 +157,14 @@ export function StatCard({
   return (
     <div className={`rounded-xl border p-4 space-y-0.5 ${accent ? colors[accent] : "bg-card border-border"}`}>
       <p className="text-xs text-muted-foreground">{label}</p>
-      <p className="text-xl font-bold leading-tight">{value}</p>
-      {sub && <p className="text-xs text-muted-foreground">{sub}</p>}
+      <p className={`text-xl font-bold leading-tight transition-all ${isPrivate ? "blur-sm select-none" : ""}`}>
+        {value}
+      </p>
+      {sub && (
+        <p className={`text-xs text-muted-foreground transition-all ${isPrivate ? "blur-sm select-none" : ""}`}>
+          {sub}
+        </p>
+      )}
     </div>
   );
 }
