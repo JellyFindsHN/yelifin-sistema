@@ -4,6 +4,7 @@
 import React from "react";
 import { useRequireAuth } from "@/hooks/use-require-auth";
 import { useOnboardingGuard } from "@/hooks/use-onboarding-guard";
+import { usePlanGuard } from "@/hooks/use-plan-guard";
 import { LoadingScreen } from "@/hooks/ui/loading-screen";
 import { SWRProvider } from "@/components/providers/swr-provider";
 import { PrivacyModeProvider } from "@/context/privacy-mode-context";
@@ -21,6 +22,7 @@ import {
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const { firebaseUser, loading } = useRequireAuth();
   const { checking }              = useOnboardingGuard();
+  usePlanGuard();
 
   if (loading || checking) return <LoadingScreen />;
   if (!firebaseUser) return null;

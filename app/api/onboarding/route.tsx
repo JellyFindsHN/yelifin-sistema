@@ -22,6 +22,7 @@ export async function GET(request: NextRequest) {
       data: {
         onboarding_completed: profile?.onboarding_completed ?? false,
         currency: profile?.currency ?? "HNL",
+        plan_slug: auth.data.subscription.planSlug ?? null,
       },
     });
   } catch (error) {

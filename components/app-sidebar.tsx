@@ -5,7 +5,7 @@ import {
   BarChart3, Box, Calendar, ChevronDown, CreditCard,
   Home, ShoppingCart, Users, Warehouse, Settings,
   LogOut, User, Zap, Building2, Crown, Receipt,
-  Shield, Tags
+  Shield, Tags, Wallet, ArrowLeftRight,
 } from "lucide-react"
 import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
@@ -34,6 +34,13 @@ import {
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { ThemeToggle }   from "@/components/theme-toggle"
 import { PrivacyToggle } from "@/components/privacy-toggle"
+
+// ── Plan-specific nav (finanzas plan: flat finance items) ────────────────
+const financesOnlyNav = [
+  { title: "Cuentas",          url: "/finances",                icon: Wallet },
+  { title: "Transacciones",    url: "/finances/transactions",   icon: ArrowLeftRight },
+  { title: "Tarjetas crédito", url: "/finances/credit-cards",   icon: CreditCard },
+]
 
 // ── Nav config ──────────────────────────────────────────────────────────
 const mainNav = [
@@ -83,6 +90,7 @@ const adminNav = [
     submenu: [
       { title: "Resumen",   url: "/admin" },
       { title: "Usuarios",  url: "/admin/users" },
+      { title: "Planes",    url: "/admin/plans" },
     ],
   },
 ]
@@ -237,9 +245,11 @@ export function AppSidebar() {
   const getUserInitials = () =>
     displayName.split(" ").map((n: string) => n[0]).join("").toUpperCase().slice(0, 2)
 
-  const isAdmin = user?.subscription?.plan?.name === "Admin"
+  const isAdmin      = user?.subscription?.plan?.slug === "admin"
+  const planSlug     = user?.subscription?.plan?.slug ?? null
+  const isFinanzas   = planSlug === "finanzas"
 
-  const renderNav = (items: any[]) =>
+  const renderNav = (items: typeof mainNav) =>
     items.map((item) =>
       isCollapsed
         ? <CollapsedItem key={item.title} item={item} isActive={isActive} closeOnMobile={closeOnMobile} pathname={pathname} />
@@ -268,37 +278,49 @@ export function AppSidebar() {
 
         {/* ── Content ── */}
         <SidebarContent>
+          {isFinanzas ? (
+            // Finanzas plan: flat finance nav, no dashboard, no other sections
+            <SidebarGroup>
+              {!isCollapsed && <SidebarGroupLabel>Finanzas</SidebarGroupLabel>}
+              <SidebarGroupContent>
+                <SidebarMenu>{renderNav(financesOnlyNav)}</SidebarMenu>
+              </SidebarGroupContent>
+            </SidebarGroup>
+          ) : (
+            <>
+              <SidebarGroup>
+                {!isCollapsed && <SidebarGroupLabel>Menú Principal</SidebarGroupLabel>}
+                <SidebarGroupContent>
+                  <SidebarMenu>{renderNav(mainNav)}</SidebarMenu>
+                </SidebarGroupContent>
+              </SidebarGroup>
+
+              {isAdmin && (
+                <SidebarGroup>
+                  {!isCollapsed && <SidebarGroupLabel>Análisis</SidebarGroupLabel>}
+                  <SidebarGroupContent>
+                    <SidebarMenu>{renderNav(secondaryNav)}</SidebarMenu>
+                  </SidebarGroupContent>
+                </SidebarGroup>
+              )}
+
+              {isAdmin && (
+                <SidebarGroup>
+                  {!isCollapsed && <SidebarGroupLabel>Admin</SidebarGroupLabel>}
+                  <SidebarGroupContent>
+                    <SidebarMenu>{renderNav(adminNav)}</SidebarMenu>
+                  </SidebarGroupContent>
+                </SidebarGroup>
+              )}
+            </>
+          )}
+
           <SidebarGroup>
-            {!isCollapsed && <SidebarGroupLabel>Menú Principal</SidebarGroupLabel>}
+            {!isCollapsed && <SidebarGroupLabel>Sistema</SidebarGroupLabel>}
             <SidebarGroupContent>
-              <SidebarMenu>{renderNav(mainNav)}</SidebarMenu>
+              <SidebarMenu>{renderNav(settingsNav)}</SidebarMenu>
             </SidebarGroupContent>
           </SidebarGroup>
-
-          {isAdmin && (
-            <SidebarGroup>
-              {!isCollapsed && <SidebarGroupLabel>Análisis</SidebarGroupLabel>}
-              <SidebarGroupContent>
-                <SidebarMenu>{renderNav(secondaryNav)}</SidebarMenu>
-              </SidebarGroupContent>
-            </SidebarGroup>
-          )}
-
-          {isAdmin && (
-            <SidebarGroup>
-              {!isCollapsed && <SidebarGroupLabel>Admin</SidebarGroupLabel>}
-              <SidebarGroupContent>
-                <SidebarMenu>{renderNav(adminNav)}</SidebarMenu>
-              </SidebarGroupContent>
-            </SidebarGroup>
-          )}
-
-            <SidebarGroup>
-              {!isCollapsed && <SidebarGroupLabel>Sistema</SidebarGroupLabel>}
-              <SidebarGroupContent>
-                <SidebarMenu>{renderNav(settingsNav)}</SidebarMenu>
-              </SidebarGroupContent>
-            </SidebarGroup>
 
         </SidebarContent>
 

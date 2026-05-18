@@ -34,7 +34,7 @@ export default function AdminPage() {
   const { user, loading } = useAuth();
   const { counts, planStats, recentUsers, isLoading } = useAdminStats();
 
-  const isAdmin = user?.subscription?.plan?.name === "Admin";
+  const isAdmin = user?.subscription?.plan?.slug === "admin";
 
   if (!loading && !isAdmin) {
     router.replace("/dashboard");

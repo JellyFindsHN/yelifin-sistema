@@ -1,0 +1,84 @@
+// app/api/admin/plans/[id]/route.ts
+import { NextRequest } from "next/server";
+import { neon } from "@neondatabase/serverless";
+import { verifyAdmin, createErrorResponse, isAuthSuccess } from "@/lib/auth";
+
+const sql = neon(process.env.DATABASE_URL!);
+
+type Params = { params: Promise<{ id: string }> };
+
+export async function PATCH(request: NextRequest, { params }: Params) {
+  const auth = await verifyAdmin(request);
+  if (!isAuthSuccess(auth)) return createErrorResponse(auth.error, auth.status);
+
+  const { id: rawId } = await params;
+  const id = Number(rawId);
+  if (!id) return createErrorResponse("ID inválido", 400);
+
+  try {
+    const body = await request.json();
+    const {
+      name,
+      description,
+      price_usd,
+      billing_interval,
+      max_products,
+      max_sales_per_month,
+      max_storage_mb,
+      is_active,
+    } = body;
+
+    const [plan] = await sql`
+      UPDATE subscription_plans SET
+        name                 = COALESCE(${name ?? null}, name),
+        description          = COALESCE(${description ?? null}, description),
+        price_usd            = COALESCE(${price_usd ?? null}, price_usd),
+        billing_interval     = COALESCE(${billing_interval ?? null}, billing_interval),
+        max_products         = ${max_products !== undefined ? (max_products === null ? null : Number(max_products)) : sql`max_products`},
+        max_sales_per_month  = ${max_sales_per_month !== undefined ? (max_sales_per_month === null ? null : Number(max_sales_per_month)) : sql`max_sales_per_month`},
+        max_storage_mb       = ${max_storage_mb !== undefined ? (max_storage_mb === null ? null : Number(max_storage_mb)) : sql`max_storage_mb`},
+        is_active            = COALESCE(${is_active ?? null}, is_active),
+        updated_at           = CURRENT_TIMESTAMP
+      WHERE id = ${id}
+      RETURNING *
+    `;
+
+    if (!plan) return createErrorResponse("Plan no encontrado", 404);
+    return Response.json({ data: plan });
+  } catch (error) {
+    console.error("PATCH /api/admin/plans/[id]:", error);
+    return createErrorResponse("Error al actualizar plan", 500);
+  }
+}
+
+export async function DELETE(request: NextRequest, { params }: Params) {
+  const auth = await verifyAdmin(request);
+  if (!isAuthSuccess(auth)) return createErrorResponse(auth.error, auth.status);
+
+  const { id: rawId } = await params;
+  const id = Number(rawId);
+  if (!id) return createErrorResponse("ID inválido", 400);
+
+  try {
+    const [{ user_count }] = await sql`
+      SELECT COUNT(us.id)::int AS user_count
+      FROM subscription_plans sp
+      LEFT JOIN user_subscriptions us ON us.plan_id = sp.id
+      WHERE sp.id = ${id}
+      GROUP BY sp.id
+    `;
+
+    if (user_count > 0) {
+      return createErrorResponse(
+        `No se puede eliminar: ${user_count} usuario${user_count !== 1 ? "s" : ""} usa${user_count !== 1 ? "n" : ""} este plan`,
+        409
+      );
+    }
+
+    await sql`DELETE FROM subscription_plans WHERE id = ${id}`;
+    return Response.json({ ok: true });
+  } catch (error) {
+    console.error("DELETE /api/admin/plans/[id]:", error);
+    return createErrorResponse("Error al eliminar plan", 500);
+  }
+}

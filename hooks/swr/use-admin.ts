@@ -169,6 +169,51 @@ export function useAdminPlans() {
   };
 }
 
+export type PlanInput = {
+  name?: string;
+  slug?: string;
+  description?: string | null;
+  price_usd?: number;
+  billing_interval?: string;
+  max_products?: number | null;
+  max_sales_per_month?: number | null;
+  max_storage_mb?: number | null;
+  is_active?: boolean;
+};
+
+export function useAdminCreatePlan() {
+  const authFetch = useAuthFetch();
+  const [isCreating, setIsCreating] = useState(false);
+  const createPlan = async (input: PlanInput) => {
+    setIsCreating(true);
+    try { return await authFetch("/api/admin/plans", { method: "POST", body: JSON.stringify(input) }); }
+    finally { setIsCreating(false); }
+  };
+  return { createPlan, isCreating };
+}
+
+export function useAdminUpdatePlan() {
+  const authFetch = useAuthFetch();
+  const [isSaving, setIsSaving] = useState(false);
+  const updatePlan = async (id: number, input: PlanInput) => {
+    setIsSaving(true);
+    try { return await authFetch(`/api/admin/plans/${id}`, { method: "PATCH", body: JSON.stringify(input) }); }
+    finally { setIsSaving(false); }
+  };
+  return { updatePlan, isSaving };
+}
+
+export function useAdminDeletePlan() {
+  const authFetch = useAuthFetch();
+  const [isDeleting, setIsDeleting] = useState(false);
+  const deletePlan = async (id: number) => {
+    setIsDeleting(true);
+    try { return await authFetch(`/api/admin/plans/${id}`, { method: "DELETE" }); }
+    finally { setIsDeleting(false); }
+  };
+  return { deletePlan, isDeleting };
+}
+
 export function useAdminUpdateUser(id: number | null) {
   const authFetch = useAuthFetch();
   const [isSaving, setIsSaving] = useState(false);

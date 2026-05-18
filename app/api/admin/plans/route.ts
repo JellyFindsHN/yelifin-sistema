@@ -5,6 +5,42 @@ import { verifyAdmin, createErrorResponse, isAuthSuccess } from "@/lib/auth";
 
 const sql = neon(process.env.DATABASE_URL!);
 
+export async function POST(request: NextRequest) {
+  const auth = await verifyAdmin(request);
+  if (!isAuthSuccess(auth)) return createErrorResponse(auth.error, auth.status);
+
+  try {
+    const body = await request.json();
+    const { name, slug, description, price_usd, billing_interval, max_products, max_sales_per_month, max_storage_mb } = body;
+
+    if (!name?.trim() || !slug?.trim() || !billing_interval) {
+      return createErrorResponse("Nombre, slug e intervalo de facturación son requeridos", 400);
+    }
+
+    const [plan] = await sql`
+      INSERT INTO subscription_plans
+        (name, slug, description, price_usd, billing_interval, max_products, max_sales_per_month, max_storage_mb)
+      VALUES (
+        ${name.trim()},
+        ${slug.trim().toLowerCase().replace(/\s+/g, "-")},
+        ${description ?? null},
+        ${Number(price_usd ?? 0)},
+        ${billing_interval},
+        ${max_products != null ? Number(max_products) : null},
+        ${max_sales_per_month != null ? Number(max_sales_per_month) : null},
+        ${max_storage_mb != null ? Number(max_storage_mb) : null}
+      )
+      RETURNING *
+    `;
+
+    return Response.json({ data: plan }, { status: 201 });
+  } catch (error: any) {
+    console.error("POST /api/admin/plans:", error);
+    if (error?.code === "23505") return createErrorResponse("Ya existe un plan con ese slug", 409);
+    return createErrorResponse("Error al crear plan", 500);
+  }
+}
+
 export async function GET(request: NextRequest) {
   const auth = await verifyAdmin(request);
   if (!isAuthSuccess(auth)) return createErrorResponse(auth.error, auth.status);
