@@ -1,10 +1,12 @@
 // app/(dashboard)/reports/events/page.tsx
 "use client";
 
+import { useState, useEffect } from "react";
 import { useEventsReport } from "@/hooks/swr/use-reports";
 import { useCurrency }     from "@/hooks/swr/use-currency";
 import { exportToExcel, exportToPDF, fmtN } from "@/lib/export";
 import { ReportShell, StatCard, useDateRange } from "@/components/reports/report-shell";
+import { PaginationControls } from "@/components/shared/pagination-controls";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge }    from "@/components/ui/badge";
 import {
@@ -22,10 +24,15 @@ const STATUS_COLOR: Record<string, string> = {
   COMPLETED: "bg-green-100 text-green-700 border-green-200",
 };
 
+const EVENT_PAGE_SIZE = 10;
+
 export default function EventsReportPage() {
   const { from, to, setFrom, setTo } = useDateRange("year");
   const { format, symbol }           = useCurrency();
   const { summary, events, isLoading } = useEventsReport(from, to);
+  const [eventPage, setEventPage] = useState(1);
+
+  useEffect(() => { setEventPage(1); }, [from, to]);
 
   const periodLabel = `${new Date(from + "T12:00:00").toLocaleDateString("es-HN", { day: "numeric", month: "short", year: "numeric" })} — ${new Date(to + "T12:00:00").toLocaleDateString("es-HN", { day: "numeric", month: "short", year: "numeric" })}`;
 
@@ -149,50 +156,61 @@ export default function EventsReportPage() {
 
       {/* Events table */}
       {!isLoading && events.length > 0 && (
-        <div className="rounded-xl border overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b bg-muted/30 text-xs text-muted-foreground">
-                  <th className="text-left px-4 py-2">Evento</th>
-                  <th className="text-left px-4 py-2 hidden sm:table-cell">Fecha</th>
-                  <th className="text-right px-4 py-2">Ventas</th>
-                  <th className="text-right px-4 py-2">Ingresos</th>
-                  <th className="text-right px-4 py-2 hidden md:table-cell">Gastos</th>
-                  <th className="text-right px-4 py-2">Utilidad neta</th>
-                  <th className="text-left px-4 py-2 hidden lg:table-cell">Estado</th>
-                </tr>
-              </thead>
-              <tbody>
-                {events.map((e) => (
-                  <tr key={e.id} className="border-b last:border-0 hover:bg-muted/20 transition-colors">
-                    <td className="px-4 py-2.5">
-                      <p className="font-medium max-w-[160px] truncate">{e.name}</p>
-                      {e.location && <p className="text-xs text-muted-foreground">{e.location}</p>}
-                    </td>
-                    <td className="px-4 py-2.5 text-muted-foreground text-xs hidden sm:table-cell" suppressHydrationWarning>
-                      {new Date(e.starts_at).toLocaleDateString("es-HN", { day: "numeric", month: "short", year: "numeric" })}
-                    </td>
-                    <td className="px-4 py-2.5 text-right">{e.sales_count}</td>
-                    <td className="px-4 py-2.5 text-right font-medium">{format(e.total_revenue)}</td>
-                    <td className="px-4 py-2.5 text-right text-muted-foreground hidden md:table-cell">
-                      {format(Number(e.fixed_cost) + Number(e.extra_expenses))}
-                    </td>
-                    <td className="px-4 py-2.5 text-right font-semibold">
-                      <span className={Number(e.net_profit) >= 0 ? "text-green-700 dark:text-green-400" : "text-destructive"}>
-                        {Number(e.net_profit) < 0 ? "-" : ""}{format(Math.abs(Number(e.net_profit)))}
-                      </span>
-                    </td>
-                    <td className="px-4 py-2.5 hidden lg:table-cell">
-                      <Badge className={`${STATUS_COLOR[e.status] ?? ""} border text-xs`}>
-                        {STATUS_LABEL[e.status] ?? e.status}
-                      </Badge>
-                    </td>
+        <div className="space-y-2">
+          <div className="rounded-xl border overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b bg-muted/30 text-xs text-muted-foreground">
+                    <th className="text-left px-4 py-2">Evento</th>
+                    <th className="text-left px-4 py-2 hidden sm:table-cell">Fecha</th>
+                    <th className="text-right px-4 py-2">Ventas</th>
+                    <th className="text-right px-4 py-2">Ingresos</th>
+                    <th className="text-right px-4 py-2 hidden md:table-cell">Gastos</th>
+                    <th className="text-right px-4 py-2">Utilidad neta</th>
+                    <th className="text-left px-4 py-2 hidden lg:table-cell">Estado</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {events
+                    .slice((eventPage - 1) * EVENT_PAGE_SIZE, eventPage * EVENT_PAGE_SIZE)
+                    .map((e) => (
+                      <tr key={e.id} className="border-b last:border-0 hover:bg-muted/20 transition-colors">
+                        <td className="px-4 py-2.5">
+                          <p className="font-medium max-w-[160px] truncate">{e.name}</p>
+                          {e.location && <p className="text-xs text-muted-foreground">{e.location}</p>}
+                        </td>
+                        <td className="px-4 py-2.5 text-muted-foreground text-xs hidden sm:table-cell" suppressHydrationWarning>
+                          {new Date(e.starts_at).toLocaleDateString("es-HN", { day: "numeric", month: "short", year: "numeric" })}
+                        </td>
+                        <td className="px-4 py-2.5 text-right">{e.sales_count}</td>
+                        <td className="px-4 py-2.5 text-right font-medium">{format(e.total_revenue)}</td>
+                        <td className="px-4 py-2.5 text-right text-muted-foreground hidden md:table-cell">
+                          {format(Number(e.fixed_cost) + Number(e.extra_expenses))}
+                        </td>
+                        <td className="px-4 py-2.5 text-right font-semibold">
+                          <span className={Number(e.net_profit) >= 0 ? "text-green-700 dark:text-green-400" : "text-destructive"}>
+                            {Number(e.net_profit) < 0 ? "-" : ""}{format(Math.abs(Number(e.net_profit)))}
+                          </span>
+                        </td>
+                        <td className="px-4 py-2.5 hidden lg:table-cell">
+                          <Badge className={`${STATUS_COLOR[e.status] ?? ""} border text-xs`}>
+                            {STATUS_LABEL[e.status] ?? e.status}
+                          </Badge>
+                        </td>
+                      </tr>
+                    ))}
+                </tbody>
+              </table>
+            </div>
           </div>
+          <PaginationControls
+            page={eventPage}
+            totalPages={Math.ceil(events.length / EVENT_PAGE_SIZE)}
+            total={events.length}
+            label="eventos"
+            onPageChange={setEventPage}
+          />
         </div>
       )}
 

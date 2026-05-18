@@ -57,8 +57,8 @@ export default function EventsPage() {
           { title: "Ganancia neta", value: format(totalProfit),      sub: "ingresos − gastos",         icon: TrendingUp, cls: totalProfit >= 0 ? "text-green-600" : "text-destructive" },
           { title: "ROI promedio",  value: `${avgRoi.toFixed(1)}%`,  sub: "retorno sobre inversión",   icon: BarChart3,  cls: avgRoi >= 0 ? "text-green-600" : "text-destructive" },
         ].map((s) => (
-          <Card key={s.title}>
-            <CardContent className="pl-3 py-3">
+          <Card key={s.title} >
+            <CardContent>
               <div className="flex items-center justify-between mb-1.5">
                 <span className="text-xs font-medium text-muted-foreground">{s.title}</span>
                 <s.icon className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
