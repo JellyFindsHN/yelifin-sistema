@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useState, useMemo, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -131,15 +131,15 @@ function ActionsMenu({
         <Button
           variant="ghost"
           size="icon"
-          className="h-8 w-8 shrink-0"
+          className="size-8 shrink-0"
           onClick={(e) => e.stopPropagation()}
         >
-          <MoreVertical className="h-4 w-4" />
+          <MoreVertical className="size-4" />
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end">
         <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onEdit(t); }}>
-          <Pencil className="h-4 w-4 mr-2" />
+          <Pencil className="size-4 mr-2" />
           Editar
         </DropdownMenuItem>
         <DropdownMenuSeparator />
@@ -147,7 +147,7 @@ function ActionsMenu({
           className="text-destructive focus:text-destructive"
           onClick={(e) => { e.stopPropagation(); onDelete(t); }}
         >
-          <Trash2 className="h-4 w-4 mr-2" />
+          <Trash2 className="size-4 mr-2" />
           Eliminar
         </DropdownMenuItem>
       </DropdownMenuContent>
@@ -157,7 +157,7 @@ function ActionsMenu({
 
 // ── Page ───────────────────────────────────────────────────────────────
 export default function TransactionsPage() {
-  const router = useRouter();
+  const { push } = useRouter();
   const searchParams = useSearchParams();
   const { mutate: globalMutate } = useSWRConfig();
   const now = new Date();
@@ -297,7 +297,7 @@ export default function TransactionsPage() {
 
   const handleTransactionClick = (t: Transaction) => {
     if (t.reference_type === "SALE" && t.reference_id) {
-      router.push(`/sales/${t.reference_id}`);
+      push(`/sales/${t.reference_id}`);
     }
   };
 
@@ -341,8 +341,8 @@ export default function TransactionsPage() {
         >
           <CardContent className="pl-3.5">
             <div className="flex items-start gap-3">
-              <div className="h-8 w-8 rounded-full bg-muted flex items-center justify-center shrink-0">
-                <Icon className={`h-4 w-4 ${cfg.color}`} />
+              <div className="size-8 rounded-full bg-muted flex items-center justify-center shrink-0">
+                <Icon className={`size-4 ${cfg.color}`} />
               </div>
               <div className="flex-1 min-w-0">
                 <div className="flex items-start justify-between gap-2">
@@ -384,8 +384,8 @@ export default function TransactionsPage() {
       <Card key={`cc-${t.id}`} className="pt-3 pb-2.5">
         <CardContent className="pl-3.5">
           <div className="flex items-start gap-3">
-            <div className="h-8 w-8 rounded-full bg-muted flex items-center justify-center shrink-0">
-              <Icon className={`h-4 w-4 ${cfg.color}`} />
+            <div className="size-8 rounded-full bg-muted flex items-center justify-center shrink-0">
+              <Icon className={`size-4 ${cfg.color}`} />
             </div>
             <div className="flex-1 min-w-0">
               <div className="flex items-start justify-between gap-2">
@@ -437,7 +437,7 @@ export default function TransactionsPage() {
         >
           <TableCell>
             <Badge className={`gap-1 ${cfg.badge}`} variant="outline">
-              <Icon className="h-3 w-3" />
+              <Icon className="size-3" />
               {cfg.label}
             </Badge>
           </TableCell>
@@ -477,7 +477,7 @@ export default function TransactionsPage() {
       <TableRow key={`cc-${t.id}`}>
         <TableCell>
           <Badge className={`gap-1 ${cfg.badge}`} variant="outline">
-            <Icon className="h-3 w-3" />
+            <Icon className="size-3" />
             {cfg.label}
           </Badge>
         </TableCell>
@@ -486,7 +486,7 @@ export default function TransactionsPage() {
         </TableCell>
         <TableCell className="text-sm">
           <span className="flex items-center gap-1">
-            <CreditCard className="h-3 w-3 text-muted-foreground shrink-0" />
+            <CreditCard className="size-3 text-muted-foreground shrink-0" />
             {t.card_name}{t.last_four ? ` ···· ${t.last_four}` : ""}
           </span>
         </TableCell>
@@ -524,7 +524,7 @@ export default function TransactionsPage() {
       {/* Header */}
       <div className="flex items-center justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">Transacciones</h1>
+          <h1 className="text-2xl font-semibold tracking-tight">Transacciones</h1>
           <p className="text-muted-foreground text-sm">{periodLabel}</p>
         </div>
       </div>
@@ -542,7 +542,7 @@ export default function TransactionsPage() {
                 <CardContent className="pl-3">
                   <div className="flex items-center justify-between mb-1.5">
                     <span className="text-[11px] font-medium text-muted-foreground">{s.label}</span>
-                    <s.icon className="h-3 w-3 text-muted-foreground shrink-0" />
+                    <s.icon className="size-3 text-muted-foreground shrink-0" />
                   </div>
                   <div className={`text-sm font-bold ${s.color}`}>
                     {isLoading ? <Skeleton className="h-4 w-16" /> : format(s.value)}
@@ -725,8 +725,8 @@ export default function TransactionsPage() {
           return (
             <Card className="bg-muted/40">
               <CardContent className="p-3 flex items-center gap-3">
-                <div className="h-9 w-9 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
-                  <Icon className="h-4 w-4 text-primary" />
+                <div className="size-9 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
+                  <Icon className="size-4 text-primary" />
                 </div>
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-semibold">{selectedAccount.name}</p>
@@ -743,8 +743,8 @@ export default function TransactionsPage() {
           return (
             <Card className="bg-muted/40">
               <CardContent className="p-3 flex items-center gap-3">
-                <div className="h-9 w-9 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
-                  <CreditCard className="h-4 w-4 text-primary" />
+                <div className="size-9 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
+                  <CreditCard className="size-4 text-primary" />
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-1.5">
@@ -780,7 +780,7 @@ export default function TransactionsPage() {
         ) : rows.length === 0 ? (
           <Card>
             <CardContent className="flex flex-col items-center justify-center py-12">
-              <SlidersHorizontal className="h-10 w-10 text-muted-foreground/40" />
+              <SlidersHorizontal className="size-10 text-muted-foreground/40" />
               <p className="mt-3 text-sm text-muted-foreground">
                 No hay transacciones en este período
               </p>

@@ -1,4 +1,4 @@
-// components/products/confirm-purchase-arrival-dialog.tsx
+﻿// components/products/confirm-purchase-arrival-dialog.tsx
 "use client";
 
 import { useState, useEffect } from "react";
@@ -104,7 +104,7 @@ export function ConfirmPurchaseArrivalDialog({
 
         <DialogHeader className="shrink-0 px-5 pt-2 pb-3 sm:pt-5 border-b">
           <DialogTitle className="flex items-center gap-2 text-lg font-bold">
-            <PackageCheck className="h-5 w-5 text-primary" />
+            <PackageCheck className="size-5 text-primary" />
             Confirmar llegada
           </DialogTitle>
           <p className="text-xs text-muted-foreground">
@@ -143,7 +143,7 @@ export function ConfirmPurchaseArrivalDialog({
           {/* Input de nuevo envío */}
           <div className="space-y-1.5">
             <Label className="text-sm font-medium flex items-center gap-1.5">
-              <Truck className="h-3.5 w-3.5 text-muted-foreground" />
+              <Truck className="size-3.5 text-muted-foreground" />
               Costo de envío real
               <span className="text-xs text-muted-foreground font-normal">
                 {originalShipping > 0 ? `· original: ${format(originalShipping)}` : "· sin envío registrado"}
@@ -173,7 +173,7 @@ export function ConfirmPurchaseArrivalDialog({
           {parsedShipping > 0 && accounts.length > 0 && (
             <div className="space-y-1.5">
               <Label className="text-sm font-medium flex items-center gap-1.5">
-                <Wallet className="h-3.5 w-3.5 text-muted-foreground" />
+                <Wallet className="size-3.5 text-muted-foreground" />
                 Cuenta para el envío
               </Label>
               <Select
@@ -212,7 +212,7 @@ export function ConfirmPurchaseArrivalDialog({
                 : "border-green-200 bg-green-50/60 dark:bg-green-950/20"
             )}>
               <div className="flex items-center gap-1.5 font-medium text-xs mb-1">
-                <AlertTriangle className="h-3.5 w-3.5" />
+                <AlertTriangle className="size-3.5" />
                 Ajuste financiero automático
               </div>
               <div className="flex justify-between text-muted-foreground">
@@ -277,8 +277,8 @@ export function ConfirmPurchaseArrivalDialog({
             className="flex-1 h-11 gap-2"
           >
             {isConfirming
-              ? <><Loader2 className="h-4 w-4 animate-spin" />Registrando...</>
-              : <><PackageCheck className="h-4 w-4" />Confirmar llegada</>
+              ? <><Loader2 className="size-4 animate-spin" />Registrando…</>
+              : <><PackageCheck className="size-4" />Confirmar llegada</>
             }
           </Button>
         </div>

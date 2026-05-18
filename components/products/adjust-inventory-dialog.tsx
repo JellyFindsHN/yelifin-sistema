@@ -1,4 +1,4 @@
-// components/products/adjust-inventory-dialog.tsx
+﻿// components/products/adjust-inventory-dialog.tsx
 "use client";
 
 import { useState } from "react";
@@ -121,7 +121,7 @@ export function AdjustInventoryDialog({ product, variant, open, onOpenChange, on
               <p className="text-sm text-muted-foreground truncate max-w-65">{product.name}</p>
               {variant && (
                 <div className="flex items-center gap-1 mt-0.5">
-                  <Layers className="h-3 w-3 text-muted-foreground" />
+                  <Layers className="size-3 text-muted-foreground" />
                   <p className="text-xs text-muted-foreground">{variant.variant_name}</p>
                 </div>
               )}
@@ -151,7 +151,7 @@ export function AdjustInventoryDialog({ product, variant, open, onOpenChange, on
                       : "border-border bg-background text-muted-foreground hover:bg-muted",
                   )}
                 >
-                  <TrendingUp className="h-5 w-5" />
+                  <TrendingUp className="size-5" />
                   <span className="text-xs font-medium">Agregar</span>
                 </button>
                 <button
@@ -165,7 +165,7 @@ export function AdjustInventoryDialog({ product, variant, open, onOpenChange, on
                       : "border-border bg-background text-muted-foreground hover:bg-muted",
                   )}
                 >
-                  <TrendingDown className="h-5 w-5" />
+                  <TrendingDown className="size-5" />
                   <span className="text-xs font-medium">Remover</span>
                 </button>
               </div>
@@ -248,10 +248,10 @@ export function AdjustInventoryDialog({ product, variant, open, onOpenChange, on
               )}
             >
               {isLoading
-                ? <><Loader2 className="h-4 w-4 animate-spin" />Guardando...</>
+                ? <><Loader2 className="size-4 animate-spin" />Guardando…</>
                 : type === "in"
-                  ? <><TrendingUp  className="h-4 w-4" />Agregar unidades</>
-                  : <><TrendingDown className="h-4 w-4" />Remover unidades</>
+                  ? <><TrendingUp  className="size-4" />Agregar unidades</>
+                  : <><TrendingDown className="size-4" />Remover unidades</>
               }
             </Button>
           </div>

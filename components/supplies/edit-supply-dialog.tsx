@@ -1,4 +1,4 @@
-// components/supplies/edit-supply-dialog.tsx
+﻿// components/supplies/edit-supply-dialog.tsx
 "use client";
 
 import { useEffect } from "react";
@@ -184,8 +184,8 @@ export function EditSupplyDialog({
           >
             {isUpdating ? (
               <>
-                <Loader2 className="h-4 w-4 animate-spin" />
-                Guardando...
+                <Loader2 className="size-4 animate-spin" />
+                Guardando…
               </>
             ) : (
               "Guardar"

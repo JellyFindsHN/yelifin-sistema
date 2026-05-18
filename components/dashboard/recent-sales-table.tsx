@@ -1,4 +1,4 @@
-// components/dashboard/recent-sales-table.tsx
+﻿// components/dashboard/recent-sales-table.tsx
 "use client";
 
 import { useRouter } from "next/navigation";
@@ -21,7 +21,7 @@ const paymentLabel: Record<string, { label: string; icon: any }> = {
 type Props = { recentSales: any[]; isLoading: boolean };
 
 export function RecentSalesTable({ recentSales, isLoading }: Props) {
-  const router = useRouter();
+  const { push } = useRouter();
   const { format: formatCurrency } = useCurrency();
   const tz = useTimezone();
   const formatDateFull = (d: string) =>
@@ -65,12 +65,12 @@ export function RecentSalesTable({ recentSales, isLoading }: Props) {
                 const pay     = paymentLabel[sale.payment_method] ?? paymentLabel.OTHER;
                 const PayIcon = pay.icon;
                 return (
-                  <TableRow key={sale.id} className="cursor-pointer hover:bg-muted/50" onClick={() => router.push(`/sales/${sale.id}`)}>
+                  <TableRow key={sale.id} className="cursor-pointer hover:bg-muted/50" onClick={() => push(`/sales/${sale.id}`)}>
                     <TableCell className="font-mono font-medium">{sale.sale_number}</TableCell>
                     <TableCell>{sale.customer_name ?? <span className="text-muted-foreground">Anónimo</span>}</TableCell>
                     <TableCell>
                       <Badge variant="outline" className="gap-1">
-                        <PayIcon className="h-3 w-3" />{pay.label}
+                        <PayIcon className="size-3" />{pay.label}
                       </Badge>
                     </TableCell>
                     <TableCell className="text-muted-foreground text-sm">{formatDateFull(sale.sold_at)}</TableCell>

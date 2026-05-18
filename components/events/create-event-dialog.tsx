@@ -1,4 +1,4 @@
-// components/events/create-event-dialog.tsx
+﻿// components/events/create-event-dialog.tsx
 "use client";
 
 import { useForm } from "react-hook-form";
@@ -100,7 +100,7 @@ export function CreateEventDialog({ open, onOpenChange, onSuccess }: Props) {
         {/* Header */}
         <DialogHeader className="shrink-0 px-5 pt-2 pb-3 sm:pt-5 border-b">
           <DialogTitle className="flex items-center gap-2 text-lg font-bold">
-            <CalendarPlus className="h-4 w-4 text-primary" />
+            <CalendarPlus className="size-4 text-primary" />
             Nuevo evento
           </DialogTitle>
         </DialogHeader>
@@ -223,8 +223,8 @@ export function CreateEventDialog({ open, onOpenChange, onSuccess }: Props) {
             className="flex-1 h-11 gap-2"
           >
             {isSubmitting
-              ? <><Loader2 className="h-4 w-4 animate-spin" />Creando...</>
-              : <><CalendarPlus className="h-4 w-4" />Crear evento</>
+              ? <><Loader2 className="size-4 animate-spin" />Creando…</>
+              : <><CalendarPlus className="size-4" />Crear evento</>
             }
           </Button>
         </div>

@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { use } from "react";
 import Link from "next/link";
@@ -34,7 +34,7 @@ export default function ReceiptPage({ params }: Props) {
   if (saleLoading || profileLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-100">
-        <p className="text-sm text-gray-500">Cargando ticket...</p>
+        <p className="text-sm text-gray-500">Cargando ticket…</p>
       </div>
     );
   }

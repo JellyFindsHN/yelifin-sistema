@@ -1,4 +1,4 @@
-// components/sales/pos/variant-picker-sheet.tsx
+﻿// components/sales/pos/variant-picker-sheet.tsx
 "use client";
 
 import {
@@ -66,7 +66,7 @@ export function VariantPickerSheet({
         {/* Header */}
         <DialogHeader className="shrink-0 px-5 pb-3 pt-2 sm:pt-5 border-b">
           <DialogTitle className="flex items-center gap-2 text-base font-bold">
-            <Layers className="h-4 w-4 text-primary" />
+            <Layers className="size-4 text-primary" />
             Seleccionar variante
           </DialogTitle>
           <p className="text-xs text-muted-foreground text-left">{product.name}</p>
@@ -158,13 +158,13 @@ function VariantOption({
       )}
     >
       {/* Imagen */}
-      <div className="relative h-12 w-12 rounded-lg overflow-hidden bg-muted flex items-center justify-center shrink-0">
+      <div className="relative size-12 rounded-lg overflow-hidden bg-muted flex items-center justify-center shrink-0">
         {image ? (
           <Image src={image} alt={name} fill className="object-cover" />
         ) : isBase ? (
-          <Box className="h-5 w-5 text-muted-foreground/40" />
+          <Box className="size-5 text-muted-foreground/40" />
         ) : (
-          <Layers className="h-5 w-5 text-muted-foreground/40" />
+          <Layers className="size-5 text-muted-foreground/40" />
         )}
       </div>
 

@@ -1,4 +1,4 @@
-// app/(dashboard)/sales/new/page.tsx
+﻿// app/(dashboard)/sales/new/page.tsx
 "use client";
 
 import { useState, useMemo, useEffect, useCallback, Suspense } from "react";
@@ -41,7 +41,7 @@ type SearchBarProps = {
 
 
 function NewSaleContent() {
-  const router = useRouter();
+  const { push } = useRouter();
   const searchParams = useSearchParams();
 
   const eventIdParam = searchParams.get("event_id");
@@ -91,12 +91,12 @@ function NewSaleContent() {
   }, [hasCart]);
 
   const safeNavigate = useCallback((href: string) => {
-    if (!hasCart) { router.push(href); return; }
+    if (!hasCart) { push(href); return; }
     setPendingHref(href);
     setExitDialog(true);
-  }, [hasCart, router]);
+  }, [hasCart, push]);
 
-  const confirmExit = () => { setExitDialog(false); if (pendingHref) router.push(pendingHref); };
+  const confirmExit = () => { setExitDialog(false); if (pendingHref) push(pendingHref); };
   const cancelExit = () => { setExitDialog(false); setPendingHref(null); };
 
  const availableProducts = useMemo(
@@ -268,7 +268,7 @@ function NewSaleContent() {
       );
       mutateInventory();
       setCart([]);
-      router.push(backHref);
+      push(backHref);
     } catch (err: any) {
       toast.error(err.message || "Error al registrar la venta");
     }
@@ -319,9 +319,9 @@ function NewSaleContent() {
         <div className="shrink-0 px-4 pt-3 pb-3 space-y-3 bg-background z-10 border-b">
           <div className="flex items-center gap-3">
             <Button variant="ghost" size="icon" className="shrink-0" onClick={() => safeNavigate(backHref)}>
-              <ArrowLeft className="h-4 w-4" />
+              <ArrowLeft className="size-4" />
             </Button>
-            <h1 className="text-xl font-bold tracking-tight flex-1">Nueva Venta</h1>
+            <h1 className="text-xl font-semibold tracking-tight flex-1">Nueva Venta</h1>
             {cart.length > 0 && (
               <Badge variant="secondary" className="shrink-0">
                 {cart.reduce((acc, i) => acc + i.quantity, 0)} uds
@@ -349,10 +349,10 @@ function NewSaleContent() {
       <div className="hidden lg:flex flex-col h-[calc(100vh-4rem)] pb-4">
         <div className="shrink-0 flex items-center gap-3 py-3">
           <Button variant="ghost" size="icon" onClick={() => safeNavigate(backHref)}>
-            <ArrowLeft className="h-4 w-4" />
+            <ArrowLeft className="size-4" />
           </Button>
           <div className="flex-1">
-            <h1 className="text-2xl font-bold tracking-tight">Nueva Venta</h1>
+            <h1 className="text-2xl font-semibold tracking-tight">Nueva Venta</h1>
             <p className="text-muted-foreground text-sm">
               {cart.length} producto{cart.length !== 1 ? "s" : ""}
               {suppliesUsed.length > 0 && ` · ${suppliesUsed.length} suministro${suppliesUsed.length !== 1 ? "s" : ""}`}
@@ -368,10 +368,10 @@ function NewSaleContent() {
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition-colors cursor-pointer ${desktopStep === 1 ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-muted"
                 }`}
             >
-              <ShoppingCart className="h-3.5 w-3.5" />
+              <ShoppingCart className="size-3.5" />
               Productos
             </button>
-            <ChevronRight className="h-4 w-4 text-muted-foreground" />
+            <ChevronRight className="size-4 text-muted-foreground" />
             <button
               onClick={() => cart.length > 0 && setDesktopStep(2)}
               disabled={cart.length === 0}
@@ -400,7 +400,7 @@ function NewSaleContent() {
               <CartPanel {...cartProps} />
               {cart.length > 0 && (
                 <Button className="w-full gap-2" onClick={() => setDesktopStep(2)}>
-                  Continuar al detalle <ArrowRight className="h-4 w-4" />
+                  Continuar al detalle <ArrowRight className="size-4" />
                 </Button>
               )}
             </div>
@@ -450,8 +450,8 @@ function NewSaleContent() {
           <div className="bg-background rounded-2xl w-full sm:max-w-sm shadow-2xl animate-in slide-in-from-bottom-4 sm:zoom-in-95 duration-200" onClick={(e) => e.stopPropagation()}>
             <div className="p-6 pb-4">
               <div className="flex items-center gap-3 mb-3">
-                <div className="h-10 w-10 rounded-full bg-yellow-100 flex items-center justify-center shrink-0">
-                  <AlertTriangle className="h-5 w-5 text-yellow-600" />
+                <div className="size-10 rounded-full bg-yellow-100 flex items-center justify-center shrink-0">
+                  <AlertTriangle className="size-5 text-yellow-600" />
                 </div>
                 <h2 className="text-base font-semibold">¿Salir de la venta?</h2>
               </div>

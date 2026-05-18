@@ -1,4 +1,4 @@
-// app/(dashboard)/inventory/movements/page.tsx
+﻿// app/(dashboard)/inventory/movements/page.tsx
 "use client";
 
 import { useState, useEffect } from "react";
@@ -62,49 +62,49 @@ function TypeBadge({ m }: { m: Movement }) {
   if (m.reference_type === "ADJUSTMENT") {
     return m.movement_type === "IN" ? (
       <Badge className="bg-green-100 text-green-700 border-green-200 gap-1" variant="outline">
-        <TrendingUp className="h-3 w-3" /> Ajuste +
+        <TrendingUp className="size-3" /> Ajuste +
       </Badge>
     ) : (
       <Badge className="bg-red-100 text-red-700 border-red-200 gap-1" variant="outline">
-        <TrendingDown className="h-3 w-3" /> Ajuste −
+        <TrendingDown className="size-3" /> Ajuste −
       </Badge>
     );
   }
   if (m.reference_type === "INITIAL") {
     return (
       <Badge className="bg-purple-100 text-purple-700 border-purple-200 gap-1" variant="outline">
-        <BoxIcon className="h-3 w-3" /> Inicial
+        <BoxIcon className="size-3" /> Inicial
       </Badge>
     );
   }
   if (m.reference_type === "SALE_CANCELLED") {
     return (
       <Badge className="bg-gray-100 text-gray-600 border-gray-200 gap-1" variant="outline">
-        <RotateCcw className="h-3 w-3" /> Cancelación
+        <RotateCcw className="size-3" /> Cancelación
       </Badge>
     );
   }
   if (m.reference_type === "SALE_EDITED") {
     return m.movement_type === "OUT" ? (
       <Badge className="bg-yellow-100 text-yellow-700 border-yellow-200 gap-1" variant="outline">
-        <FilePen className="h-3 w-3" /> Edición +
+        <FilePen className="size-3" /> Edición +
       </Badge>
     ) : (
       <Badge className="bg-orange-100 text-orange-700 border-orange-200 gap-1" variant="outline">
-        <FilePen className="h-3 w-3" /> Edición −
+        <FilePen className="size-3" /> Edición −
       </Badge>
     );
   }
   if (m.movement_type === "IN") {
     return (
       <Badge className="bg-blue-100 text-blue-700 border-blue-200 gap-1" variant="outline">
-        <ArrowDownCircle className="h-3 w-3" /> Entrada
+        <ArrowDownCircle className="size-3" /> Entrada
       </Badge>
     );
   }
   return (
     <Badge className="bg-orange-100 text-orange-700 border-orange-200 gap-1" variant="outline">
-      <ArrowUpCircle className="h-3 w-3" /> Salida
+      <ArrowUpCircle className="size-3" /> Salida
     </Badge>
   );
 }
@@ -114,7 +114,7 @@ function TypeBadge({ m }: { m: Movement }) {
 function ProductCell({ m }: { m: Movement }) {
   return (
     <div className="flex items-center gap-2">
-      <div className="relative h-8 w-8 rounded-md overflow-hidden bg-muted shrink-0 flex items-center justify-center">
+      <div className="relative size-8 rounded-md overflow-hidden bg-muted shrink-0 flex items-center justify-center">
         {m.image_url ? (
           <img
             src={m.image_url}
@@ -123,7 +123,7 @@ function ProductCell({ m }: { m: Movement }) {
             onError={(e) => { e.currentTarget.style.display = "none"; }}
           />
         ) : (
-          <Package className="h-4 w-4 text-muted-foreground/40" />
+          <Package className="size-4 text-muted-foreground/40" />
         )}
       </div>
       <div className="min-w-0">
@@ -131,7 +131,7 @@ function ProductCell({ m }: { m: Movement }) {
         {/* Variante */}
         {m.variant_name && (
           <div className="flex items-center gap-1 mt-0.5">
-            <Layers className="h-2.5 w-2.5 text-muted-foreground shrink-0" />
+            <Layers className="size-2.5 text-muted-foreground shrink-0" />
             <span className="text-xs text-muted-foreground truncate">{m.variant_name}</span>
           </div>
         )}
@@ -326,7 +326,7 @@ function MobileDetail({ m, format }: { m: Movement; format: FormatFn }) {
 
 export default function MovementsPage() {
   const now    = new Date();
-  const router = useRouter();
+  const { push } = useRouter();
 
   const [search,        setSearch]        = useState("");
   const [filterMode,    setFilterMode]    = useState<"month" | "date">("month");
@@ -396,7 +396,7 @@ export default function MovementsPage() {
     <div className="space-y-4 pb-24">
       {/* Header */}
       <div>
-        <h1 className="text-2xl font-bold tracking-tight">Movimientos</h1>
+        <h1 className="text-2xl font-semibold tracking-tight">Movimientos</h1>
         <p className="text-muted-foreground text-sm">Entradas y salidas · {periodLabel}</p>
       </div>
 
@@ -500,7 +500,7 @@ export default function MovementsPage() {
               className="gap-1.5 text-muted-foreground shrink-0"
               onClick={clearAll}
             >
-              <X className="h-3.5 w-3.5" /> Limpiar
+              <X className="size-3.5" /> Limpiar
             </Button>
           )}
         </div>
@@ -567,7 +567,7 @@ export default function MovementsPage() {
         ) : movements.length === 0 ? (
           <Card>
             <CardContent className="flex flex-col items-center justify-center py-12">
-              <SlidersHorizontal className="h-10 w-10 text-muted-foreground/40" />
+              <SlidersHorizontal className="size-10 text-muted-foreground/40" />
               <p className="mt-3 text-sm text-muted-foreground">No hay movimientos</p>
             </CardContent>
           </Card>
@@ -576,7 +576,7 @@ export default function MovementsPage() {
             <Card key={m.id}>
               <CardContent className="pl-3.5">
                 <div className="flex items-center gap-3 mb-3">
-                  <div className="relative h-10 w-10 rounded-lg overflow-hidden bg-muted shrink-0 flex items-center justify-center">
+                  <div className="relative size-10 rounded-lg overflow-hidden bg-muted shrink-0 flex items-center justify-center">
                     {m.image_url ? (
                       <img
                         src={m.image_url}
@@ -585,14 +585,14 @@ export default function MovementsPage() {
                         onError={(e) => { e.currentTarget.style.display = "none"; }}
                       />
                     ) : (
-                      <Package className="h-5 w-5 text-muted-foreground/40" />
+                      <Package className="size-5 text-muted-foreground/40" />
                     )}
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className="font-medium truncate">{m.product_name}</p>
                     {m.variant_name && (
                       <div className="flex items-center gap-1">
-                        <Layers className="h-2.5 w-2.5 text-muted-foreground shrink-0" />
+                        <Layers className="size-2.5 text-muted-foreground shrink-0" />
                         <span className="text-xs text-muted-foreground truncate">{m.variant_name}</span>
                       </div>
                     )}
@@ -669,9 +669,9 @@ export default function MovementsPage() {
       {/* FAB */}
       <Fab
         actions={[
-          { label: "Nuevo producto",  icon: Plus,        onClick: () => router.push("/inventory") },
-          { label: "Registrar venta", icon: ShoppingCart, onClick: () => router.push("/sales/new") },
-          { label: "Agregar stock",   icon: PackagePlus,  onClick: () => router.push("/inventory") },
+          { label: "Nuevo producto",  icon: Plus,        onClick: () => push("/inventory") },
+          { label: "Registrar venta", icon: ShoppingCart, onClick: () => push("/sales/new") },
+          { label: "Agregar stock",   icon: PackagePlus,  onClick: () => push("/inventory") },
         ]}
       />
     </div>

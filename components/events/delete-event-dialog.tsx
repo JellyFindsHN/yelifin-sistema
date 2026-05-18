@@ -1,4 +1,4 @@
-// components/events/delete-event-dialog.tsx
+﻿// components/events/delete-event-dialog.tsx
 "use client";
 
 import { useState } from "react";
@@ -65,14 +65,14 @@ export function DeleteEventDialog({ event, open, onOpenChange, onSuccess }: Prop
 
         <DialogHeader className="shrink-0 px-5 pt-2 pb-3 sm:pt-5 border-b">
           <DialogTitle className="flex items-center gap-2 text-lg font-bold text-destructive">
-            <Trash2 className="h-4 w-4" />
+            <Trash2 className="size-4" />
             Eliminar evento
           </DialogTitle>
         </DialogHeader>
 
         <div className="flex-1 px-5 py-5 space-y-4">
           <div className="flex items-start gap-3 p-3.5 rounded-xl bg-destructive/5 border border-destructive/10">
-            <AlertTriangle className="h-5 w-5 text-destructive shrink-0 mt-0.5" />
+            <AlertTriangle className="size-5 text-destructive shrink-0 mt-0.5" />
             <div>
               <p className="text-sm font-medium">¿Eliminar "{event.name}"?</p>
               <p className="text-xs text-muted-foreground mt-1">
@@ -96,8 +96,8 @@ export function DeleteEventDialog({ event, open, onOpenChange, onSuccess }: Prop
             className="flex-1 h-11 gap-2"
           >
             {isDeleting
-              ? <><Loader2 className="h-4 w-4 animate-spin" />Eliminando...</>
-              : <><Trash2 className="h-4 w-4" />Eliminar</>
+              ? <><Loader2 className="size-4 animate-spin" />Eliminando…</>
+              : <><Trash2 className="size-4" />Eliminar</>
             }
           </Button>
         </div>

@@ -1,4 +1,4 @@
-// components/auth/register-form.tsx
+﻿// components/auth/register-form.tsx
 "use client";
 
 import { useState } from "react";
@@ -37,7 +37,7 @@ const registerSchema = z
 type RegisterFormData = z.infer<typeof registerSchema>;
 
 export function RegisterForm() {
-  const router = useRouter();
+  const { push } = useRouter();
   const [isLoading, setIsLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
@@ -82,7 +82,7 @@ export function RegisterForm() {
         { duration: 5000 }
       );
 
-      router.push("/dashboard");
+      push("/dashboard");
     } catch (error: any) {
       console.error("Error en registro:", error);
 
@@ -175,9 +175,9 @@ export function RegisterForm() {
             tabIndex={-1}
           >
             {showPassword ? (
-              <EyeOff className="w-4 h-4" />
+              <EyeOff className="size-4" />
             ) : (
-              <Eye className="w-4 h-4" />
+              <Eye className="size-4" />
             )}
           </button>
         </div>
@@ -206,9 +206,9 @@ export function RegisterForm() {
             tabIndex={-1}
           >
             {showConfirmPassword ? (
-              <EyeOff className="w-4 h-4" />
+              <EyeOff className="size-4" />
             ) : (
-              <Eye className="w-4 h-4" />
+              <Eye className="size-4" />
             )}
           </button>
         </div>
@@ -222,8 +222,8 @@ export function RegisterForm() {
       <Button type="submit" className="w-full" disabled={isLoading}>
         {isLoading ? (
           <>
-            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-            Creando cuenta...
+            <Loader2 className="mr-2 size-4 animate-spin" />
+            Creando cuenta…
           </>
         ) : (
           "Comenzar prueba de 30 días"

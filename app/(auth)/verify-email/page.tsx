@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
@@ -14,15 +14,15 @@ const RESEND_COOLDOWN = 60;
 
 export default function VerifyEmailPage() {
   const { firebaseUser, loading, emailVerified } = useAuth();
-  const router = useRouter();
+  const { push } = useRouter();
   const [isSending,   setIsSending]   = useState(false);
   const [isChecking,  setIsChecking]  = useState(false);
   const [cooldown,    setCooldown]    = useState(0);
 
   useEffect(() => {
     if (loading) return;
-    if (emailVerified) { router.push('/onboarding'); return; }
-    if (!firebaseUser) { router.push('/login'); return; }
+    if (emailVerified) { push('/onboarding'); return; }
+    if (!firebaseUser) { push('/login'); return; }
   }, [firebaseUser, loading, emailVerified, router]);
 
   useEffect(() => {
@@ -57,7 +57,7 @@ export default function VerifyEmailPage() {
       if (firebaseUser.emailVerified) {
         toast.success('¡Email verificado! Configurando tu cuenta...');
         // ✅ Va a onboarding, no a dashboard
-        router.push('/onboarding');
+        push('/onboarding');
       } else {
         toast.error('Tu email aún no ha sido verificado.');
       }
@@ -70,7 +70,7 @@ export default function VerifyEmailPage() {
 
   const handleLogout = async () => {
     await signOut(auth);
-    router.push('/login');
+    push('/login');
   };
 
   if (loading) return <LoadingScreen />;
@@ -82,15 +82,15 @@ export default function VerifyEmailPage() {
         <div className="bg-background rounded-2xl border shadow-sm p-8 space-y-6">
 
           <div className="flex items-center gap-2">
-            <div className="w-10 h-10 bg-primary rounded-lg flex items-center justify-center shadow-lg shadow-primary/50">
-              <Zap className="w-6 h-6 text-primary-foreground" />
+            <div className="size-10 bg-primary rounded-lg flex items-center justify-center shadow-lg shadow-primary/50">
+              <Zap className="size-6 text-primary-foreground" />
             </div>
             <span className="text-2xl font-bold text-primary">Konta</span>
           </div>
 
           <div className="space-y-3">
-            <div className="w-14 h-14 bg-primary/10 rounded-full flex items-center justify-center">
-              <Mail className="w-7 h-7 text-primary" />
+            <div className="size-14 bg-primary/10 rounded-full flex items-center justify-center">
+              <Mail className="size-7 text-primary" />
             </div>
             <h1 className="text-2xl font-bold">Verifica tu email</h1>
             <p className="text-muted-foreground text-sm leading-relaxed">
@@ -109,7 +109,7 @@ export default function VerifyEmailPage() {
           <div className="space-y-3">
             <Button className="w-full" onClick={handleCheckVerification} disabled={isChecking}>
               {isChecking ? (
-                <><RefreshCw className="w-4 h-4 mr-2 animate-spin" />Verificando...</>
+                <><RefreshCw className="size-4 mr-2 animate-spin" />Verificando…</>
               ) : (
                 'Ya verifiqué mi email'
               )}
@@ -117,7 +117,7 @@ export default function VerifyEmailPage() {
 
             <Button variant="outline" className="w-full" onClick={handleResend} disabled={isSending || cooldown > 0}>
               {isSending ? (
-                <><RefreshCw className="w-4 h-4 mr-2 animate-spin" />Enviando...</>
+                <><RefreshCw className="size-4 mr-2 animate-spin" />Enviando…</>
               ) : cooldown > 0 ? (
                 `Reenviar en ${cooldown}s`
               ) : (
@@ -134,7 +134,7 @@ export default function VerifyEmailPage() {
             onClick={handleLogout}
             className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors"
           >
-            <LogOut className="w-4 h-4" />
+            <LogOut className="size-4" />
             Cerrar sesión y usar otra cuenta
           </button>
         </div>

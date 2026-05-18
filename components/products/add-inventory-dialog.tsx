@@ -1,4 +1,4 @@
-// components/products/add-inventory-dialog.tsx
+﻿// components/products/add-inventory-dialog.tsx
 "use client";
 
 import { useEffect, useState } from "react";
@@ -249,7 +249,7 @@ export function AddInventoryDialog({ product, open, onOpenChange, onSuccess }: P
 
         <DialogHeader className="shrink-0 px-5 pt-2 pb-3 sm:pt-5 border-b">
           <DialogTitle className="flex items-center gap-2 text-lg font-bold">
-            <PackagePlus className="h-5 w-5 text-primary" />
+            <PackagePlus className="size-5 text-primary" />
             Agregar stock
           </DialogTitle>
           <p className="text-sm text-muted-foreground truncate">
@@ -277,7 +277,7 @@ export function AddInventoryDialog({ product, open, onOpenChange, onSuccess }: P
                   paymentMode === "account" ? "bg-background shadow-sm" : "text-muted-foreground hover:text-foreground"
                 )}
               >
-                <Wallet className="h-3 w-3" /> Cuenta
+                <Wallet className="size-3" /> Cuenta
               </button>
               <button
                 type="button"
@@ -287,7 +287,7 @@ export function AddInventoryDialog({ product, open, onOpenChange, onSuccess }: P
                   paymentMode === "credit_card" ? "bg-background shadow-sm" : "text-muted-foreground hover:text-foreground"
                 )}
               >
-                <CreditCard className="h-3 w-3" /> Tarjeta
+                <CreditCard className="size-3" /> Tarjeta
               </button>
             </div>
           )}
@@ -296,7 +296,7 @@ export function AddInventoryDialog({ product, open, onOpenChange, onSuccess }: P
           {paymentMode === "account" && (
           <div className="space-y-1.5">
             <Label className="text-sm font-medium flex items-center gap-1.5">
-              <Wallet className="h-3.5 w-3.5 text-muted-foreground" />
+              <Wallet className="size-3.5 text-muted-foreground" />
               Cuenta <span className="text-destructive text-xs">*</span>
             </Label>
             <Select
@@ -326,7 +326,7 @@ export function AddInventoryDialog({ product, open, onOpenChange, onSuccess }: P
           {paymentMode === "credit_card" && (
           <div className="space-y-1.5">
             <Label className="text-sm font-medium flex items-center gap-1.5">
-              <CreditCard className="h-3.5 w-3.5 text-muted-foreground" />
+              <CreditCard className="size-3.5 text-muted-foreground" />
               Tarjeta de crédito <span className="text-destructive text-xs">*</span>
             </Label>
             <Select
@@ -402,7 +402,7 @@ export function AddInventoryDialog({ product, open, onOpenChange, onSuccess }: P
                   disabled={isCreating}
                   className="h-7 text-xs gap-1 text-primary hover:text-primary"
                 >
-                  <Plus className="h-3 w-3" />
+                  <Plus className="size-3" />
                   Agregar fila
                 </Button>
               )}
@@ -511,7 +511,7 @@ export function AddInventoryDialog({ product, open, onOpenChange, onSuccess }: P
                         disabled={isCreating || items.length === 1}
                         className="h-10 w-8 text-muted-foreground hover:text-destructive"
                       >
-                        <Trash2 className="h-3.5 w-3.5" />
+                        <Trash2 className="size-3.5" />
                       </Button>
                     )}
                   </div>
@@ -563,7 +563,7 @@ export function AddInventoryDialog({ product, open, onOpenChange, onSuccess }: P
           {ship > 0 && accounts.length > 0 && (
             <div className="space-y-1.5">
               <Label className="text-sm font-medium flex items-center gap-1.5">
-                <Truck className="h-3.5 w-3.5 text-muted-foreground" />
+                <Truck className="size-3.5 text-muted-foreground" />
                 Cuenta para el envío
                 <span className="text-xs text-muted-foreground font-normal">
                   {paymentMode === "account" ? "(opcional, si es diferente a la cuenta principal)" : ""}
@@ -605,7 +605,7 @@ export function AddInventoryDialog({ product, open, onOpenChange, onSuccess }: P
           {totalUnits > 0 && totalCost > 0 && (
             <div className="rounded-lg bg-primary/5 border border-primary/10 p-3 space-y-1.5">
               <div className="flex items-center gap-1.5 text-xs font-medium text-primary mb-2">
-                <Calculator className="h-3.5 w-3.5" />
+                <Calculator className="size-3.5" />
                 Resumen de la compra
               </div>
               {items
@@ -683,10 +683,10 @@ export function AddInventoryDialog({ product, open, onOpenChange, onSuccess }: P
             className="flex-1 h-11 gap-2"
           >
             {isCreating
-              ? <><Loader2 className="h-4 w-4 animate-spin" />Registrando...</>
+              ? <><Loader2 className="size-4 animate-spin" />Registrando…</>
               : isPending
-                ? <><Clock className="h-4 w-4" />Registrar como pendiente</>
-                : <><PackagePlus className="h-4 w-4" />Registrar compra</>
+                ? <><Clock className="size-4" />Registrar como pendiente</>
+                : <><PackagePlus className="size-4" />Registrar compra</>
             }
           </Button>
         </div>

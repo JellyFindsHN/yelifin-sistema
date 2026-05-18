@@ -1,4 +1,4 @@
-// components/dashboard/metrics-grid.tsx
+﻿// components/dashboard/metrics-grid.tsx
 "use client";
 import { useCurrency } from "@/hooks/swr/use-currency";
 import { Card, CardContent } from "@/components/ui/card";
@@ -12,7 +12,7 @@ function ChangeIndicator({ value }: { value: number | null }) {
   const isUp = value >= 0;
   return (
     <span className={`flex items-center gap-0.5 text-xs font-medium ${isUp ? "text-green-600" : "text-destructive"}`}>
-      {isUp ? <ArrowUpRight className="h-3 w-3" /> : <ArrowDownRight className="h-3 w-3" />}
+      {isUp ? <ArrowUpRight className="size-3" /> : <ArrowDownRight className="size-3" />}
       {Math.abs(value).toFixed(1)}% vs anterior
     </span>
   );
@@ -57,7 +57,7 @@ export function MetricsGrid({ metrics: m, isLoading }: Props) {
           <CardContent className="pl-3">
             <div className="flex items-center justify-between mb-1.5">
               <span className="text-xs font-medium text-muted-foreground">{stat.title}</span>
-              <stat.icon className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+              <stat.icon className="size-3.5 text-muted-foreground shrink-0" />
             </div>
             <div className={`text-lg font-bold lg:text-xl ${(stat as any).valueClass ?? ""}`}>
               {isLoading ? <Skeleton className="h-6 w-20" /> : stat.value}

@@ -1,4 +1,4 @@
-"use client"
+﻿"use client"
 
 import { Moon, Sun } from "lucide-react"
 import { useTheme } from "next-themes"
@@ -29,9 +29,9 @@ export function ThemeToggle({ isCollapsed = false }: ThemeToggleProps) {
           >
             {mounted
               ? isDark
-                ? <Sun className="h-4 w-4" />
-                : <Moon className="h-4 w-4" />
-              : <Moon className="h-4 w-4 opacity-0" />
+                ? <Sun className="size-4" />
+                : <Moon className="size-4" />
+              : <Moon className="size-4 opacity-0" />
             }
           </button>
         </TooltipTrigger>
@@ -49,9 +49,9 @@ export function ThemeToggle({ isCollapsed = false }: ThemeToggleProps) {
     >
       {mounted
         ? isDark
-          ? <Sun className="h-4 w-4 shrink-0" />
-          : <Moon className="h-4 w-4 shrink-0" />
-        : <Moon className="h-4 w-4 shrink-0 opacity-0" />
+          ? <Sun className="size-4 shrink-0" />
+          : <Moon className="size-4 shrink-0" />
+        : <Moon className="size-4 shrink-0 opacity-0" />
       }
       <span className="text-sm">{label}</span>
     </button>

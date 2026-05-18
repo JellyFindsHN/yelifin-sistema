@@ -1,4 +1,4 @@
-// components/supplies/add-supply-purchase-dialog.tsx
+﻿// components/supplies/add-supply-purchase-dialog.tsx
 "use client";
 
 import { useEffect, useState } from "react";
@@ -126,7 +126,7 @@ export function AddSupplyPurchaseDialog({
         {/* Header */}
         <DialogHeader className="shrink-0 px-5 pt-2 pb-3 sm:pt-5 border-b">
           <DialogTitle className="flex items-center gap-2 text-lg font-bold">
-            <ShoppingBag className="h-4 w-4 text-primary" />
+            <ShoppingBag className="size-4 text-primary" />
             Registrar compra
           </DialogTitle>
           <p className="text-sm text-muted-foreground truncate">{supply.name}</p>
@@ -140,7 +140,7 @@ export function AddSupplyPurchaseDialog({
           {/* Cuenta */}
           <div className="space-y-1.5">
             <Label className="text-sm font-medium flex items-center gap-1.5">
-              <Wallet className="h-3.5 w-3.5 text-muted-foreground" />
+              <Wallet className="size-3.5 text-muted-foreground" />
               Cuenta <span className="text-destructive text-xs">*</span>
             </Label>
 
@@ -257,8 +257,8 @@ export function AddSupplyPurchaseDialog({
           >
             {isCreating ? (
               <>
-                <Loader2 className="h-4 w-4 animate-spin" />
-                Registrando...
+                <Loader2 className="size-4 animate-spin" />
+                Registrando…
               </>
             ) : (
               "Registrar compra"

@@ -1,4 +1,4 @@
-// components/app-sidebar.tsx
+﻿// components/app-sidebar.tsx
 "use client"
 
 import {
@@ -132,7 +132,7 @@ function CollapsedItem({
             className="justify-center"
           >
             <Link href={item.submenu ? item.submenu[0].url : item.url} onClick={closeOnMobile}>
-              <item.icon className="h-4 w-4" />
+              <item.icon className="size-4" />
             </Link>
           </SidebarMenuButton>
         </TooltipTrigger>
@@ -180,9 +180,9 @@ function ExpandedItem({
         <Collapsible defaultOpen={isActive(item.url)} className="group/collapsible">
           <CollapsibleTrigger asChild>
             <SidebarMenuButton isActive={isActive(item.url)}>
-              <item.icon className="h-4 w-4" />
+              <item.icon className="size-4" />
               <span>{item.title}</span>
-              <ChevronDown className="ml-auto h-4 w-4 transition-transform group-data-[state=open]/collapsible:rotate-180" />
+              <ChevronDown className="ml-auto size-4 transition-transform group-data-[state=open]/collapsible:rotate-180" />
             </SidebarMenuButton>
           </CollapsibleTrigger>
           <CollapsibleContent>
@@ -200,7 +200,7 @@ function ExpandedItem({
       ) : (
         <SidebarMenuButton asChild isActive={isActive(item.url)}>
           <Link href={item.url} onClick={closeOnMobile}>
-            <item.icon className="h-4 w-4" />
+            <item.icon className="size-4" />
             <span>{item.title}</span>
           </Link>
         </SidebarMenuButton>
@@ -212,7 +212,7 @@ function ExpandedItem({
 // ── Component ───────────────────────────────────────────────────────────
 export function AppSidebar() {
   const pathname = usePathname()
-  const router   = useRouter()
+  const { push } = useRouter()
   const { user, firebaseUser }  = useAuth()
   const { isMobile, setOpenMobile, state } = useSidebar()
 
@@ -230,7 +230,7 @@ export function AppSidebar() {
       document.cookie = "token=; Max-Age=0; path=/"
       toast.success("Sesión cerrada exitosamente")
       closeOnMobile()
-      router.push("/")
+      push("/")
     } catch {
       toast.error("Error al cerrar sesión")
     }
@@ -267,8 +267,8 @@ export function AppSidebar() {
             onClick={closeOnMobile}
             className={`flex items-center gap-2 ${isCollapsed ? "justify-center" : ""}`}
           >
-            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary">
-              <Zap className="h-5 w-5 text-primary-foreground" />
+            <div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-primary">
+              <Zap className="size-5 text-primary-foreground" />
             </div>
             {!isCollapsed && (
               <span className="text-lg font-semibold text-sidebar-foreground">Konta</span>
@@ -331,7 +331,7 @@ export function AppSidebar() {
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <button className={`flex w-full items-center rounded-lg p-2 hover:bg-sidebar-accent transition-colors ${isCollapsed ? "justify-center" : "gap-3"}`}>
-                <Avatar className="h-8 w-8 shrink-0">
+                <Avatar className="size-8 shrink-0">
                   <AvatarImage
                     src={user?.profile?.business_logo_url ?? undefined}
                     alt={displayName}
@@ -347,7 +347,7 @@ export function AppSidebar() {
                       <span className="font-medium text-sidebar-foreground truncate w-full">{displayName}</span>
                       <span className="text-xs text-muted-foreground truncate w-full">{firebaseUser?.email}</span>
                     </div>
-                    <ChevronDown className="h-4 w-4 text-muted-foreground shrink-0" />
+                    <ChevronDown className="size-4 text-muted-foreground shrink-0" />
                   </>
                 )}
               </button>
@@ -363,12 +363,12 @@ export function AppSidebar() {
                 <p className="text-xs text-muted-foreground truncate">{firebaseUser?.email}</p>
                 {isAdmin ? (
                   <span className="inline-flex items-center gap-1 mt-1.5 text-xs font-medium text-emerald-600">
-                    <Shield className="h-3 w-3" /> Admin
+                    <Shield className="size-3" /> Admin
                   </span>
                 ) : (
                   user?.subscription?.plan?.name && (
                     <span className="inline-flex items-center gap-1 mt-1.5 text-xs text-primary font-medium">
-                      <Crown className="h-3 w-3" /> Plan {user.subscription.plan.name}
+                      <Crown className="size-3" /> Plan {user.subscription.plan.name}
                     </span>
                   )
                 )}
@@ -376,22 +376,22 @@ export function AppSidebar() {
 
               <DropdownMenuItem asChild>
                 <Link href="/settings/profile" onClick={closeOnMobile} className="flex items-center cursor-pointer">
-                  <User className="mr-2 h-4 w-4" /> Mi Perfil
+                  <User className="mr-2 size-4" /> Mi Perfil
                 </Link>
               </DropdownMenuItem>
               <DropdownMenuItem asChild>
                 <Link href="/settings/organization" onClick={closeOnMobile} className="flex items-center cursor-pointer">
-                  <Building2 className="mr-2 h-4 w-4" /> Mi Negocio
+                  <Building2 className="mr-2 size-4" /> Mi Negocio
                 </Link>
               </DropdownMenuItem>
               <DropdownMenuItem asChild>
                 <Link href="/settings/billing" onClick={closeOnMobile} className="flex items-center cursor-pointer">
-                  <Receipt className="mr-2 h-4 w-4" /> Suscripción
+                  <Receipt className="mr-2 size-4" /> Suscripción
                 </Link>
               </DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem onClick={handleLogout} className="text-destructive cursor-pointer">
-                <LogOut className="mr-2 h-4 w-4" /> Cerrar Sesión
+                <LogOut className="mr-2 size-4" /> Cerrar Sesión
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>

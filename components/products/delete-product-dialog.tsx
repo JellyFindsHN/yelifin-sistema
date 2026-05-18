@@ -1,4 +1,4 @@
-// components/products/delete-product-dialog.tsx
+﻿// components/products/delete-product-dialog.tsx
 "use client";
 
 import {
@@ -72,7 +72,7 @@ export function DeleteProductDialog({ product, open, onOpenChange, onSuccess }: 
             className="bg-destructive hover:bg-destructive/90"
           >
             {isDeleting ? (
-              <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Eliminando...</>
+              <><Loader2 className="mr-2 size-4 animate-spin" />Eliminando…</>
             ) : "Eliminar"}
           </AlertDialogAction>
         </AlertDialogFooter>

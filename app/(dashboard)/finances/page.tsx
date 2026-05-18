@@ -1,4 +1,4 @@
-// app/(dashboard)/finances/page.tsx
+﻿// app/(dashboard)/finances/page.tsx
 "use client";
 
 import { useState } from "react";
@@ -65,7 +65,7 @@ const REF_LABELS: Record<string, string> = {
 
 export default function FinancesPage() {
   const now = new Date();
-  const router = useRouter();
+  const { push } = useRouter();
 
   const [selectedMonth, setSelectedMonth] = useState<number | undefined>(now.getMonth() + 1);
   const [selectedYear, setSelectedYear] = useState<number | undefined>(now.getFullYear());
@@ -114,7 +114,7 @@ export default function FinancesPage() {
     <div className="space-y-4 pb-24">
 
       <div>
-        <h1 className="text-2xl font-bold tracking-tight">Finanzas</h1>
+        <h1 className="text-2xl font-semibold tracking-tight">Finanzas</h1>
         <p className="text-muted-foreground text-sm">{periodLabel}</p>
       </div>
 
@@ -157,7 +157,7 @@ export default function FinancesPage() {
         <CardContent className="p-4">
           <div className="flex items-center justify-between mb-1">
             <span className="text-sm font-medium opacity-80">Balance total</span>
-            <Wallet className="h-4 w-4 opacity-60" />
+            <Wallet className="size-4 opacity-60" />
           </div>
           {isLoading
             ? <Skeleton className="h-8 w-32 bg-primary-foreground/20" />
@@ -174,7 +174,7 @@ export default function FinancesPage() {
           <CardContent className="p-3">
             <div className="flex items-center justify-between mb-1.5">
               <span className="text-[11px] font-medium text-muted-foreground">Ingresos</span>
-              <TrendingUp className="h-3 w-3 text-green-600" />
+              <TrendingUp className="size-3 text-green-600" />
             </div>
             <div className="text-base font-bold text-green-600">
               {isLoading ? <Skeleton className="h-5 w-20" /> : format(summary?.period.income ?? 0)}
@@ -186,7 +186,7 @@ export default function FinancesPage() {
           <CardContent className="p-3">
             <div className="flex items-center justify-between mb-1.5">
               <span className="text-[11px] font-medium text-muted-foreground">Egresos</span>
-              <TrendingDown className="h-3 w-3 text-destructive" />
+              <TrendingDown className="size-3 text-destructive" />
             </div>
             <div className="text-base font-bold text-destructive">
               {isLoading ? <Skeleton className="h-5 w-20" /> : format(summary?.period.expense ?? 0)}
@@ -204,7 +204,7 @@ export default function FinancesPage() {
               <div className="divide-y">
                 {Array.from({ length: 3 }).map((_, i) => (
                   <div key={i} className="flex items-center gap-3 p-3.5">
-                    <Skeleton className="h-8 w-8 rounded-lg shrink-0" />
+                    <Skeleton className="size-8 rounded-lg shrink-0" />
                     <div className="flex-1 space-y-1.5">
                       <Skeleton className="h-3.5 w-24" />
                       <Skeleton className="h-3 w-16" />
@@ -215,7 +215,7 @@ export default function FinancesPage() {
               </div>
             ) : (summary?.accounts ?? []).length === 0 && creditCards.length === 0 ? (
               <div className="py-8 flex flex-col items-center justify-center">
-                <Wallet className="h-8 w-8 text-muted-foreground/30" />
+                <Wallet className="size-8 text-muted-foreground/30" />
                 <p className="text-sm text-muted-foreground mt-2">Sin cuentas creadas</p>
               </div>
             ) : (
@@ -228,10 +228,10 @@ export default function FinancesPage() {
                     <div key={account.id} className="flex items-center gap-3 p-3.5">
                       <div
                         className="flex items-center gap-3 flex-1 min-w-0 cursor-pointer hover:bg-muted/50 rounded-lg transition-colors -m-1 p-1"
-                        onClick={() => router.push(`/finances/transactions?account_id=${account.id}`)}
+                        onClick={() => push(`/finances/transactions?account_id=${account.id}`)}
                       >
-                        <div className="h-8 w-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
-                          <Icon className="h-4 w-4 text-primary" />
+                        <div className="size-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
+                          <Icon className="size-4 text-primary" />
                         </div>
                         <div className="flex-1 min-w-0">
                           <p className="text-sm font-medium truncate">{account.name}</p>
@@ -244,15 +244,15 @@ export default function FinancesPage() {
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
                           <Button
-                            variant="ghost" size="icon" className="h-7 w-7 shrink-0"
+                            variant="ghost" size="icon" className="size-7 shrink-0"
                             onClick={(e) => e.stopPropagation()}
                           >
-                            <MoreVertical className="h-4 w-4" />
+                            <MoreVertical className="size-4" />
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
                           <DropdownMenuItem onClick={(e) => { e.stopPropagation(); fullAccount && setEditAccount(fullAccount); }}>
-                            <Pencil className="h-4 w-4 mr-2" />
+                            <Pencil className="size-4 mr-2" />
                             Editar
                           </DropdownMenuItem>
                           <DropdownMenuSeparator />
@@ -260,7 +260,7 @@ export default function FinancesPage() {
                             className="text-destructive focus:text-destructive"
                             onClick={(e) => { e.stopPropagation(); fullAccount && setDeleteAccount(fullAccount); }}
                           >
-                            <Trash2 className="h-4 w-4 mr-2" />
+                            <Trash2 className="size-4 mr-2" />
                             Eliminar
                           </DropdownMenuItem>
                         </DropdownMenuContent>
@@ -272,10 +272,10 @@ export default function FinancesPage() {
                   <div key={`cc-${card.id}`} className="flex items-center gap-3 p-3.5">
                     <div
                       className="flex items-center gap-3 flex-1 min-w-0 cursor-pointer hover:bg-muted/50 rounded-lg transition-colors -m-1 p-1"
-                      onClick={() => router.push(`/finances/transactions?account_id=cc-${card.id}`)}
+                      onClick={() => push(`/finances/transactions?account_id=cc-${card.id}`)}
                     >
-                      <div className="h-8 w-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
-                        <CreditCard className="h-4 w-4 text-primary" />
+                      <div className="size-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
+                        <CreditCard className="size-4 text-primary" />
                       </div>
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-1.5 flex-wrap">
@@ -296,8 +296,8 @@ export default function FinancesPage() {
                       </div>
                     </div>
                     <Link href={`/finances/credit-cards/${card.id}`} onClick={(e) => e.stopPropagation()}>
-                      <Button variant="ghost" size="icon" className="h-7 w-7 shrink-0">
-                        <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                      <Button variant="ghost" size="icon" className="size-7 shrink-0">
+                        <ChevronRight className="size-4 text-muted-foreground" />
                       </Button>
                     </Link>
                   </div>
@@ -357,7 +357,7 @@ export default function FinancesPage() {
           </div>
           <Button variant="ghost" size="sm" asChild className="gap-1 text-xs">
             <Link href="/finances/transactions">
-              Ver todas <ExternalLink className="h-3 w-3" />
+              Ver todas <ExternalLink className="size-3" />
             </Link>
           </Button>
         </div>
@@ -368,7 +368,7 @@ export default function FinancesPage() {
           ) : !summary?.today_transactions.length ? (
             <Card className="pt-1 pb-1">
               <CardContent className="py-8 flex flex-col items-center justify-center">
-                <ArrowLeftRight className="h-8 w-8 text-muted-foreground/30" />
+                <ArrowLeftRight className="size-8 text-muted-foreground/30" />
                 <p className="text-sm text-muted-foreground mt-2">Sin movimientos hoy</p>
               </CardContent>
             </Card>
@@ -380,8 +380,8 @@ export default function FinancesPage() {
                 <Card className="pt-1 pb-1" key={t.id}>
                   <CardContent className="p-3.5">
                     <div className="flex items-center gap-3">
-                      <div className="h-8 w-8 rounded-full bg-muted flex items-center justify-center shrink-0">
-                        <Icon className={`h-4 w-4 ${cfg.color}`} />
+                      <div className="size-8 rounded-full bg-muted flex items-center justify-center shrink-0">
+                        <Icon className={`size-4 ${cfg.color}`} />
                       </div>
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-medium truncate">

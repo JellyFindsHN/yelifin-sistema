@@ -1,4 +1,4 @@
-// app/(dashboard)/settings/organization/page.tsx
+﻿// app/(dashboard)/settings/organization/page.tsx
 "use client";
 
 import { useState, useEffect, useRef } from "react";
@@ -58,7 +58,7 @@ const CURRENCIES = [
 // ── Componente ────────────────────────────────────────────────────────
 
 export default function OrganizationSettingsPage() {
-  const router = useRouter();
+  const { back } = useRouter();
   const { user, profile, isLoading, mutate } = useMe();
   const { updateProfile, isSaving }           = useUpdateProfile();
   const { uploadLogo, isUploading }           = useUploadLogo();
@@ -155,11 +155,11 @@ export default function OrganizationSettingsPage() {
 
       {/* Header */}
       <div className="flex items-center gap-3">
-        <Button variant="ghost" size="icon" onClick={() => router.back()}>
-          <ArrowLeft className="h-4 w-4" />
+        <Button variant="ghost" size="icon" onClick={() => back()}>
+          <ArrowLeft className="size-4" />
         </Button>
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">Mi negocio</h1>
+          <h1 className="text-2xl font-semibold tracking-tight">Mi negocio</h1>
           <p className="text-muted-foreground text-sm">
             Actualizá el nombre, logo y configuración de tu negocio.
           </p>
@@ -170,14 +170,14 @@ export default function OrganizationSettingsPage() {
       <Card>
         <CardHeader className="pb-3">
           <CardTitle className="text-base flex items-center gap-2">
-            <Building2 className="h-4 w-4 text-muted-foreground" />
+            <Building2 className="size-4 text-muted-foreground" />
             Logo del negocio
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="flex items-center gap-4">
             {/* Preview */}
-            <div className="h-20 w-20 rounded-xl border bg-muted/40 flex items-center justify-center shrink-0 overflow-hidden">
+            <div className="size-20 rounded-xl border bg-muted/40 flex items-center justify-center shrink-0 overflow-hidden">
               {currentLogo ? (
                 <Image
                   src={currentLogo}
@@ -188,7 +188,7 @@ export default function OrganizationSettingsPage() {
                   unoptimized
                 />
               ) : (
-                <ImageIcon className="h-8 w-8 text-muted-foreground/40" />
+                <ImageIcon className="size-8 text-muted-foreground/40" />
               )}
             </div>
 
@@ -210,9 +210,9 @@ export default function OrganizationSettingsPage() {
                 disabled={busy}
               >
                 {isUploading ? (
-                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  <Loader2 className="size-3.5 animate-spin" />
                 ) : (
-                  <Upload className="h-3.5 w-3.5" />
+                  <Upload className="size-3.5" />
                 )}
                 {currentLogo ? "Cambiar imagen" : "Subir logo"}
               </Button>
@@ -225,7 +225,7 @@ export default function OrganizationSettingsPage() {
                   onClick={handleRemoveLogo}
                   disabled={busy}
                 >
-                  <X className="h-3.5 w-3.5" />
+                  <X className="size-3.5" />
                   Eliminar logo
                 </Button>
               )}
@@ -321,9 +321,9 @@ export default function OrganizationSettingsPage() {
           disabled={busy}
         >
           {busy ? (
-            <><Loader2 className="h-4 w-4 animate-spin" />Guardando...</>
+            <><Loader2 className="size-4 animate-spin" />Guardando…</>
           ) : (
-            <><Save className="h-4 w-4" />Guardar cambios</>
+            <><Save className="size-4" />Guardar cambios</>
           )}
         </Button>
       </div>

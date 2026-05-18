@@ -1,4 +1,4 @@
-// components/credit-cards/create-credit-card-dialog.tsx
+﻿// components/credit-cards/create-credit-card-dialog.tsx
 "use client";
 
 import { useForm } from "react-hook-form";
@@ -87,7 +87,7 @@ export function CreateCreditCardDialog({ open, onOpenChange, onSuccess }: Props)
 
         <DialogHeader className="shrink-0 px-5 pt-2 pb-3 sm:pt-5 border-b">
           <DialogTitle className="flex items-center gap-2 text-lg font-bold">
-            <CreditCard className="h-4 w-4 text-primary" />
+            <CreditCard className="size-4 text-primary" />
             Nueva tarjeta de crédito
           </DialogTitle>
         </DialogHeader>
@@ -221,8 +221,8 @@ export function CreateCreditCardDialog({ open, onOpenChange, onSuccess }: Props)
           </Button>
           <Button type="submit" form="create-cc-form" disabled={isCreating} className="flex-1 h-11 gap-2">
             {isCreating
-              ? <><Loader2 className="h-4 w-4 animate-spin" />Creando...</>
-              : <><PlusCircle className="h-4 w-4" />Crear tarjeta</>
+              ? <><Loader2 className="size-4 animate-spin" />Creando…</>
+              : <><PlusCircle className="size-4" />Crear tarjeta</>
             }
           </Button>
         </div>

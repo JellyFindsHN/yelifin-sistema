@@ -1,4 +1,4 @@
-// components/supplies/delete-supply-dialog.tsx
+﻿// components/supplies/delete-supply-dialog.tsx
 "use client";
 
 import {
@@ -56,8 +56,8 @@ export function DeleteSupplyDialog({
           <Button variant="destructive" onClick={handleDelete} disabled={isDeleting}>
             {isDeleting ? (
               <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Eliminando...
+                <Loader2 className="mr-2 size-4 animate-spin" />
+                Eliminando…
               </>
             ) : (
               "Eliminar"

@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { Eye, EyeOff } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
@@ -22,8 +22,8 @@ export function PrivacyToggle({ isCollapsed = false }: PrivacyToggleProps) {
             className="flex w-full items-center justify-center rounded-lg p-2 hover:bg-sidebar-accent transition-colors text-sidebar-foreground"
           >
             {isPrivate
-              ? <EyeOff className="h-4 w-4 text-primary" />
-              : <Eye className="h-4 w-4" />
+              ? <EyeOff className="size-4 text-primary" />
+              : <Eye className="size-4" />
             }
           </button>
         </TooltipTrigger>
@@ -44,8 +44,8 @@ export function PrivacyToggle({ isCollapsed = false }: PrivacyToggleProps) {
       }`}
     >
       {isPrivate
-        ? <EyeOff className="h-4 w-4 shrink-0" />
-        : <Eye    className="h-4 w-4 shrink-0" />
+        ? <EyeOff className="size-4 shrink-0" />
+        : <Eye    className="size-4 shrink-0" />
       }
       <span className="text-sm">{label}</span>
     </button>

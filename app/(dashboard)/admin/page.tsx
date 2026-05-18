@@ -1,4 +1,4 @@
-// app/(dashboard)/admin/page.tsx
+﻿// app/(dashboard)/admin/page.tsx
 "use client";
 
 import { useRouter } from "next/navigation";
@@ -41,7 +41,7 @@ function fmtBytes(bytes: number): string {
 }
 
 export default function AdminPage() {
-  const router = useRouter();
+  const { replace, push } = useRouter();
   const { user, loading } = useAuth();
   const { counts, planStats, recentUsers, isLoading } = useAdminStats();
   const { storage, isLoading: loadingStorage } = useAdminStorage();
@@ -49,7 +49,7 @@ export default function AdminPage() {
   const isAdmin = user?.subscription?.plan?.slug === "admin";
 
   if (!loading && !isAdmin) {
-    router.replace("/dashboard");
+    replace("/dashboard");
     return null;
   }
 
@@ -66,11 +66,11 @@ export default function AdminPage() {
     <div className="space-y-6 pb-10">
       {/* Header */}
       <div className="flex items-center gap-3">
-        <div className="h-9 w-9 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
-          <Shield className="h-5 w-5 text-primary" />
+        <div className="size-9 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
+          <Shield className="size-5 text-primary" />
         </div>
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">Panel de administración</h1>
+          <h1 className="text-2xl font-semibold tracking-tight">Panel de administración</h1>
           <p className="text-sm text-muted-foreground">Gestión de usuarios y suscripciones</p>
         </div>
       </div>
@@ -82,10 +82,10 @@ export default function AdminPage() {
         </div>
       ) : counts ? (
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-          <StatCard icon={<Users      className="h-5 w-5 text-primary" />} label="Usuarios totales"       value={counts.total_users}   bg="bg-primary/5" />
-          <StatCard icon={<UserCheck className="h-5 w-5 text-primary" />} label="Con suscripción activa" value={counts.active_count}  bg="bg-primary/5" />
-          <StatCard icon={<TrendingUp className="h-5 w-5 text-primary" />} label="En período de prueba"  value={counts.trial_count}   bg="bg-primary/5" />
-          <StatCard icon={<TrendingUp className="h-5 w-5 text-primary" />} label="Nuevos este mes"       value={counts.new_this_month} bg="bg-primary/5" />
+          <StatCard icon={<Users      className="size-5 text-primary" />} label="Usuarios totales"       value={counts.total_users}   bg="bg-primary/5" />
+          <StatCard icon={<UserCheck className="size-5 text-primary" />} label="Con suscripción activa" value={counts.active_count}  bg="bg-primary/5" />
+          <StatCard icon={<TrendingUp className="size-5 text-primary" />} label="En período de prueba"  value={counts.trial_count}   bg="bg-primary/5" />
+          <StatCard icon={<TrendingUp className="size-5 text-primary" />} label="Nuevos este mes"       value={counts.new_this_month} bg="bg-primary/5" />
         </div>
       ) : null}
 
@@ -94,7 +94,7 @@ export default function AdminPage() {
         <Card>
           <CardHeader className="pb-3">
             <CardTitle className="text-base flex items-center gap-2">
-              <Crown className="h-4 w-4 text-muted-foreground" />
+              <Crown className="size-4 text-muted-foreground" />
               Usuarios por plan
             </CardTitle>
           </CardHeader>
@@ -119,7 +119,7 @@ export default function AdminPage() {
           <Card>
             <CardHeader className="pb-3">
               <CardTitle className="text-base flex items-center gap-2">
-                <UserX className="h-4 w-4 text-muted-foreground" />
+                <UserX className="size-4 text-muted-foreground" />
                 Estado de suscripciones
               </CardTitle>
             </CardHeader>
@@ -141,7 +141,7 @@ export default function AdminPage() {
 
       {/* ── DB Storage section ─────────────────────────────────────── */}
       <div className="flex items-center gap-2 pt-2">
-        <Database className="h-4 w-4 text-muted-foreground" />
+        <Database className="size-4 text-muted-foreground" />
         <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Base de datos</h2>
       </div>
 
@@ -155,7 +155,7 @@ export default function AdminPage() {
           <Card>
             <CardContent>
               <div className="flex items-center gap-2 mb-1.5">
-                <HardDrive className="h-4 w-4 text-primary" />
+                <HardDrive className="size-4 text-primary" />
               </div>
               <p className="text-xl font-bold text-foreground">
                 {fmtBytes(storage.db_size_bytes)}
@@ -166,7 +166,7 @@ export default function AdminPage() {
           <Card>
             <CardContent>
               <div className="flex items-center gap-2 mb-1.5">
-                <Image className="h-4 w-4 text-primary" />
+                <Image className="size-4 text-primary" />
               </div>
               <p className="text-xl font-bold text-foreground">
                 {storage.image_counts.user_photos + storage.image_counts.logos + storage.image_counts.product_images}
@@ -177,7 +177,7 @@ export default function AdminPage() {
           <Card >
             <CardContent>
               <div className="flex items-center gap-2 mb-1.5">
-                <BarChart2 className="h-4 w-4 text-primary" />
+                <BarChart2 className="size-4 text-primary" />
               </div>
               <p className="text-xl font-bold text-foreground">
                 {storage.table_sizes.length}
@@ -193,7 +193,7 @@ export default function AdminPage() {
         <Card>
           <CardHeader className="pb-3">
             <CardTitle className="text-base flex items-center gap-2">
-              <Database className="h-4 w-4 text-muted-foreground" />
+              <Database className="size-4 text-muted-foreground" />
               Tamaño por tabla
             </CardTitle>
           </CardHeader>
@@ -245,7 +245,7 @@ export default function AdminPage() {
         <Card>
           <CardHeader className="pb-3">
             <CardTitle className="text-base flex items-center gap-2">
-              <Users className="h-4 w-4 text-muted-foreground" />
+              <Users className="size-4 text-muted-foreground" />
               Usuarios con más registros
             </CardTitle>
           </CardHeader>
@@ -261,7 +261,7 @@ export default function AdminPage() {
                   <div
                     key={u.id}
                     className="cursor-pointer"
-                    onClick={() => router.push(`/admin/users/${u.id}`)}
+                    onClick={() => push(`/admin/users/${u.id}`)}
                   >
                     <div className="flex items-center justify-between mb-1">
                       <span className="text-xs font-medium truncate max-w-45">{u.display_name}</span>
@@ -287,7 +287,7 @@ export default function AdminPage() {
           <Card className="md:col-span-2">
             <CardHeader className="pb-3">
               <CardTitle className="text-base flex items-center gap-2">
-                <Image className="h-4 w-4 text-muted-foreground" />
+                <Image className="size-4 text-muted-foreground" />
                 Imágenes almacenadas
               </CardTitle>
             </CardHeader>
@@ -315,8 +315,8 @@ export default function AdminPage() {
       <Card>
         <CardHeader className="pb-3 flex flex-row items-center justify-between">
           <CardTitle className="text-base">Usuarios recientes</CardTitle>
-          <Button variant="ghost" size="sm" className="gap-1 text-xs" onClick={() => router.push("/admin/users")}>
-            Ver todos <ChevronRight className="h-3.5 w-3.5" />
+          <Button variant="ghost" size="sm" className="gap-1 text-xs" onClick={() => push("/admin/users")}>
+            Ver todos <ChevronRight className="size-3.5" />
           </Button>
         </CardHeader>
         <CardContent>
@@ -328,7 +328,7 @@ export default function AdminPage() {
                 <div
                   key={u.id}
                   className="flex items-center justify-between py-3 gap-3 cursor-pointer hover:bg-muted/30 px-2 -mx-2 rounded-lg transition-colors"
-                  onClick={() => router.push(`/admin/users/${u.id}`)}
+                  onClick={() => push(`/admin/users/${u.id}`)}
                 >
                   <div className="min-w-0">
                     <p className="text-sm font-medium truncate">
@@ -345,7 +345,7 @@ export default function AdminPage() {
                     <span className="text-xs text-muted-foreground" suppressHydrationWarning>
                       {new Date(u.created_at).toLocaleDateString("es-HN", { day: "numeric", month: "short" })}
                     </span>
-                    <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />
+                    <ChevronRight className="size-3.5 text-muted-foreground" />
                   </div>
                 </div>
               ))}

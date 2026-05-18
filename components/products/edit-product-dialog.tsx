@@ -1,4 +1,4 @@
-// components/products/edit-product-dialog.tsx
+﻿// components/products/edit-product-dialog.tsx
 "use client";
 
 import { useState, useRef, useEffect } from "react";
@@ -218,7 +218,7 @@ export function EditProductDialog({
         {/* Header */}
         <DialogHeader className="shrink-0 px-5 pt-2 pb-3 sm:pt-5 border-b">
           <DialogTitle className="flex items-center gap-2 text-lg font-bold">
-            <Pencil className="h-4 w-4 text-primary" />
+            <Pencil className="size-4 text-primary" />
             Editar {is_service ? "servicio" : "producto"}
           </DialogTitle>
         </DialogHeader>
@@ -232,7 +232,7 @@ export function EditProductDialog({
 
             {/* Imagen */}
             <div className="space-y-2">
-              <FieldLabel icon={<ImageIcon className="h-3.5 w-3.5" />} label="Imagen" optional />
+              <FieldLabel icon={<ImageIcon className="size-3.5" />} label="Imagen" optional />
               <div
                 className={cn(
                   "relative w-full aspect-video rounded-xl border-2 border-dashed transition-colors overflow-hidden cursor-pointer",
@@ -250,7 +250,7 @@ export function EditProductDialog({
                       onClick={(e) => { e.stopPropagation(); handleRemoveImage(); }}
                       className="absolute top-2 right-2 bg-background/80 backdrop-blur-sm rounded-full p-1.5 shadow hover:bg-background transition-colors"
                     >
-                      <X className="h-3.5 w-3.5" />
+                      <X className="size-3.5" />
                     </button>
                     <span className="absolute bottom-2 right-2 text-xs bg-black/60 text-white px-2 py-0.5 rounded-full">
                       WebP
@@ -258,8 +258,8 @@ export function EditProductDialog({
                   </>
                 ) : (
                   <div className="flex flex-col items-center justify-center h-full gap-2 text-muted-foreground p-4">
-                    <div className="h-10 w-10 rounded-xl bg-muted flex items-center justify-center">
-                      <Upload className="h-5 w-5" />
+                    <div className="size-10 rounded-xl bg-muted flex items-center justify-center">
+                      <Upload className="size-5" />
                     </div>
                     <p className="text-sm font-medium">Toca para subir imagen</p>
                     <p className="text-xs text-center opacity-70">
@@ -280,7 +280,7 @@ export function EditProductDialog({
 
             {/* Nombre */}
             <div className="space-y-2">
-              <FieldLabel icon={<FileText className="h-3.5 w-3.5" />} label="Nombre" required />
+              <FieldLabel icon={<FileText className="size-3.5" />} label="Nombre" required />
               <Input
                 {...register("name")}
                 disabled={isLoading}
@@ -294,7 +294,7 @@ export function EditProductDialog({
             {/* SKU */}
             <div className="space-y-2">
               <FieldLabel
-                icon={<Hash className="h-3.5 w-3.5" />}
+                icon={<Hash className="size-3.5" />}
                 label="SKU"
                 required={!is_service}
                 optional={is_service}
@@ -313,7 +313,7 @@ export function EditProductDialog({
             {/* Precio */}
             <div className="space-y-2">
               <FieldLabel
-                icon={<DollarSign className="h-3.5 w-3.5" />}
+                icon={<DollarSign className="size-3.5" />}
                 label="Precio de venta"
                 required
               />
@@ -338,7 +338,7 @@ export function EditProductDialog({
 
             {/* Descripción */}
             <div className="space-y-2">
-              <FieldLabel icon={<FileText className="h-3.5 w-3.5" />} label="Descripción" optional />
+              <FieldLabel icon={<FileText className="size-3.5" />} label="Descripción" optional />
               <Textarea
                 placeholder={
                   is_service
@@ -374,12 +374,12 @@ export function EditProductDialog({
           >
             {isLoading ? (
               <>
-                <Loader2 className="h-4 w-4 animate-spin" />
+                <Loader2 className="size-4 animate-spin" />
                 {isUploadingImage ? "Subiendo imagen..." : "Guardando..."}
               </>
             ) : (
               <>
-                <Pencil className="h-4 w-4" />
+                <Pencil className="size-4" />
                 Guardar cambios
               </>
             )}

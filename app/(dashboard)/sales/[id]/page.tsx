@@ -1,4 +1,4 @@
-// app/(dashboard)/sales/[id]/page.tsx
+﻿// app/(dashboard)/sales/[id]/page.tsx
 "use client";
 
 import { use, useState } from "react";
@@ -44,7 +44,7 @@ export default function SaleDetailPage({ params }: Props) {
   const numericId           = Number(id);
   const { sale, isLoading } = useSale(numericId);
   const { confirmSale, cancelSale, isPatching } = usePatchSale(numericId);
-  const router              = useRouter();
+  const { refresh, push }   = useRouter();
   const { format }          = useCurrency();
   const tz                  = useTimezone();
 
@@ -56,7 +56,7 @@ export default function SaleDetailPage({ params }: Props) {
   if (!sale)
     return (
       <div className="flex flex-col items-center justify-center py-24 gap-4">
-        <Receipt className="h-12 w-12 text-muted-foreground/40" />
+        <Receipt className="size-12 text-muted-foreground/40" />
         <p className="text-muted-foreground">Venta no encontrada</p>
         <Button variant="outline" asChild>
           <Link href="/sales">Volver a ventas</Link>
@@ -92,7 +92,7 @@ export default function SaleDetailPage({ params }: Props) {
       await confirmSale();
       toast.success("Venta confirmada");
       setConfirmOpen(false);
-      router.refresh();
+      refresh();
     } catch (err: any) {
       toast.error(err.message || "Error al confirmar la venta");
     }
@@ -103,7 +103,7 @@ export default function SaleDetailPage({ params }: Props) {
       await cancelSale();
       toast.success("Venta cancelada · stock devuelto");
       setCancelOpen(false);
-      router.push("/sales");
+      push("/sales");
     } catch (err: any) {
       toast.error(err.message || "Error al cancelar la venta");
     }
@@ -117,23 +117,23 @@ export default function SaleDetailPage({ params }: Props) {
         <div className="flex items-center gap-3">
           <Button variant="ghost" size="icon" asChild className="shrink-0">
             <Link href="/sales">
-              <ArrowLeft className="h-4 w-4" />
+              <ArrowLeft className="size-4" />
             </Link>
           </Button>
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 flex-wrap">
-              <h1 className="text-2xl font-bold tracking-tight font-mono">
+              <h1 className="text-2xl font-semibold tracking-tight font-mono">
                 {sale.sale_number}
               </h1>
               {isCompleted && (
                 <Badge className="bg-green-100 text-green-700 border-green-200 gap-1" variant="outline">
-                  <CheckCircle className="h-3 w-3" />
+                  <CheckCircle className="size-3" />
                   Completada
                 </Badge>
               )}
               {isPending && (
                 <Badge className="bg-amber-100 text-amber-700 border-amber-200 gap-1" variant="outline">
-                  <Clock className="h-3 w-3" />
+                  <Clock className="size-3" />
                   Pendiente de pago
                 </Badge>
               )}
@@ -156,13 +156,13 @@ export default function SaleDetailPage({ params }: Props) {
           <div className="hidden sm:flex gap-2 shrink-0">
             <Button variant="outline" size="sm" className="gap-1.5 text-xs" asChild>
               <Link href={`/sales/${sale.id}/invoice`}>
-                <FileText className="h-3.5 w-3.5" />
+                <FileText className="size-3.5" />
                 Factura PDF
               </Link>
             </Button>
             <Button variant="outline" size="sm" className="gap-1.5 text-xs" asChild>
               <Link href={`/sales/${sale.id}/receipt`}>
-                <Printer className="h-3.5 w-3.5" />
+                <Printer className="size-3.5" />
                 Ticket
               </Link>
             </Button>
@@ -173,13 +173,13 @@ export default function SaleDetailPage({ params }: Props) {
         <div className="flex sm:hidden gap-2 pl-11">
           <Button variant="outline" size="sm" className="gap-1.5 text-xs flex-1" asChild>
             <Link href={`/sales/${sale.id}/invoice`}>
-              <FileText className="h-3.5 w-3.5" />
+              <FileText className="size-3.5" />
               Factura PDF
             </Link>
           </Button>
           <Button variant="outline" size="sm" className="gap-1.5 text-xs flex-1" asChild>
             <Link href={`/sales/${sale.id}/receipt`}>
-              <Printer className="h-3.5 w-3.5" />
+              <Printer className="size-3.5" />
               Ticket
             </Link>
           </Button>
@@ -202,7 +202,7 @@ export default function SaleDetailPage({ params }: Props) {
                 variant="outline"
                 size="sm"
                 className="w-full sm:w-auto"
-                onClick={() => router.push(`/sales/${sale.id}/edit`)}
+                onClick={() => push(`/sales/${sale.id}/edit`)}
               >
                 Editar venta
               </Button>
@@ -233,8 +233,8 @@ export default function SaleDetailPage({ params }: Props) {
       <div className="grid grid-cols-2 gap-3">
         <Card>
           <CardContent className="pl-3 flex items-center gap-2.5">
-            <div className="h-8 w-8 rounded-full bg-muted flex items-center justify-center shrink-0">
-              <User className="h-3.5 w-3.5 text-muted-foreground" />
+            <div className="size-8 rounded-full bg-muted flex items-center justify-center shrink-0">
+              <User className="size-3.5 text-muted-foreground" />
             </div>
             <div className="min-w-0">
               <p className="text-xs text-muted-foreground">Cliente</p>
@@ -247,8 +247,8 @@ export default function SaleDetailPage({ params }: Props) {
 
         <Card>
           <CardContent className="pl-3 flex items-center gap-2.5">
-            <div className="h-8 w-8 rounded-full bg-muted flex items-center justify-center shrink-0">
-              <Building2 className="h-3.5 w-3.5 text-muted-foreground" />
+            <div className="size-8 rounded-full bg-muted flex items-center justify-center shrink-0">
+              <Building2 className="size-3.5 text-muted-foreground" />
             </div>
             <div className="min-w-0">
               <p className="text-xs text-muted-foreground">Cuenta</p>
@@ -305,7 +305,7 @@ export default function SaleDetailPage({ params }: Props) {
       <Card>
         <CardHeader>
           <CardTitle className="text-base flex items-center gap-2">
-            <Package className="h-4 w-4" />
+            <Package className="size-4" />
             Productos vendidos
           </CardTitle>
         </CardHeader>
@@ -319,7 +319,7 @@ export default function SaleDetailPage({ params }: Props) {
 
             return (
               <div key={item.id} className="flex gap-3 p-3 rounded-lg border">
-                <div className="relative h-12 w-12 rounded-lg overflow-hidden bg-muted shrink-0 flex items-center justify-center">
+                <div className="relative size-12 rounded-lg overflow-hidden bg-muted shrink-0 flex items-center justify-center">
                   {item.image_url ? (
                     <Image
                       src={item.image_url}
@@ -328,14 +328,14 @@ export default function SaleDetailPage({ params }: Props) {
                       className="object-cover"
                     />
                   ) : (
-                    <Package className="h-5 w-5 text-muted-foreground/40" />
+                    <Package className="size-5 text-muted-foreground/40" />
                   )}
                 </div>
                 <div className="flex-1 min-w-0">
                   <p className="font-medium truncate">{item.product_name}</p>
                   {item.variant_name && (
                     <div className="flex items-center gap-1 mt-0.5">
-                      <Layers className="h-3 w-3 text-primary shrink-0" />
+                      <Layers className="size-3 text-primary shrink-0" />
                       <p className="text-xs text-primary font-medium truncate">{item.variant_name}</p>
                     </div>
                   )}
@@ -368,7 +368,7 @@ export default function SaleDetailPage({ params }: Props) {
         <Card className="border-orange-200 dark:border-orange-800/40">
           <CardHeader>
             <CardTitle className="text-base flex items-center gap-2 text-orange-700 dark:text-orange-400">
-              <FlaskConical className="h-4 w-4" />
+              <FlaskConical className="size-4" />
               Suministros usados
             </CardTitle>
           </CardHeader>
@@ -405,7 +405,7 @@ export default function SaleDetailPage({ params }: Props) {
       <Card>
         <CardHeader>
           <CardTitle className="text-base flex items-center gap-2">
-            <Tag className="h-4 w-4" />
+            <Tag className="size-4" />
             Desglose
           </CardTitle>
         </CardHeader>
@@ -425,7 +425,7 @@ export default function SaleDetailPage({ params }: Props) {
           {shippingAmount > 0 && (
             <div className="flex justify-between text-muted-foreground">
               <span className="flex items-center gap-1.5">
-                <Truck className="h-3.5 w-3.5" />
+                <Truck className="size-3.5" />
                 Envío
               </span>
               <span>+{format(shippingAmount)}</span>
@@ -457,7 +457,7 @@ export default function SaleDetailPage({ params }: Props) {
           {suppliesCost > 0 && (
             <div className="flex justify-between text-orange-600">
               <span className="flex items-center gap-1.5">
-                <FlaskConical className="h-3.5 w-3.5" />
+                <FlaskConical className="size-3.5" />
                 Costo suministros
               </span>
               <span>-{format(suppliesCost)}</span>
@@ -470,7 +470,7 @@ export default function SaleDetailPage({ params }: Props) {
             isPending ? "text-amber-700" : "text-green-600"
           }`}>
             <span className="flex items-center gap-1.5">
-              <TrendingUp className="h-4 w-4" />
+              <TrendingUp className="size-4" />
               {profitLabel}
             </span>
             <span>{format(totalProfit)}</span>
@@ -483,7 +483,7 @@ export default function SaleDetailPage({ params }: Props) {
         <Card>
           <CardHeader>
           <CardTitle className="text-base flex items-center gap-2">
-            <NotebookPen className="h-4 w-4" />
+            <NotebookPen className="size-4" />
             Notas
           </CardTitle>
         </CardHeader>
@@ -525,7 +525,7 @@ function SaleDetailSkeleton() {
   return (
     <div className="space-y-6 max-w-3xl mx-auto">
       <div className="flex items-center gap-3">
-        <Skeleton className="h-9 w-9 rounded-lg" />
+        <Skeleton className="size-9 rounded-lg" />
         <div className="space-y-2">
           <Skeleton className="h-7 w-32" />
           <Skeleton className="h-4 w-48" />

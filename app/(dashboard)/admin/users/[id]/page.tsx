@@ -1,4 +1,4 @@
-// app/(dashboard)/admin/users/[id]/page.tsx
+﻿// app/(dashboard)/admin/users/[id]/page.tsx
 "use client";
 
 import { useState, useEffect, use } from "react";
@@ -43,7 +43,7 @@ const STATUS_COLOR: Record<string, string> = {
 
 export default function AdminUserDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
-  const router  = useRouter();
+  const { back } = useRouter();
   const userId  = Number(id);
 
   const { user, activity, storage, isLoading, mutate } = useAdminUser(userId);
@@ -91,11 +91,11 @@ export default function AdminUserDetailPage({ params }: { params: Promise<{ id: 
     }
   };
 
-  if (isLoading) return <LoadingSkeleton onBack={() => router.back()} />;
+  if (isLoading) return <LoadingSkeleton onBack={() => back()} />;
   if (!user) return (
     <div className="text-center py-20 text-muted-foreground space-y-2">
       <p>Usuario no encontrado.</p>
-      <Button variant="outline" onClick={() => router.back()}>Volver</Button>
+      <Button variant="outline" onClick={() => back()}>Volver</Button>
     </div>
   );
 
@@ -105,17 +105,17 @@ export default function AdminUserDetailPage({ params }: { params: Promise<{ id: 
     <div className="space-y-5 pb-10 max-w-3xl mx-auto">
       {/* Header */}
       <div className="flex items-center gap-3">
-        <Button variant="ghost" size="icon" onClick={() => router.back()}>
-          <ArrowLeft className="h-4 w-4" />
+        <Button variant="ghost" size="icon" onClick={() => back()}>
+          <ArrowLeft className="size-4" />
         </Button>
         <div className="flex-1 min-w-0">
-          <h1 className="text-xl font-bold truncate">{displayName}</h1>
+          <h1 className="text-xl font-semibold truncate">{displayName}</h1>
           <p className="text-xs text-muted-foreground">{user.email}</p>
         </div>
         <div className="flex items-center gap-2 shrink-0">
           {user.is_active
-            ? <Badge className="bg-green-100 text-green-700 border-green-200 border gap-1"><CheckCircle2 className="h-3 w-3"/>Activo</Badge>
-            : <Badge className="bg-red-100 text-red-700 border-red-200 border gap-1"><XCircle className="h-3 w-3"/>Inactivo</Badge>
+            ? <Badge className="bg-green-100 text-green-700 border-green-200 border gap-1"><CheckCircle2 className="size-3"/>Activo</Badge>
+            : <Badge className="bg-red-100 text-red-700 border-red-200 border gap-1"><XCircle className="size-3"/>Inactivo</Badge>
           }
         </div>
       </div>
@@ -126,28 +126,28 @@ export default function AdminUserDetailPage({ params }: { params: Promise<{ id: 
         <Card className="pt-1 pb-1">
           <CardHeader className="px-3.5 pt-3 pb-2">
             <CardTitle className="text-xs font-medium text-muted-foreground flex items-center gap-1.5">
-              <Building2 className="h-3.5 w-3.5" /> Información
+              <Building2 className="size-3.5" /> Información
             </CardTitle>
           </CardHeader>
           <CardContent className="px-3.5 pb-3 space-y-2.5 text-sm">
-            <InfoRow icon={<Mail className="h-3.5 w-3.5"/>} label="Email" value={user.email} />
-            {user.business_name && <InfoRow icon={<Building2 className="h-3.5 w-3.5"/>} label="Negocio" value={user.business_name} />}
-            {user.display_name  && <InfoRow icon={<Building2 className="h-3.5 w-3.5"/>} label="Nombre" value={user.display_name} />}
-            <InfoRow icon={<Calendar className="h-3.5 w-3.5"/>} label="Registrado"
+            <InfoRow icon={<Mail className="size-3.5"/>} label="Email" value={user.email} />
+            {user.business_name && <InfoRow icon={<Building2 className="size-3.5"/>} label="Negocio" value={user.business_name} />}
+            {user.display_name  && <InfoRow icon={<Building2 className="size-3.5"/>} label="Nombre" value={user.display_name} />}
+            <InfoRow icon={<Calendar className="size-3.5"/>} label="Registrado"
               value={new Date(user.created_at).toLocaleDateString("es-HN", { day: "numeric", month: "long", year: "numeric" })}
             />
-            <InfoRow icon={<Clock className="h-3.5 w-3.5"/>} label="Último acceso"
+            <InfoRow icon={<Clock className="size-3.5"/>} label="Último acceso"
               value={user.last_sign_in_time
                 ? new Date(user.last_sign_in_time).toLocaleString("es-HN", { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })
                 : "—"}
             />
-            <InfoRow icon={<RefreshCw className="h-3.5 w-3.5"/>} label="Token renovado"
+            <InfoRow icon={<RefreshCw className="size-3.5"/>} label="Token renovado"
               value={user.last_refresh_time
                 ? new Date(user.last_refresh_time).toLocaleString("es-HN", { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })
                 : "—"}
             />
-            <InfoRow icon={<Building2 className="h-3.5 w-3.5"/>} label="Moneda" value={user.currency ?? "—"} />
-            <InfoRow icon={<Building2 className="h-3.5 w-3.5"/>} label="Zona horaria" value={user.timezone} />
+            <InfoRow icon={<Building2 className="size-3.5"/>} label="Moneda" value={user.currency ?? "—"} />
+            <InfoRow icon={<Building2 className="size-3.5"/>} label="Zona horaria" value={user.timezone} />
           </CardContent>
         </Card>
 
@@ -157,13 +157,13 @@ export default function AdminUserDetailPage({ params }: { params: Promise<{ id: 
             <Card className="pt-1 pb-1">
               <CardHeader className="px-3.5 pt-3 pb-2">
                 <CardTitle className="text-xs font-medium text-muted-foreground flex items-center gap-1.5">
-                  <ReceiptText className="h-3.5 w-3.5" /> Actividad
+                  <ReceiptText className="size-3.5" /> Actividad
                 </CardTitle>
               </CardHeader>
               <CardContent className="px-3.5 pb-3 space-y-2">
-                <ActivityStat icon={<ShoppingCart className="h-3.5 w-3.5 text-primary"/>} label="Ventas"        value={activity.total_sales} />
-                <ActivityStat icon={<Package      className="h-3.5 w-3.5 text-primary"/>} label="Productos"     value={activity.total_products} />
-                <ActivityStat icon={<ReceiptText  className="h-3.5 w-3.5 text-primary"/>} label="Transacciones" value={activity.total_transactions} />
+                <ActivityStat icon={<ShoppingCart className="size-3.5 text-primary"/>} label="Ventas"        value={activity.total_sales} />
+                <ActivityStat icon={<Package      className="size-3.5 text-primary"/>} label="Productos"     value={activity.total_products} />
+                <ActivityStat icon={<ReceiptText  className="size-3.5 text-primary"/>} label="Transacciones" value={activity.total_transactions} />
               </CardContent>
             </Card>
           )}
@@ -172,7 +172,7 @@ export default function AdminUserDetailPage({ params }: { params: Promise<{ id: 
           <Card className="pt-1 pb-1">
             <CardHeader className="px-3.5 pt-3 pb-2">
               <CardTitle className="text-xs font-medium text-muted-foreground flex items-center gap-1.5">
-                <Crown className="h-3.5 w-3.5" /> Suscripción
+                <Crown className="size-3.5" /> Suscripción
               </CardTitle>
             </CardHeader>
             <CardContent className="px-3.5 pb-3 text-sm space-y-2.5">
@@ -263,7 +263,7 @@ export default function AdminUserDetailPage({ params }: { params: Promise<{ id: 
           </div>
 
           <Button onClick={handleSaveSub} disabled={isSaving} size="sm" className="gap-2">
-            {isSaving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />}
+            {isSaving ? <Loader2 className="size-3.5 animate-spin" /> : <Save className="size-3.5" />}
             Guardar cambios
           </Button>
         </CardContent>
@@ -273,7 +273,7 @@ export default function AdminUserDetailPage({ params }: { params: Promise<{ id: 
       <Card className="border-destructive/30 pt-1 pb-1">
         <CardHeader className="px-3.5 pt-3 pb-2">
           <CardTitle className="text-xs font-medium text-destructive flex items-center gap-1.5">
-            <AlertTriangle className="h-3.5 w-3.5" /> Zona de peligro
+            <AlertTriangle className="size-3.5" /> Zona de peligro
           </CardTitle>
         </CardHeader>
         <CardContent className="px-3.5 pb-3">
@@ -368,7 +368,7 @@ function StorageCard({ storage }: { storage: AdminUserStorage }) {
       <CardHeader className="px-3.5 pt-3 pb-2">
         <CardTitle className="text-xs font-medium text-muted-foreground flex items-center justify-between">
           <span className="flex items-center gap-1.5">
-            <Database className="h-3.5 w-3.5" /> Almacenamiento en BD
+            <Database className="size-3.5" /> Almacenamiento en BD
           </span>
           <Badge variant="secondary" className="text-[10px]">
             {total.toLocaleString("es-HN")} filas totales
@@ -404,7 +404,7 @@ function StorageCard({ storage }: { storage: AdminUserStorage }) {
             <Separator className="my-1" />
             <div className="flex items-center justify-between">
               <span className="text-xs text-muted-foreground flex items-center gap-1.5">
-                <Image className="h-3 w-3" /> Imágenes subidas
+                <Image className="size-3" /> Imágenes subidas
               </span>
               <Badge variant="outline" className="text-[10px]">
                 {storage.image_count}
@@ -421,7 +421,7 @@ function LoadingSkeleton({ onBack }: { onBack: () => void }) {
   return (
     <div className="space-y-4 max-w-3xl mx-auto">
       <div className="flex items-center gap-3">
-        <Button variant="ghost" size="icon" onClick={onBack}><ArrowLeft className="h-4 w-4" /></Button>
+        <Button variant="ghost" size="icon" onClick={onBack}><ArrowLeft className="size-4" /></Button>
         <Skeleton className="h-7 w-48" />
       </div>
       <div className="grid gap-4 sm:grid-cols-2">

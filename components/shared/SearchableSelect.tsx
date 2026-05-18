@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useState, useRef, useEffect } from "react";
 import { Search, X, ChevronDown, Check } from "lucide-react";
@@ -45,7 +45,8 @@ export function SearchableSelect({
 
   useEffect(() => {
     if (open) {
-      setTimeout(() => inputRef.current?.focus(), 0);
+      const id = setTimeout(() => inputRef.current?.focus(), 0);
+      return () => clearTimeout(id);
     } else {
       setSearch("");
     }
@@ -70,7 +71,7 @@ export function SearchableSelect({
           <span className="truncate text-left">{selectedLabel}</span>
           <ChevronDown
             className={cn(
-              "ml-2 h-4 w-4 shrink-0 text-muted-foreground transition-transform duration-200",
+              "ml-2 size-4 shrink-0 text-muted-foreground transition-transform duration-200",
               open && "rotate-180",
             )}
           />
@@ -86,7 +87,7 @@ export function SearchableSelect({
         {/* Buscador — mismo estilo que SearchBar */}
         <div className="p-2 border-b">
           <div className="relative">
-            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground pointer-events-none" />
+            <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground pointer-events-none" />
             <Input
               ref={inputRef}
               placeholder={searchPlaceholder}
@@ -100,7 +101,7 @@ export function SearchableSelect({
                 onClick={() => { setSearch(""); inputRef.current?.focus(); }}
                 className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
               >
-                <X className="h-4 w-4" />
+                <X className="size-4" />
               </button>
             )}
           </div>
@@ -117,7 +118,7 @@ export function SearchableSelect({
                 value === defaultOption.value && "bg-accent/50",
               )}
             >
-              <Check className={cn("h-4 w-4 shrink-0", value !== defaultOption.value && "invisible")} />
+              <Check className={cn("size-4 shrink-0", value !== defaultOption.value && "invisible")} />
               {defaultOption.label}
             </button>
           )}
@@ -137,7 +138,7 @@ export function SearchableSelect({
                   value === item.value && "bg-accent/50",
                 )}
               >
-                <Check className={cn("h-4 w-4 shrink-0", value !== item.value && "invisible")} />
+                <Check className={cn("size-4 shrink-0", value !== item.value && "invisible")} />
                 {item.label}
               </button>
             ))

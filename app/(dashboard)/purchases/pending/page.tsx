@@ -1,4 +1,4 @@
-// app/(dashboard)/purchases/pending/page.tsx
+﻿// app/(dashboard)/purchases/pending/page.tsx
 "use client";
 
 import { useState } from "react";
@@ -19,7 +19,7 @@ import { useCurrency }            from "@/hooks/swr/use-currency";
 import { ConfirmPurchaseArrivalDialog } from "@/components/products/confirm-purchase-arrival-dialog";
 
 export default function PendingPurchasesPage() {
-  const router = useRouter();
+  const { back, push } = useRouter();
   const { purchases, isLoading, mutate: mutatePurchases } = usePurchases();
   const { mutate: mutateInventory } = useInventory();
   const { accounts, mutate: mutateAccounts } = useAccounts();
@@ -40,11 +40,11 @@ export default function PendingPurchasesPage() {
 
       {/* Header */}
       <div className="flex items-center gap-3">
-        <Button variant="ghost" size="icon" onClick={() => router.back()}>
-          <ArrowLeft className="h-4 w-4" />
+        <Button variant="ghost" size="icon" onClick={() => back()}>
+          <ArrowLeft className="size-4" />
         </Button>
         <div className="flex-1 min-w-0">
-          <h1 className="text-2xl font-bold tracking-tight">Compras pendientes</h1>
+          <h1 className="text-2xl font-semibold tracking-tight">Compras pendientes</h1>
           <p className="text-muted-foreground text-sm">
             {isLoading
               ? "Cargando..."
@@ -73,11 +73,11 @@ export default function PendingPurchasesPage() {
       {/* Empty state */}
       {!isLoading && pending.length === 0 && (
         <div className="flex flex-col items-center justify-center py-20 text-muted-foreground gap-3">
-          <div className="h-14 w-14 rounded-full bg-muted flex items-center justify-center">
-            <PackageCheck className="h-7 w-7 opacity-40" />
+          <div className="size-14 rounded-full bg-muted flex items-center justify-center">
+            <PackageCheck className="size-7 opacity-40" />
           </div>
           <p className="text-sm">No hay compras pendientes de llegada</p>
-          <Button variant="outline" size="sm" onClick={() => router.push("/inventory")}>
+          <Button variant="outline" size="sm" onClick={() => push("/inventory")}>
             Ir a inventario
           </Button>
         </div>
@@ -127,8 +127,8 @@ function PurchaseCard({
         {/* Fila superior */}
         <div className="flex items-start justify-between gap-3">
           <div className="flex items-center gap-2.5 min-w-0">
-            <div className="h-9 w-9 rounded-lg bg-amber-100 dark:bg-amber-900/40 flex items-center justify-center shrink-0">
-              <Clock className="h-4 w-4 text-amber-600" />
+            <div className="size-9 rounded-lg bg-amber-100 dark:bg-amber-900/40 flex items-center justify-center shrink-0">
+              <Clock className="size-4 text-amber-600" />
             </div>
             <div className="min-w-0">
               <p className="text-sm font-semibold leading-tight">
@@ -146,24 +146,24 @@ function PurchaseCard({
         {/* Detalles */}
         <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 text-xs text-muted-foreground">
           <div className="flex items-center gap-1.5">
-            <CalendarDays className="h-3 w-3 shrink-0" />
+            <CalendarDays className="size-3 shrink-0" />
             <span>{date}</span>
           </div>
           {p.account_name && (
             <div className="flex items-center gap-1.5">
-              <Wallet className="h-3 w-3 shrink-0" />
+              <Wallet className="size-3 shrink-0" />
               <span className="truncate">{p.account_name}</span>
             </div>
           )}
           {Number(p.shipping) > 0 && (
             <div className="flex items-center gap-1.5">
-              <Truck className="h-3 w-3 shrink-0" />
+              <Truck className="size-3 shrink-0" />
               <span>Envío: {format(Number(p.shipping))}</span>
             </div>
           )}
           {p.notes && (
             <div className="flex items-center gap-1.5 col-span-2">
-              <StickyNote className="h-3 w-3 shrink-0" />
+              <StickyNote className="size-3 shrink-0" />
               <span className="truncate">{p.notes}</span>
             </div>
           )}
@@ -179,7 +179,7 @@ function PurchaseCard({
           className="w-full gap-2"
           onClick={onConfirm}
         >
-          <PackageCheck className="h-4 w-4" />
+          <PackageCheck className="size-4" />
           Confirmar llegada
         </Button>
       </CardContent>

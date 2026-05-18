@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useRef, useState, useEffect } from "react";
 import Image from "next/image";
@@ -164,7 +164,7 @@ export function ProductImageUpload({
               onClick={handleRemove}
               className="absolute top-2 right-2 bg-background/80 backdrop-blur-sm rounded-full p-1.5 shadow hover:bg-background transition-colors"
             >
-              <X className="h-3.5 w-3.5" />
+              <X className="size-3.5" />
             </button>
           )}
           <span className="absolute bottom-2 right-2 text-xs bg-black/60 text-white px-2 py-0.5 rounded-full">
@@ -173,8 +173,8 @@ export function ProductImageUpload({
         </>
       ) : (
         <div className="flex flex-col items-center justify-center h-full gap-2 text-muted-foreground p-4">
-          <div className="h-10 w-10 rounded-xl bg-muted flex items-center justify-center">
-            <Upload className="h-5 w-5" />
+          <div className="size-10 rounded-xl bg-muted flex items-center justify-center">
+            <Upload className="size-5" />
           </div>
           <p className="text-sm font-medium">
             {isDragging ? "Suelta la imagen aquí" : "Toca o arrastra una imagen"}

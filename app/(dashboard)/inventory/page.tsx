@@ -1,4 +1,4 @@
-// app/(dashboard)/inventory/page.tsx
+﻿// app/(dashboard)/inventory/page.tsx
 "use client";
 
 import { useState, useEffect } from "react";
@@ -90,37 +90,37 @@ function ProductActionsMenu({
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0">
-          <MoreVertical className="h-4 w-4" />
+        <Button variant="ghost" size="icon" className="size-8 shrink-0">
+          <MoreVertical className="size-4" />
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end">
         {!item.is_service && (
           <>
             <DropdownMenuItem onClick={() => { const p = findProduct(item.product_id); if (p) setInventoryProduct(p); }}>
-              <PackagePlus className="h-4 w-4 mr-2 text-primary" />
+              <PackagePlus className="size-4 mr-2 text-primary" />
               Agregar stock
             </DropdownMenuItem>
             <DropdownMenuItem onClick={() => { const p = findProduct(item.product_id); if (p) setAdjustProduct(p); }}>
-              <SlidersHorizontal className="h-4 w-4 mr-2 text-muted-foreground" />
+              <SlidersHorizontal className="size-4 mr-2 text-muted-foreground" />
               Ajuste de inventario
             </DropdownMenuItem>
             <DropdownMenuItem onClick={() => { const p = findProduct(item.product_id); if (p) setVariantProduct(p); }}>
-              <Layers className="h-4 w-4 mr-2 text-muted-foreground" />
+              <Layers className="size-4 mr-2 text-muted-foreground" />
               Agregar variante
             </DropdownMenuItem>
             <DropdownMenuSeparator />
           </>
         )}
         <DropdownMenuItem onClick={() => { const p = findProduct(item.product_id); if (p) setEditProduct(p); }}>
-          <Pencil className="h-4 w-4 mr-2" />
+          <Pencil className="size-4 mr-2" />
           {item.is_service ? "Editar servicio" : "Editar producto"}
         </DropdownMenuItem>
         <DropdownMenuItem
           className="text-destructive focus:text-destructive"
           onClick={() => { const p = findProduct(item.product_id); if (p) setDeleteProduct(p); }}
         >
-          <Trash2 className="h-4 w-4 mr-2" />
+          <Trash2 className="size-4 mr-2" />
           Eliminar
         </DropdownMenuItem>
       </DropdownMenuContent>
@@ -144,18 +144,18 @@ function VariantActionsMenu({
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button variant="ghost" size="icon" className="h-7 w-7 shrink-0">
-          <MoreVertical className="h-3.5 w-3.5" />
+        <Button variant="ghost" size="icon" className="size-7 shrink-0">
+          <MoreVertical className="size-3.5" />
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end">
         <DropdownMenuItem onClick={() => setAdjustVariant({ product, variant })}>
-          <SlidersHorizontal className="h-4 w-4 mr-2 text-muted-foreground" />
+          <SlidersHorizontal className="size-4 mr-2 text-muted-foreground" />
           Ajuste de inventario
         </DropdownMenuItem>
         <DropdownMenuSeparator />
         <DropdownMenuItem onClick={() => setEditVariant({ product, variant })}>
-          <Pencil className="h-4 w-4 mr-2" />
+          <Pencil className="size-4 mr-2" />
           Editar variante
         </DropdownMenuItem>
         <DropdownMenuSeparator />
@@ -163,7 +163,7 @@ function VariantActionsMenu({
           className="text-destructive focus:text-destructive"
           onClick={() => setDeleteVariantTarget({ product, variant })}
         >
-          <Trash2 className="h-4 w-4 mr-2" />
+          <Trash2 className="size-4 mr-2" />
           Eliminar variante
         </DropdownMenuItem>
       </DropdownMenuContent>
@@ -182,10 +182,10 @@ function BaseTableRow({
     <TableRow className="bg-muted/20 hover:bg-muted/30">
       <TableCell>
         <div className="flex items-center gap-3 pl-10">
-          <div className="relative h-8 w-8 rounded-md overflow-hidden bg-muted flex items-center justify-center shrink-0">
+          <div className="relative size-8 rounded-md overflow-hidden bg-muted flex items-center justify-center shrink-0">
             {item.image_url
               ? <Image src={item.image_url} alt={item.product_name} fill className="object-cover" />
-              : <Box className="h-3.5 w-3.5 text-muted-foreground/40" />
+              : <Box className="size-3.5 text-muted-foreground/40" />
             }
           </div>
           <div>
@@ -233,7 +233,7 @@ function VariantTableRow({
     <TableRow className="bg-muted/30 hover:bg-muted/50">
       <TableCell>
         <div className="flex items-center gap-3 pl-10">
-          <div className="relative h-8 w-8 rounded-md overflow-hidden bg-muted flex items-center justify-center shrink-0">
+          <div className="relative size-8 rounded-md overflow-hidden bg-muted flex items-center justify-center shrink-0">
             {variantStock.image_url ?? product.image_url
               ? <Image
                   src={variantStock.image_url ?? product.image_url!}
@@ -241,7 +241,7 @@ function VariantTableRow({
                   fill
                   className="object-cover"
                 />
-              : <Layers className="h-3.5 w-3.5 text-muted-foreground/40" />
+              : <Layers className="size-3.5 text-muted-foreground/40" />
             }
           </div>
           <div className="min-w-0">
@@ -299,10 +299,10 @@ function BaseCard({
   return (
     <div className="rounded-lg border bg-muted/20 overflow-hidden">
       <div className="flex items-center gap-3 px-3 py-2.5">
-        <div className="relative h-9 w-9 rounded-md overflow-hidden bg-muted flex items-center justify-center shrink-0">
+        <div className="relative size-9 rounded-md overflow-hidden bg-muted flex items-center justify-center shrink-0">
           {item.image_url
             ? <Image src={item.image_url} alt={item.product_name} fill className="object-cover" />
-            : <Box className="h-3.5 w-3.5 text-muted-foreground/40" />
+            : <Box className="size-3.5 text-muted-foreground/40" />
           }
         </div>
         <div className="flex-1 min-w-0">
@@ -362,7 +362,7 @@ function VariantCard({
   return (
     <div className="rounded-lg border bg-muted/30 overflow-hidden">
       <div className="flex items-center gap-3 px-3 py-2.5">
-        <div className="relative h-9 w-9 rounded-md overflow-hidden bg-muted flex items-center justify-center shrink-0">
+        <div className="relative size-9 rounded-md overflow-hidden bg-muted flex items-center justify-center shrink-0">
           {variantStock.image_url ?? product.image_url
             ? <Image
                 src={variantStock.image_url ?? product.image_url!}
@@ -370,7 +370,7 @@ function VariantCard({
                 fill
                 className="object-cover"
               />
-            : <Layers className="h-3.5 w-3.5 text-muted-foreground/40" />
+            : <Layers className="size-3.5 text-muted-foreground/40" />
           }
         </div>
         <div className="flex-1 min-w-0">
@@ -430,7 +430,7 @@ function VariantCard({
 // ── Page ───────────────────────────────────────────────────────────────
 
 export default function InventoryPage() {
-  const router = useRouter();
+  const { push } = useRouter();
 
   const [search,      setSearch]      = useState("");
   const [stockFilter, setStockFilter] = useState("all");
@@ -515,7 +515,7 @@ export default function InventoryPage() {
 
       {/* Header */}
       <div>
-        <h1 className="text-2xl font-bold tracking-tight">Inventario</h1>
+        <h1 className="text-2xl font-semibold tracking-tight">Inventario</h1>
         <p className="text-muted-foreground text-sm">
           {loadingInventory
             ? "Cargando..."
@@ -536,7 +536,7 @@ export default function InventoryPage() {
             <CardContent className="pl-3">
               <div className="flex items-center justify-between mb-1.5">
                 <span className="text-xs font-medium text-muted-foreground">{stat.title}</span>
-                <stat.icon className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                <stat.icon className="size-3.5 text-muted-foreground shrink-0" />
               </div>
               {loadingInventory
                 ? <Skeleton className="h-5 w-16" />
@@ -552,11 +552,11 @@ export default function InventoryPage() {
       {pendingPurchases.length > 0 && (
         <button
           type="button"
-          onClick={() => router.push("/purchases/pending")}
+          onClick={() => push("/purchases/pending")}
           className="w-full flex items-center justify-between gap-3 rounded-xl border border-amber-200 bg-amber-50/60 dark:bg-amber-950/20 dark:border-amber-800/40 px-4 py-3 text-left hover:bg-amber-100/60 dark:hover:bg-amber-950/40 transition-colors"
         >
           <div className="flex items-center gap-2.5 min-w-0">
-            <Clock className="h-4 w-4 text-amber-600 shrink-0" />
+            <Clock className="size-4 text-amber-600 shrink-0" />
             <p className="text-sm font-medium text-amber-800 dark:text-amber-300 truncate">
               {pendingPurchases.length} compra{pendingPurchases.length !== 1 ? "s" : ""} pendiente{pendingPurchases.length !== 1 ? "s" : ""} de llegada — inventario no acreditado
             </p>
@@ -590,7 +590,7 @@ export default function InventoryPage() {
             className="gap-1.5 text-muted-foreground shrink-0"
             onClick={() => { setSearch(""); setStockFilter("all"); setPage(1); }}
           >
-            <X className="h-3.5 w-3.5" /> Limpiar
+            <X className="size-3.5" /> Limpiar
           </Button>
         )}
       </div>
@@ -647,16 +647,16 @@ export default function InventoryPage() {
                           <div className="flex items-center gap-3">
                             {hasVariants ? (
                               <ChevronDown className={cn(
-                                "h-3.5 w-3.5 text-muted-foreground shrink-0 transition-transform duration-200",
+                                "size-3.5 text-muted-foreground shrink-0 transition-transform duration-200",
                                 isExpanded && "rotate-180"
                               )} />
                             ) : (
                               <div className="w-3.5 shrink-0" />
                             )}
-                            <div className="relative h-10 w-10 rounded-lg overflow-hidden bg-muted flex items-center justify-center shrink-0">
+                            <div className="relative size-10 rounded-lg overflow-hidden bg-muted flex items-center justify-center shrink-0">
                               {item.image_url
                                 ? <Image src={item.image_url} alt={item.product_name} fill className="object-cover" />
-                                : <Package className="h-5 w-5 text-muted-foreground/40" />
+                                : <Package className="size-5 text-muted-foreground/40" />
                               }
                             </div>
                             <div>
@@ -731,7 +731,7 @@ export default function InventoryPage() {
         ) : inventory.length === 0 ? (
           <Card>
             <CardContent className="flex flex-col items-center justify-center py-12">
-              <Package className="h-10 w-10 text-muted-foreground/40" />
+              <Package className="size-10 text-muted-foreground/40" />
               <p className="mt-3 text-sm text-muted-foreground">
                 {hasFilters ? "No se encontraron productos" : "Agrega productos para visualizarlos aquí"}
               </p>
@@ -748,10 +748,10 @@ export default function InventoryPage() {
                 <CardContent className="pl-3 pr-2">
                   {/* Cabecera del producto */}
                   <div className="flex items-center gap-3">
-                    <div className="relative h-12 w-12 rounded-lg overflow-hidden bg-muted flex items-center justify-center shrink-0">
+                    <div className="relative size-12 rounded-lg overflow-hidden bg-muted flex items-center justify-center shrink-0">
                       {item.image_url
                         ? <Image src={item.image_url} alt={item.product_name} fill className="object-cover" />
-                        : <Package className="h-6 w-6 text-muted-foreground/40" />
+                        : <Package className="size-6 text-muted-foreground/40" />
                       }
                     </div>
                     <div className="flex-1 min-w-0">
@@ -814,7 +814,7 @@ export default function InventoryPage() {
                           Ver desglose — base + {item.variants_stock.length} variante{item.variants_stock.length !== 1 ? "s" : ""}
                         </span>
                         <ChevronDown className={cn(
-                          "h-3.5 w-3.5 transition-transform duration-200",
+                          "size-3.5 transition-transform duration-200",
                           isExpanded && "rotate-180"
                         )} />
                       </button>
@@ -905,7 +905,7 @@ export default function InventoryPage() {
       <Fab
         actions={[
           { label: "Nueva transacción", icon: ArrowLeftRight, onClick: () => setTransactionOpen(true) },
-          { label: "Nueva venta",       icon: ShoppingCart,   onClick: () => router.push("/sales/new") },
+          { label: "Nueva venta",       icon: ShoppingCart,   onClick: () => push("/sales/new") },
           { label: "Nuevo producto",    icon: Plus,           onClick: () => setCreateOpen(true) },
         ]}
       />

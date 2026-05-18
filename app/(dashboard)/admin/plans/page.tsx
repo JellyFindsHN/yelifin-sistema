@@ -1,4 +1,4 @@
-// app/(dashboard)/admin/plans/page.tsx
+﻿// app/(dashboard)/admin/plans/page.tsx
 "use client";
 
 import { useState } from "react";
@@ -41,7 +41,7 @@ const INTERVAL_COLORS: Record<string, string> = {
 };
 
 function limitLabel(val: number | null) {
-  if (val == null) return <span className="flex items-center gap-0.5 text-green-600"><Infinity className="h-3.5 w-3.5" /> Sin límite</span>;
+  if (val == null) return <span className="flex items-center gap-0.5 text-green-600"><Infinity className="size-3.5" /> Sin límite</span>;
   return val.toLocaleString("es-HN");
 }
 
@@ -185,15 +185,15 @@ function PlanFormDialog({
           <p className="text-xs text-muted-foreground -mb-1">Límites — dejar vacío = sin límite</p>
           <div className="grid grid-cols-3 gap-3">
             <div className="space-y-1.5">
-              <Label className="text-xs flex items-center gap-1"><Package className="h-3 w-3" /> Productos</Label>
+              <Label className="text-xs flex items-center gap-1"><Package className="size-3" /> Productos</Label>
               <Input type="number" min="0" value={form.max_products} onChange={(e) => set("max_products")(e.target.value)} placeholder="∞" />
             </div>
             <div className="space-y-1.5">
-              <Label className="text-xs flex items-center gap-1"><ShoppingCart className="h-3 w-3" /> Ventas/mes</Label>
+              <Label className="text-xs flex items-center gap-1"><ShoppingCart className="size-3" /> Ventas/mes</Label>
               <Input type="number" min="0" value={form.max_sales_per_month} onChange={(e) => set("max_sales_per_month")(e.target.value)} placeholder="∞" />
             </div>
             <div className="space-y-1.5">
-              <Label className="text-xs flex items-center gap-1"><HardDrive className="h-3 w-3" /> Almac. (MB)</Label>
+              <Label className="text-xs flex items-center gap-1"><HardDrive className="size-3" /> Almac. (MB)</Label>
               <Input type="number" min="0" value={form.max_storage_mb} onChange={(e) => set("max_storage_mb")(e.target.value)} placeholder="∞" />
             </div>
           </div>
@@ -209,7 +209,7 @@ function PlanFormDialog({
           <DialogFooter>
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>Cancelar</Button>
             <Button type="submit" disabled={isSaving || !form.name.trim()}>
-              {isSaving && <Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" />}
+              {isSaving && <Loader2 className="size-3.5 animate-spin mr-1.5" />}
               {isEdit ? "Guardar cambios" : "Crear plan"}
             </Button>
           </DialogFooter>
@@ -222,7 +222,7 @@ function PlanFormDialog({
 // ── Page ─────────────────────────────────────────────────────────────────
 
 export default function AdminPlansPage() {
-  const router = useRouter();
+  const { push } = useRouter();
   const { plans, isLoading, mutate } = useAdminPlans();
   const { createPlan, isCreating } = useAdminCreatePlan();
   const { updatePlan, isSaving }   = useAdminUpdatePlan();
@@ -282,17 +282,17 @@ export default function AdminPlansPage() {
     <div className="space-y-5 pb-10">
       {/* Header */}
       <div className="flex items-center gap-3">
-        <Button variant="ghost" size="icon" onClick={() => router.push("/admin")}>
-          <ArrowLeft className="h-4 w-4" />
+        <Button variant="ghost" size="icon" onClick={() => push("/admin")}>
+          <ArrowLeft className="size-4" />
         </Button>
         <div className="flex-1 min-w-0">
-          <h1 className="text-2xl font-bold tracking-tight">Planes</h1>
+          <h1 className="text-2xl font-semibold tracking-tight">Planes</h1>
           <p className="text-sm text-muted-foreground">
             {isLoading ? "Cargando…" : `${plans.length} plan${plans.length !== 1 ? "es" : ""}`}
           </p>
         </div>
         <Button size="sm" className="gap-1.5" onClick={() => setCreateOpen(true)}>
-          <Plus className="h-4 w-4" />
+          <Plus className="size-4" />
           Nuevo plan
         </Button>
       </div>
@@ -305,10 +305,10 @@ export default function AdminPlansPage() {
       ) : plans.length === 0 ? (
         <Card>
           <CardContent className="py-16 flex flex-col items-center gap-3">
-            <Crown className="h-10 w-10 text-muted-foreground/30" />
+            <Crown className="size-10 text-muted-foreground/30" />
             <p className="text-sm text-muted-foreground">No hay planes configurados</p>
             <Button size="sm" variant="outline" className="gap-1.5" onClick={() => setCreateOpen(true)}>
-              <Plus className="h-3.5 w-3.5" /> Crear primer plan
+              <Plus className="size-3.5" /> Crear primer plan
             </Button>
           </CardContent>
         </Card>
@@ -356,19 +356,19 @@ export default function AdminPlansPage() {
                 <div className="space-y-1.5 text-xs">
                   <div className="flex items-center justify-between">
                     <span className="flex items-center gap-1 text-muted-foreground">
-                      <Package className="h-3 w-3" /> Productos
+                      <Package className="size-3" /> Productos
                     </span>
                     <span className="font-medium">{limitLabel(plan.max_products)}</span>
                   </div>
                   <div className="flex items-center justify-between">
                     <span className="flex items-center gap-1 text-muted-foreground">
-                      <ShoppingCart className="h-3 w-3" /> Ventas/mes
+                      <ShoppingCart className="size-3" /> Ventas/mes
                     </span>
                     <span className="font-medium">{limitLabel(plan.max_sales_per_month)}</span>
                   </div>
                   <div className="flex items-center justify-between">
                     <span className="flex items-center gap-1 text-muted-foreground">
-                      <HardDrive className="h-3 w-3" /> Almacenamiento
+                      <HardDrive className="size-3" /> Almacenamiento
                     </span>
                     <span className="font-medium">
                       {plan.max_storage_mb != null ? `${plan.max_storage_mb} MB` : limitLabel(null)}
@@ -378,7 +378,7 @@ export default function AdminPlansPage() {
 
                 {/* Users count */}
                 <div className="flex items-center gap-1.5 text-xs text-muted-foreground pt-1 border-t mt-auto">
-                  <Users className="h-3 w-3" />
+                  <Users className="size-3" />
                   <span>{plan.user_count} usuario{plan.user_count !== 1 ? "s" : ""} activo{plan.user_count !== 1 ? "s" : ""}</span>
                 </div>
 
@@ -388,7 +388,7 @@ export default function AdminPlansPage() {
                     variant="outline" size="sm" className="flex-1 gap-1.5 text-xs"
                     onClick={() => setEditPlan(plan)}
                   >
-                    <Pencil className="h-3 w-3" /> Editar
+                    <Pencil className="size-3" /> Editar
                   </Button>
                   <Button
                     variant="outline" size="sm" className="text-xs"
@@ -398,12 +398,12 @@ export default function AdminPlansPage() {
                   </Button>
                   <Button
                     variant="ghost" size="icon"
-                    className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10"
+                    className="size-8 text-destructive hover:text-destructive hover:bg-destructive/10"
                     disabled={plan.user_count > 0}
                     onClick={() => setDeletingPlan(plan)}
                     title={plan.user_count > 0 ? "No se puede eliminar: hay usuarios en este plan" : "Eliminar plan"}
                   >
-                    <Trash2 className="h-3.5 w-3.5" />
+                    <Trash2 className="size-3.5" />
                   </Button>
                 </div>
               </CardContent>
@@ -448,7 +448,7 @@ export default function AdminPlansPage() {
               onClick={handleDelete}
               disabled={isDeleting}
             >
-              {isDeleting && <Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" />}
+              {isDeleting && <Loader2 className="size-3.5 animate-spin mr-1.5" />}
               Eliminar
             </AlertDialogAction>
           </AlertDialogFooter>

@@ -1,4 +1,4 @@
-// components/credit-cards/pay-credit-card-dialog.tsx
+﻿// components/credit-cards/pay-credit-card-dialog.tsx
 "use client";
 
 import { useState } from "react";
@@ -107,7 +107,7 @@ export function PayCreditCardDialog({ open, onOpenChange, card, accounts, onSucc
 
         <DialogHeader className="shrink-0 px-5 pt-2 pb-3 sm:pt-5 border-b">
           <DialogTitle className="flex items-center gap-2 text-lg font-bold">
-            <Banknote className="h-4 w-4 text-primary" />
+            <Banknote className="size-4 text-primary" />
             Pagar tarjeta
           </DialogTitle>
           {card && (
@@ -245,8 +245,8 @@ export function PayCreditCardDialog({ open, onOpenChange, card, accounts, onSucc
           </Button>
           <Button type="submit" form="pay-cc-form" disabled={isPaying} className="flex-1 h-11 gap-2">
             {isPaying
-              ? <><Loader2 className="h-4 w-4 animate-spin" />Registrando...</>
-              : <><Banknote className="h-4 w-4" />Registrar pago</>
+              ? <><Loader2 className="size-4 animate-spin" />Registrando…</>
+              : <><Banknote className="size-4" />Registrar pago</>
             }
           </Button>
         </div>

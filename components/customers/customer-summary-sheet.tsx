@@ -1,4 +1,4 @@
-// components/customers/customer-summary-sheet.tsx
+﻿// components/customers/customer-summary-sheet.tsx
 "use client";
 
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -78,19 +78,19 @@ export function CustomerSummarySheet({ customer, open, onOpenChange, onEdit, onD
               <div className="flex flex-wrap items-center gap-2 mt-1">
                 {customer.email && (
                   <span className="flex items-center gap-1 text-xs text-muted-foreground">
-                    <Mail className="h-3 w-3" /> {customer.email}
+                    <Mail className="size-3" /> {customer.email}
                   </span>
                 )}
                 {customer.phone && (
                   <span className="flex items-center gap-1 text-xs text-muted-foreground">
-                    <Phone className="h-3 w-3" /> {customer.phone}
+                    <Phone className="size-3" /> {customer.phone}
                   </span>
                 )}
               </div>
             </div>
             {tier && tierColors && (
               <span className={cn("shrink-0 inline-flex items-center gap-1 text-xs font-semibold px-2.5 py-1 rounded-full border", tierColors.bg, tierColors.text, tierColors.border)}>
-                <Star className="h-3 w-3" /> {tier.tier_name}
+                <Star className="size-3" /> {tier.tier_name}
               </span>
             )}
           </div>
@@ -113,22 +113,22 @@ export function CustomerSummarySheet({ customer, open, onOpenChange, onEdit, onD
               {/* Stats */}
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                 <StatCard
-                  icon={<ShoppingCart className="h-3.5 w-3.5 text-primary" />}
+                  icon={<ShoppingCart className="size-3.5 text-primary" />}
                   label="Órdenes"
                   value={String(summary.total_orders)}
                 />
                 <StatCard
-                  icon={<TrendingUp className="h-3.5 w-3.5 text-green-600" />}
+                  icon={<TrendingUp className="size-3.5 text-green-600" />}
                   label="Total gastado"
                   value={format(Number(summary.total_spent))}
                 />
                 <StatCard
-                  icon={<Banknote className="h-3.5 w-3.5 text-amber-600" />}
+                  icon={<Banknote className="size-3.5 text-amber-600" />}
                   label="Ticket promedio"
                   value={format(Number(summary.avg_order_value))}
                 />
                 <StatCard
-                  icon={<Clock className="h-3.5 w-3.5 text-muted-foreground" />}
+                  icon={<Clock className="size-3.5 text-muted-foreground" />}
                   label="Última compra"
                   value={summary.last_purchase_at
                     ? new Date(summary.last_purchase_at).toLocaleDateString("es-HN", { day: "numeric", month: "short", year: "numeric" })
@@ -139,7 +139,7 @@ export function CustomerSummarySheet({ customer, open, onOpenChange, onEdit, onD
               {/* Nivel de fidelización */}
               {tier && tierColors && (
                 <div className={cn("rounded-xl border px-4 py-3 flex items-center gap-3", tierColors.border, tierColors.bg)}>
-                  <Star className={cn("h-5 w-5 shrink-0", tierColors.text)} />
+                  <Star className={cn("size-5 shrink-0", tierColors.text)} />
                   <div className="flex-1 min-w-0">
                     <p className={cn("text-sm font-semibold", tierColors.text)}>
                       Cliente {tier.tier_name} · {tier.discount_pct}% descuento
@@ -194,7 +194,7 @@ export function CustomerSummarySheet({ customer, open, onOpenChange, onEdit, onD
 
               {/* Registro */}
               <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                <Calendar className="h-3 w-3" />
+                <Calendar className="size-3" />
                 Cliente desde <span suppressHydrationWarning>{new Date(summary.created_at).toLocaleDateString("es-HN", { day: "numeric", month: "long", year: "numeric" })}</span>
               </div>
             </>
@@ -208,13 +208,13 @@ export function CustomerSummarySheet({ customer, open, onOpenChange, onEdit, onD
             className="flex-1 gap-2 text-destructive hover:text-destructive"
             onClick={() => { onOpenChange(false); onDelete(customer); }}
           >
-            <Trash2 className="h-4 w-4" /> Eliminar
+            <Trash2 className="size-4" /> Eliminar
           </Button>
           <Button
             className="flex-1 gap-2"
             onClick={() => { onOpenChange(false); onEdit(customer); }}
           >
-            <Pencil className="h-4 w-4" /> Editar
+            <Pencil className="size-4" /> Editar
           </Button>
         </div>
       </DialogContent>

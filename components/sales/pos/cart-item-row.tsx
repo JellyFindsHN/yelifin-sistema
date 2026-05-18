@@ -1,4 +1,4 @@
-// components/sales/pos/cart-item-row.tsx
+﻿// components/sales/pos/cart-item-row.tsx
 "use client";
 
 import Image from "next/image";
@@ -41,7 +41,7 @@ export function CartItemRow({
   return (
     <div className="space-y-2 p-2.5 rounded-lg border bg-card">
       <div className="flex items-start gap-2">
-        <div className="relative h-9 w-9 rounded-md overflow-hidden bg-muted shrink-0">
+        <div className="relative size-9 rounded-md overflow-hidden bg-muted shrink-0">
           {item.image_url ? (
             <Image
               src={item.image_url}
@@ -50,7 +50,7 @@ export function CartItemRow({
               className="object-cover"
             />
           ) : (
-            <Package className="h-4 w-4 m-auto mt-2.5 text-muted-foreground/40" />
+            <Package className="size-4 m-auto mt-2.5 text-muted-foreground/40" />
           )}
         </div>
         <div className="flex-1 min-w-0">
@@ -79,10 +79,10 @@ export function CartItemRow({
         <Button
           variant="ghost"
           size="icon"
-          className="h-7 w-7 text-destructive shrink-0"
+          className="size-7 text-destructive shrink-0"
           onClick={() => onRemove(item.product_id, item.variant_id)}
         >
-          <Trash2 className="h-3.5 w-3.5" />
+          <Trash2 className="size-3.5" />
         </Button>
       </div>
 
@@ -92,10 +92,10 @@ export function CartItemRow({
           <Button
             variant="outline"
             size="icon"
-            className="h-6 w-6"
+            className="size-6"
             onClick={() => onQuantity(item.product_id, -1, item.variant_id)}
           >
-            <Minus className="h-3 w-3" />
+            <Minus className="size-3" />
           </Button>
           <Input
             type="number"
@@ -121,16 +121,16 @@ export function CartItemRow({
           <Button
             variant="outline"
             size="icon"
-            className="h-6 w-6"
+            className="size-6"
             onClick={() => onQuantity(item.product_id, 1, item.variant_id)}
           >
-            <Plus className="h-3 w-3" />
+            <Plus className="size-3" />
           </Button>
         </div>
 
         {discountType === "per_item" && (
           <div className="flex items-center gap-1">
-            <Tag className="h-3 w-3 text-muted-foreground" />
+            <Tag className="size-3 text-muted-foreground" />
             <div className="relative">
               <Input
                 type="number"

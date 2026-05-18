@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 
 import * as React from 'react'
 import * as MenubarPrimitive from '@radix-ui/react-menubar'
@@ -235,7 +235,7 @@ function MenubarSubTrigger({
       {...props}
     >
       {children}
-      <ChevronRightIcon className="ml-auto h-4 w-4" />
+      <ChevronRightIcon className="ml-auto size-4" />
     </MenubarPrimitive.SubTrigger>
   )
 }

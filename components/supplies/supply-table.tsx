@@ -1,4 +1,4 @@
-// components/supplies/supply-table.tsx
+﻿// components/supplies/supply-table.tsx
 "use client";
 
 import { Supply } from "@/hooks/swr/use-supplies";
@@ -44,7 +44,7 @@ export function SupplyTable({
     return (
       <Card>
         <CardContent className="flex flex-col items-center justify-center py-16">
-          <Boxes className="h-10 w-10 text-muted-foreground/40" />
+          <Boxes className="size-10 text-muted-foreground/40" />
           <p className="mt-3 text-sm text-muted-foreground">No se encontraron suministros</p>
         </CardContent>
       </Card>
@@ -70,7 +70,7 @@ export function SupplyTable({
                       Unidad: <span className="font-mono">{s.unit ?? "unit"}</span>
                     </p>
                   </div>
-                  <Box className="h-4 w-4 text-muted-foreground" />
+                  <Box className="size-4 text-muted-foreground" />
                 </div>
 
                 {/* Stats */}
@@ -99,7 +99,7 @@ export function SupplyTable({
                     className="flex-1 gap-1.5"
                     onClick={() => onAddPurchase(s)}
                   >
-                    <PackagePlus className="h-3.5 w-3.5" />
+                    <PackagePlus className="size-3.5" />
                     Compra
                   </Button>
                   <Button
@@ -108,7 +108,7 @@ export function SupplyTable({
                     className="flex-1 gap-1.5"
                     onClick={() => onEdit(s)}
                   >
-                    <Pencil className="h-3.5 w-3.5" />
+                    <Pencil className="size-3.5" />
                     Editar
                   </Button>
                   <Button
@@ -117,7 +117,7 @@ export function SupplyTable({
                     className="text-destructive hover:text-destructive hover:bg-destructive/10"
                     onClick={() => onDelete(s)}
                   >
-                    <Trash2 className="h-3.5 w-3.5" />
+                    <Trash2 className="size-3.5" />
                   </Button>
                 </div>
               </CardContent>
@@ -163,27 +163,27 @@ export function SupplyTable({
                         <Button
                           variant="ghost"
                           size="icon"
-                          className="h-8 w-8"
+                          className="size-8"
                           title="Registrar compra"
                           onClick={() => onAddPurchase(s)}
                         >
-                          <PackagePlus className="h-3.5 w-3.5" />
+                          <PackagePlus className="size-3.5" />
                         </Button>
                         <Button
                           variant="ghost"
                           size="icon"
-                          className="h-8 w-8"
+                          className="size-8"
                           onClick={() => onEdit(s)}
                         >
-                          <Pencil className="h-3.5 w-3.5" />
+                          <Pencil className="size-3.5" />
                         </Button>
                         <Button
                           variant="ghost"
                           size="icon"
-                          className="h-8 w-8 text-destructive"
+                          className="size-8 text-destructive"
                           onClick={() => onDelete(s)}
                         >
-                          <Trash2 className="h-3.5 w-3.5" />
+                          <Trash2 className="size-3.5" />
                         </Button>
                       </div>
                     </TableCell>

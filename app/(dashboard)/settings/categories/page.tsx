@@ -1,4 +1,4 @@
-// app/(dashboard)/settings/categories/page.tsx
+﻿// app/(dashboard)/settings/categories/page.tsx
 "use client";
 
 import { useState, useEffect } from "react";
@@ -155,7 +155,7 @@ export default function CategoriesPage() {
       {/* Header */}
       <div className="flex items-center justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">
+          <h1 className="text-2xl font-semibold tracking-tight">
             Categorías de Transacciones
           </h1>
           <p className="text-muted-foreground text-sm">
@@ -181,7 +181,7 @@ export default function CategoriesPage() {
                   : "text-muted-foreground hover:bg-muted"
               }`}
             >
-              <Icon className="h-3.5 w-3.5" />
+              <Icon className="size-3.5" />
               {config.label}
             </button>
           );
@@ -196,19 +196,19 @@ export default function CategoriesPage() {
           <SelectContent>
             <SelectItem value="INCOME">
               <div className="flex items-center gap-2">
-                <ArrowDownCircle className="h-4 w-4 text-green-600" />
+                <ArrowDownCircle className="size-4 text-green-600" />
                 Ingresos
               </div>
             </SelectItem>
             <SelectItem value="EXPENSE">
               <div className="flex items-center gap-2">
-                <ArrowUpCircle className="h-4 w-4 text-red-600" />
+                <ArrowUpCircle className="size-4 text-red-600" />
                 Egresos
               </div>
             </SelectItem>
             <SelectItem value="TRANSFER">
               <div className="flex items-center gap-2">
-                <ArrowLeftRight className="h-4 w-4 text-blue-600" />
+                <ArrowLeftRight className="size-4 text-blue-600" />
                 Transferencias
               </div>
             </SelectItem>
@@ -256,21 +256,21 @@ export default function CategoriesPage() {
                         <Button
                           variant="ghost"
                           size="icon"
-                          className="h-8 w-8"
+                          className="size-8"
                           onClick={() => {
                             setEditCategory(cat);
                             setFormName(cat.name);
                           }}
                         >
-                          <Pencil className="h-4 w-4" />
+                          <Pencil className="size-4" />
                         </Button>
                         <Button
                           variant="ghost"
                           size="icon"
-                          className="h-8 w-8 text-destructive hover:text-destructive"
+                          className="size-8 text-destructive hover:text-destructive"
                           onClick={() => setDeleteCategory(cat)}
                         >
-                          <Trash2 className="h-4 w-4" />
+                          <Trash2 className="size-4" />
                         </Button>
                       </div>
                     </TableCell>
@@ -308,21 +308,21 @@ export default function CategoriesPage() {
                   <Button
                     variant="ghost"
                     size="icon"
-                    className="h-8 w-8"
+                    className="size-8"
                     onClick={() => {
                       setEditCategory(cat);
                       setFormName(cat.name);
                     }}
                   >
-                    <Pencil className="h-4 w-4" />
+                    <Pencil className="size-4" />
                   </Button>
                   <Button
                     variant="ghost"
                     size="icon"
-                    className="h-8 w-8 text-destructive"
+                    className="size-8 text-destructive"
                     onClick={() => setDeleteCategory(cat)}
                   >
-                    <Trash2 className="h-4 w-4" />
+                    <Trash2 className="size-4" />
                   </Button>
                 </div>
               </CardContent>
@@ -371,7 +371,7 @@ export default function CategoriesPage() {
 
           <DialogHeader className="shrink-0 px-5 pt-2 pb-3 sm:pt-5 border-b">
             <DialogTitle className="flex items-center gap-2 text-lg font-bold">
-              <Tags className="h-4 w-4 text-primary" />
+              <Tags className="size-4 text-primary" />
               Nueva Categoría
             </DialogTitle>
           </DialogHeader>
@@ -438,8 +438,8 @@ export default function CategoriesPage() {
             >
               {isSubmitting ? (
                 <>
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                  Creando...
+                  <Loader2 className="size-4 animate-spin" />
+                  Creando…
                 </>
               ) : (
                 "Crear"
@@ -475,7 +475,7 @@ export default function CategoriesPage() {
 
           <DialogHeader className="shrink-0 px-5 pt-2 pb-3 sm:pt-5 border-b">
             <DialogTitle className="flex items-center gap-2 text-lg font-bold">
-              <Pencil className="h-4 w-4 text-primary" />
+              <Pencil className="size-4 text-primary" />
               Editar Categoría
             </DialogTitle>
           </DialogHeader>
@@ -526,8 +526,8 @@ export default function CategoriesPage() {
             >
               {isSubmitting ? (
                 <>
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                  Guardando...
+                  <Loader2 className="size-4 animate-spin" />
+                  Guardando…
                 </>
               ) : (
                 "Guardar"
@@ -563,7 +563,7 @@ export default function CategoriesPage() {
 
           <DialogHeader className="shrink-0 px-5 pt-2 pb-3 sm:pt-5 border-b">
             <DialogTitle className="flex items-center gap-2 text-lg font-bold text-destructive">
-              <Trash2 className="h-4 w-4" />
+              <Trash2 className="size-4" />
               Eliminar Categoría
             </DialogTitle>
           </DialogHeader>
@@ -597,8 +597,8 @@ export default function CategoriesPage() {
             >
               {isSubmitting ? (
                 <>
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                  Eliminando...
+                  <Loader2 className="size-4 animate-spin" />
+                  Eliminando…
                 </>
               ) : (
                 "Eliminar"

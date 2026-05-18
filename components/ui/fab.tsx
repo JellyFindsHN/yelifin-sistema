@@ -1,4 +1,4 @@
-// components/ui/fab.tsx
+﻿// components/ui/fab.tsx
 "use client";
 
 import { useState, useEffect } from "react";
@@ -28,9 +28,9 @@ export function Fab({ actions }: Props) {
       <div className="fixed bottom-6 right-6 z-50">
         <button
           onClick={actions[0].onClick}
-          className="h-14 w-14 rounded-full bg-primary text-primary-foreground shadow-xl flex items-center justify-center hover:bg-primary/90 active:scale-95 transition-all"
+          className="size-14 rounded-full bg-primary text-primary-foreground shadow-xl flex items-center justify-center hover:bg-primary/90 active:scale-95 transition-all"
         >
-          <Icon className="h-6 w-6" />
+          <Icon className="size-6" />
         </button>
       </div>
     );
@@ -75,13 +75,13 @@ export function Fab({ actions }: Props) {
                 <button
                   onClick={() => { action.onClick(); setOpen(false); }}
                   className={cn(
-                    "pointer-events-auto h-12 w-12 rounded-full shadow-lg flex items-center justify-center transition-colors shrink-0",
+                    "pointer-events-auto size-12 rounded-full shadow-lg flex items-center justify-center transition-colors shrink-0",
                     action.variant === "destructive"
                       ? "bg-destructive text-destructive-foreground hover:bg-destructive/90"
                       : "bg-background border-2 text-foreground hover:bg-muted"
                   )}
                 >
-                  <Icon className="h-5 w-5" />
+                  <Icon className="size-5" />
                 </button>
               </div>
             );
@@ -91,13 +91,13 @@ export function Fab({ actions }: Props) {
         {/* Botón principal */}
         <button
           onClick={() => setOpen((prev) => !prev)}
-          className="pointer-events-auto h-14 w-14 rounded-full bg-primary text-primary-foreground shadow-xl flex items-center justify-center hover:bg-primary/90 transition-colors"
+          className="pointer-events-auto size-14 rounded-full bg-primary text-primary-foreground shadow-xl flex items-center justify-center hover:bg-primary/90 transition-colors"
           style={{
             transform:  open ? "rotate(405deg)" : "rotate(0deg)",
             transition: "transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1)",
           }}
         >
-          <Plus className="h-6 w-6" />
+          <Plus className="size-6" />
         </button>
       </div>
     </>

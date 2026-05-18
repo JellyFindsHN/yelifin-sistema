@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useState, useEffect } from "react";
 import { useCurrency } from "@/hooks/swr/use-currency";
@@ -67,7 +67,7 @@ const getTaxRate = (v: any): number => Number(v) || 0;
 
 // ── Acciones para venta PENDIENTE ─────────────────────────────────────
 function PendingActions({ saleId, onMutate }: { saleId: number; onMutate: () => void }) {
-  const router = useRouter();
+  const { push } = useRouter();
   const { confirmSale, cancelSale, isPatching } = usePatchSale(saleId);
 
   const handleConfirm = async () => {
@@ -94,29 +94,29 @@ function PendingActions({ saleId, onMutate }: { saleId: number; onMutate: () => 
     <div onClick={(e) => e.stopPropagation()}>
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
-          <Button variant="ghost" size="icon" className="h-8 w-8" disabled={isPatching}>
+          <Button variant="ghost" size="icon" className="size-8" disabled={isPatching}>
             {isPatching
-              ? <Clock className="h-4 w-4 animate-spin text-muted-foreground" />
-              : <MoreVertical className="h-4 w-4" />
+              ? <Clock className="size-4 animate-spin text-muted-foreground" />
+              : <MoreVertical className="size-4" />
             }
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" className="w-44">
-          <DropdownMenuItem onClick={() => router.push(`/sales/${saleId}/edit`)}>
-            <Pencil className="h-4 w-4 mr-2" /> Editar
+          <DropdownMenuItem onClick={() => push(`/sales/${saleId}/edit`)}>
+            <Pencil className="size-4 mr-2" /> Editar
           </DropdownMenuItem>
           <DropdownMenuItem
             className="text-green-600 focus:text-green-700 focus:bg-green-50"
             onClick={handleConfirm}
           >
-            <CheckCircle className="h-4 w-4 mr-2" /> Confirmar pago
+            <CheckCircle className="size-4 mr-2" /> Confirmar pago
           </DropdownMenuItem>
           <DropdownMenuSeparator />
           <DropdownMenuItem
             className="text-destructive focus:text-destructive focus:bg-destructive/10"
             onClick={handleCancel}
           >
-            <XCircle className="h-4 w-4 mr-2" /> Cancelar venta
+            <XCircle className="size-4 mr-2" /> Cancelar venta
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
@@ -132,25 +132,25 @@ function CompletedActions({
   sale: Sale;
   onDeleteRequest: (sale: Sale) => void;
 }) {
-  const router = useRouter();
+  const { push } = useRouter();
   return (
     <div onClick={(e) => e.stopPropagation()}>
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
-          <Button variant="ghost" size="icon" className="h-8 w-8">
-            <MoreVertical className="h-4 w-4" />
+          <Button variant="ghost" size="icon" className="size-8">
+            <MoreVertical className="size-4" />
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" className="w-44">
-          <DropdownMenuItem onClick={() => router.push(`/sales/${sale.id}`)}>
-            <Search className="h-4 w-4 mr-2" /> Ver detalle
+          <DropdownMenuItem onClick={() => push(`/sales/${sale.id}`)}>
+            <Search className="size-4 mr-2" /> Ver detalle
           </DropdownMenuItem>
           <DropdownMenuSeparator />
           <DropdownMenuItem
             className="text-destructive focus:text-destructive focus:bg-destructive/10"
             onClick={() => onDeleteRequest(sale)}
           >
-            <Trash2 className="h-4 w-4 mr-2" /> Anular venta
+            <Trash2 className="size-4 mr-2" /> Anular venta
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
@@ -160,7 +160,7 @@ function CompletedActions({
 
 // ── Page ──────────────────────────────────────────────────────────────
 export default function SalesPage() {
-  const router     = useRouter();
+  const { push }   = useRouter();
   const { format } = useCurrency();
 
   const [preset,         setPreset]         = useState<Preset>("7d");
@@ -225,7 +225,7 @@ export default function SalesPage() {
       {/* Header */}
       <div className="flex items-center justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">Ventas</h1>
+          <h1 className="text-2xl font-semibold tracking-tight">Ventas</h1>
           <p className="text-muted-foreground text-sm">
             {activePeriodLabel}
             {stats.pending_count > 0 && (
@@ -250,7 +250,7 @@ export default function SalesPage() {
           <CardContent className="pl-3.5 py-3">
             <div className="flex items-center justify-between mb-1">
               <span className="text-xs font-medium text-muted-foreground">Ventas</span>
-              <ShoppingCart className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+              <ShoppingCart className="size-3.5 text-muted-foreground shrink-0" />
             </div>
             {isLoading ? <Skeleton className="h-6 w-12" /> : (
               <div className="flex items-baseline gap-1.5">
@@ -264,7 +264,7 @@ export default function SalesPage() {
           <CardContent className="pl-3.5 py-3">
             <div className="flex items-center justify-between mb-1">
               <span className="text-xs font-medium text-muted-foreground">Ingresos</span>
-              <DollarSign className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+              <DollarSign className="size-3.5 text-muted-foreground shrink-0" />
             </div>
             {isLoading
               ? <Skeleton className="h-6 w-20" />
@@ -276,7 +276,7 @@ export default function SalesPage() {
           <CardContent className="pl-3.5 py-3">
             <div className="flex items-center justify-between mb-1">
               <span className="text-xs font-medium text-muted-foreground">Ganancia</span>
-              <TrendingUp className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+              <TrendingUp className="size-3.5 text-muted-foreground shrink-0" />
             </div>
             {isLoading ? <Skeleton className="h-6 w-20" /> : (
               <div className="flex items-baseline gap-1.5">
@@ -344,7 +344,7 @@ export default function SalesPage() {
 
         {hasFilters && (
           <Button variant="ghost" size="sm" className="gap-1.5 text-muted-foreground w-full" onClick={clearAll}>
-            <X className="h-3.5 w-3.5" /> Limpiar filtros
+            <X className="size-3.5" /> Limpiar filtros
           </Button>
         )}
       </div>
@@ -356,7 +356,7 @@ export default function SalesPage() {
         ) : sales.length === 0 ? (
           <Card>
             <CardContent className="flex flex-col items-center justify-center py-12">
-              <Receipt className="h-10 w-10 text-muted-foreground/40" />
+              <Receipt className="size-10 text-muted-foreground/40" />
               <p className="mt-3 text-sm text-muted-foreground">No se encontraron ventas</p>
             </CardContent>
           </Card>
@@ -370,7 +370,7 @@ export default function SalesPage() {
               <Card
                 key={sale.id}
                 className={`pt-1 pb-1 cursor-pointer active:scale-[0.99] transition-transform ${isPending ? "border-amber-200 bg-amber-50/30 dark:bg-amber-950/10" : ""}`}
-                onClick={() => router.push(`/sales/${sale.id}`)}
+                onClick={() => push(`/sales/${sale.id}`)}
               >
                 <CardContent className="px-4 py-3">
                   <div className="flex items-start justify-between gap-2 mb-2">
@@ -379,7 +379,7 @@ export default function SalesPage() {
                         <p className="font-mono text-sm font-semibold">{sale.sale_number}</p>
                         {isPending && (
                           <Badge className="text-[10px] px-1.5 py-0 bg-amber-100 text-amber-700 border-amber-200 gap-1" variant="outline">
-                            <Clock className="h-2.5 w-2.5" /> Pendiente
+                            <Clock className="size-2.5" /> Pendiente
                           </Badge>
                         )}
                         {taxRate > 0 && (
@@ -397,7 +397,7 @@ export default function SalesPage() {
                       : (
                         <div className="flex items-center gap-1 shrink-0">
                           <Badge variant="outline" className="gap-1 text-xs">
-                            <PayIcon className="h-3 w-3" /> {(sale as any).account_name}
+                            <PayIcon className="size-3" /> {(sale as any).account_name}
                           </Badge>
                           <CompletedActions sale={sale} onDeleteRequest={setDeletingSale} />
                         </div>
@@ -474,7 +474,7 @@ export default function SalesPage() {
                     <TableRow
                       key={sale.id}
                       className={`cursor-pointer hover:bg-muted/50 ${isPending ? "bg-amber-50/30 dark:bg-amber-950/10" : ""}`}
-                      onClick={() => router.push(`/sales/${sale.id}`)}
+                      onClick={() => push(`/sales/${sale.id}`)}
                     >
                       <TableCell className="font-medium font-mono">{sale.sale_number}</TableCell>
                       <TableCell className="text-muted-foreground text-sm">{formatDateOnly(sale.sold_at)}</TableCell>
@@ -482,11 +482,11 @@ export default function SalesPage() {
                       <TableCell>
                         {isPending ? (
                           <Badge className="bg-amber-100 text-amber-700 border-amber-200 gap-1" variant="outline">
-                            <Clock className="h-3 w-3" /> Pendiente
+                            <Clock className="size-3" /> Pendiente
                           </Badge>
                         ) : (
                           <Badge className="bg-green-100 text-green-700 border-green-200 gap-1" variant="outline">
-                            <CheckCircle className="h-3 w-3" /> Completada
+                            <CheckCircle className="size-3" /> Completada
                           </Badge>
                         )}
                       </TableCell>
@@ -497,7 +497,7 @@ export default function SalesPage() {
                       </TableCell>
                       <TableCell>
                         <Badge variant="outline" className="gap-1">
-                          <PayIcon className="h-3 w-3" /> {payment.label}
+                          <PayIcon className="size-3" /> {payment.label}
                         </Badge>
                       </TableCell>
                       <TableCell className="text-muted-foreground text-sm">
@@ -587,7 +587,7 @@ export default function SalesPage() {
         </div>
       )}
 
-      <Fab actions={[{ label: "Nueva venta", icon: ShoppingCart, onClick: () => router.push("/sales/new") }]} />
+      <Fab actions={[{ label: "Nueva venta", icon: ShoppingCart, onClick: () => push("/sales/new") }]} />
 
       {/* Confirm anular venta completada */}
       <ConfirmDialog

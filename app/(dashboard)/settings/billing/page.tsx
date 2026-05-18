@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
@@ -12,7 +12,7 @@ import { Separator } from "@/components/ui/separator";
 import { useMe } from "@/hooks/swr/use-me";
 
 export default function BillingSettingsPage() {
-  const router = useRouter();
+  const { push } = useRouter();
   const { subscription, isTrial, hasActiveSubscription, isLoading } = useMe();
 
   const planName = subscription?.plan?.name ?? "Sin plan";
@@ -40,7 +40,7 @@ export default function BillingSettingsPage() {
       {/* Header */}
       <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
         <div className="space-y-1">
-          <h1 className="text-2xl font-bold tracking-tight">Suscripción</h1>
+          <h1 className="text-2xl font-semibold tracking-tight">Suscripción</h1>
           <p className="text-muted-foreground text-sm">
             Aquí podrás gestionar tu plan, pagos y facturación.
           </p>
@@ -49,7 +49,7 @@ export default function BillingSettingsPage() {
           <Button
             variant="outline"
             size="sm"
-            onClick={() => router.push("/settings/profile")}
+            onClick={() => push("/settings/profile")}
           >
             Volver a mi perfil
           </Button>

@@ -1,4 +1,4 @@
-// app/(dashboard)/finances/credit-cards/page.tsx
+﻿// app/(dashboard)/finances/credit-cards/page.tsx
 "use client";
 
 import { useState, useMemo } from "react";
@@ -136,7 +136,7 @@ export default function CreditCardsPage() {
       {/* Header */}
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">Tarjetas de crédito</h1>
+          <h1 className="text-2xl font-semibold tracking-tight">Tarjetas de crédito</h1>
           <p className="text-muted-foreground text-sm">
             {creditCards.length} tarjeta{creditCards.length !== 1 ? "s" : ""} activa{creditCards.length !== 1 ? "s" : ""}
           </p>
@@ -212,7 +212,7 @@ export default function CreditCardsPage() {
                 <CardContent className="pl-3">
                   <div className="flex items-center justify-between mb-1.5">
                     <span className="text-[11px] font-medium text-muted-foreground">{s.label}</span>
-                    <s.icon className="h-3 w-3 text-muted-foreground shrink-0" />
+                    <s.icon className="size-3 text-muted-foreground shrink-0" />
                   </div>
                   <div className={`text-sm font-bold ${s.color}`}>
                     {loadingTxs
@@ -259,7 +259,7 @@ export default function CreditCardsPage() {
                 <div className="divide-y">
                   {Array.from({ length: 3 }).map((_, i) => (
                     <div key={i} className="flex items-center gap-3 p-3.5">
-                      <Skeleton className="h-10 w-10 rounded-xl shrink-0" />
+                      <Skeleton className="size-10 rounded-xl shrink-0" />
                       <div className="flex-1 space-y-1.5">
                         <Skeleton className="h-3.5 w-28" />
                         <Skeleton className="h-3 w-20" />
@@ -270,10 +270,10 @@ export default function CreditCardsPage() {
                 </div>
               ) : creditCards.length === 0 ? (
                 <div className="py-12 flex flex-col items-center justify-center gap-2">
-                  <CreditCard className="h-10 w-10 text-muted-foreground/30" />
+                  <CreditCard className="size-10 text-muted-foreground/30" />
                   <p className="text-sm text-muted-foreground">Sin tarjetas de crédito</p>
                   <Button size="sm" variant="outline" className="mt-2 gap-1.5" onClick={() => setCreateOpen(true)}>
-                    <Plus className="h-3.5 w-3.5" />
+                    <Plus className="size-3.5" />
                     Agregar tarjeta
                   </Button>
                 </div>
@@ -281,8 +281,8 @@ export default function CreditCardsPage() {
                 <div className="divide-y">
                   {creditCards.map((card) => (
                     <div key={card.id} className="flex items-center gap-3 p-3.5">
-                      <div className="h-10 w-10 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
-                        <CreditCard className="h-5 w-5 text-primary" />
+                      <div className="size-10 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
+                        <CreditCard className="size-5 text-primary" />
                       </div>
 
                       <div className="flex-1 min-w-0">
@@ -300,7 +300,7 @@ export default function CreditCardsPage() {
                           )}
                           {Number(card.balance_usd) > 0 && (
                             <span className={`text-xs text-destructive font-medium flex items-center gap-0.5 ${isPrivate ? "blur-sm select-none" : ""}`}>
-                              <DollarSign className="h-2.5 w-2.5" />
+                              <DollarSign className="size-2.5" />
                               {Number(card.balance_usd).toFixed(2)} USD
                             </span>
                           )}
@@ -309,7 +309,7 @@ export default function CreditCardsPage() {
                           )}
                           {card.payment_due_day && (
                             <span className="text-xs text-muted-foreground flex items-center gap-0.5">
-                              <CalendarDays className="h-2.5 w-2.5" />
+                              <CalendarDays className="size-2.5" />
                               Pago día {card.payment_due_day}
                             </span>
                           )}
@@ -325,14 +325,14 @@ export default function CreditCardsPage() {
                           Pagar
                         </Button>
                         <Button
-                          variant="ghost" size="icon" className="h-7 w-7 text-destructive hover:text-destructive"
+                          variant="ghost" size="icon" className="size-7 text-destructive hover:text-destructive"
                           onClick={() => handleDelete(card)}
                         >
-                          <Trash2 className="h-3 w-3" />
+                          <Trash2 className="size-3" />
                         </Button>
                         <Link href={`/finances/credit-cards/${card.id}`}>
-                          <Button variant="ghost" size="icon" className="h-7 w-7">
-                            <ChevronRight className="h-4 w-4" />
+                          <Button variant="ghost" size="icon" className="size-7">
+                            <ChevronRight className="size-4" />
                           </Button>
                         </Link>
                       </div>
@@ -354,7 +354,7 @@ export default function CreditCardsPage() {
                 <div className="divide-y">
                   {Array.from({ length: 4 }).map((_, i) => (
                     <div key={i} className="flex items-center gap-3 p-3.5">
-                      <Skeleton className="h-8 w-8 rounded-lg shrink-0" />
+                      <Skeleton className="size-8 rounded-lg shrink-0" />
                       <div className="flex-1 space-y-1.5">
                         <Skeleton className="h-3.5 w-32" />
                         <Skeleton className="h-3 w-20" />
@@ -377,12 +377,12 @@ export default function CreditCardsPage() {
                       : format(Number(t.amount_local ?? t.amount));
                     return (
                       <div key={t.id} className="flex items-start gap-3 p-3.5">
-                        <div className={`h-8 w-8 rounded-lg flex items-center justify-center shrink-0 ${
+                        <div className={`size-8 rounded-lg flex items-center justify-center shrink-0 ${
                           isCharge ? "bg-red-100 dark:bg-red-950/30" : "bg-green-100 dark:bg-green-950/30"
                         }`}>
                           {isCharge
-                            ? <ArrowUpCircle className="h-4 w-4 text-destructive" />
-                            : <ArrowDownCircle className="h-4 w-4 text-green-600" />
+                            ? <ArrowUpCircle className="size-4 text-destructive" />
+                            : <ArrowDownCircle className="size-4 text-green-600" />
                           }
                         </div>
 
@@ -433,7 +433,7 @@ export default function CreditCardsPage() {
 
               {loadingTxs ? (
                 <div className="flex items-center justify-center py-16">
-                  <Skeleton className="h-32 w-32 rounded-full" />
+                  <Skeleton className="size-32 rounded-full" />
                 </div>
               ) : categoryData.length === 0 ? (
                 <p className="text-sm text-muted-foreground text-center py-10">

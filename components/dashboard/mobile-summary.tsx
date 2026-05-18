@@ -1,4 +1,4 @@
-// components/dashboard/mobile-summary.tsx
+﻿// components/dashboard/mobile-summary.tsx
 "use client";
 
 import { useRouter } from "next/navigation";
@@ -13,7 +13,7 @@ import { Package, AlertTriangle } from "lucide-react";
 type Props = { lowStock: any[]; recentSales: any[]; isLoading: boolean };
 
 export function MobileSummary({ lowStock, recentSales, isLoading }: Props) {
-  const router = useRouter();
+  const { push } = useRouter();
   const { format } = useCurrency();
   const tz = useTimezone();
   const formatDateFull = (d: string) =>
@@ -25,7 +25,7 @@ export function MobileSummary({ lowStock, recentSales, isLoading }: Props) {
         <Card>
           <CardContent className="pl-4">
             <div className="flex items-center gap-2 mb-3">
-              <AlertTriangle className="h-4 w-4 text-yellow-500" />
+              <AlertTriangle className="size-4 text-yellow-500" />
               <span className="text-sm font-medium">Alertas de stock</span>
             </div>
             <div className="space-y-2">
@@ -33,10 +33,10 @@ export function MobileSummary({ lowStock, recentSales, isLoading }: Props) {
                 ? Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-9 w-full" />)
                 : lowStock.slice(0, 4).map((p: any) => (
                   <div key={p.id} className="flex items-center gap-2">
-                    <div className="relative h-7 w-7 rounded-md overflow-hidden bg-muted shrink-0 flex items-center justify-center">
+                    <div className="relative size-7 rounded-md overflow-hidden bg-muted shrink-0 flex items-center justify-center">
                       {p.image_url
                         ? <Image src={p.image_url} alt={p.name} fill className="object-cover" />
-                        : <Package className="h-3.5 w-3.5 text-muted-foreground/40" />
+                        : <Package className="size-3.5 text-muted-foreground/40" />
                       }
                     </div>
                     <p className="text-sm flex-1 truncate">{p.name}</p>
@@ -63,7 +63,7 @@ export function MobileSummary({ lowStock, recentSales, isLoading }: Props) {
                   <div
                     key={sale.id}
                     className="flex items-center justify-between p-2.5 rounded-lg border cursor-pointer active:scale-[0.99] transition-transform"
-                    onClick={() => router.push(`/sales/${sale.id}`)}
+                    onClick={() => push(`/sales/${sale.id}`)}
                   >
                     <div className="min-w-0">
                       <p className="font-mono text-sm font-medium">{sale.sale_number}</p>

@@ -1,4 +1,4 @@
-// app/(dashboard)/customers/page.tsx
+﻿// app/(dashboard)/customers/page.tsx
 "use client";
 
 import { useState, useEffect } from "react";
@@ -66,7 +66,7 @@ export default function CustomersPage() {
       {/* Header */}
       <div className="flex items-start justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">Clientes</h1>
+          <h1 className="text-2xl font-semibold tracking-tight">Clientes</h1>
           <p className="text-muted-foreground text-sm">
             {isLoading ? "Cargando..." : `${stats.total_customers} cliente${stats.total_customers !== 1 ? "s" : ""}`}
           </p>
@@ -77,7 +77,7 @@ export default function CustomersPage() {
           className="gap-1.5 shrink-0"
           onClick={() => setLoyaltyOpen(true)}
         >
-          <Star className="h-3.5 w-3.5 text-amber-500" />
+          <Star className="size-3.5 text-amber-500" />
           Fidelización
         </Button>*/}
       </div>
@@ -92,7 +92,7 @@ export default function CustomersPage() {
           <Card key={stat.title} className={stat.title === "Total facturado" ? "col-span-2 md:col-span-1 pt-1 pb-1" : "pt-1 pb-1"}>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pl-3.5 pb-1 pt-3">
               <CardTitle className="text-xs font-medium text-muted-foreground mb-0">{stat.title}</CardTitle>
-              <stat.icon className="h-3.5 w-3.5 text-muted-foreground" />
+              <stat.icon className="size-3.5 text-muted-foreground" />
             </CardHeader>
             <CardContent className="pl-3.5 pb-3">
               <div className="text-xl font-bold">
@@ -151,7 +151,7 @@ export default function CustomersPage() {
                           <span className="font-medium">{customer.name}</span>
                           {tier && tierColors && (
                             <span className={cn("inline-flex items-center gap-0.5 text-[10px] font-medium px-1.5 py-0.5 rounded-full border", tierColors.bg, tierColors.text, tierColors.border)}>
-                              <Star className="h-2.5 w-2.5" />{tier.tier_name}
+                              <Star className="size-2.5" />{tier.tier_name}
                             </span>
                           )}
                         </div>
@@ -187,7 +187,7 @@ export default function CustomersPage() {
         ) : customers.length === 0 ? (
           <Card>
             <CardContent className="flex flex-col items-center justify-center py-12">
-              <Users className="h-10 w-10 text-muted-foreground/40" />
+              <Users className="size-10 text-muted-foreground/40" />
               <p className="mt-3 text-sm text-muted-foreground">No se encontraron clientes</p>
             </CardContent>
           </Card>
@@ -208,7 +208,7 @@ export default function CustomersPage() {
                         <p className="font-medium text-sm">{customer.name}</p>
                         {tier && tierColors && (
                           <span className={cn("inline-flex items-center gap-0.5 text-[10px] font-medium px-1.5 py-0.5 rounded-full border", tierColors.bg, tierColors.text, tierColors.border)}>
-                            <Star className="h-2.5 w-2.5" />{tier.tier_name}
+                            <Star className="size-2.5" />{tier.tier_name}
                           </span>
                         )}
                       </div>
@@ -329,23 +329,23 @@ function ActionsDropdown({
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button variant="ghost" size="icon" className="h-8 w-8">
-          <MoreHorizontal className="h-4 w-4" />
+        <Button variant="ghost" size="icon" className="size-8">
+          <MoreHorizontal className="size-4" />
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-44">
         <DropdownMenuItem onClick={onView} className="gap-2 cursor-pointer">
-          <Eye className="h-4 w-4" /> Ver resumen
+          <Eye className="size-4" /> Ver resumen
         </DropdownMenuItem>
         <DropdownMenuItem onClick={onEdit} className="gap-2 cursor-pointer">
-          <Pencil className="h-4 w-4" /> Editar
+          <Pencil className="size-4" /> Editar
         </DropdownMenuItem>
         <DropdownMenuSeparator />
         <DropdownMenuItem
           onClick={onDelete}
           className="gap-2 cursor-pointer text-destructive focus:text-destructive"
         >
-          <Trash2 className="h-4 w-4" /> Eliminar
+          <Trash2 className="size-4" /> Eliminar
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>

@@ -1,4 +1,4 @@
-// components/customers/create-customer-dialog.tsx
+﻿// components/customers/create-customer-dialog.tsx
 "use client";
 
 import { useForm } from "react-hook-form";
@@ -90,7 +90,7 @@ export function CreateCustomerDialog({ open, onOpenChange, onSuccess }: Props) {
         {/* Header */}
         <DialogHeader className="shrink-0 px-5 pt-2 pb-3 sm:pt-5 border-b">
           <DialogTitle className="flex items-center gap-2 text-lg font-bold">
-            <UserPlus className="h-4 w-4 text-primary" />
+            <UserPlus className="size-4 text-primary" />
             Nuevo cliente
           </DialogTitle>
         </DialogHeader>
@@ -178,8 +178,8 @@ export function CreateCustomerDialog({ open, onOpenChange, onSuccess }: Props) {
             className="flex-1 h-11 gap-2"
           >
             {isCreating
-              ? <><Loader2 className="h-4 w-4 animate-spin" />Creando...</>
-              : <><UserPlus className="h-4 w-4" />Crear cliente</>
+              ? <><Loader2 className="size-4 animate-spin" />Creando…</>
+              : <><UserPlus className="size-4" />Crear cliente</>
             }
           </Button>
         </div>

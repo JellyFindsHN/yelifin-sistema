@@ -1,4 +1,4 @@
-// components/transactions/create-transaction-modal.tsx
+﻿// components/transactions/create-transaction-modal.tsx
 "use client";
 
 import { useState } from "react";
@@ -210,7 +210,7 @@ export function CreateTransactionModal({
                         : "text-muted-foreground hover:bg-muted",
                     )}
                   >
-                    <Icon className="h-3.5 w-3.5" />
+                    <Icon className="size-3.5" />
                     {label}
                   </button>
                 );
@@ -230,7 +230,7 @@ export function CreateTransactionModal({
                     sourceMode === "account" ? "bg-background shadow-sm" : "text-muted-foreground hover:text-foreground"
                   )}
                 >
-                  <Wallet className="h-3 w-3" /> Cuenta
+                  <Wallet className="size-3" /> Cuenta
                 </button>
                 <button
                   type="button"
@@ -240,7 +240,7 @@ export function CreateTransactionModal({
                     sourceMode === "credit_card" ? "bg-background shadow-sm" : "text-muted-foreground hover:text-foreground"
                   )}
                 >
-                  <CreditCard className="h-3 w-3" /> Tarjeta
+                  <CreditCard className="size-3" /> Tarjeta
                 </button>
               </div>
             )}
@@ -433,8 +433,8 @@ export function CreateTransactionModal({
           >
             {isCreating ? (
               <>
-                <Loader2 className="h-4 w-4 animate-spin" />
-                Guardando...
+                <Loader2 className="size-4 animate-spin" />
+                Guardando…
               </>
             ) : (
               "Registrar"

@@ -1,4 +1,4 @@
-// app/(dashboard)/supplies/page.tsx
+﻿// app/(dashboard)/supplies/page.tsx
 "use client";
 
 import { useState, useEffect } from "react";
@@ -45,7 +45,7 @@ export default function SuppliesPage() {
       {/* Header */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">Suministros</h1>
+          <h1 className="text-2xl font-semibold tracking-tight">Suministros</h1>
           <p className="text-muted-foreground">
             {isLoading ? "Cargando..." : `${total} suministro${total !== 1 ? "s" : ""}`}
           </p>

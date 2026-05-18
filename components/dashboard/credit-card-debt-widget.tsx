@@ -1,4 +1,4 @@
-// components/dashboard/credit-card-debt-widget.tsx
+﻿// components/dashboard/credit-card-debt-widget.tsx
 "use client";
 
 import Link from "next/link";
@@ -24,8 +24,8 @@ export function CreditCardDebtWidget({ debtLocal, debtUsd, isLoading }: Props) {
           <CardContent className="p-4 pt-0 pb-0">
           <div className="flex items-center justify-between mb-3">
             <div className="flex items-center gap-2">
-              <div className="h-8 w-8 rounded-lg bg-destructive/10 flex items-center justify-center">
-              <CreditCard className="h-4 w-4 text-destructive" />
+              <div className="size-8 rounded-lg bg-destructive/10 flex items-center justify-center">
+              <CreditCard className="size-4 text-destructive" />
             </div>
             <p className="text-sm font-semibold">Deuda en tarjetas de crédito</p>
           </div>
@@ -48,7 +48,7 @@ export function CreditCardDebtWidget({ debtLocal, debtUsd, isLoading }: Props) {
             {debtUsd > 0 && (
               <div>
                 <p className="text-xs text-muted-foreground flex items-center gap-0.5 fw-bold">
-                  <DollarSign className="h-2.5 w-2.5 fw-bold" /> USD
+                  <DollarSign className="size-2.5 fw-bold" /> USD
                 </p>
                 <p className="text-2xl font-bold text-destructive">
                   {new Intl.NumberFormat("es-HN", {

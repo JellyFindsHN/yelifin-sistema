@@ -1,4 +1,4 @@
-// components/sales/pos/cart-panel.tsx
+﻿// components/sales/pos/cart-panel.tsx
 "use client";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -63,7 +63,7 @@ export function CartPanel({
     <Card>
       <CardHeader className="pl-4 px-4 pb-3">
         <CardTitle className="text-base flex items-center gap-2">
-          <ShoppingCart className="h-4 w-4" />
+          <ShoppingCart className="size-4" />
           Carrito
           {cart.length > 0 && (
             <Badge variant="secondary" className="ml-auto">{cart.length}</Badge>
@@ -169,7 +169,7 @@ export function CartPanel({
         {suppliesUsed.length > 0 && (
           <div className="rounded-xl border border-dashed border-orange-200 bg-orange-50/50 dark:bg-orange-950/20 dark:border-orange-800/40 p-2.5 space-y-1.5">
             <div className="flex items-center gap-1.5">
-              <FlaskConical className="h-3.5 w-3.5 text-orange-500 shrink-0" />
+              <FlaskConical className="size-3.5 text-orange-500 shrink-0" />
               <span className="text-xs font-semibold text-orange-700 dark:text-orange-400 flex-1">
                 Suministros
               </span>
@@ -182,10 +182,10 @@ export function CartPanel({
                 <div key={s.supply_id} className="flex items-center gap-1.5 bg-background rounded-lg px-2 py-1 border text-xs">
                   <span className="flex-1 truncate font-medium">{s.name}</span>
                   <button
-                    className="h-5 w-5 rounded flex items-center justify-center hover:bg-muted transition-colors cursor-pointer shrink-0"
+                    className="size-5 rounded flex items-center justify-center hover:bg-muted transition-colors cursor-pointer shrink-0"
                     onClick={() => onSupplyQtyChange(s.supply_id, Math.max(0.5, s.quantity - 0.5))}
                   >
-                    <Minus className="h-2.5 w-2.5" />
+                    <Minus className="size-2.5" />
                   </button>
                   <Input
                     type="number"
@@ -203,19 +203,19 @@ export function CartPanel({
                     {s.unit ?? "ud"}
                   </span>
                   <button
-                    className="h-5 w-5 rounded flex items-center justify-center hover:bg-muted transition-colors cursor-pointer shrink-0"
+                    className="size-5 rounded flex items-center justify-center hover:bg-muted transition-colors cursor-pointer shrink-0"
                     onClick={() => onSupplyQtyChange(s.supply_id, s.quantity + 0.5)}
                   >
-                    <Plus className="h-2.5 w-2.5" />
+                    <Plus className="size-2.5" />
                   </button>
                   <span className="text-[10px] text-muted-foreground w-10 text-right shrink-0">
                     {format(s.quantity * s.unit_cost)}
                   </span>
                   <button
-                    className="h-5 w-5 rounded flex items-center justify-center text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors cursor-pointer shrink-0"
+                    className="size-5 rounded flex items-center justify-center text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors cursor-pointer shrink-0"
                     onClick={() => onSupplyRemove(s.supply_id)}
                   >
-                    <X className="h-3 w-3" />
+                    <X className="size-3" />
                   </button>
                 </div>
               ))}

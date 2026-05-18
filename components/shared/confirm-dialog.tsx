@@ -1,4 +1,4 @@
-// components/shared/confirm-dialog.tsx
+﻿// components/shared/confirm-dialog.tsx
 "use client";
 
 import {
@@ -69,9 +69,9 @@ export function ConfirmDialog({
         <DialogHeader className="space-y-2">
           <div className="flex items-center gap-2.5">
             <div
-              className={`h-9 w-9 rounded-full flex items-center justify-center ${iconStyles}`}
+              className={`size-9 rounded-full flex items-center justify-center ${iconStyles}`}
             >
-              <Icon className="h-4 w-4" />
+              <Icon className="size-4" />
             </div>
             <DialogTitle className="text-base">
               {title}

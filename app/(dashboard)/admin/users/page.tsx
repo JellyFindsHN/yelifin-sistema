@@ -1,4 +1,4 @@
-// app/(dashboard)/admin/users/page.tsx
+﻿// app/(dashboard)/admin/users/page.tsx
 "use client";
 
 import { useState, useCallback } from "react";
@@ -52,7 +52,7 @@ const STATUS_COLOR: Record<string, string> = {
 };
 
 export default function AdminUsersPage() {
-  const router = useRouter();
+  const { back, push } = useRouter();
   const [search,  setSearch]  = useState("");
   const [status,  setStatus]  = useState("all");
   const [page,    setPage]    = useState(1);
@@ -79,11 +79,11 @@ export default function AdminUsersPage() {
     <div className="space-y-4 pb-10">
       {/* Header */}
       <div className="flex items-center gap-3">
-        <Button variant="ghost" size="icon" onClick={() => router.back()}>
-          <ArrowLeft className="h-4 w-4" />
+        <Button variant="ghost" size="icon" onClick={() => back()}>
+          <ArrowLeft className="size-4" />
         </Button>
         <div className="flex-1 min-w-0">
-          <h1 className="text-2xl font-bold tracking-tight">Usuarios</h1>
+          <h1 className="text-2xl font-semibold tracking-tight">Usuarios</h1>
           <p className="text-sm text-muted-foreground">
             {isLoading ? "Cargando..." : `${total} usuario${total !== 1 ? "s" : ""} registrados`}
           </p>
@@ -93,7 +93,7 @@ export default function AdminUsersPage() {
       {/* Filters */}
       <div className="flex flex-col sm:flex-row gap-2">
         <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground pointer-events-none" />
           <Input
             placeholder="Buscar por email, nombre o negocio..."
             value={search}
@@ -150,7 +150,7 @@ export default function AdminUsersPage() {
                 <TableRow
                   key={u.id}
                   className="cursor-pointer hover:bg-muted/40 transition-colors"
-                  onClick={() => router.push(`/admin/users/${u.id}`)}
+                  onClick={() => push(`/admin/users/${u.id}`)}
                 >
                   <TableCell>
                     <p className="font-medium text-sm">
@@ -168,8 +168,8 @@ export default function AdminUsersPage() {
                   </TableCell>
                   <TableCell>
                     {u.is_active
-                      ? <CheckCircle2 className="h-4 w-4 text-green-600" />
-                      : <XCircle    className="h-4 w-4 text-destructive" />}
+                      ? <CheckCircle2 className="size-4 text-green-600" />
+                      : <XCircle    className="size-4 text-destructive" />}
                   </TableCell>
                   <TableCell className="text-xs text-muted-foreground" suppressHydrationWarning>
                     {new Date(u.created_at).toLocaleDateString("es-HN", {
@@ -178,7 +178,7 @@ export default function AdminUsersPage() {
                   </TableCell>
                   <TableCell>
                     <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                      <Clock className="h-3 w-3 shrink-0" />
+                      <Clock className="size-3 shrink-0" />
                       <span title={u.last_refresh_time ?? u.last_sign_in_time ?? "—"}>
                         {relativeTime(u.last_refresh_time ?? u.last_sign_in_time)}
                       </span>
@@ -204,7 +204,7 @@ export default function AdminUsersPage() {
                 <div
                   key={u.id}
                   className="rounded-xl border p-3.5 cursor-pointer hover:bg-muted/30 transition-colors"
-                  onClick={() => router.push(`/admin/users/${u.id}`)}
+                  onClick={() => push(`/admin/users/${u.id}`)}
                 >
                   <div className="flex items-start justify-between gap-2">
                     <div className="min-w-0">
@@ -215,8 +215,8 @@ export default function AdminUsersPage() {
                     </div>
                     <div className="flex items-center gap-1.5 shrink-0">
                       {u.is_active
-                        ? <CheckCircle2 className="h-3.5 w-3.5 text-green-600" />
-                        : <XCircle    className="h-3.5 w-3.5 text-destructive" />}
+                        ? <CheckCircle2 className="size-3.5 text-green-600" />
+                        : <XCircle    className="size-3.5 text-destructive" />}
                     </div>
                   </div>
                   <div className="flex items-center gap-2 mt-2">
@@ -227,7 +227,7 @@ export default function AdminUsersPage() {
                       </Badge>
                     )}
                     <span className="flex items-center gap-1 text-xs text-muted-foreground ml-auto">
-                      <Clock className="h-3 w-3" />
+                      <Clock className="size-3" />
                       {relativeTime(u.last_refresh_time ?? u.last_sign_in_time)}
                     </span>
                   </div>

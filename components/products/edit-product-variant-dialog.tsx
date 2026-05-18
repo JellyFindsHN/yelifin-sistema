@@ -1,4 +1,4 @@
-// components/products/edit-product-variant-dialog.tsx
+﻿// components/products/edit-product-variant-dialog.tsx
 "use client";
 
 import { useState, useEffect } from "react";
@@ -235,7 +235,7 @@ export function EditProductVariantDialog({
         {/* Header */}
         <DialogHeader className="shrink-0 px-5 pt-2 pb-3 sm:pt-5 border-b">
           <DialogTitle className="flex items-center gap-2 text-lg font-bold">
-            <Layers className="h-4 w-4 text-primary" />
+            <Layers className="size-4 text-primary" />
             Editar variante
           </DialogTitle>
           <p className="text-xs text-muted-foreground mt-0.5 truncate">
@@ -250,7 +250,7 @@ export function EditProductVariantDialog({
           <form id="edit-variant-form" onSubmit={handleSubmit(onSubmit)} className="space-y-5">
 
             <div className="space-y-2">
-              <FieldLabel icon={<ImageIcon className="h-3.5 w-3.5" />} label="Imagen" optional />
+              <FieldLabel icon={<ImageIcon className="size-3.5" />} label="Imagen" optional />
               <ProductImageUpload
                 disabled={isLoading}
                 onChange={setImageFile}
@@ -260,7 +260,7 @@ export function EditProductVariantDialog({
             </div>
 
             <div className="space-y-2">
-              <FieldLabel icon={<Tag className="h-3.5 w-3.5" />} label="Nombre" required />
+              <FieldLabel icon={<Tag className="size-3.5" />} label="Nombre" required />
               <Input
                 {...register("variant_name")}
                 placeholder="Ej: Talla M / Color Rojo / 500g"
@@ -273,7 +273,7 @@ export function EditProductVariantDialog({
             </div>
 
             <div className="space-y-2">
-              <FieldLabel icon={<Hash className="h-3.5 w-3.5" />} label="SKU" required />
+              <FieldLabel icon={<Hash className="size-3.5" />} label="SKU" required />
               <Input
                 {...register("sku")}
                 placeholder="Ej: CAM-NEG-M"
@@ -287,7 +287,7 @@ export function EditProductVariantDialog({
 
             <div className="space-y-2">
               <FieldLabel
-                icon={<DollarSign className="h-3.5 w-3.5" />}
+                icon={<DollarSign className="size-3.5" />}
                 label="Precio especial"
                 optional
               />
@@ -322,7 +322,7 @@ export function EditProductVariantDialog({
             <div className="space-y-3">
               <div className="flex items-center justify-between">
                 <FieldLabel
-                  icon={<Tag className="h-3.5 w-3.5" />}
+                  icon={<Tag className="size-3.5" />}
                   label="Atributos"
                   optional
                 />
@@ -334,7 +334,7 @@ export function EditProductVariantDialog({
                   disabled={isLoading || attributes.length >= 8}
                   className="h-7 text-xs gap-1 text-primary hover:text-primary"
                 >
-                  <Plus className="h-3 w-3" />
+                  <Plus className="size-3" />
                   Agregar
                 </Button>
               </div>
@@ -362,9 +362,9 @@ export function EditProductVariantDialog({
                       size="icon"
                       onClick={() => removeAttribute(attr.id)}
                       disabled={isLoading || attributes.length === 1}
-                      className="h-10 w-10 shrink-0 text-muted-foreground hover:text-destructive"
+                      className="size-10 shrink-0 text-muted-foreground hover:text-destructive"
                     >
-                      <Trash2 className="h-3.5 w-3.5" />
+                      <Trash2 className="size-3.5" />
                     </Button>
                   </div>
                 ))}
@@ -397,12 +397,12 @@ export function EditProductVariantDialog({
           >
             {isLoading ? (
               <>
-                <Loader2 className="h-4 w-4 animate-spin" />
+                <Loader2 className="size-4 animate-spin" />
                 {submitLabel}
               </>
             ) : (
               <>
-                <Pencil className="h-4 w-4" />
+                <Pencil className="size-4" />
                 {submitLabel}
               </>
             )}

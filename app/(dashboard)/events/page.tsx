@@ -1,4 +1,4 @@
-// app/(dashboard)/events/page.tsx
+﻿// app/(dashboard)/events/page.tsx
 "use client";
 
 import { useState } from "react";
@@ -18,7 +18,7 @@ import { AddExpenseDialog }    from "@/components/events/add-expense-dialog";
 import { Fab }                 from "@/components/ui/fab";
 
 export default function EventsPage() {
-  const router                        = useRouter();
+  const { push }                      = useRouter();
   const { events, isLoading, mutate } = useEvents();
   const { format }                    = useCurrency();
 
@@ -40,7 +40,7 @@ export default function EventsPage() {
 
       {/* Header */}
       <div>
-        <h1 className="text-2xl font-bold tracking-tight">Eventos y Ferias</h1>
+        <h1 className="text-2xl font-semibold tracking-tight">Eventos y Ferias</h1>
         <p className="text-muted-foreground text-sm">
           {isLoading
             ? "Cargando..."
@@ -61,7 +61,7 @@ export default function EventsPage() {
             <CardContent>
               <div className="flex items-center justify-between mb-1.5">
                 <span className="text-xs font-medium text-muted-foreground">{s.title}</span>
-                <s.icon className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                <s.icon className="size-3.5 text-muted-foreground shrink-0" />
               </div>
               <div className={`text-lg font-bold ${s.cls}`}>
                 {isLoading ? <Skeleton className="h-6 w-20" /> : s.value}
@@ -82,15 +82,15 @@ export default function EventsPage() {
       ) : events.length === 0 ? (
         <Card>
           <CardContent className="flex flex-col items-center justify-center py-16">
-            <div className="h-14 w-14 rounded-2xl bg-primary/10 flex items-center justify-center mb-4">
-              <Calendar className="h-7 w-7 text-primary" />
+            <div className="size-14 rounded-2xl bg-primary/10 flex items-center justify-center mb-4">
+              <Calendar className="size-7 text-primary" />
             </div>
             <p className="text-base font-semibold">Sin eventos registrados</p>
             <p className="text-sm text-muted-foreground mt-1 text-center max-w-xs">
               Crea tu primer evento para rastrear ventas, gastos y rentabilidad de ferias.
             </p>
             <Button className="mt-5 gap-2" onClick={() => setCreateOpen(true)}>
-              <CalendarPlus className="h-4 w-4" />
+              <CalendarPlus className="size-4" />
               Crear evento
             </Button>
           </CardContent>
@@ -101,7 +101,7 @@ export default function EventsPage() {
             <EventCard
               key={event.id}
               event={event}
-              onView={(e) => router.push(`/events/${e.id}`)}
+              onView={(e) => push(`/events/${e.id}`)}
               onEdit={setEditEvent}
               onDelete={setDeleteEvent}
               onAddExpense={setExpenseEvent}

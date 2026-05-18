@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useState } from "react";
 import { useForm } from "react-hook-form";
@@ -227,7 +227,7 @@ export function CreateProductDialog({ open, onOpenChange, onSuccess }: Props) {
                   "mt-0.5 rounded-lg p-1.5 transition-colors",
                   isService ? "bg-primary/10 text-primary" : "bg-muted text-muted-foreground"
                 )}>
-                  <Wrench className="h-4 w-4" />
+                  <Wrench className="size-4" />
                 </div>
                 <div className="space-y-0.5">
                   <p className="text-sm font-medium leading-none">Es un servicio</p>
@@ -247,13 +247,13 @@ export function CreateProductDialog({ open, onOpenChange, onSuccess }: Props) {
 
             {/* Imagen */}
             <div className="space-y-2">
-              <FieldLabel icon={<ImageIcon className="h-3.5 w-3.5" />} label="Imagen" optional />
+              <FieldLabel icon={<ImageIcon className="size-3.5" />} label="Imagen" optional />
               <ProductImageUpload disabled={isLoading} onChange={setImageFile} />
             </div>
 
             {/* Nombre */}
             <div className="space-y-2">
-              <FieldLabel icon={<FileText className="h-3.5 w-3.5" />} label="Nombre" required />
+              <FieldLabel icon={<FileText className="size-3.5" />} label="Nombre" required />
               <Input
                 {...register("name")}
                 placeholder={isService ? "Ej: Mantenimiento de equipo" : "Ej: Camiseta negra talla M"}
@@ -266,7 +266,7 @@ export function CreateProductDialog({ open, onOpenChange, onSuccess }: Props) {
             {/* SKU — opcional para servicios */}
             <div className="space-y-2">
               <FieldLabel
-                icon={<Hash className="h-3.5 w-3.5" />}
+                icon={<Hash className="size-3.5" />}
                 label="SKU"
                 required={!isService}
                 optional={isService}
@@ -294,7 +294,7 @@ export function CreateProductDialog({ open, onOpenChange, onSuccess }: Props) {
 
             {/* Precio */}
             <div className="space-y-2">
-              <FieldLabel icon={<DollarSign className="h-3.5 w-3.5" />} label="Precio de venta" required />
+              <FieldLabel icon={<DollarSign className="size-3.5" />} label="Precio de venta" required />
               <div className="relative">
                 <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground font-medium text-sm">
                   {symbol}
@@ -311,7 +311,7 @@ export function CreateProductDialog({ open, onOpenChange, onSuccess }: Props) {
 
             {/* Descripción */}
             <div className="space-y-2">
-              <FieldLabel icon={<FileText className="h-3.5 w-3.5" />} label="Descripción" optional />
+              <FieldLabel icon={<FileText className="size-3.5" />} label="Descripción" optional />
               <Textarea
                 placeholder={
                   isService
@@ -355,8 +355,8 @@ export function CreateProductDialog({ open, onOpenChange, onSuccess }: Props) {
             className="flex-1 h-11 gap-2"
           >
             {isLoading
-              ? <><Loader2 className="h-4 w-4 animate-spin" />{submitLabel}</>
-              : <><PackagePlus className="h-4 w-4" />{submitLabel}</>
+              ? <><Loader2 className="size-4 animate-spin" />{submitLabel}</>
+              : <><PackagePlus className="size-4" />{submitLabel}</>
             }
           </Button>
         </div>

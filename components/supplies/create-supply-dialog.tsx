@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -281,8 +281,8 @@ export function CreateSupplyDialog({
           >
             {isCreating ? (
               <>
-                <Loader2 className="h-4 w-4 animate-spin" />
-                Creando...
+                <Loader2 className="size-4 animate-spin" />
+                Creando…
               </>
             ) : (
               "Crear"

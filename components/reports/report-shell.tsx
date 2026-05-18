@@ -1,4 +1,4 @@
-// components/reports/report-shell.tsx
+﻿// components/reports/report-shell.tsx
 "use client";
 
 import { useState } from "react";
@@ -64,7 +64,7 @@ export function ReportShell({
   showDateRange = true, onExportPDF,
   isLoading, children,
 }: Props) {
-  const router = useRouter();
+  const { back } = useRouter();
   const [exportingPDF, setExportingPDF] = useState(false);
 
   const handlePDF = async () => {
@@ -78,12 +78,12 @@ export function ReportShell({
     <div className="space-y-5 pb-10">
       {/* Top bar */}
       <div className="flex flex-wrap items-start gap-3">
-        <Button variant="ghost" size="icon" onClick={() => router.back()} className="shrink-0">
-          <ArrowLeft className="h-4 w-4" />
+        <Button variant="ghost" size="icon" onClick={() => back()} className="shrink-0">
+          <ArrowLeft className="size-4" />
         </Button>
 
         <div className="flex-1 min-w-0">
-          <h1 className="text-2xl font-bold tracking-tight">{title}</h1>
+          <h1 className="text-2xl font-semibold tracking-tight">{title}</h1>
           {subtitle && <p className="text-sm text-muted-foreground" suppressHydrationWarning>{subtitle}</p>}
         </div>
 
@@ -96,8 +96,8 @@ export function ReportShell({
             disabled={busy}
           >
             {exportingPDF
-              ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
-              : <FileText className="h-3.5 w-3.5 text-red-500" />
+              ? <Loader2 className="size-3.5 animate-spin" />
+              : <FileText className="size-3.5 text-red-500" />
             }
             PDF
           </Button>

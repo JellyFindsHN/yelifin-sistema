@@ -1,4 +1,4 @@
-// app/page.tsx
+﻿// app/page.tsx
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import {
@@ -77,7 +77,7 @@ export default function Home() {
                 "Soporte en español cuando lo necesitas",
               ].map((item) => (
                 <li key={item} className="flex items-start gap-3">
-                  <CheckCircle2 className="w-5 h-5 text-primary shrink-0 mt-0.5" />
+                  <CheckCircle2 className="size-5 text-primary shrink-0 mt-0.5" />
                   <span className="text-sm sm:text-base">{item}</span>
                 </li>
               ))}
@@ -85,7 +85,7 @@ export default function Home() {
             <Link href="/register" className="block">
               <Button size="lg" className="w-full text-base sm:text-lg h-12 sm:h-14 gap-2 shadow-lg shadow-primary/30">
                 Comenzar prueba gratuita
-                <ArrowRight className="w-4 h-4 sm:w-5 sm:h-5" />
+                <ArrowRight className="size-4 sm:w-5 sm:h-5" />
               </Button>
             </Link>
             <p className="text-xs sm:text-sm text-center text-muted-foreground mt-3 sm:mt-4">
@@ -113,8 +113,8 @@ export default function Home() {
             { icon: Calendar,     bg: "bg-rose-500/10",    color: "text-rose-600",     title: "Ferias y eventos sin estrés", desc: "Prepara lo que llevas, controla las ventas del evento y ve cuánto ganaste cuando termina. Sin perder nada." },
           ].map((f) => (
             <div key={f.title} className="bg-card p-6 sm:p-8 rounded-2xl border hover:shadow-xl hover:border-primary/50 transition-all">
-              <div className={`w-12 h-12 ${f.bg} rounded-xl flex items-center justify-center mb-4`}>
-                <f.icon className={`w-6 h-6 ${f.color}`} />
+              <div className={`size-12 ${f.bg} rounded-xl flex items-center justify-center mb-4`}>
+                <f.icon className={`size-6 ${f.color}`} />
               </div>
               <h3 className="text-lg sm:text-xl font-bold mb-2">{f.title}</h3>
               <p className="text-sm sm:text-base text-muted-foreground">{f.desc}</p>
@@ -137,7 +137,7 @@ export default function Home() {
               { title: "Soporte en Español",         desc: "Todo el sistema en tu idioma" },
             ].map((b) => (
               <div key={b.title} className="flex gap-3 sm:gap-4">
-                <CheckCircle2 className="w-5 h-5 sm:w-6 sm:h-6 shrink-0 mt-1" />
+                <CheckCircle2 className="size-5 sm:w-6 sm:h-6 shrink-0 mt-1" />
                 <div>
                   <h3 className="font-bold text-base sm:text-lg mb-1">{b.title}</h3>
                   <p className="text-sm sm:text-base text-primary-foreground/80">{b.desc}</p>
@@ -168,8 +168,8 @@ export default function Home() {
         <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-12">
           <div className="flex flex-col md:flex-row justify-between items-center gap-4 sm:gap-6">
             <div className="flex items-center gap-2">
-              <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center shadow-lg shadow-primary/30">
-                <Zap className="w-5 h-5 text-primary-foreground" />
+              <div className="size-8 bg-primary rounded-lg flex items-center justify-center shadow-lg shadow-primary/30">
+                <Zap className="size-5 text-primary-foreground" />
               </div>
               <span className="text-lg sm:text-xl font-bold">Konta</span>
             </div>

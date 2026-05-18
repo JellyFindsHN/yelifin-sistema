@@ -1,4 +1,4 @@
-// app/(dashboard)/dashboard/page.tsx
+﻿// app/(dashboard)/dashboard/page.tsx
 "use client";
 
 import { useState } from "react";
@@ -50,7 +50,7 @@ const MONTH_NAMES = [
 ];
 
 export default function DashboardPage() {
-  const router = useRouter();
+  const { push } = useRouter();
 
   const [selectedMonth, setSelectedMonth] = useState<number | undefined>();
   const [selectedYear, setSelectedYear] = useState<number | undefined>();
@@ -111,16 +111,16 @@ export default function DashboardPage() {
       {/* Header */}
       <div className="flex items-center justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">Dashboard</h1>
+          <h1 className="text-2xl font-semibold tracking-tight">Dashboard</h1>
           <p className="text-muted-foreground text-sm">Resumen de tu negocio</p>
         </div>
 
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button variant="outline" size="sm" className="gap-1.5 shrink-0">
-              <CalendarDays className="h-3.5 w-3.5" />
+              <CalendarDays className="size-3.5" />
               <span className="text-sm">{periodLabel()}</span>
-              <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
+              <ChevronDown className="size-3.5 text-muted-foreground" />
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-52">
@@ -228,7 +228,7 @@ export default function DashboardPage() {
           {
             label: "Nueva venta",
             icon: ShoppingCart,
-            onClick: () => router.push("/sales/new"),
+            onClick: () => push("/sales/new"),
           },
           {
             label: "Nueva transacción",

@@ -1,4 +1,4 @@
-// components/customers/edit-customer-dialog.tsx
+﻿// components/customers/edit-customer-dialog.tsx
 "use client";
 
 import { useEffect } from "react";
@@ -103,7 +103,7 @@ export function EditCustomerDialog({ customer, open, onOpenChange, onSuccess }: 
         {/* Header */}
         <DialogHeader className="shrink-0 px-5 pt-2 pb-3 sm:pt-5 border-b">
           <DialogTitle className="flex items-center gap-2 text-lg font-bold">
-            <Pencil className="h-4 w-4 text-primary" />
+            <Pencil className="size-4 text-primary" />
             Editar cliente
           </DialogTitle>
           <p className="text-sm text-muted-foreground truncate">{customer.name}</p>
@@ -192,8 +192,8 @@ export function EditCustomerDialog({ customer, open, onOpenChange, onSuccess }: 
             className="flex-1 h-11 gap-2"
           >
             {isUpdating
-              ? <><Loader2 className="h-4 w-4 animate-spin" />Guardando...</>
-              : <><Pencil className="h-4 w-4" />Guardar cambios</>
+              ? <><Loader2 className="size-4 animate-spin" />Guardando…</>
+              : <><Pencil className="size-4" />Guardar cambios</>
             }
           </Button>
         </div>

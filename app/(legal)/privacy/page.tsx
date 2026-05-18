@@ -1,4 +1,4 @@
-// app/(legal)/privacy/page.tsx
+﻿// app/(legal)/privacy/page.tsx
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 
@@ -16,7 +16,7 @@ export default function PrivacyPage() {
             href="/"
             className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-primary"
           >
-            <ArrowLeft className="h-4 w-4" />
+            <ArrowLeft className="size-4" />
             Volver al inicio
           </Link>
           <span className="text-lg font-semibold">Konta</span>
@@ -25,7 +25,7 @@ export default function PrivacyPage() {
 
       <main className="container mx-auto max-w-3xl px-4 py-10 md:py-16 space-y-8">
         <section className="space-y-2">
-          <h1 className="text-3xl font-bold tracking-tight">Política de Privacidad</h1>
+          <h1 className="text-3xl font-semibold tracking-tight">Política de Privacidad</h1>
           <p className="text-sm text-muted-foreground">
             Última actualización: 17 de mayo de 2026
           </p>

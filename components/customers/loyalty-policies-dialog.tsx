@@ -1,4 +1,4 @@
-// components/customers/loyalty-policies-dialog.tsx
+﻿// components/customers/loyalty-policies-dialog.tsx
 "use client";
 
 import { useState, useEffect } from "react";
@@ -153,13 +153,13 @@ export function LoyaltyPoliciesDialog({ open, onOpenChange }: Props) {
         <DialogHeader className="shrink-0 px-5 pt-2 pb-3 sm:pt-5 border-b">
           <div className="flex items-center gap-3">
             {mode === "form" && (
-              <Button variant="ghost" size="icon" className="h-7 w-7 shrink-0" onClick={resetForm}>
-                <ChevronLeft className="h-4 w-4" />
+              <Button variant="ghost" size="icon" className="size-7 shrink-0" onClick={resetForm}>
+                <ChevronLeft className="size-4" />
               </Button>
             )}
             <div>
               <DialogTitle className="flex items-center gap-2 text-lg font-bold">
-                <Star className="h-4 w-4 text-primary" />
+                <Star className="size-4 text-primary" />
                 Programa de Fidelización
               </DialogTitle>
               <p className="text-xs text-muted-foreground mt-0.5">
@@ -183,7 +183,7 @@ export function LoyaltyPoliciesDialog({ open, onOpenChange }: Props) {
                 Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-16 rounded-xl" />)
               ) : policies.length === 0 ? (
                 <div className="text-center py-10 text-muted-foreground space-y-2">
-                  <Star className="h-9 w-9 mx-auto opacity-30" />
+                  <Star className="size-9 mx-auto opacity-30" />
                   <p className="text-sm">No tienes niveles configurados</p>
                   <p className="text-xs">Crea tu primer nivel para empezar a fidelizar clientes</p>
                 </div>
@@ -192,7 +192,7 @@ export function LoyaltyPoliciesDialog({ open, onOpenChange }: Props) {
                   const colors = TIER_COLOR_CLASSES[policy.color] ?? TIER_COLOR_CLASSES.amber;
                   return (
                     <div key={policy.id} className={cn("rounded-xl border px-4 py-3 flex items-start gap-3", colors.border, colors.bg)}>
-                      <div className={cn("mt-0.5 h-3 w-3 rounded-full shrink-0", colors.dot)} />
+                      <div className={cn("mt-0.5 size-3 rounded-full shrink-0", colors.dot)} />
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2">
                           <p className={cn("text-sm font-semibold", colors.text)}>{policy.tier_name}</p>
@@ -213,7 +213,7 @@ export function LoyaltyPoliciesDialog({ open, onOpenChange }: Props) {
                               disabled={isDeleting}
                               onClick={() => handleDelete(policy.id)}
                             >
-                              {isDeleting ? <Loader2 className="h-3 w-3 animate-spin" /> : "Confirmar"}
+                              {isDeleting ? <Loader2 className="size-3 animate-spin" /> : "Confirmar"}
                             </Button>
                             <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => setDeleteId(null)}>
                               Cancelar
@@ -221,11 +221,11 @@ export function LoyaltyPoliciesDialog({ open, onOpenChange }: Props) {
                           </div>
                         ) : (
                           <>
-                            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleOpenForm(policy)}>
-                              <Pencil className="h-3.5 w-3.5" />
+                            <Button variant="ghost" size="icon" className="size-7" onClick={() => handleOpenForm(policy)}>
+                              <Pencil className="size-3.5" />
                             </Button>
-                            <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive hover:text-destructive" onClick={() => setDeleteId(policy.id)}>
-                              <Trash2 className="h-3.5 w-3.5" />
+                            <Button variant="ghost" size="icon" className="size-7 text-destructive hover:text-destructive" onClick={() => setDeleteId(policy.id)}>
+                              <Trash2 className="size-3.5" />
                             </Button>
                           </>
                         )}
@@ -272,7 +272,7 @@ export function LoyaltyPoliciesDialog({ open, onOpenChange }: Props) {
                           form.color === c.value ? "ring-2 ring-offset-1 ring-current scale-105" : "opacity-60 hover:opacity-100"
                         )}
                       >
-                        <span className={cn("h-2 w-2 rounded-full", cls.dot)} />
+                        <span className={cn("size-2 rounded-full", cls.dot)} />
                         {c.label}
                       </button>
                     );
@@ -290,12 +290,12 @@ export function LoyaltyPoliciesDialog({ open, onOpenChange }: Props) {
                 <label className="flex items-center gap-3 rounded-xl border px-3.5 py-3 cursor-pointer hover:bg-muted/30 transition-colors">
                   <input
                     type="checkbox"
-                    className="h-4 w-4 accent-primary"
+                    className="size-4 accent-primary"
                     checked={form.use_orders}
                     onChange={(e) => setForm(f => ({ ...f, use_orders: e.target.checked }))}
                     disabled={isSaving}
                   />
-                  <ShoppingCart className="h-4 w-4 text-primary shrink-0" />
+                  <ShoppingCart className="size-4 text-primary shrink-0" />
                   <div className="flex-1 flex items-center gap-2">
                     <span className="text-sm">Mínimo de órdenes</span>
                     {form.use_orders && (
@@ -316,12 +316,12 @@ export function LoyaltyPoliciesDialog({ open, onOpenChange }: Props) {
                 <label className="flex items-center gap-3 rounded-xl border px-3.5 py-3 cursor-pointer hover:bg-muted/30 transition-colors">
                   <input
                     type="checkbox"
-                    className="h-4 w-4 accent-primary"
+                    className="size-4 accent-primary"
                     checked={form.use_spent}
                     onChange={(e) => setForm(f => ({ ...f, use_spent: e.target.checked }))}
                     disabled={isSaving}
                   />
-                  <Banknote className="h-4 w-4 text-green-600 shrink-0" />
+                  <Banknote className="size-4 text-green-600 shrink-0" />
                   <div className="flex-1 flex items-center gap-2">
                     <span className="text-sm">Monto mínimo acumulado</span>
                     {form.use_spent && (
@@ -376,7 +376,7 @@ export function LoyaltyPoliciesDialog({ open, onOpenChange }: Props) {
                 Cerrar
               </Button>
               <Button className="flex-1 gap-2" onClick={() => handleOpenForm()}>
-                <Plus className="h-4 w-4" /> Agregar nivel
+                <Plus className="size-4" /> Agregar nivel
               </Button>
             </>
           ) : (
@@ -386,7 +386,7 @@ export function LoyaltyPoliciesDialog({ open, onOpenChange }: Props) {
               </Button>
               <Button className="flex-1 gap-2" onClick={handleSave} disabled={isSaving}>
                 {isSaving
-                  ? <><Loader2 className="h-4 w-4 animate-spin" />Guardando...</>
+                  ? <><Loader2 className="size-4 animate-spin" />Guardando…</>
                   : editPolicy ? "Guardar cambios" : "Crear nivel"}
               </Button>
             </>

@@ -1,7 +1,7 @@
-// components/transactions/edit-transaction-modal.tsx
+﻿// components/transactions/edit-transaction-modal.tsx
 "use client";
 
-import { useState, useEffect } from "react";
+import { useReducer, useEffect } from "react";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle,
 } from "@/components/ui/dialog";
@@ -28,6 +28,30 @@ const TYPE_CONFIG: Record<TxType, { label: string; icon: React.ElementType }> = 
   TRANSFER: { label: "Transferencia",  icon: ArrowLeftRight  },
 };
 
+type FormState = {
+  accountId:   string;
+  toAccountId: string;
+  amount:      string;
+  category:    string;
+  description: string;
+  occurredAt:  string;
+};
+
+function txFromTransaction(t: Transaction): FormState {
+  return {
+    accountId:   String(t.account_id),
+    toAccountId: String(t.to_account_id ?? ""),
+    amount:      String(t.amount),
+    category:    t.category ?? "",
+    description: t.description ?? "",
+    occurredAt:  toLocalDateInput(t.occurred_at),
+  };
+}
+
+function formReducer(state: FormState, patch: Partial<FormState>): FormState {
+  return { ...state, ...patch };
+}
+
 type Props = {
   open:          boolean;
   onOpenChange:  (v: boolean) => void;
@@ -45,23 +69,12 @@ export function EditTransactionModal({
   // El tipo no es editable — solo se muestran los campos relevantes
   const type = transaction.type as TxType;
 
-  const [accountId,   setAccountId]   = useState(String(transaction.account_id));
-  const [toAccountId, setToAccountId] = useState(String(transaction.to_account_id ?? ""));
-  const [amount,      setAmount]      = useState(String(transaction.amount));
-  const [category,    setCategory]    = useState(transaction.category ?? "");
-  const [description, setDescription] = useState(transaction.description ?? "");
-  const [occurredAt,  setOccurredAt]  = useState(
-    toLocalDateInput(transaction.occurred_at)
-  );
+  const [form, dispatch] = useReducer(formReducer, txFromTransaction(transaction));
+  const { accountId, toAccountId, amount, category, description, occurredAt } = form;
 
   // Sincronizar si cambia la transacción (ej: se abre con otra tx)
   useEffect(() => {
-    setAccountId(String(transaction.account_id));
-    setToAccountId(String(transaction.to_account_id ?? ""));
-    setAmount(String(transaction.amount));
-    setCategory(transaction.category ?? "");
-    setDescription(transaction.description ?? "");
-    setOccurredAt(toLocalDateInput(transaction.occurred_at));
+    dispatch(txFromTransaction(transaction));
   }, [transaction]);
 
   const { categories } = useTransactionCategories(type);
@@ -128,7 +141,7 @@ export function EditTransactionModal({
             </DialogTitle>
             
           <div className="flex items-center gap-1.5 mt-1">
-            <Icon className="h-3.5 w-3.5 text-muted-foreground" />
+            <Icon className="size-3.5 text-muted-foreground" />
             <span className="text-xs text-muted-foreground">{typeLabel} · No se puede cambiar el tipo</span>
           </div>
         </DialogHeader>
@@ -143,7 +156,7 @@ export function EditTransactionModal({
               {type === "TRANSFER" ? "Cuenta origen" : "Cuenta"}{" "}
               <span className="text-destructive text-xs">*</span>
             </Label>
-            <Select value={accountId} onValueChange={setAccountId}>
+            <Select value={accountId} onValueChange={(v) => dispatch({ accountId: v })}>
               <SelectTrigger className="w-full h-11">
                 <SelectValue placeholder="Selecciona una cuenta" />
               </SelectTrigger>
@@ -168,7 +181,7 @@ export function EditTransactionModal({
               <Label className="text-sm font-medium">
                 Cuenta destino <span className="text-destructive text-xs">*</span>
               </Label>
-              <Select value={toAccountId} onValueChange={setToAccountId}>
+              <Select value={toAccountId} onValueChange={(v) => dispatch({ toAccountId: v })}>
                 <SelectTrigger className="w-full h-11">
                   <SelectValue placeholder="Selecciona cuenta destino" />
                 </SelectTrigger>
@@ -200,7 +213,7 @@ export function EditTransactionModal({
                 min="0"
                 placeholder="0.00"
                 value={amount}
-                onChange={(e) => setAmount(e.target.value)}
+                onChange={(e) => dispatch({ amount: e.target.value })}
                 className="h-11 pl-8 text-base"
               />
             </div>
@@ -214,7 +227,7 @@ export function EditTransactionModal({
             <Input
               type="date"
               value={occurredAt}
-              onChange={(e) => setOccurredAt(e.target.value)}
+              onChange={(e) => dispatch({ occurredAt: e.target.value })}
               className="h-11 text-base"
             />
           </div>
@@ -225,7 +238,7 @@ export function EditTransactionModal({
               Categoría{" "}
               <span className="text-xs text-muted-foreground font-normal">opcional</span>
             </Label>
-            <Select value={category} onValueChange={setCategory}>
+            <Select value={category} onValueChange={(v) => dispatch({ category: v })}>
               <SelectTrigger className="h-11 w-full">
                 <SelectValue placeholder="Sin categoría" />
               </SelectTrigger>
@@ -250,7 +263,7 @@ export function EditTransactionModal({
               placeholder="Detalle de la transacción..."
               rows={2}
               value={description}
-              onChange={(e) => setDescription(e.target.value)}
+              onChange={(e) => dispatch({ description: e.target.value })}
               className="resize-none text-base"
             />
           </div>
@@ -274,7 +287,7 @@ export function EditTransactionModal({
             className="flex-1 h-11 gap-2"
           >
             {isUpdating
-              ? <><Loader2 className="h-4 w-4 animate-spin" />Guardando...</>
+              ? <><Loader2 className="size-4 animate-spin" />Guardando…</>
               : "Guardar cambios"
             }
           </Button>

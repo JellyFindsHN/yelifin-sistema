@@ -1,4 +1,4 @@
-// components/dashboard/top-products-stock.tsx
+﻿// components/dashboard/top-products-stock.tsx
 "use client";
 
 import Image from "next/image";
@@ -46,7 +46,7 @@ export function TopProductsStock({ topProducts, lowStock, isLoading }: Props) {
       <Card>
         <CardHeader className="pb-2 pt-4 px-4">
           <CardTitle className="text-base flex items-center gap-2">
-            <AlertTriangle className="h-4 w-4 text-yellow-500" />
+            <AlertTriangle className="size-4 text-yellow-500" />
             Alertas de stock
           </CardTitle>
           <CardDescription>Productos con stock bajo</CardDescription>
@@ -60,10 +60,10 @@ export function TopProductsStock({ topProducts, lowStock, isLoading }: Props) {
             <div className="space-y-2">
               {lowStock.map((p: any) => (
                 <div key={p.id} className="flex items-center gap-3 p-2.5 rounded-lg border">
-                  <div className="relative h-8 w-8 rounded-md overflow-hidden bg-muted shrink-0 flex items-center justify-center">
+                  <div className="relative size-8 rounded-md overflow-hidden bg-muted shrink-0 flex items-center justify-center">
                     {p.image_url
                       ? <Image src={p.image_url} alt={p.name} fill className="object-cover" />
-                      : <Package className="h-4 w-4 text-muted-foreground/40" />
+                      : <Package className="size-4 text-muted-foreground/40" />
                     }
                   </div>
                   <div className="flex-1 min-w-0">

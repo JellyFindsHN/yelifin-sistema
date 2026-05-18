@@ -1,4 +1,4 @@
-// components/sales/pos/product-grid.tsx
+﻿// components/sales/pos/product-grid.tsx
 "use client";
 
 import Image from "next/image";
@@ -25,7 +25,7 @@ export function PosProductGrid({ products, cart, onAdd, search }: Props) {
   if (products.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center py-16 text-muted-foreground">
-        <Package className="h-10 w-10 mb-3 opacity-40" />
+        <Package className="size-10 mb-3 opacity-40" />
         <p className="text-sm">
           {search ? "No se encontraron productos" : "No hay productos con stock"}
         </p>
@@ -52,10 +52,10 @@ export function PosProductGrid({ products, cart, onAdd, search }: Props) {
                   className="object-cover"
                 />
               ) : (
-                <Package className="h-8 w-8 text-muted-foreground/20" />
+                <Package className="size-8 text-muted-foreground/20" />
               )}
               {cartQty > 0 && (
-                <div className="absolute top-1.5 right-1.5 bg-primary text-primary-foreground text-xs font-bold rounded-full h-5 w-5 flex items-center justify-center shadow">
+                <div className="absolute top-1.5 right-1.5 bg-primary text-primary-foreground text-xs font-bold rounded-full size-5 flex items-center justify-center shadow">
                   {cartQty}
                 </div>
               )}

@@ -1,4 +1,4 @@
-// components/customers/delete-customer-dialog.tsx
+﻿// components/customers/delete-customer-dialog.tsx
 "use client";
 
 import {
@@ -50,7 +50,7 @@ export function DeleteCustomerDialog({ customer, open, onOpenChange, onSuccess }
             disabled={isDeleting}
             className="bg-destructive hover:bg-destructive/90"
           >
-            {isDeleting ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Eliminando...</> : "Eliminar"}
+            {isDeleting ? <><Loader2 className="mr-2 size-4 animate-spin" />Eliminando…</> : "Eliminar"}
           </AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>
