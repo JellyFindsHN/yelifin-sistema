@@ -3,15 +3,18 @@
 
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/hooks/use-auth";
-import { useAdminStats } from "@/hooks/swr/use-admin";
+import { useAdminStats, useAdminStorage } from "@/hooks/swr/use-admin";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   Users, UserCheck, UserX, TrendingUp, Shield,
-  ChevronRight, Crown,
+  ChevronRight, Crown, Database, Image, HardDrive, BarChart2,
 } from "lucide-react";
+import {
+  BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer,
+} from "recharts";
 
 const STATUS_LABEL: Record<string, string> = {
   TRIAL:     "Prueba",
@@ -29,10 +32,19 @@ const STATUS_COLOR: Record<string, string> = {
   PAST_DUE:  "bg-amber-100 text-amber-700 border-amber-200",
 };
 
+
+function fmtBytes(bytes: number): string {
+  if (bytes < 1024)        return `${bytes} B`;
+  if (bytes < 1024 ** 2)   return `${(bytes / 1024).toFixed(1)} KB`;
+  if (bytes < 1024 ** 3)   return `${(bytes / 1024 ** 2).toFixed(2)} MB`;
+  return `${(bytes / 1024 ** 3).toFixed(2)} GB`;
+}
+
 export default function AdminPage() {
   const router = useRouter();
   const { user, loading } = useAuth();
   const { counts, planStats, recentUsers, isLoading } = useAdminStats();
+  const { storage, isLoading: loadingStorage } = useAdminStorage();
 
   const isAdmin = user?.subscription?.plan?.slug === "admin";
 
@@ -40,6 +52,15 @@ export default function AdminPage() {
     router.replace("/dashboard");
     return null;
   }
+
+  const topTables = (storage?.table_sizes ?? []).slice(0, 10).map((t) => ({
+    name:  t.tablename.replace(/_/g, " "),
+    bytes: t.size_bytes,
+    label: fmtBytes(t.size_bytes),
+  }));
+
+  const topUsers = storage?.top_users ?? [];
+  const maxRows  = topUsers[0]?.total_rows ?? 1;
 
   return (
     <div className="space-y-6 pb-10">
@@ -57,34 +78,14 @@ export default function AdminPage() {
       {/* Stat cards */}
       {isLoading ? (
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-          {[1,2,3,4].map(i => <Skeleton key={i} className="h-24 rounded-xl" />)}{/* skeleton - index key ok */}
+          {[1,2,3,4].map(i => <Skeleton key={i} className="h-24 rounded-xl" />)}
         </div>
       ) : counts ? (
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-          <StatCard
-            icon={<Users className="h-5 w-5 text-primary" />}
-            label="Usuarios totales"
-            value={counts.total_users}
-            bg="bg-primary/5"
-          />
-          <StatCard
-            icon={<UserCheck className="h-5 w-5 text-green-600" />}
-            label="Con suscripción activa"
-            value={counts.active_count}
-            bg="bg-green-50 dark:bg-green-950/20"
-          />
-          <StatCard
-            icon={<TrendingUp className="h-5 w-5 text-blue-600" />}
-            label="En período de prueba"
-            value={counts.trial_count}
-            bg="bg-blue-50 dark:bg-blue-950/20"
-          />
-          <StatCard
-            icon={<TrendingUp className="h-5 w-5 text-amber-600" />}
-            label="Nuevos este mes"
-            value={counts.new_this_month}
-            bg="bg-amber-50 dark:bg-amber-950/20"
-          />
+          <StatCard icon={<Users      className="h-5 w-5 text-primary" />} label="Usuarios totales"       value={counts.total_users}   bg="bg-primary/5" />
+          <StatCard icon={<UserCheck className="h-5 w-5 text-primary" />} label="Con suscripción activa" value={counts.active_count}  bg="bg-primary/5" />
+          <StatCard icon={<TrendingUp className="h-5 w-5 text-primary" />} label="En período de prueba"  value={counts.trial_count}   bg="bg-primary/5" />
+          <StatCard icon={<TrendingUp className="h-5 w-5 text-primary" />} label="Nuevos este mes"       value={counts.new_this_month} bg="bg-primary/5" />
         </div>
       ) : null}
 
@@ -99,7 +100,7 @@ export default function AdminPage() {
           </CardHeader>
           <CardContent className="space-y-2">
             {isLoading ? (
-              <div className="space-y-2">{[1,2,3].map(i => <Skeleton key={i} className="h-8" />)}{/* skeleton - index key ok */}</div>
+              <div className="space-y-2">{[1,2,3].map(i => <Skeleton key={i} className="h-8" />)}</div>
             ) : planStats.length === 0 ? (
               <p className="text-sm text-muted-foreground">Sin datos</p>
             ) : (
@@ -129,12 +130,182 @@ export default function AdminPage() {
                 return (
                   <div key={s} className="flex items-center justify-between py-1">
                     <span className="text-muted-foreground">{STATUS_LABEL[s]}</span>
-                    <Badge className={`${STATUS_COLOR[s]} border text-xs font-medium`}>
-                      {val}
-                    </Badge>
+                    <Badge className={`${STATUS_COLOR[s]} border text-xs font-medium`}>{val}</Badge>
                   </div>
                 );
               })}
+            </CardContent>
+          </Card>
+        )}
+      </div>
+
+      {/* ── DB Storage section ─────────────────────────────────────── */}
+      <div className="flex items-center gap-2 pt-2">
+        <Database className="h-4 w-4 text-muted-foreground" />
+        <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Base de datos</h2>
+      </div>
+
+      {/* DB size summary cards */}
+      {loadingStorage ? (
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+          {[1,2,3].map(i => <Skeleton key={i} className="h-20 rounded-xl" />)}
+        </div>
+      ) : storage && (
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+          <Card>
+            <CardContent>
+              <div className="flex items-center gap-2 mb-1.5">
+                <HardDrive className="h-4 w-4 text-primary" />
+              </div>
+              <p className="text-xl font-bold text-foreground">
+                {fmtBytes(storage.db_size_bytes)}
+              </p>
+              <p className="text-xs text-muted-foreground mt-0.5">Tamaño total de la BD</p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent>
+              <div className="flex items-center gap-2 mb-1.5">
+                <Image className="h-4 w-4 text-primary" />
+              </div>
+              <p className="text-xl font-bold text-foreground">
+                {storage.image_counts.user_photos + storage.image_counts.logos + storage.image_counts.product_images}
+              </p>
+              <p className="text-xs text-muted-foreground mt-0.5">Imágenes almacenadas</p>
+            </CardContent>
+          </Card>
+          <Card >
+            <CardContent>
+              <div className="flex items-center gap-2 mb-1.5">
+                <BarChart2 className="h-4 w-4 text-primary" />
+              </div>
+              <p className="text-xl font-bold text-foreground">
+                {storage.table_sizes.length}
+              </p>
+              <p className="text-xs text-muted-foreground mt-0.5">Tablas en la BD</p>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
+      <div className="grid gap-4 md:grid-cols-2">
+        {/* Table size chart */}
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base flex items-center gap-2">
+              <Database className="h-4 w-4 text-muted-foreground" />
+              Tamaño por tabla
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {loadingStorage ? (
+              <Skeleton className="h-52 mx-4 rounded-xl" />
+            ) : topTables.length === 0 ? (
+              <p className="text-sm text-muted-foreground px-4">Sin datos</p>
+            ) : (
+              <ResponsiveContainer width="100%" height={260}>
+                <BarChart
+                  data={topTables}
+                  layout="vertical"
+                  margin={{ left: 8, right: 48, top: 4, bottom: 4 }}
+                >
+                  <XAxis
+                    type="number"
+                    tickFormatter={(v) => fmtBytes(v)}
+                    tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }}
+                    axisLine={false}
+                    tickLine={false}
+                  />
+                  <YAxis
+                    type="category"
+                    dataKey="name"
+                    width={120}
+                    tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }}
+                    axisLine={false}
+                    tickLine={false}
+                  />
+                  <Tooltip
+                    formatter={(value: number) => [fmtBytes(value), "Tamaño"]}
+                    contentStyle={{
+                      background: "hsl(var(--popover))",
+                      border: "1px solid hsl(var(--border))",
+                      borderRadius: "8px",
+                      fontSize: "12px",
+                      color: "hsl(var(--popover-foreground))",
+                    }}
+                  />
+                  <Bar dataKey="bytes" radius={[0, 4, 4, 0]} fill="hsl(var(--primary))" />
+                </BarChart>
+              </ResponsiveContainer>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Top users by rows */}
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base flex items-center gap-2">
+              <Users className="h-4 w-4 text-muted-foreground" />
+              Usuarios con más registros
+            </CardTitle>
+          </CardHeader>
+          <CardContent >
+            {loadingStorage ? (
+              <div className="space-y-2">{[1,2,3,4,5].map(i => <Skeleton key={i} className="h-8" />)}</div>
+            ) : topUsers.length === 0 ? (
+              <p className="text-sm text-muted-foreground">Sin datos</p>
+            ) : (
+              topUsers.slice(0, 8).map((u) => {
+                const pct = maxRows > 0 ? Math.round((u.total_rows / maxRows) * 100) : 0;
+                return (
+                  <div
+                    key={u.id}
+                    className="cursor-pointer"
+                    onClick={() => router.push(`/admin/users/${u.id}`)}
+                  >
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="text-xs font-medium truncate max-w-45">{u.display_name}</span>
+                      <span className="text-xs text-muted-foreground shrink-0 ml-2">
+                        {u.total_rows.toLocaleString("es-HN")} filas
+                      </span>
+                    </div>
+                    <div className="h-1.5 rounded-full bg-muted overflow-hidden">
+                      <div
+                        className="h-full rounded-full bg-primary transition-all"
+                        style={{ width: `${pct}%` }}
+                      />
+                    </div>
+                  </div>
+                );
+              })
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Image breakdown */}
+        {storage && (
+          <Card className="md:col-span-2">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base flex items-center gap-2">
+                <Image className="h-4 w-4 text-muted-foreground" />
+                Imágenes almacenadas
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-3 gap-4 text-center">
+                <div>
+                  <p className="text-2xl font-bold text-foreground">{storage.image_counts.logos}</p>
+                  <p className="text-xs text-muted-foreground mt-1">Logos de negocio</p>
+                </div>
+                <div>
+                  <p className="text-2xl font-bold text-foreground">{storage.image_counts.product_images}</p>
+                  <p className="text-xs text-muted-foreground mt-1">Imágenes de productos</p>
+                </div>
+                <div>
+                  <p className="text-2xl font-bold text-foreground">{storage.image_counts.user_photos}</p>
+                  <p className="text-xs text-muted-foreground mt-1">Fotos de perfil</p>
+                </div>
+              </div>
             </CardContent>
           </Card>
         )}
@@ -150,7 +321,7 @@ export default function AdminPage() {
         </CardHeader>
         <CardContent>
           {isLoading ? (
-            <div className="space-y-2">{[1,2,3].map(i => <Skeleton key={i} className="h-12" />)}{/* skeleton - index key ok */}</div>
+            <div className="space-y-2">{[1,2,3].map(i => <Skeleton key={i} className="h-12" />)}</div>
           ) : (
             <div className="divide-y">
               {recentUsers.map((u) => (
@@ -190,8 +361,8 @@ function StatCard({ icon, label, value, bg }: {
   icon: React.ReactNode; label: string; value: number; bg: string;
 }) {
   return (
-    <Card className="border-0 shadow-sm">
-      <CardContent className={`p-4 rounded-xl ${bg}`}>
+    <Card>
+      <CardContent>
         <div className="flex items-center gap-2 mb-2">{icon}</div>
         <p className="text-2xl font-bold">{value}</p>
         <p className="text-xs text-muted-foreground mt-0.5">{label}</p>

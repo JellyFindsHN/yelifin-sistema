@@ -20,6 +20,7 @@ import {
 import { toast } from "sonner";
 import {
   useCreditCards, useDeleteCreditCard, useAllCreditCardTransactions,
+  useCCTransactionPeriods,
   CreditCard as CreditCardType,
 } from "@/hooks/swr/use-credit-cards";
 import { useAccounts } from "@/hooks/swr/use-accounts";
@@ -54,11 +55,31 @@ export default function CreditCardsPage() {
   const [payCard, setPayCard] = useState<CreditCardType | null>(null);
   const [selectedMonth, setSelectedMonth] = useState(now.getMonth() + 1);
   const [selectedYear, setSelectedYear] = useState(now.getFullYear());
+  const [selectedCardId, setSelectedCardId] = useState<number | undefined>(undefined);
+
+  const { periods } = useCCTransactionPeriods();
 
   const { transactions: ccTxs, isLoading: loadingTxs } = useAllCreditCardTransactions({
     month: selectedMonth,
     year: selectedYear,
+    card_id: selectedCardId,
   });
+
+  const currentMonth = now.getMonth() + 1;
+  const currentYear  = now.getFullYear();
+
+  const availableYears = [...new Set([
+    ...periods.map((p) => p.year),
+    currentYear,
+  ])].sort((a, b) => b - a);
+
+  const monthsForYear = (y: number) => {
+    const fromPeriods = periods.filter((p) => p.year === y).map((p) => p.month);
+    const withCurrent = y === currentYear && !fromPeriods.includes(currentMonth)
+      ? [...fromPeriods, currentMonth]
+      : fromPeriods;
+    return [...new Set(withCurrent)].sort((a, b) => b - a);
+  };
 
   const totalDebtLocal = creditCards.reduce((a, c) => a + Number(c.balance), 0);
   const totalDebtUsd   = creditCards.reduce((a, c) => a + Number(c.balance_usd), 0);
@@ -107,9 +128,8 @@ export default function CreditCardsPage() {
     }
   };
 
-  // Build year options: current year + years with data (simplified — last 3 years)
-  const yearOptions = Array.from({ length: 3 }, (_, i) => now.getFullYear() - i);
-  const monthOptions = Array.from({ length: 12 }, (_, i) => i + 1);
+  const yearOptions  = availableYears;
+  const monthOptions = monthsForYear(selectedYear);
 
   return (
     <div className="space-y-4 pb-24">
@@ -122,10 +142,29 @@ export default function CreditCardsPage() {
           </p>
         </div>
 
-        {/* Month / year filter */}
-        <div className="flex gap-2 shrink-0">
+        {/* Filters */}
+        <div className="flex flex-wrap gap-2 shrink-0">
+          {/* Card filter */}
+          {creditCards.length > 1 && (
+            <Select
+              value={selectedCardId != null ? String(selectedCardId) : "all"}
+              onValueChange={(v) => setSelectedCardId(v === "all" ? undefined : Number(v))}
+            >
+              <SelectTrigger className="w-40 h-8 text-xs">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all" className="text-xs">Todas las tarjetas</SelectItem>
+                {creditCards.map((c) => (
+                  <SelectItem key={c.id} value={String(c.id)} className="text-xs">
+                    {c.name}{c.last_four ? ` ···· ${c.last_four}` : ""}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
           <Select value={String(selectedMonth)} onValueChange={(v) => setSelectedMonth(Number(v))}>
-            <SelectTrigger className="w-36 h-8 text-xs">
+            <SelectTrigger className="w-32 h-8 text-xs">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -134,7 +173,17 @@ export default function CreditCardsPage() {
               ))}
             </SelectContent>
           </Select>
-          <Select value={String(selectedYear)} onValueChange={(v) => setSelectedYear(Number(v))}>
+          <Select
+            value={String(selectedYear)}
+            onValueChange={(v) => {
+              const y = Number(v);
+              setSelectedYear(y);
+              const months = monthsForYear(y);
+              if (months.length && !months.includes(selectedMonth)) {
+                setSelectedMonth(months[0]);
+              }
+            }}
+          >
             <SelectTrigger className="w-24 h-8 text-xs">
               <SelectValue />
             </SelectTrigger>

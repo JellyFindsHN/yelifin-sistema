@@ -4,7 +4,7 @@
 import { useState, useEffect, use } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { useAdminUser, useAdminUpdateUser, useAdminPlans } from "@/hooks/swr/use-admin";
+import { useAdminUser, useAdminUpdateUser, useAdminPlans, type AdminUserStorage } from "@/hooks/swr/use-admin";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge }    from "@/components/ui/badge";
 import { Button }   from "@/components/ui/button";
@@ -23,7 +23,7 @@ import {
 import {
   ArrowLeft, Building2, Mail, Calendar, ShoppingCart,
   Package, ReceiptText, Crown, AlertTriangle, CheckCircle2,
-  XCircle, Loader2, Save, Clock, RefreshCw,
+  XCircle, Loader2, Save, Clock, RefreshCw, Database, Image,
 } from "lucide-react";
 
 const STATUS_LABEL: Record<string, string> = {
@@ -46,7 +46,7 @@ export default function AdminUserDetailPage({ params }: { params: Promise<{ id: 
   const router  = useRouter();
   const userId  = Number(id);
 
-  const { user, activity, isLoading, mutate } = useAdminUser(userId);
+  const { user, activity, storage, isLoading, mutate } = useAdminUser(userId);
   const { plans }                              = useAdminPlans();
   const { updateUser, isSaving }              = useAdminUpdateUser(userId);
 
@@ -146,7 +146,7 @@ export default function AdminUserDetailPage({ params }: { params: Promise<{ id: 
                 ? new Date(user.last_refresh_time).toLocaleString("es-HN", { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })
                 : "—"}
             />
-            <InfoRow icon={<Building2 className="h-3.5 w-3.5"/>} label="Moneda" value={user.currency} />
+            <InfoRow icon={<Building2 className="h-3.5 w-3.5"/>} label="Moneda" value={user.currency ?? "—"} />
             <InfoRow icon={<Building2 className="h-3.5 w-3.5"/>} label="Zona horaria" value={user.timezone} />
           </CardContent>
         </Card>
@@ -161,9 +161,9 @@ export default function AdminUserDetailPage({ params }: { params: Promise<{ id: 
                 </CardTitle>
               </CardHeader>
               <CardContent className="px-3.5 pb-3 space-y-2">
-                <ActivityStat icon={<ShoppingCart className="h-3.5 w-3.5 text-primary"/>}    label="Ventas"         value={activity.total_sales} />
-                <ActivityStat icon={<Package      className="h-3.5 w-3.5 text-amber-600"/>}  label="Productos"      value={activity.total_products} />
-                <ActivityStat icon={<ReceiptText  className="h-3.5 w-3.5 text-green-600"/>}  label="Transacciones"  value={activity.total_transactions} />
+                <ActivityStat icon={<ShoppingCart className="h-3.5 w-3.5 text-primary"/>} label="Ventas"        value={activity.total_sales} />
+                <ActivityStat icon={<Package      className="h-3.5 w-3.5 text-primary"/>} label="Productos"     value={activity.total_products} />
+                <ActivityStat icon={<ReceiptText  className="h-3.5 w-3.5 text-primary"/>} label="Transacciones" value={activity.total_transactions} />
               </CardContent>
             </Card>
           )}
@@ -208,6 +208,9 @@ export default function AdminUserDetailPage({ params }: { params: Promise<{ id: 
           </Card>
         </div>
       </div>
+
+      {/* Almacenamiento */}
+      {storage && <StorageCard storage={storage} />}
 
       {/* Editar suscripción */}
       <Card className="pt-1 pb-1">
@@ -340,6 +343,77 @@ function ActivityStat({ icon, label, value }: { icon: React.ReactNode; label: st
       </div>
       <span className="font-bold text-sm">{value}</span>
     </div>
+  );
+}
+
+const STORAGE_ROWS: { key: keyof AdminUserStorage; label: string }[] = [
+  { key: "products",            label: "Productos"              },
+  { key: "sales",               label: "Ventas"                 },
+  { key: "transactions",        label: "Transacciones"          },
+  { key: "customers",           label: "Clientes"               },
+  { key: "accounts",            label: "Cuentas"                },
+  { key: "credit_cards",        label: "Tarjetas de crédito"    },
+  { key: "cc_transactions",     label: "Movimientos de tarjeta" },
+  { key: "inventory_batches",   label: "Lotes de inventario"    },
+  { key: "inventory_movements", label: "Movimientos de inventario" },
+  { key: "events",              label: "Eventos"                },
+];
+
+function StorageCard({ storage }: { storage: AdminUserStorage }) {
+  const total = STORAGE_ROWS.reduce((sum, r) => sum + (storage[r.key] as number), 0);
+  const maxVal = Math.max(...STORAGE_ROWS.map((r) => storage[r.key] as number), 1);
+
+  return (
+    <Card className="pt-1 pb-1">
+      <CardHeader className="px-3.5 pt-3 pb-2">
+        <CardTitle className="text-xs font-medium text-muted-foreground flex items-center justify-between">
+          <span className="flex items-center gap-1.5">
+            <Database className="h-3.5 w-3.5" /> Almacenamiento en BD
+          </span>
+          <Badge variant="secondary" className="text-[10px]">
+            {total.toLocaleString("es-HN")} filas totales
+          </Badge>
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="px-3.5 pb-3 space-y-2">
+        {STORAGE_ROWS.filter((r) => (storage[r.key] as number) > 0).map((r) => {
+          const val = storage[r.key] as number;
+          const pct = Math.round((val / maxVal) * 100);
+          return (
+            <div key={r.key}>
+              <div className="flex items-center justify-between mb-0.5">
+                <span className="text-xs text-muted-foreground">{r.label}</span>
+                <span className="text-xs font-medium">{val.toLocaleString("es-HN")}</span>
+              </div>
+              <div className="h-1.5 rounded-full bg-muted overflow-hidden">
+                <div
+                  className="h-full rounded-full bg-primary transition-all"
+                  style={{ width: `${pct}%` }}
+                />
+              </div>
+            </div>
+          );
+        })}
+        {total === 0 && (
+          <p className="text-xs text-muted-foreground">Sin datos registrados</p>
+        )}
+
+        {/* Imágenes */}
+        {storage.image_count > 0 && (
+          <>
+            <Separator className="my-1" />
+            <div className="flex items-center justify-between">
+              <span className="text-xs text-muted-foreground flex items-center gap-1.5">
+                <Image className="h-3 w-3" /> Imágenes subidas
+              </span>
+              <Badge variant="outline" className="text-[10px]">
+                {storage.image_count}
+              </Badge>
+            </div>
+          </>
+        )}
+      </CardContent>
+    </Card>
   );
 }
 

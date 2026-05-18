@@ -28,13 +28,13 @@ import {
 import {
   useCreditCard,
   useCreditCardTransactions,
-  useUpdateCCTransactionCategory,
+  useCreditCardPeriods,
   useDeleteCCTransaction,
   CreditCardTransaction,
 } from "@/hooks/swr/use-credit-cards";
 import { useAccounts } from "@/hooks/swr/use-accounts";
 import { useCurrency } from "@/hooks/swr/use-currency";
-import { useTransactionCategories, TransactionCategory } from "@/hooks/swr/use-transaction-categories";
+import { useTransactionCategories } from "@/hooks/swr/use-transaction-categories";
 import { toast } from "sonner";
 import { PayCreditCardDialog } from "@/components/credit-cards/pay-credit-card-dialog";
 import { EditCCTransactionDialog } from "@/components/credit-cards/edit-cc-transaction-dialog";
@@ -66,9 +66,9 @@ export default function CreditCardDetailPage({
     month: selectedMonth,
     year: selectedYear,
   });
+  const { periods } = useCreditCardPeriods(cardId);
   const { accounts } = useAccounts();
   const { format, currency } = useCurrency();
-  const { updateCategory } = useUpdateCCTransactionCategory();
   const { deleteTransaction, isDeleting } = useDeleteCCTransaction();
   const { categories: expenseCategories } = useTransactionCategories("EXPENSE");
 
@@ -76,16 +76,6 @@ export default function CreditCardDetailPage({
     mutateCard();
     mutateTxns();
     setPayOpen(false);
-  };
-
-  const handleCategoryChange = async (txId: number, category: string | null) => {
-    try {
-      await updateCategory(txId, category);
-      mutateTxns();
-      toast.success("Categoria actualizada");
-    } catch {
-      toast.error("Error al actualizar categoria");
-    }
   };
 
   const handleDelete = async () => {
@@ -101,7 +91,24 @@ export default function CreditCardDetailPage({
     }
   };
 
-  const years = [now.getFullYear(), now.getFullYear() - 1];
+  const currentMonth = now.getMonth() + 1;
+  const currentYear  = now.getFullYear();
+
+  const availableYears = [...new Set([
+    ...periods.map((p) => p.year),
+    currentYear,
+  ])].sort((a, b) => b - a);
+
+  const monthsForYear = (y: number) => {
+    const fromPeriods = periods.filter((p) => p.year === y).map((p) => p.month);
+    const withCurrent = y === currentYear && !fromPeriods.includes(currentMonth)
+      ? [...fromPeriods, currentMonth]
+      : fromPeriods;
+    return [...new Set(withCurrent)].sort((a, b) => b - a);
+  };
+
+  const yearOptions  = availableYears;
+  const monthOptions = monthsForYear(selectedYear);
 
   return (
     <div className="space-y-4 pb-24">
@@ -127,50 +134,88 @@ export default function CreditCardDetailPage({
 
       {/* Card info */}
       {loadingCard ? (
-        <Skeleton className="h-32 w-full rounded-xl" />
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <Skeleton className="h-32 w-full rounded-xl" />
+          <Skeleton className="h-32 w-full rounded-xl" />
+        </div>
       ) : creditCard && (
-        <Card className="bg-primary text-primary-foreground">
-          <CardContent className="p-4 pt-0 pb-0">
-            <div className="flex items-center justify-between mb-3">
-              <p className="text-sm font-medium opacity-80">Saldo pendiente</p>
-              <CreditCard className="h-5 w-5 opacity-60" />
-            </div>
-            <div className="flex flex-wrap gap-4">
-              <div>
-                <p className="text-xs opacity-60">{currency}</p>
-                <p className="text-2xl font-bold">{format(Number(creditCard.balance))}</p>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          {/* Saldo pendiente */}
+          <Card className="bg-primary text-primary-foreground">
+            <CardContent className="p-4 pt-0 pb-0">
+              <div className="flex items-center justify-between mb-3">
+                <p className="text-sm font-medium opacity-80">Saldo pendiente</p>
+                <CreditCard className="h-5 w-5 opacity-60" />
               </div>
-              {Number(creditCard.balance_usd) > 0 && (
+              <div className="flex flex-wrap gap-4">
                 <div>
-                  <p className="text-xs opacity-60">USD</p>
-                  <p className="text-2xl font-bold flex items-center gap-0.5">
-                    <DollarSign className="h-4 w-4" />
-                    {Number(creditCard.balance_usd).toFixed(2)}
+                  <p className="text-xs opacity-60">{currency}</p>
+                  <p className="text-2xl font-bold">{format(Number(creditCard.balance))}</p>
+                </div>
+                {Number(creditCard.balance_usd) > 0 && (
+                  <div>
+                    <p className="text-xs opacity-60">USD</p>
+                    <p className="text-2xl font-bold flex items-center gap-0.5">
+                      <DollarSign className="h-4 w-4" />
+                      {Number(creditCard.balance_usd).toFixed(2)}
+                    </p>
+                  </div>
+                )}
+              </div>
+              <div className="flex items-center gap-4 mt-3 flex-wrap">
+                {creditCard.credit_limit && (
+                  <p className="text-xs opacity-60">
+                    Límite: {format(Number(creditCard.credit_limit))}
+                  </p>
+                )}
+                {creditCard.payment_due_day && (
+                  <p className="text-xs opacity-60 flex items-center gap-1">
+                    <CalendarDays className="h-3 w-3" />
+                    Pago: día {creditCard.payment_due_day}
+                  </p>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Saldo al corte */}
+          <Card className="border-amber-200 bg-amber-50/60 dark:bg-amber-950/20 dark:border-amber-800">
+            <CardContent className="p-4 pt-0 pb-0">
+              <div className="flex items-center justify-between mb-3">
+                <p className="text-sm font-medium text-amber-700 dark:text-amber-400">Saldo al corte</p>
+                <CalendarDays className="h-5 w-5 text-amber-500" />
+              </div>
+              <div className="flex flex-wrap gap-4">
+                <div>
+                  <p className="text-xs text-muted-foreground">{currency}</p>
+                  <p className="text-2xl font-bold text-amber-700 dark:text-amber-400">
+                    {format(creditCard.statement_balance_local ?? 0)}
                   </p>
                 </div>
-              )}
-            </div>
-            <div className="flex items-center gap-4 mt-3 flex-wrap">
-              {creditCard.credit_limit && (
-                <p className="text-xs opacity-60">
-                  Limite: {format(Number(creditCard.credit_limit))}
-                </p>
-              )}
-              {creditCard.statement_closing_day && (
-                <p className="text-xs opacity-60 flex items-center gap-1">
-                  <CalendarDays className="h-3 w-3" />
-                  Corte: dia {creditCard.statement_closing_day}
-                </p>
-              )}
-              {creditCard.payment_due_day && (
-                <p className="text-xs opacity-60 flex items-center gap-1">
-                  <CalendarDays className="h-3 w-3" />
-                  Pago: dia {creditCard.payment_due_day}
-                </p>
-              )}
-            </div>
-          </CardContent>
-        </Card>
+                <div>
+                  <p className="text-xs text-muted-foreground">USD</p>
+                  <p className="text-2xl font-bold text-amber-700 dark:text-amber-400 flex items-center gap-0.5">
+                    <DollarSign className="h-4 w-4" />
+                    {(creditCard.statement_balance_usd ?? 0).toFixed(2)}
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center gap-4 mt-3 flex-wrap">
+                {creditCard.statement_closing_day && (
+                  <p className="text-xs text-muted-foreground flex items-center gap-1">
+                    <CalendarDays className="h-3 w-3" />
+                    Corte: día {creditCard.statement_closing_day}
+                  </p>
+                )}
+                {creditCard.cycle_start && (
+                  <p className="text-xs text-muted-foreground">
+                    Desde {new Date(creditCard.cycle_start).toLocaleDateString("es-HN", { day: "numeric", month: "short" })}
+                  </p>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        </div>
       )}
 
       {/* Filtro de periodo */}
@@ -178,15 +223,25 @@ export default function CreditCardDetailPage({
         <Select value={String(selectedMonth)} onValueChange={(v) => setSelectedMonth(Number(v))}>
           <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
           <SelectContent>
-            {MONTH_NAMES.slice(1).map((name, i) => (
-              <SelectItem key={i + 1} value={String(i + 1)}>{name}</SelectItem>
+            {monthOptions.map((m) => (
+              <SelectItem key={m} value={String(m)}>{MONTH_NAMES[m]}</SelectItem>
             ))}
           </SelectContent>
         </Select>
-        <Select value={String(selectedYear)} onValueChange={(v) => setSelectedYear(Number(v))}>
+        <Select
+          value={String(selectedYear)}
+          onValueChange={(v) => {
+            const y = Number(v);
+            setSelectedYear(y);
+            const months = monthsForYear(y);
+            if (months.length && !months.includes(selectedMonth)) {
+              setSelectedMonth(months[0]);
+            }
+          }}
+        >
           <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
           <SelectContent>
-            {years.map((y) => <SelectItem key={y} value={String(y)}>{y}</SelectItem>)}
+            {yearOptions.map((y) => <SelectItem key={y} value={String(y)}>{y}</SelectItem>)}
           </SelectContent>
         </Select>
       </div>
@@ -248,8 +303,6 @@ export default function CreditCardDetailPage({
                     txn={txn}
                     format={format}
                     currency={currency}
-                    expenseCategories={expenseCategories}
-                    onCategoryChange={handleCategoryChange}
                     onEdit={() => setEditingTxn(txn)}
                     onDelete={() => setDeletingTxn(txn)}
                   />
@@ -315,16 +368,12 @@ function CreditCardTxnRow({
   txn,
   format,
   currency,
-  expenseCategories,
-  onCategoryChange,
   onEdit,
   onDelete,
 }: {
   txn: CreditCardTransaction;
   format: (v: number) => string;
   currency: string;
-  expenseCategories: TransactionCategory[];
-  onCategoryChange: (id: number, category: string | null) => Promise<void>;
   onEdit: () => void;
   onDelete: () => void;
 }) {
@@ -367,25 +416,12 @@ function CreditCardTxnRow({
             </span>
           )}
         </div>
-        {isCharge && (
+        {isCharge && txn.category && (
           <div className="mt-1">
-            <Select
-              value={txn.category ?? "__none__"}
-              onValueChange={async (val) => {
-                await onCategoryChange(txn.id, val === "__none__" ? null : val);
-              }}
-            >
-              <SelectTrigger className="h-6 text-[10px] w-36 border-dashed px-2">
-                <Tag className="h-2.5 w-2.5 mr-1 shrink-0" />
-                <SelectValue placeholder="Sin categoria" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="__none__">Sin categoria</SelectItem>
-                {expenseCategories.map((c) => (
-                  <SelectItem key={c.id} value={c.name}>{c.name}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <Badge variant="secondary" className="text-[10px] px-1.5 py-0 gap-1">
+              <Tag className="h-2.5 w-2.5 shrink-0" />
+              {txn.category}
+            </Badge>
           </div>
         )}
       </div>

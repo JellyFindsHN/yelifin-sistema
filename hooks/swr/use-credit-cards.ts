@@ -19,6 +19,10 @@ export type CreditCard = {
   is_active: boolean;
   created_at: string;
   updated_at: string;
+  // only present on detail endpoint
+  statement_balance_local?: number;
+  statement_balance_usd?: number;
+  cycle_start?: string;
 };
 
 export type CreditCardTransaction = {
@@ -145,6 +149,34 @@ export function useCreditCardTransactions(
     isLoading,
     error: error?.message ?? null,
     mutate,
+  };
+}
+
+export function useCreditCardPeriods(id: number | null) {
+  const { firebaseUser } = useAuth();
+  const authFetch = useAuthFetch();
+  const { data, isLoading } = useSWR(
+    firebaseUser && id ? `/api/credit-cards/${id}/periods` : null,
+    (url: string) => authFetch(url),
+    { revalidateOnFocus: false, dedupingInterval: 5 * 60_000 }
+  );
+  return {
+    periods: (data?.data ?? []) as { year: number; month: number }[],
+    isLoading,
+  };
+}
+
+export function useCCTransactionPeriods() {
+  const { firebaseUser } = useAuth();
+  const authFetch = useAuthFetch();
+  const { data, isLoading } = useSWR(
+    firebaseUser ? "/api/credit-card-transactions/periods" : null,
+    (url: string) => authFetch(url),
+    { revalidateOnFocus: false, dedupingInterval: 5 * 60_000 }
+  );
+  return {
+    periods: (data?.data ?? []) as { year: number; month: number }[],
+    isLoading,
   };
 }
 

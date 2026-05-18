@@ -77,12 +77,32 @@ export async function GET(request: NextRequest, { params }: Params) {
     // Totales de actividad
     const [activity] = await sql`
       SELECT
-        (SELECT COUNT(*) FROM sales       WHERE user_id = ${userId})::int AS total_sales,
-        (SELECT COUNT(*) FROM products    WHERE user_id = ${userId} AND is_active = TRUE)::int AS total_products,
+        (SELECT COUNT(*) FROM sales        WHERE user_id = ${userId})::int AS total_sales,
+        (SELECT COUNT(*) FROM products     WHERE user_id = ${userId} AND is_active = TRUE)::int AS total_products,
         (SELECT COUNT(*) FROM transactions WHERE user_id = ${userId})::int AS total_transactions
     `;
 
-    return Response.json({ user: { ...user, ...firebaseMeta }, activity });
+    // Almacenamiento del usuario
+    const [storage] = await sql`
+      SELECT
+        (SELECT COUNT(*) FROM products                 WHERE user_id = ${userId})::int AS products,
+        (SELECT COUNT(*) FROM sales                    WHERE user_id = ${userId})::int AS sales,
+        (SELECT COUNT(*) FROM transactions             WHERE user_id = ${userId})::int AS transactions,
+        (SELECT COUNT(*) FROM customers                WHERE user_id = ${userId})::int AS customers,
+        (SELECT COUNT(*) FROM accounts                 WHERE user_id = ${userId})::int AS accounts,
+        (SELECT COUNT(*) FROM credit_cards             WHERE user_id = ${userId})::int AS credit_cards,
+        (SELECT COUNT(*) FROM credit_card_transactions WHERE user_id = ${userId})::int AS cc_transactions,
+        (SELECT COUNT(*) FROM inventory_batches        WHERE user_id = ${userId})::int AS inventory_batches,
+        (SELECT COUNT(*) FROM inventory_movements      WHERE user_id = ${userId})::int AS inventory_movements,
+        (SELECT COUNT(*) FROM events                   WHERE user_id = ${userId})::int AS events,
+        (
+          CASE WHEN (SELECT photo_url FROM users WHERE id = ${userId}) IS NOT NULL THEN 1 ELSE 0 END +
+          CASE WHEN (SELECT business_logo_url FROM user_profile WHERE user_id = ${userId}) IS NOT NULL THEN 1 ELSE 0 END +
+          (SELECT COUNT(*) FROM products WHERE user_id = ${userId} AND image_url IS NOT NULL)::int
+        )::int AS image_count
+    `;
+
+    return Response.json({ user: { ...user, ...firebaseMeta }, activity, storage });
   } catch (error) {
     console.error("GET /api/admin/users/[id]:", error);
     return createErrorResponse("Error al obtener usuario", 500);

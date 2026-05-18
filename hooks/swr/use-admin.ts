@@ -67,6 +67,27 @@ export type AdminUserActivity = {
   total_transactions: number;
 };
 
+export type AdminUserStorage = {
+  products:            number;
+  sales:               number;
+  transactions:        number;
+  customers:           number;
+  accounts:            number;
+  credit_cards:        number;
+  cc_transactions:     number;
+  inventory_batches:   number;
+  inventory_movements: number;
+  events:              number;
+  image_count:         number;
+};
+
+export type AdminStorageStats = {
+  db_size_bytes: number;
+  table_sizes: { tablename: string; size_bytes: number }[];
+  top_users: { id: number; email: string; display_name: string; total_rows: number }[];
+  image_counts: { user_photos: number; logos: number; product_images: number };
+};
+
 export type AdminPlan = {
   id:                   number;
   name:                 string;
@@ -147,6 +168,23 @@ export function useAdminUser(id: number | null) {
   return {
     user:     (data?.user     ?? null) as AdminUserDetail | null,
     activity: (data?.activity ?? null) as AdminUserActivity | null,
+    storage:  (data?.storage  ?? null) as AdminUserStorage | null,
+    isLoading,
+    error:    (error as any)?.message ?? null,
+    mutate,
+  };
+}
+
+export function useAdminStorage() {
+  const { firebaseUser } = useAuth();
+  const authFetch = useAuthFetch();
+  const { data, isLoading, error, mutate } = useSWR(
+    firebaseUser ? "/api/admin/storage" : null,
+    (u: string) => authFetch(u),
+    { revalidateOnFocus: false, dedupingInterval: 60_000 }
+  );
+  return {
+    storage:  (data ?? null) as AdminStorageStats | null,
     isLoading,
     error:    (error as any)?.message ?? null,
     mutate,
