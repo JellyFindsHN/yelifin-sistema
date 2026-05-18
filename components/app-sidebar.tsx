@@ -31,7 +31,7 @@ import {
 import {
   Tooltip, TooltipContent, TooltipProvider, TooltipTrigger,
 } from "@/components/ui/tooltip"
-import { Avatar, AvatarFallback } from "@/components/ui/avatar"
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { ThemeToggle }   from "@/components/theme-toggle"
 import { PrivacyToggle } from "@/components/privacy-toggle"
 
@@ -310,6 +310,11 @@ export function AppSidebar() {
             <DropdownMenuTrigger asChild>
               <button className={`flex w-full items-center rounded-lg p-2 hover:bg-sidebar-accent transition-colors ${isCollapsed ? "justify-center" : "gap-3"}`}>
                 <Avatar className="h-8 w-8 shrink-0">
+                  <AvatarImage
+                    src={user?.profile?.business_logo_url ?? undefined}
+                    alt={displayName}
+                    className="object-cover"
+                  />
                   <AvatarFallback className="bg-primary text-primary-foreground text-sm">
                     {getUserInitials()}
                   </AvatarFallback>
