@@ -23,7 +23,7 @@ export default function VerifyEmailPage() {
     if (loading) return;
     if (emailVerified) { push('/onboarding'); return; }
     if (!firebaseUser) { push('/login'); return; }
-  }, [firebaseUser, loading, emailVerified, router]);
+  }, [firebaseUser, loading, emailVerified, push]);
 
   useEffect(() => {
     if (cooldown <= 0) return;
