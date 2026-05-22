@@ -105,6 +105,7 @@ export function EditProductDialog({
   const [imageFile,        setImageFile]        = useState<File | null>(null);
   const [imagePreview,     setImagePreview]      = useState<string | null>(null);
   const [isUploadingImage, setIsUploadingImage]  = useState(false);
+  const [isDragging,       setIsDragging]        = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const {
@@ -131,6 +132,29 @@ export function EditProductDialog({
 
   const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
+    if (!file) return;
+    if (!file.type.startsWith("image/")) { toast.error("Solo se permiten imágenes"); return; }
+    if (file.size > 5 * 1024 * 1024)    { toast.error("La imagen no puede superar 5MB"); return; }
+    setImageFile(file);
+    setImagePreview(URL.createObjectURL(file));
+  };
+
+  const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    if (isLoading) return;
+    setIsDragging(true);
+  };
+
+  const handleDragLeave = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    setIsDragging(false);
+  };
+
+  const handleDrop = async (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    if (isLoading) return;
+    setIsDragging(false);
+    const file = e.dataTransfer.files?.[0];
     if (!file) return;
     if (!file.type.startsWith("image/")) { toast.error("Solo se permiten imágenes"); return; }
     if (file.size > 5 * 1024 * 1024)    { toast.error("La imagen no puede superar 5MB"); return; }
@@ -235,12 +259,17 @@ export function EditProductDialog({
               <FieldLabel icon={<ImageIcon className="size-3.5" />} label="Imagen" optional />
               <div
                 className={cn(
-                  "relative w-full aspect-video rounded-xl border-2 border-dashed transition-colors overflow-hidden cursor-pointer",
+                  "relative w-full aspect-video rounded-xl border-2 border-dashed transition-colors overflow-hidden",
+                  isLoading ? "opacity-50 cursor-not-allowed" : "cursor-pointer",
                   imagePreview
                     ? "border-transparent"
                     : "border-muted-foreground/20 hover:border-primary/40 bg-muted/20",
+                  isDragging && !isLoading && "border-primary bg-primary/5",
                 )}
                 onClick={() => !isLoading && fileInputRef.current?.click()}
+                onDragOver={handleDragOver}
+                onDragLeave={handleDragLeave}
+                onDrop={handleDrop}
               >
                 {imagePreview ? (
                   <>
@@ -261,7 +290,9 @@ export function EditProductDialog({
                     <div className="size-10 rounded-xl bg-muted flex items-center justify-center">
                       <Upload className="size-5" />
                     </div>
-                    <p className="text-sm font-medium">Toca para subir imagen</p>
+                    <p className="text-sm font-medium">
+                      {isDragging ? "Suelta la imagen aquí" : "Toca o arrastra una imagen"}
+                    </p>
                     <p className="text-xs text-center opacity-70">
                       PNG, JPG, WebP · máx 5MB · se convierte a WebP
                     </p>
