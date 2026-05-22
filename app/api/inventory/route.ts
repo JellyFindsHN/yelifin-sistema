@@ -12,7 +12,6 @@ export async function GET(request: NextRequest) {
   try {
     const { userId }       = auth.data;
     const { searchParams } = new URL(request.url);
-
     const search      = searchParams.get("search")?.trim() || null;
     const stockFilter = searchParams.get("stock") || null;
     const page        = Math.max(1, Number(searchParams.get("page"))  || 1);
@@ -22,8 +21,8 @@ export async function GET(request: NextRequest) {
     // ── Stats globales (sin filtros) ──────────────────────────────────
     const [statsRow] = await sql`
       SELECT
-        COUNT(p.id)::int AS total_products,
-        COUNT(p.id) FILTER (WHERE NOT p.is_service)::int AS total_physical,
+        COUNT(DISTINCT p.id) FILTER (WHERE p.is_active = TRUE AND p.user_id = ${userId})::int AS total_products,
+        COUNT(DISTINCT p.id) FILTER (WHERE NOT p.is_service)::int AS total_physical,
         COALESCE(SUM(ib.qty_available) FILTER (WHERE NOT p.is_service), 0)::numeric AS total_stock,
         COALESCE(SUM(ib.qty_available * ib.unit_cost) FILTER (WHERE NOT p.is_service), 0)::numeric AS total_value,
         COUNT(DISTINCT p.id) FILTER (
@@ -41,7 +40,7 @@ export async function GET(request: NextRequest) {
         )::int AS out_of_stock
       FROM products p
       LEFT JOIN inventory_batches ib ON ib.product_id = p.id AND ib.user_id = p.user_id
-      WHERE p.user_id = ${userId} AND p.is_active = TRUE
+      WHERE p.user_id = ${userId} AND p.is_active = TRUE;
     `;
 
     // ── Filtros dinámicos ─────────────────────────────────────────────
