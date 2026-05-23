@@ -35,8 +35,8 @@ export async function GET(request: NextRequest, { params }: Params) {
         COALESCE(SUM(ib.qty_available), 0) AS stock,
         (
           SELECT COALESCE(
-            json_agg(
-              json_build_object(
+            jsonb_agg(
+              jsonb_build_object(
                 'id',             pv.id,
                 'variant_name',   pv.variant_name,
                 'sku',            pv.sku,
@@ -48,7 +48,7 @@ export async function GET(request: NextRequest, { params }: Params) {
                 'updated_at',     pv.updated_at
               ) ORDER BY pv.id
             ),
-            '[]'::json
+            '[]'::jsonb
           )
           FROM product_variants pv
           WHERE pv.product_id = p.id
@@ -162,6 +162,7 @@ export async function DELETE(request: NextRequest, { params }: Params) {
       return Response.json({ message: "Producto eliminado permanentemente" });
     }
 
+    // Soft-delete the product
     await sql`
       UPDATE products SET
         is_active  = FALSE,
@@ -169,6 +170,33 @@ export async function DELETE(request: NextRequest, { params }: Params) {
       WHERE id      = ${productId}
         AND user_id = ${userId}
     `;
+
+    // Hard-delete variants with no history; soft-delete those that have history
+    const variants = await sql`
+      SELECT id FROM product_variants
+      WHERE product_id = ${productId}
+        AND user_id    = ${userId}
+    `;
+
+    for (const v of variants) {
+      const [vUsage] = await sql`
+        SELECT (
+          (SELECT COUNT(*) FROM sale_items          WHERE variant_id = ${v.id}) +
+          (SELECT COUNT(*) FROM inventory_movements WHERE variant_id = ${v.id})
+        ) AS total
+      `;
+      if (Number(vUsage.total) === 0) {
+        await sql`DELETE FROM product_variants WHERE id = ${v.id} AND user_id = ${userId}`;
+      } else {
+        await sql`
+          UPDATE product_variants SET
+            is_active  = FALSE,
+            updated_at = CURRENT_TIMESTAMP
+          WHERE id      = ${v.id}
+            AND user_id = ${userId}
+        `;
+      }
+    }
 
     return Response.json({ message: "Producto desactivado correctamente" });
   } catch (error) {

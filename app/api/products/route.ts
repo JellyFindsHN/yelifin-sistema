@@ -29,8 +29,8 @@ export async function GET(request: NextRequest) {
         COALESCE(SUM(ib.qty_available), 0) AS stock,
         (
           SELECT COALESCE(
-            json_agg(
-              json_build_object(
+            jsonb_agg(
+              jsonb_build_object(
                 'id',             pv.id,
                 'variant_name',   pv.variant_name,
                 'sku',            pv.sku,
@@ -42,7 +42,7 @@ export async function GET(request: NextRequest) {
                 'updated_at',     pv.updated_at
               ) ORDER BY pv.id
             ),
-            '[]'::json
+            '[]'::jsonb
           )
           FROM product_variants pv
           WHERE pv.product_id = p.id

@@ -48,11 +48,11 @@ function NewSaleContent() {
   const eventId = eventIdParam ? Number(eventIdParam) : null;
   const backHref = eventId ? "/events" : "/sales";
 
-  const { inventory, mutate: mutateInventory } = useInventory();
+  const { inventory, mutate: mutateInventory } = useInventory({ limit: 500 });
   const { products } = useProducts();
   const { createSale, isCreating } = useCreateSale();
   const { accounts } = useAccounts();
-  const { customers } = useCustomers();
+  const { customers } = useCustomers({ limit: 500 });
   const { policies: loyaltyPolicies } = useLoyaltyPolicies();
   const { supplies } = useSupplies();
   const { mutate: mutateEvents } = useEvents();

@@ -15,7 +15,7 @@ export async function GET(request: NextRequest) {
     const search      = searchParams.get("search")?.trim() || null;
     const stockFilter = searchParams.get("stock") || null;
     const page        = Math.max(1, Number(searchParams.get("page"))  || 1);
-    const limit       = Math.min(100, Math.max(1, Number(searchParams.get("limit")) || 25));
+    const limit       = Math.min(500, Math.max(1, Number(searchParams.get("limit")) || 25));
     const offset      = (page - 1) * limit;
 
     // ── Stats globales (sin filtros) ──────────────────────────────────
@@ -110,8 +110,8 @@ export async function GET(request: NextRequest) {
 
         (
           SELECT COALESCE(
-            json_agg(
-              json_build_object(
+            jsonb_agg(
+              jsonb_build_object(
                 'variant_id',     pv.id,
                 'variant_name',   pv.variant_name,
                 'sku',            pv.sku,
@@ -123,7 +123,7 @@ export async function GET(request: NextRequest) {
                 'total_value',    COALESCE(vib.total_val, 0)
               ) ORDER BY pv.id
             ),
-            '[]'::json
+            '[]'::jsonb
           )
           FROM product_variants pv
           LEFT JOIN LATERAL (

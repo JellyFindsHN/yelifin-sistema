@@ -220,23 +220,23 @@ function VariantTableRow({
   setDeleteVariantTarget,
 }: {
   variantStock: VariantStock;
-  product: Product;
+  product: Product | null;
   format: (v: number) => string;
   findVariant: (product: Product, variantId: number) => ProductVariant | null;
   setAdjustVariant: (v: { product: Product; variant: ProductVariant } | null) => void;
   setEditVariant: (v: { product: Product; variant: ProductVariant } | null) => void;
   setDeleteVariantTarget: (v: { product: Product; variant: ProductVariant } | null) => void;
 }) {
-  const pv = findVariant(product, variantStock.variant_id);
+  const pv = product ? findVariant(product, variantStock.variant_id) : null;
 
   return (
     <TableRow className="bg-muted/30 hover:bg-muted/50">
       <TableCell>
         <div className="flex items-center gap-3 pl-10">
           <div className="relative size-8 rounded-md overflow-hidden bg-muted flex items-center justify-center shrink-0">
-            {variantStock.image_url ?? product.image_url
+            {(variantStock.image_url ?? product?.image_url)
               ? <Image
-                  src={variantStock.image_url ?? product.image_url!}
+                  src={(variantStock.image_url ?? product?.image_url)!}
                   alt={variantStock.variant_name}
                   fill
                   className="object-cover"
@@ -268,14 +268,16 @@ function VariantTableRow({
       <TableCell className="text-sm">
         {variantStock.price_override != null
           ? format(variantStock.price_override)
-          : <span className="text-xs text-muted-foreground">Base: {format(product.price)}</span>
+          : product
+          ? <span className="text-xs text-muted-foreground">Base: {format(product.price)}</span>
+          : "—"
         }
       </TableCell>
       <TableCell className="text-right text-sm font-medium">
         {Number(variantStock.stock) > 0 ? format(variantStock.total_value) : "—"}
       </TableCell>
       <TableCell>
-        {pv && (
+        {pv && product && (
           <VariantActionsMenu
             product={product}
             variant={pv}
@@ -347,25 +349,25 @@ function VariantCard({
   setDeleteVariantTarget,
 }: {
   variantStock: VariantStock;
-  product: Product;
+  product: Product | null;
   format: (v: number) => string;
   findVariant: (product: Product, variantId: number) => ProductVariant | null;
   setAdjustVariant: (v: { product: Product; variant: ProductVariant } | null) => void;
   setEditVariant: (v: { product: Product; variant: ProductVariant } | null) => void;
   setDeleteVariantTarget: (v: { product: Product; variant: ProductVariant } | null) => void;
 }) {
-  const pv = findVariant(product, variantStock.variant_id);
+  const pv = product ? findVariant(product, variantStock.variant_id) : null;
   const salePrice = variantStock.price_override != null
     ? variantStock.price_override
-    : product.price;
+    : product?.price ?? 0;
 
   return (
     <div className="rounded-lg border bg-muted/30 overflow-hidden">
       <div className="flex items-center gap-3 px-3 py-2.5">
         <div className="relative size-9 rounded-md overflow-hidden bg-muted flex items-center justify-center shrink-0">
-          {variantStock.image_url ?? product.image_url
+          {(variantStock.image_url ?? product?.image_url)
             ? <Image
-                src={variantStock.image_url ?? product.image_url!}
+                src={(variantStock.image_url ?? product?.image_url)!}
                 alt={variantStock.variant_name}
                 fill
                 className="object-cover"
@@ -392,7 +394,7 @@ function VariantCard({
             </div>
             <div className="flex items-center gap-1 shrink-0">
               {getStockBadge(Number(variantStock.stock))}
-              {pv && (
+              {pv && product && (
                 <VariantActionsMenu
                   product={product}
                   variant={pv}
@@ -695,7 +697,7 @@ export default function InventoryPage() {
                       </TableRow>
 
                       {/* Acordeón: base + variantes */}
-                      {hasVariants && isExpanded && product && (
+                      {hasVariants && isExpanded && (
                         <>
                           <BaseTableRow item={item} format={format} />
                           {item.variants_stock.map((vs) => (
@@ -819,7 +821,7 @@ export default function InventoryPage() {
                         )} />
                       </button>
 
-                      {isExpanded && product && (
+                      {isExpanded && (
                         <div className="mt-2 space-y-2">
                           <BaseCard item={item} format={format} />
                           {item.variants_stock.map((vs) => (

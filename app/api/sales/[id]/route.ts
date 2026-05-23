@@ -158,21 +158,20 @@ export async function PATCH(request: NextRequest, { params }: Params) {
 
           const variantId = item.variant_id ? Number(item.variant_id) : null;
 
-          // Restaurar al último batch de la variante correcta
           const [lastBatch] = variantId !== null
             ? await sql`
                 SELECT id FROM inventory_batches
                 WHERE user_id    = ${userId}
                   AND product_id = ${item.product_id}
                   AND variant_id = ${variantId}
-                ORDER BY received_at DESC LIMIT 1
+                ORDER BY received_at ASC LIMIT 1
               `
             : await sql`
                 SELECT id FROM inventory_batches
                 WHERE user_id    = ${userId}
                   AND product_id = ${item.product_id}
                   AND variant_id IS NULL
-                ORDER BY received_at DESC LIMIT 1
+                ORDER BY received_at ASC LIMIT 1
               `;
 
           if (lastBatch) {
@@ -774,7 +773,6 @@ export async function DELETE(request: NextRequest, { params }: Params) {
 
     await sql`BEGIN`;
     try {
-      // 1. Devolver stock por variante (FIFO inverso → último batch)
       for (const item of items) {
         if (item.is_service) continue;
 
@@ -786,14 +784,14 @@ export async function DELETE(request: NextRequest, { params }: Params) {
               WHERE user_id    = ${userId}
                 AND product_id = ${item.product_id}
                 AND variant_id = ${variantId}
-              ORDER BY received_at DESC LIMIT 1
+              ORDER BY received_at ASC LIMIT 1
             `
           : await sql`
               SELECT id FROM inventory_batches
               WHERE user_id    = ${userId}
                 AND product_id = ${item.product_id}
                 AND variant_id IS NULL
-              ORDER BY received_at DESC LIMIT 1
+              ORDER BY received_at ASC LIMIT 1
             `;
 
         if (lastBatch) {

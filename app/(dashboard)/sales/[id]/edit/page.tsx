@@ -95,9 +95,9 @@ function EditSaleContent() {
   const { sale, isLoading } = useSale(saleId);
   const { products } = useProducts();
   const { accounts } = useAccounts();
-  const { customers } = useCustomers();
+  const { customers } = useCustomers({ limit: 500 });
   const { supplies } = useSupplies();
-  const { inventory, mutate: mutateInventory } = useInventory();
+  const { inventory, mutate: mutateInventory } = useInventory({ limit: 500 });
   const { editSale, confirmSale, cancelSale, isPatching } = usePatchSale(saleId);
 
   const [cart, setCart] = useState<CartItem[]>([]);
