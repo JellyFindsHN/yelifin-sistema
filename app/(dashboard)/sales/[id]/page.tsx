@@ -27,7 +27,9 @@ import {
   Layers,
   FileText,
   Printer,
-  NotebookPen
+  NotebookPen,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react";
 
 import { useSale, usePatchSale } from "@/hooks/swr/use-sales";
@@ -492,6 +494,28 @@ export default function SaleDetailPage({ params }: Props) {
           </CardContent>
         </Card>
       )}
+
+      {/* Navegación Anterior / Siguiente */}
+      <div className="flex items-center justify-between gap-3 pt-2">
+        <Button
+          variant="outline"
+          className="flex-1 gap-2"
+          disabled={!sale.prev_id}
+          onClick={() => sale.prev_id && push(`/sales/${sale.prev_id}`)}
+        >
+          <ChevronLeft className="size-4" />
+          Anterior
+        </Button>
+        <Button
+          variant="outline"
+          className="flex-1 gap-2"
+          disabled={!sale.next_id}
+          onClick={() => sale.next_id && push(`/sales/${sale.next_id}`)}
+        >
+          Siguiente
+          <ChevronRight className="size-4" />
+        </Button>
+      </div>
 
       {/* Dialogs de confirmación */}
       <ConfirmDialog

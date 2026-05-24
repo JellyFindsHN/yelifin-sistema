@@ -75,6 +75,8 @@ export type Sale = {
 };
 
 export type SaleDetail = Sale & {
+  next_id: number | null;
+  prev_id: number | null;
   items: {
     id:           number;
     product_id:   number;

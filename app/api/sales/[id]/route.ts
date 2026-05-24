@@ -38,6 +38,18 @@ export async function GET(request: NextRequest, { params }: Params) {
 
     if (!sale) return createErrorResponse("Venta no encontrada", 404);
 
+    const [neighbors] = await sql`
+      WITH ordered AS (
+        SELECT
+          id,
+          LAG(id)  OVER (ORDER BY sold_at DESC, id DESC) AS newer_id,
+          LEAD(id) OVER (ORDER BY sold_at DESC, id DESC) AS older_id
+        FROM sales
+        WHERE user_id = ${userId}
+      )
+      SELECT newer_id, older_id FROM ordered WHERE id = ${saleId}
+    `;
+
     const items = await sql`
       SELECT
         si.*,
@@ -59,7 +71,15 @@ export async function GET(request: NextRequest, { params }: Params) {
       WHERE ss.sale_id = ${saleId} AND ss.user_id = ${userId}
     `;
 
-    return Response.json({ data: { ...sale, items, supplies } });
+    return Response.json({
+      data: {
+        ...sale,
+        items,
+        supplies,
+        next_id: neighbors?.newer_id ?? null,
+        prev_id: neighbors?.older_id ?? null,
+      },
+    });
   } catch (error) {
     console.error("GET /api/sales/[id]:", error);
     return createErrorResponse("Error al obtener venta", 500);
