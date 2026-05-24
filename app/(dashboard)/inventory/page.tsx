@@ -26,7 +26,7 @@ import {
   Package, Warehouse, AlertTriangle, DollarSign,
   Plus, MoreVertical, Pencil, Trash2, PackagePlus,
   ShoppingCart, SlidersHorizontal, ArrowLeftRight,
-  ChevronDown, Layers, Box, Clock, X,
+  ChevronDown, Layers, Box, Clock, X, Eye,
 } from "lucide-react";
 import {
   Pagination, PaginationContent, PaginationItem,
@@ -78,6 +78,7 @@ function ProductActionsMenu({
   setVariantProduct,
   setEditProduct,
   setDeleteProduct,
+  onViewDetail,
 }: {
   item: InventoryItem;
   findProduct: (id: number) => Product | null;
@@ -86,6 +87,7 @@ function ProductActionsMenu({
   setVariantProduct: (p: Product | null) => void;
   setEditProduct: (p: Product | null) => void;
   setDeleteProduct: (p: Product | null) => void;
+  onViewDetail: (id: number) => void;
 }) {
   return (
     <DropdownMenu>
@@ -95,6 +97,11 @@ function ProductActionsMenu({
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end">
+        <DropdownMenuItem onClick={() => onViewDetail(item.product_id)}>
+          <Eye className="size-4 mr-2 text-muted-foreground" />
+          Ver detalle
+        </DropdownMenuItem>
+        <DropdownMenuSeparator />
         {!item.is_service && (
           <>
             <DropdownMenuItem onClick={() => { const p = findProduct(item.product_id); if (p) setInventoryProduct(p); }}>
@@ -640,10 +647,10 @@ export default function InventoryPage() {
                       <TableRow
                         key={item.product_id}
                         className={cn(
-                          hasVariants && "cursor-pointer select-none",
-                          isExpanded  && "bg-muted/20"
+                          "cursor-pointer select-none",
+                          isExpanded && "bg-muted/20"
                         )}
-                        onClick={() => hasVariants && toggleExpand(item.product_id)}
+                        onClick={() => hasVariants ? toggleExpand(item.product_id) : push(`/inventory/${item.product_id}`)}
                       >
                         <TableCell>
                           <div className="flex items-center gap-3">
@@ -692,6 +699,7 @@ export default function InventoryPage() {
                             setVariantProduct={setVariantProduct}
                             setEditProduct={setEditProduct}
                             setDeleteProduct={setDeleteProduct}
+                            onViewDetail={(id) => push(`/inventory/${id}`)}
                           />
                         </TableCell>
                       </TableRow>
@@ -746,7 +754,11 @@ export default function InventoryPage() {
             const isExpanded  = expanded.has(item.product_id);
 
             return (
-              <Card key={item.product_id}>
+              <Card
+                key={item.product_id}
+                className={!hasVariants ? "cursor-pointer" : undefined}
+                onClick={!hasVariants ? () => push(`/inventory/${item.product_id}`) : undefined}
+              >
                 <CardContent className="pl-3 pr-2">
                   {/* Cabecera del producto */}
                   <div className="flex items-center gap-3">
@@ -777,6 +789,7 @@ export default function InventoryPage() {
                             setVariantProduct={setVariantProduct}
                             setEditProduct={setEditProduct}
                             setDeleteProduct={setDeleteProduct}
+                            onViewDetail={(id) => push(`/inventory/${id}`)}
                           />
                         </div>
                       </div>
