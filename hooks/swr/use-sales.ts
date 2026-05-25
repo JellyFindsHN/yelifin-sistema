@@ -33,7 +33,7 @@ export type CreateSaleInput = {
   status?:         SaleStatus;
 };
 
-export type ConfirmSaleInput = { action: 'confirm' };
+export type ConfirmSaleInput = { action: 'confirm'; confirmed_at: string };
 export type CancelSaleInput  = { action: 'cancel' };
 
 export type EditSaleInput = {
@@ -281,7 +281,7 @@ export function usePatchSale(id: number | null) {
     }
   };
 
-  const confirmSale = () => patchSale({ action: 'confirm' });
+  const confirmSale = () => patchSale({ action: 'confirm', confirmed_at: new Date().toISOString() });
   const cancelSale  = () => patchSale({ action: 'cancel' });
   const editSale    = (data: Omit<EditSaleInput, 'action'>) =>
     patchSale({ action: 'edit', ...data });

@@ -113,6 +113,7 @@ export async function PATCH(request: NextRequest, { params }: Params) {
 
     // ── CONFIRM ──────────────────────────────────────────────────────
     if (action === "confirm") {
+      const confirmedAt = body.confirmed_at ?? new Date().toISOString();
       const txParts: string[] = [`Venta ${sale.sale_number}`];
       if (Number(sale.tax_rate)     > 0) txParts.push(`ISV ${sale.tax_rate}% incluido`);
       if (Number(sale.shipping_cost)> 0) txParts.push(`envío L ${Number(sale.shipping_cost).toFixed(2)}`);
@@ -126,7 +127,7 @@ export async function PATCH(request: NextRequest, { params }: Params) {
       await sql`BEGIN`;
       try {
         await sql`
-          UPDATE sales SET status = 'COMPLETED', updated_at = CURRENT_TIMESTAMP
+          UPDATE sales SET status = 'COMPLETED', sold_at = ${confirmedAt}, updated_at = CURRENT_TIMESTAMP
           WHERE id = ${saleId} AND user_id = ${userId}
         `;
         await sql`
@@ -135,7 +136,7 @@ export async function PATCH(request: NextRequest, { params }: Params) {
             category, description, reference_type, reference_id, occurred_at
           ) VALUES (
             ${userId}, 'INCOME', ${sale.account_id}, ${sale.total},
-            'Ventas', ${txDescription}, ${refType}, ${refId}, ${sale.sold_at}
+            'Ventas', ${txDescription}, ${refType}, ${refId}, ${confirmedAt}
           )
         `;
         await sql`

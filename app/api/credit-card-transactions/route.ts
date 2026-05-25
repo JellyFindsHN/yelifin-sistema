@@ -2,6 +2,7 @@
 import { NextRequest } from "next/server";
 import { neon } from "@neondatabase/serverless";
 import { verifyAuth, createErrorResponse, isAuthSuccess } from "@/lib/auth";
+import { getUtcBounds } from "@/lib/date-bounds";
 
 const sql = neon(process.env.DATABASE_URL!);
 
@@ -13,31 +14,9 @@ export async function GET(request: NextRequest) {
     const { userId } = auth.data;
     const { searchParams } = new URL(request.url);
 
-    const month   = searchParams.get("month");
-    const year    = searchParams.get("year");
-    const date    = searchParams.get("date");
-    const cardId  = searchParams.get("card_id");
+    const cardId = searchParams.get("card_id");
 
-    let startISO: string;
-    let endISO: string;
-    const now = new Date();
-
-    if (date) {
-      const d = new Date(`${date}T00:00:00`);
-      startISO = new Date(d.getFullYear(), d.getMonth(), d.getDate(), 0, 0, 0).toISOString();
-      endISO   = new Date(d.getFullYear(), d.getMonth(), d.getDate() + 1, 0, 0, 0).toISOString();
-    } else if (year && month) {
-      const y = Number(year), m = Number(month);
-      startISO = new Date(y, m - 1, 1).toISOString();
-      endISO   = new Date(y, m, 1).toISOString();
-    } else if (year) {
-      const y = Number(year);
-      startISO = new Date(y, 0, 1).toISOString();
-      endISO   = new Date(y + 1, 0, 1).toISOString();
-    } else {
-      startISO = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
-      endISO   = new Date(now.getFullYear(), now.getMonth() + 1, 1).toISOString();
-    }
+    const { startISO, endISO } = getUtcBounds(searchParams);
 
     const rows = await sql`
       SELECT

@@ -98,9 +98,18 @@ export default function DashboardPage() {
     units_sold: Number(p.units_sold ?? 0),
   }));
 
+  const PAYMENT_LABELS: Record<string, string> = {
+    CASH:        "Efectivo",
+    CARD:        "Tarjeta débito",
+    CREDIT_CARD: "Tarjeta créd.",
+    TRANSFER:    "Transferencia",
+    MIXED:       "Mixto",
+    OTHER:       "Otro",
+  };
+
   const paymentMethods = (data?.payment_methods ?? []).map(
     (p: any, i: number) => ({
-      name: p.method ?? "Otro",
+      name: PAYMENT_LABELS[p.method] ?? p.method ?? "Otro",
       value: Number(p.amount ?? 0),
       fill: ["#3B82F6", "#10B981", "#F59E0B", "#EF4444", "#8B5CF6"][i % 5],
     })

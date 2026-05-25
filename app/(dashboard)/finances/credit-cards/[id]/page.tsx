@@ -63,8 +63,9 @@ export default function CreditCardDetailPage({
 
   const { creditCard, isLoading: loadingCard, mutate: mutateCard } = useCreditCard(cardId);
   const { transactions, totals, isLoading: loadingTxns, mutate: mutateTxns } = useCreditCardTransactions(cardId, {
-    month: selectedMonth,
-    year: selectedYear,
+    month:     selectedMonth,
+    year:      selectedYear,
+    tz_offset: new Date().getTimezoneOffset(),
   });
   const { periods } = useCreditCardPeriods(cardId);
   const { accounts } = useAccounts();

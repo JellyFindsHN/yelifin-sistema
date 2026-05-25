@@ -20,6 +20,7 @@ import { cn } from "@/lib/utils";
 import { CreditCardTransaction, useUpdateCCTransaction } from "@/hooks/swr/use-credit-cards";
 import { localDateToISO, toLocalDateInput } from "@/lib/date-utils";
 import { TransactionCategory } from "@/hooks/swr/use-transaction-categories";
+import { useCurrency } from "@/hooks/swr/use-currency";
 
 const schema = z.object({
   description:   z.string().optional(),
@@ -54,6 +55,7 @@ export function EditCCTransactionDialog({
   expenseCategories,
 }: Props) {
   const { updateTransaction, isUpdating } = useUpdateCCTransaction();
+  const { symbol } = useCurrency();
 
   const {
     register,
@@ -65,6 +67,10 @@ export function EditCCTransactionDialog({
   } = useForm<FormData>({ resolver: zodResolver(schema) });
 
   const selectedCurrency = watch("currency");
+  const watchAmount      = watch("amount");
+  const watchRate        = watch("exchange_rate");
+  const isUsd            = selectedCurrency === "USD";
+  const localEquivalent  = isUsd && watchAmount && watchRate ? Number(watchAmount) * Number(watchRate) : null;
   const isSubmittingOrUpdating = isSubmitting || isUpdating;
 
   useEffect(() => {
@@ -211,7 +217,7 @@ export function EditCCTransactionDialog({
             </Label>
             <div className="relative">
               <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm font-medium">
-                {selectedCurrency === "USD" ? "$" : nativeCurrency}
+                {isUsd ? "$" : symbol}
               </span>
               <Input
                 type="number"
@@ -229,10 +235,10 @@ export function EditCCTransactionDialog({
           </div>
 
           {/* Tasa de cambio (solo USD) */}
-          {selectedCurrency === "USD" && (
+          {isUsd && (
             <div className="space-y-1.5">
               <Label className="text-sm font-medium">
-                Tasa de cambio <span className="text-destructive text-xs">*</span>
+                1 USD = cuántos {symbol} <span className="text-destructive text-xs">*</span>
               </Label>
               <div className="relative">
                 <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm font-medium">
@@ -250,6 +256,14 @@ export function EditCCTransactionDialog({
               </div>
               {errors.exchange_rate && (
                 <p className="text-xs text-destructive">{errors.exchange_rate.message}</p>
+              )}
+              {localEquivalent && localEquivalent > 0 && (
+                <div className="flex items-center gap-1.5 bg-muted/60 rounded-lg px-3 py-2">
+                  <span className="text-xs text-muted-foreground">Equivalente en {symbol}:</span>
+                  <span className="text-xs font-semibold">
+                    {new Intl.NumberFormat("es-HN", { style: "currency", currency: nativeCurrency, minimumFractionDigits: 2 }).format(localEquivalent)}
+                  </span>
+                </div>
               )}
             </div>
           )}

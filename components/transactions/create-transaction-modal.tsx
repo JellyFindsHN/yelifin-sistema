@@ -307,7 +307,7 @@ export function CreateTransactionModal({
                 {isCcUsd && (
                   <div className="space-y-1.5">
                     <Label className="text-sm font-medium">
-                      Tasa de cambio (1 USD = ? {nativeCurrency}) <span className="text-destructive text-xs">*</span>
+                      1 USD = cuántos {symbol} <span className="text-destructive text-xs">*</span>
                     </Label>
                     <Input
                       type="number" step="0.0001" min="0" placeholder="Ej: 24.89"
@@ -315,6 +315,14 @@ export function CreateTransactionModal({
                       onChange={(e) => setCcExchangeRate(e.target.value)}
                       className="h-11 text-base"
                     />
+                    {Number(amount) > 0 && Number(ccExchangeRate) > 0 && (
+                      <div className="flex items-center gap-1.5 bg-muted/60 rounded-lg px-3 py-2">
+                        <span className="text-xs text-muted-foreground">Equivalente en {symbol}:</span>
+                        <span className="text-xs font-semibold">
+                          {format(Number(amount) * Number(ccExchangeRate))}
+                        </span>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
@@ -346,12 +354,12 @@ export function CreateTransactionModal({
 
           <div className="space-y-1.5">
             <Label className="text-sm font-medium">
-              Monto ({symbol}){" "}
+              Monto ({isCcUsd ? "USD" : symbol}){" "}
               <span className="text-destructive text-xs">*</span>
             </Label>
             <div className="relative">
               <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm font-medium">
-                {symbol}
+                {isCcUsd ? "$" : symbol}
               </span>
               <Input
                 type="number"

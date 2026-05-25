@@ -278,10 +278,13 @@ export default function TransactionsPage() {
       } else {
         const t = row.data;
         const label = t.category?.trim() || "Sin categoría";
+        const amt = t.currency === "USD" && t.amount_local != null
+          ? Number(t.amount_local)
+          : Number(t.amount);
         if (t.type === "CHARGE") {
-          expenseMap.set(label, (expenseMap.get(label) ?? 0) + Number(t.amount));
+          expenseMap.set(label, (expenseMap.get(label) ?? 0) + amt);
         } else {
-          incomeMap.set(label, (incomeMap.get(label) ?? 0) + Number(t.amount));
+          incomeMap.set(label, (incomeMap.get(label) ?? 0) + amt);
         }
       }
     }

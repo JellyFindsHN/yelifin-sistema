@@ -65,6 +65,7 @@ export type PayCreditCardInput = {
   exchange_rate?: number;
   occurred_at?: string;
   description?: string;
+  category?: string;
 };
 
 function useAuthFetch() {
@@ -127,14 +128,15 @@ export function useCreditCard(id: number | null) {
 
 export function useCreditCardTransactions(
   id: number | null,
-  params?: { month?: number; year?: number }
+  params?: { month?: number; year?: number; tz_offset?: number }
 ) {
   const { firebaseUser } = useAuth();
   const authFetch = useAuthFetch();
 
   const query = new URLSearchParams();
-  if (params?.month) query.set('month', String(params.month));
-  if (params?.year)  query.set('year',  String(params.year));
+  if (params?.month)      query.set('month',     String(params.month));
+  if (params?.year)       query.set('year',      String(params.year));
+  if (params?.tz_offset !== undefined) query.set('tz_offset', String(params.tz_offset));
   const qs = query.toString();
 
   const { data, isLoading, error, mutate } = useSWR(
@@ -185,15 +187,17 @@ export function useAllCreditCardTransactions(params?: {
   year?: number;
   date?: string;
   card_id?: number;
+  tz_offset?: number;
 }) {
   const { firebaseUser } = useAuth();
   const authFetch = useAuthFetch();
 
   const query = new URLSearchParams();
-  if (params?.month)   query.set('month',   String(params.month));
-  if (params?.year)    query.set('year',    String(params.year));
-  if (params?.date)    query.set('date',    params.date);
-  if (params?.card_id) query.set('card_id', String(params.card_id));
+  if (params?.month)    query.set('month',     String(params.month));
+  if (params?.year)     query.set('year',      String(params.year));
+  if (params?.date)     query.set('date',      params.date);
+  if (params?.card_id)  query.set('card_id',   String(params.card_id));
+  if (params?.tz_offset !== undefined) query.set('tz_offset', String(params.tz_offset));
   const qs = query.toString();
 
   const { data, isLoading, error, mutate } = useSWR(

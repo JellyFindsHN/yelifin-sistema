@@ -23,6 +23,7 @@ export async function POST(
       exchange_rate,
       occurred_at,
       description,
+      category,
     } = await request.json();
 
     if (!account_id) return createErrorResponse("La cuenta es requerida", 400);
@@ -65,10 +66,10 @@ export async function POST(
       const [txn] = await sql`
         INSERT INTO transactions (
           user_id, type, account_id, amount,
-          description, reference_type, credit_card_id, occurred_at
+          category, description, reference_type, credit_card_id, occurred_at
         ) VALUES (
           ${userId}, 'EXPENSE', ${Number(account_id)}, ${localDeduction},
-          ${desc}, 'CREDIT_CARD_PAYMENT', ${Number(id)}, ${occurredAtVal}
+          ${category?.trim() || null}, ${desc}, 'CREDIT_CARD_PAYMENT', ${Number(id)}, ${occurredAtVal}
         )
         RETURNING id
       `;

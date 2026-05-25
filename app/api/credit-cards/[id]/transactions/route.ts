@@ -2,6 +2,7 @@
 import { NextRequest } from "next/server";
 import { neon } from "@neondatabase/serverless";
 import { verifyAuth, createErrorResponse, isAuthSuccess } from "@/lib/auth";
+import { getUtcBounds } from "@/lib/date-bounds";
 
 const sql = neon(process.env.DATABASE_URL!);
 
@@ -17,25 +18,7 @@ export async function GET(
     const { id } = await params;
     const { searchParams } = new URL(request.url);
 
-    const month = searchParams.get("month");
-    const year = searchParams.get("year");
-    const now = new Date();
-
-    let startISO: string;
-    let endISO: string;
-
-    if (year && month) {
-      const y = Number(year), m = Number(month);
-      startISO = new Date(y, m - 1, 1).toISOString();
-      endISO = new Date(y, m, 1).toISOString();
-    } else if (year) {
-      const y = Number(year);
-      startISO = new Date(y, 0, 1).toISOString();
-      endISO = new Date(y + 1, 0, 1).toISOString();
-    } else {
-      startISO = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
-      endISO = new Date(now.getFullYear(), now.getMonth() + 1, 1).toISOString();
-    }
+    const { startISO, endISO } = getUtcBounds(searchParams);
 
     const [card] = await sql`
       SELECT id FROM credit_cards WHERE id = ${Number(id)} AND user_id = ${userId}

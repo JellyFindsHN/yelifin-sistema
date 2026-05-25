@@ -11,11 +11,12 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Banknote, CreditCard, ArrowLeftRight, HelpCircle } from "lucide-react";
 
 const paymentLabel: Record<string, { label: string; icon: any }> = {
-  CASH:     { label: "Efectivo",      icon: Banknote },
-  CARD:     { label: "Tarjeta",       icon: CreditCard },
-  TRANSFER: { label: "Transferencia", icon: ArrowLeftRight },
-  MIXED:    { label: "Mixto",         icon: HelpCircle },
-  OTHER:    { label: "Otro",          icon: HelpCircle },
+  CASH:        { label: "Efectivo",       icon: Banknote },
+  CARD:        { label: "Tarjeta débito", icon: CreditCard },
+  CREDIT_CARD: { label: "Tarjeta créd.",  icon: CreditCard },
+  TRANSFER:    { label: "Transferencia",  icon: ArrowLeftRight },
+  MIXED:       { label: "Mixto",          icon: HelpCircle },
+  OTHER:       { label: "Otro",           icon: HelpCircle },
 };
 
 type Props = { recentSales: any[]; isLoading: boolean };

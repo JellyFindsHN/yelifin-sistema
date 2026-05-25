@@ -338,7 +338,7 @@ export function CreateProductDialog({ open, onOpenChange, onSuccess }: Props) {
         </div>
 
         {/* Footer */}
-        <div className="shrink-0 px-5 py-4 border-t bg-transparent sm:bg-background flex gap-3">
+        <div className="shrink-0 px-5 py-4 border-t bg-transparent xl:bg-transparent md:bg-transparent sm:bg-background flex gap-3">
           <Button
             type="button"
             variant="outline"
