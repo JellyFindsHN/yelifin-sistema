@@ -138,7 +138,7 @@ function CollapsedItem({
           </SidebarMenuButton>
         </TooltipTrigger>
         <TooltipContent side="right" className="flex flex-col gap-0.5 py-2 px-3 bg-foreground text-background">
-          <span className="font-medium text-sm text-white">{item.title}</span>
+          <span className="font-medium text-sm text-background">{item.title}</span>
           {item.submenu && (
             <div className="flex flex-col gap-0.5 mt-1">
               {item.submenu.map((s: any) => (
@@ -146,7 +146,7 @@ function CollapsedItem({
                   key={s.url}
                   href={s.url}
                   onClick={closeOnMobile}
-                  className={`text-xs transition-opacity text-white ${
+                  className={`text-xs transition-opacity text-background ${
                     pathname === s.url
                       ? "font-medium opacity-100"
                       : "opacity-70 hover:opacity-100"

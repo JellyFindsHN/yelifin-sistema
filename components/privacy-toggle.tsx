@@ -19,7 +19,7 @@ export function PrivacyToggle({ isCollapsed = false }: PrivacyToggleProps) {
         <TooltipTrigger asChild>
           <button
             onClick={toggle}
-            className="flex w-full items-center justify-center rounded-lg p-2 hover:bg-sidebar-accent transition-colors text-sidebar-foreground"
+            className="flex size-8 items-center justify-center rounded-lg hover:bg-sidebar-accent transition-colors text-sidebar-foreground"
           >
             {isPrivate
               ? <EyeOff className="size-4 text-primary" />
