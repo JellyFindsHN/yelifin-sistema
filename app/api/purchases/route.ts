@@ -289,7 +289,10 @@ export async function GET(request: NextRequest) {
   if (!isAuthSuccess(auth)) return createErrorResponse(auth.error, auth.status);
 
   try {
-    const { userId } = auth.data;
+    const { userId }     = auth.data;
+    const { searchParams } = new URL(request.url);
+    const statusFilter   = searchParams.get("status") || null;
+    const withItems      = searchParams.get("with_items") === "true";
 
     const purchases = await sql`
       SELECT
@@ -308,12 +311,29 @@ export async function GET(request: NextRequest) {
         pb.purchased_at,
         pb.notes,
         pb.created_at,
-        COUNT(pbi.id)::int AS items_count
+        COUNT(pbi.id)::int AS items_count,
+        ${withItems ? sql`
+          COALESCE((
+            SELECT jsonb_agg(jsonb_build_object(
+              'product_id',   pbi2.product_id,
+              'product_name', p.name,
+              'variant_name', pv.variant_name,
+              'quantity',     pbi2.quantity,
+              'unit_cost',    pbi2.unit_cost,
+              'unit_cost_usd', pbi2.unit_cost_usd
+            ) ORDER BY pbi2.id)
+            FROM purchase_batch_items pbi2
+            JOIN products p ON p.id = pbi2.product_id
+            LEFT JOIN product_variants pv ON pv.id = pbi2.variant_id
+            WHERE pbi2.purchase_batch_id = pb.id
+          ), '[]'::jsonb) AS items
+        ` : sql`NULL::jsonb AS items`}
       FROM purchase_batches pb
-      LEFT JOIN accounts             a  ON a.id  = pb.account_id
-      LEFT JOIN accounts             sa ON sa.id = pb.shipping_account_id
+      LEFT JOIN accounts             a   ON a.id  = pb.account_id
+      LEFT JOIN accounts             sa  ON sa.id = pb.shipping_account_id
       LEFT JOIN purchase_batch_items pbi ON pbi.purchase_batch_id = pb.id
       WHERE pb.user_id = ${userId}
+        AND (${statusFilter}::text IS NULL OR pb.status = ${statusFilter})
       GROUP BY pb.id, a.name, sa.name
       ORDER BY pb.purchased_at DESC
     `;

@@ -37,18 +37,23 @@ export function ConfirmPurchaseArrivalDialog({
 
   const [newShipping,       setNewShipping]       = useState("");
   const [shippingAccountId, setShippingAccountId] = useState<string>("stored");
+  const [wantsShipping,     setWantsShipping]     = useState(false);
 
   useEffect(() => {
     if (open && purchase) {
-      setNewShipping(Number(purchase.shipping) > 0 ? String(purchase.shipping) : "");
+      const hadShipping = Number(purchase.shipping) > 0;
+      setNewShipping(hadShipping ? String(purchase.shipping) : "");
       setShippingAccountId("stored");
+      setWantsShipping(hadShipping);
     }
   }, [open, purchase]);
 
   if (!purchase) return null;
 
   const originalShipping = Number(purchase.shipping);
-  const parsedShipping   = newShipping === "" ? 0 : Math.max(0, Number(newShipping));
+  const parsedShipping   = (!wantsShipping && originalShipping === 0)
+    ? 0
+    : newShipping === "" ? 0 : Math.max(0, Number(newShipping));
   const shippingDelta    = parsedShipping - originalShipping;
   const newTotal         = Number(purchase.total) + shippingDelta;
   const hasAdjustment    = shippingDelta !== 0;
@@ -140,36 +145,97 @@ export function ConfirmPurchaseArrivalDialog({
             </div>
           </div>
 
-          {/* Input de nuevo envío */}
-          <div className="space-y-1.5">
-            <Label className="text-sm font-medium flex items-center gap-1.5">
-              <Truck className="size-3.5 text-muted-foreground" />
-              Costo de envío real
-              <span className="text-xs text-muted-foreground font-normal">
-                {originalShipping > 0 ? `· original: ${format(originalShipping)}` : "· sin envío registrado"}
-              </span>
-            </Label>
-            <div className="relative">
-              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm font-medium">
-                {symbol}
-              </span>
-              <Input
-                type="number"
-                step="0.01"
-                min="0"
-                placeholder="0.00"
-                value={newShipping}
-                onChange={(e) => setNewShipping(e.target.value)}
-                disabled={isConfirming}
-                className="h-11 pl-8 text-base"
-              />
-            </div>
-            <p className="text-xs text-muted-foreground">
-              Dejá en 0 si no hubo envío. Se distribuye entre todas las unidades.
-            </p>
-          </div>
+          {/* Pregunta de envío */}
+          {originalShipping === 0 ? (
+            <div className="space-y-3">
+              <Label className="text-sm font-medium flex items-center gap-1.5">
+                <Truck className="size-3.5 text-muted-foreground" />
+                ¿Llegó con costo de envío?
+              </Label>
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  onClick={() => { setWantsShipping(false); setNewShipping(""); }}
+                  disabled={isConfirming}
+                  className={cn(
+                    "h-10 rounded-lg border text-sm font-medium transition-colors",
+                    !wantsShipping
+                      ? "bg-primary text-primary-foreground border-primary"
+                      : "bg-background text-muted-foreground hover:bg-muted"
+                  )}
+                >
+                  No, sin envío
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setWantsShipping(true)}
+                  disabled={isConfirming}
+                  className={cn(
+                    "h-10 rounded-lg border text-sm font-medium transition-colors",
+                    wantsShipping
+                      ? "bg-primary text-primary-foreground border-primary"
+                      : "bg-background text-muted-foreground hover:bg-muted"
+                  )}
+                >
+                  Sí, agregar envío
+                </button>
+              </div>
 
-          {/* Cuenta para el envío — solo si hay ajuste y hay cuentas */}
+              {wantsShipping && (
+                <div className="space-y-1.5">
+                  <div className="relative">
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm font-medium">
+                      {symbol}
+                    </span>
+                    <Input
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      placeholder="0.00"
+                      value={newShipping}
+                      onChange={(e) => setNewShipping(e.target.value)}
+                      disabled={isConfirming}
+                      className="h-11 pl-8 text-base"
+                      autoFocus
+                    />
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Se distribuye entre las {purchase.items_count} línea{purchase.items_count !== 1 ? "s" : ""} de productos.
+                  </p>
+                </div>
+              )}
+            </div>
+          ) : (
+            <div className="space-y-1.5">
+              <Label className="text-sm font-medium flex items-center gap-1.5">
+                <Truck className="size-3.5 text-muted-foreground" />
+                Costo de envío real
+                <span className="text-xs text-muted-foreground font-normal">
+                  · original: {format(originalShipping)}
+                </span>
+              </Label>
+              <div className="relative">
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm font-medium">
+                  {symbol}
+                </span>
+                <Input
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  placeholder="0.00"
+                  value={newShipping}
+                  onChange={(e) => setNewShipping(e.target.value)}
+                  disabled={isConfirming}
+                  className="h-11 pl-8 text-base"
+                />
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Se distribuye entre todas las unidades.
+              </p>
+            </div>
+          )}
+
+          {/* Cuenta para el envío — solo si hay envío y hay cuentas */}
           {parsedShipping > 0 && accounts.length > 0 && (
             <div className="space-y-1.5">
               <Label className="text-sm font-medium flex items-center gap-1.5">

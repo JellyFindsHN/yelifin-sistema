@@ -1,4 +1,4 @@
-﻿// app/(dashboard)/purchases/pending/page.tsx
+// app/(dashboard)/purchases/pending/page.tsx
 "use client";
 
 import { useState } from "react";
@@ -7,27 +7,26 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Separator } from "@/components/ui/separator";
 import {
-  ArrowLeft, Clock, PackageCheck, Package,
-  Wallet, CalendarDays, StickyNote, Truck,
+  ArrowLeft, Clock, PackageCheck,
+  Wallet, CalendarDays, StickyNote, Truck, Package,
 } from "lucide-react";
 
-import { usePurchases, Purchase } from "@/hooks/swr/use-purchases";
-import { useAccounts }            from "@/hooks/swr/use-accounts";
-import { useInventory }           from "@/hooks/swr/use-inventory";
-import { useCurrency }            from "@/hooks/swr/use-currency";
+import { usePendingPurchases, PurchaseWithItems } from "@/hooks/swr/use-purchases";
+import { useAccounts }   from "@/hooks/swr/use-accounts";
+import { useInventory }  from "@/hooks/swr/use-inventory";
+import { useCurrency }   from "@/hooks/swr/use-currency";
 import { ConfirmPurchaseArrivalDialog } from "@/components/products/confirm-purchase-arrival-dialog";
 
 export default function PendingPurchasesPage() {
   const { back, push } = useRouter();
-  const { purchases, isLoading, mutate: mutatePurchases } = usePurchases();
-  const { mutate: mutateInventory } = useInventory();
+  const { purchases, isLoading, mutate: mutatePurchases } = usePendingPurchases();
+  const { mutate: mutateInventory }  = useInventory();
   const { accounts, mutate: mutateAccounts } = useAccounts();
   const { format } = useCurrency();
 
-  const [selected, setSelected] = useState<Purchase | null>(null);
-
-  const pending = purchases.filter((p) => p.status === "PENDING");
+  const [selected, setSelected] = useState<PurchaseWithItems | null>(null);
 
   const handleSuccess = () => {
     mutatePurchases();
@@ -44,19 +43,19 @@ export default function PendingPurchasesPage() {
           <ArrowLeft className="size-4" />
         </Button>
         <div className="flex-1 min-w-0">
-          <h1 className="text-2xl font-semibold tracking-tight">Compras pendientes</h1>
+          <h1 className="text-2xl font-semibold tracking-tight">En camino</h1>
           <p className="text-muted-foreground text-sm">
             {isLoading
               ? "Cargando..."
-              : pending.length === 0
-                ? "Sin compras pendientes"
-                : `${pending.length} compra${pending.length !== 1 ? "s" : ""} esperando llegada de mercancía`
+              : purchases.length === 0
+                ? "Sin compras pendientes de llegada"
+                : `${purchases.length} compra${purchases.length !== 1 ? "s" : ""} esperando llegada de mercancía`
             }
           </p>
         </div>
-        {!isLoading && pending.length > 0 && (
+        {!isLoading && purchases.length > 0 && (
           <Badge className="bg-amber-100 text-amber-700 border-amber-200 shrink-0">
-            {pending.length} pendiente{pending.length !== 1 ? "s" : ""}
+            {purchases.length} pendiente{purchases.length !== 1 ? "s" : ""}
           </Badge>
         )}
       </div>
@@ -65,13 +64,13 @@ export default function PendingPurchasesPage() {
       {isLoading && (
         <div className="space-y-3">
           {[1, 2, 3].map((i) => (
-            <Skeleton key={i} className="h-36 rounded-xl" />
+            <Skeleton key={i} className="h-52 rounded-xl" />
           ))}
         </div>
       )}
 
       {/* Empty state */}
-      {!isLoading && pending.length === 0 && (
+      {!isLoading && purchases.length === 0 && (
         <div className="flex flex-col items-center justify-center py-20 text-muted-foreground gap-3">
           <div className="size-14 rounded-full bg-muted flex items-center justify-center">
             <PackageCheck className="size-7 opacity-40" />
@@ -84,7 +83,7 @@ export default function PendingPurchasesPage() {
       )}
 
       {/* Lista */}
-      {!isLoading && pending.map((p) => (
+      {!isLoading && purchases.map((p) => (
         <PurchaseCard
           key={p.id}
           purchase={p}
@@ -112,7 +111,7 @@ function PurchaseCard({
   format,
   onConfirm,
 }: {
-  purchase: Purchase;
+  purchase: PurchaseWithItems;
   format: (v: number) => string;
   onConfirm: () => void;
 }) {
@@ -169,16 +168,40 @@ function PurchaseCard({
           )}
         </div>
 
+        {/* Lista de productos */}
+        {p.items.length > 0 && (
+          <>
+            <Separator />
+            <div className="space-y-1.5">
+              {p.items.map((item, i) => (
+                <div key={i} className="flex items-center justify-between gap-2 text-xs">
+                  <div className="flex items-center gap-1.5 min-w-0">
+                    <Package className="size-3 text-muted-foreground shrink-0" />
+                    <span className="truncate font-medium">
+                      {item.product_name}
+                      {item.variant_name && (
+                        <span className="text-muted-foreground font-normal"> · {item.variant_name}</span>
+                      )}
+                    </span>
+                  </div>
+                  <div className="shrink-0 text-right text-muted-foreground">
+                    <span className="font-mono">{item.quantity}</span>
+                    <span className="mx-1 opacity-50">×</span>
+                    <span>{format(Number(item.unit_cost))}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </>
+        )}
+
         {/* Aviso */}
         <div className="rounded-lg bg-amber-100/60 dark:bg-amber-900/20 px-3 py-2 text-xs text-amber-700 dark:text-amber-400">
           El dinero ya fue debitado de la cuenta. Al confirmar la llegada, el stock se acreditará al inventario.
         </div>
 
         {/* Acción */}
-        <Button
-          className="w-full gap-2"
-          onClick={onConfirm}
-        >
+        <Button className="w-full gap-2" onClick={onConfirm}>
           <PackageCheck className="size-4" />
           Confirmar llegada
         </Button>

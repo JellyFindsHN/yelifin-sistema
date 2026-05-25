@@ -50,6 +50,7 @@ const mainNav = [
     submenu: [
       { title: "Productos",    url: "/inventory" },
       { title: "Movimientos",  url: "/inventory/movements" },
+      { title: "En camino",    url: "/purchases/pending" },
     ],
   },
   {

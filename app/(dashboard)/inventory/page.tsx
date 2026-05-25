@@ -55,6 +55,7 @@ import { CreateTransactionModal }     from "@/components/transactions/create-tra
 import { useAccounts }                from "@/hooks/swr/use-accounts";
 import { useCreditCards }             from "@/hooks/swr/use-credit-cards";
 import { usePurchases }               from "@/hooks/swr/use-purchases";
+import { useMe }                      from "@/hooks/swr/use-me";
 
 // ── Helpers ────────────────────────────────────────────────────────────
 
@@ -96,7 +97,7 @@ function ProductActionsMenu({
           <MoreVertical className="size-4" />
         </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end">
+      <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
         <DropdownMenuItem onClick={() => onViewDetail(item.product_id)}>
           <Eye className="size-4 mr-2 text-muted-foreground" />
           Ver detalle
@@ -479,6 +480,9 @@ export default function InventoryPage() {
   const { creditCards } = useCreditCards();
   const { format }     = useCurrency();
   const { purchases, mutate: mutatePurchases } = usePurchases();
+  const { features, subscription }             = useMe();
+
+  const isAdmin = (features?.ADMIN ?? []).length > 0 || subscription?.plan?.slug === "admin";
 
   const pendingPurchases = purchases.filter((p) => p.status === "PENDING");
 
@@ -558,7 +562,7 @@ export default function InventoryPage() {
       </div>
 
       {/* ── Banner compras pendientes ─────────────────────────────── */}
-      {pendingPurchases.length > 0 && (
+      {isAdmin && pendingPurchases.length > 0 && (
         <button
           type="button"
           onClick={() => push("/purchases/pending")}
@@ -781,16 +785,18 @@ export default function InventoryPage() {
                         </div>
                         <div className="flex items-center gap-1 shrink-0">
                           {getStockBadge(Number(item.stock), item.is_service)}
-                          <ProductActionsMenu
-                            item={item}
-                            findProduct={findProduct}
-                            setInventoryProduct={setInventoryProduct}
-                            setAdjustProduct={setAdjustProduct}
-                            setVariantProduct={setVariantProduct}
-                            setEditProduct={setEditProduct}
-                            setDeleteProduct={setDeleteProduct}
-                            onViewDetail={(id) => push(`/inventory/${id}`)}
-                          />
+                          <div onClick={(e) => e.stopPropagation()}>
+                            <ProductActionsMenu
+                              item={item}
+                              findProduct={findProduct}
+                              setInventoryProduct={setInventoryProduct}
+                              setAdjustProduct={setAdjustProduct}
+                              setVariantProduct={setVariantProduct}
+                              setEditProduct={setEditProduct}
+                              setDeleteProduct={setDeleteProduct}
+                              onViewDetail={(id) => push(`/inventory/${id}`)}
+                            />
+                          </div>
                         </div>
                       </div>
                       {item.sku && (

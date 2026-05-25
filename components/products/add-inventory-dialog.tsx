@@ -536,8 +536,41 @@ export function AddInventoryDialog({ product, open, onOpenChange, onSuccess }: P
             })}
           </div>
 
-          {/* Envío */}
-          <div className="space-y-1.5">
+          {/* Toggle pendiente */}
+          <div className="flex items-start justify-between gap-3 rounded-xl border p-3.5">
+            <div className="space-y-0.5 min-w-0">
+              <Label className="text-sm font-medium flex items-center gap-2 cursor-pointer">
+                <Clock className="size-3.5 text-amber-500 shrink-0" />
+                Stock pendiente de llegada
+              </Label>
+              <p className="text-xs text-muted-foreground">
+                {isPending
+                  ? "El stock se acredita al confirmar la llegada. El dinero se debita ahora."
+                  : "El stock entra al inventario de inmediato al guardar."}
+              </p>
+            </div>
+            <Switch
+              checked={isPending}
+              onCheckedChange={(checked) => {
+                setIsPending(checked);
+                if (checked) {
+                  setValue("shipping", 0);
+                  setShippingAccountId(null);
+                }
+              }}
+              disabled={isCreating}
+              className="shrink-0 mt-0.5"
+            />
+          </div>
+
+          {isPending && (
+            <div className="rounded-xl border border-amber-200 bg-amber-50/60 dark:bg-amber-950/20 px-3.5 py-3 text-xs text-amber-700 dark:text-amber-400 leading-relaxed">
+              El costo de envío se podrá registrar al confirmar la llegada, una vez sepas cuánto costó.
+            </div>
+          )}
+
+          {/* Envío — oculto en modo pendiente */}
+          {!isPending && <div className="space-y-1.5">
             <Label className="text-sm font-medium">
               Gastos de envío ({symbol})
               {ship > 0 && totalUnits > 0 && (
@@ -557,10 +590,10 @@ export function AddInventoryDialog({ product, open, onOpenChange, onSuccess }: P
                 className="h-11 pl-8 text-base"
               />
             </div>
-          </div>
+          </div>}
 
           {/* Cuenta para el envío (solo si hay envío y hay cuentas disponibles) */}
-          {ship > 0 && accounts.length > 0 && (
+          {!isPending && ship > 0 && accounts.length > 0 && (
             <div className="space-y-1.5">
               <Label className="text-sm font-medium flex items-center gap-1.5">
                 <Truck className="size-3.5 text-muted-foreground" />
