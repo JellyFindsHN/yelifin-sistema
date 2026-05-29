@@ -13,6 +13,12 @@
 -- PASO 1: organizations
 -- ============================================================
 
+DROP TABLE IF EXISTS organization_members   CASCADE;
+    DROP TABLE IF EXISTS org_role_permissions   CASCADE;
+    DROP TABLE IF EXISTS org_subscriptions      CASCADE;
+    DROP TABLE IF EXISTS org_roles              CASCADE;
+    DROP TABLE IF EXISTS organizations          CASCADE;
+
 CREATE TABLE IF NOT EXISTS organizations (
   id            BIGSERIAL    PRIMARY KEY,
   name          VARCHAR(255) NOT NULL,
