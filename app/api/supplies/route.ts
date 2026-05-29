@@ -11,7 +11,7 @@ export async function GET(request: NextRequest) {
   if (!isAuthSuccess(auth)) return createErrorResponse(auth.error, auth.status);
 
   try {
-    const { userId } = auth.data;
+    const { userId, orgId } = auth.data;
     const { searchParams } = new URL(request.url);
     const search = (searchParams.get("search") ?? "").trim().toLowerCase();
     const page  = Math.max(1, Number(searchParams.get("page")  ?? 1));
@@ -21,14 +21,14 @@ export async function GET(request: NextRequest) {
     const [{ count }] = await sql`
       SELECT COUNT(*)::int AS count
       FROM supplies
-      WHERE user_id = ${userId}
+      WHERE org_id = ${orgId}
         AND (${search} = '' OR LOWER(name) LIKE ${"%" + search + "%"})
     `;
 
     const supplies = await sql`
       SELECT
         id,
-        user_id,
+        org_id,
         name,
         unit,
         stock::int,
@@ -36,7 +36,7 @@ export async function GET(request: NextRequest) {
         unit_cost,
         created_at
       FROM supplies
-      WHERE user_id = ${userId}
+      WHERE org_id = ${orgId}
         AND (${search} = '' OR LOWER(name) LIKE ${"%" + search + "%"})
       ORDER BY created_at DESC
       LIMIT ${limit} OFFSET ${offset}
@@ -61,7 +61,7 @@ export async function POST(request: NextRequest) {
   if (!isAuthSuccess(auth)) return createErrorResponse(auth.error, auth.status);
 
   try {
-    const { userId } = auth.data;
+    const { userId, orgId } = auth.data;
     const body = await request.json();
 
     const name = (body?.name ?? "").trim();
@@ -76,8 +76,8 @@ export async function POST(request: NextRequest) {
     if (Number.isNaN(unit_cost) || unit_cost < 0) return createErrorResponse("Costo unitario inválido", 400);
 
     const [created] = await sql`
-      INSERT INTO supplies (user_id, name, unit, stock, min_stock, unit_cost)
-      VALUES (${userId}, ${name}, ${unit}, ${stock}, ${min_stock}, ${unit_cost})
+      INSERT INTO supplies (org_id, created_by, name, unit, stock, min_stock, unit_cost)
+      VALUES (${orgId}, ${userId}, ${name}, ${unit}, ${stock}, ${min_stock}, ${unit_cost})
       RETURNING id
     `;
 
@@ -87,7 +87,7 @@ export async function POST(request: NextRequest) {
     );
   } catch (error: any) {
     console.error(" POST /api/supplies:", error);
-    // Si el UNIQUE(user_id, name) falla:
+    // Si el UNIQUE(org_id, name) falla:
     if (String(error?.message ?? "").toLowerCase().includes("unique")) {
       return createErrorResponse("Ya existe un suministro con ese nombre", 400);
     }

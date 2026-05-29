@@ -17,7 +17,7 @@ export async function GET(request: NextRequest) {
   if (!isAuthSuccess(auth)) return createErrorResponse(auth.error, auth.status);
 
   try {
-    const { userId } = auth.data;
+    const { userId, orgId } = auth.data;
     const { searchParams } = new URL(request.url);
     const def  = defaultRange();
     const from = searchParams.get("from") ?? def.from;
@@ -32,8 +32,8 @@ export async function GET(request: NextRequest) {
         COALESCE(SUM(si.unit_cost * si.quantity), 0)::float                   AS total_cogs,
         COALESCE(SUM(s.total) - SUM(si.unit_cost * si.quantity), 0)::float    AS gross_profit
       FROM sales s
-      LEFT JOIN sale_items si ON si.sale_id = s.id AND si.user_id = ${userId}
-      WHERE s.user_id = ${userId}
+      LEFT JOIN sale_items si ON si.sale_id = s.id AND si.org_id = ${orgId}
+      WHERE s.org_id = ${orgId}
         AND s.status  = 'COMPLETED'
         AND s.sold_at >= ${from}::date
         AND s.sold_at <  (${to}::date + INTERVAL '1 day')
@@ -47,8 +47,8 @@ export async function GET(request: NextRequest) {
         COALESCE(SUM(s.total), 0)::float          AS revenue,
         COALESCE(SUM(s.total) - SUM(si.unit_cost * si.quantity), 0)::float AS profit
       FROM sales s
-      LEFT JOIN sale_items si ON si.sale_id = s.id AND si.user_id = ${userId}
-      WHERE s.user_id = ${userId}
+      LEFT JOIN sale_items si ON si.sale_id = s.id AND si.org_id = ${orgId}
+      WHERE s.org_id = ${orgId}
         AND s.status  = 'COMPLETED'
         AND s.sold_at >= ${from}::date
         AND s.sold_at <  (${to}::date + INTERVAL '1 day')
@@ -73,7 +73,7 @@ export async function GET(request: NextRequest) {
       FROM sale_items si
       JOIN products p ON p.id = si.product_id
       JOIN sales    s ON s.id = si.sale_id
-      WHERE si.user_id = ${userId}
+      WHERE si.org_id = ${orgId}
         AND s.status   = 'COMPLETED'
         AND s.sold_at  >= ${from}::date
         AND s.sold_at  <  (${to}::date + INTERVAL '1 day')
@@ -98,8 +98,8 @@ export async function GET(request: NextRequest) {
       FROM sales s
       LEFT JOIN customers  c  ON c.id  = s.customer_id
       LEFT JOIN accounts   a  ON a.id  = s.account_id
-      LEFT JOIN sale_items si ON si.sale_id = s.id AND si.user_id = ${userId}
-      WHERE s.user_id = ${userId}
+      LEFT JOIN sale_items si ON si.sale_id = s.id AND si.org_id = ${orgId}
+      WHERE s.org_id = ${orgId}
         AND s.status  = 'COMPLETED'
         AND s.sold_at >= ${from}::date
         AND s.sold_at <  (${to}::date + INTERVAL '1 day')

@@ -289,7 +289,7 @@ export async function POST(request: NextRequest) {
   if (!isAuthSuccess(auth)) return createErrorResponse(auth.error, auth.status);
 
   try {
-    const { userId } = auth.data;
+    const { userId, orgId } = auth.data;
     const body       = await request.json();
     const def        = defaultRange();
     const from       = (body.from   ?? def.from)  as string;
@@ -309,7 +309,7 @@ export async function POST(request: NextRequest) {
         COALESCE((
           SELECT SUM(t.amount) FROM transactions t
           WHERE t.reference_type = 'EVENT' AND t.reference_id = e.id
-            AND t.type = 'EXPENSE' AND t.user_id = e.user_id
+            AND t.type = 'EXPENSE' AND t.org_id = e.org_id
         ), 0)::float AS extra_expenses,
         COALESCE(SUM(s.total), 0)
           - COALESCE(SUM(si.unit_cost * si.quantity), 0)
@@ -317,7 +317,7 @@ export async function POST(request: NextRequest) {
           - COALESCE((
               SELECT SUM(t.amount) FROM transactions t
               WHERE t.reference_type = 'EVENT' AND t.reference_id = e.id
-                AND t.type = 'EXPENSE' AND t.user_id = e.user_id
+                AND t.type = 'EXPENSE' AND t.org_id = e.org_id
             ), 0) AS net_profit,
         CASE
           WHEN NOW() < e.starts_at                      THEN 'PLANNED'
@@ -325,12 +325,12 @@ export async function POST(request: NextRequest) {
           ELSE                                               'COMPLETED'
         END AS status
       FROM events e
-      LEFT JOIN sales      s  ON s.event_id = e.id AND s.status = 'COMPLETED' AND s.user_id = e.user_id
-      LEFT JOIN sale_items si ON si.sale_id = s.id AND si.user_id = e.user_id
-      WHERE e.user_id    = ${userId}
+      LEFT JOIN sales      s  ON s.event_id = e.id AND s.status = 'COMPLETED' AND s.org_id = e.org_id
+      LEFT JOIN sale_items si ON si.sale_id = s.id AND si.org_id = e.org_id
+      WHERE e.org_id     = ${orgId}
         AND e.starts_at >= ${from}::date
         AND e.starts_at <  (${to}::date + INTERVAL '1 day')
-      GROUP BY e.id, e.name, e.location, e.starts_at, e.ends_at, e.fixed_cost, e.notes, e.user_id
+      GROUP BY e.id, e.name, e.location, e.starts_at, e.ends_at, e.fixed_cost, e.notes, e.org_id
       ORDER BY e.starts_at DESC
     `;
 

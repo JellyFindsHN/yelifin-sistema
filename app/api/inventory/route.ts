@@ -10,7 +10,7 @@ export async function GET(request: NextRequest) {
   if (!isAuthSuccess(auth)) return createErrorResponse(auth.error, auth.status);
 
   try {
-    const { userId }       = auth.data;
+    const { orgId }        = auth.data;
     const { searchParams } = new URL(request.url);
     const search      = searchParams.get("search")?.trim() || null;
     const stockFilter = searchParams.get("stock") || null;
@@ -21,7 +21,7 @@ export async function GET(request: NextRequest) {
     // ── Stats globales (sin filtros) ──────────────────────────────────
     const [statsRow] = await sql`
       SELECT
-        COUNT(DISTINCT p.id) FILTER (WHERE p.is_active = TRUE AND p.user_id = ${userId})::int AS total_products,
+        COUNT(DISTINCT p.id) FILTER (WHERE p.is_active = TRUE AND p.org_id = ${orgId})::int AS total_products,
         COUNT(DISTINCT p.id) FILTER (WHERE NOT p.is_service)::int AS total_physical,
         COALESCE(SUM(ib.qty_available) FILTER (WHERE NOT p.is_service), 0)::numeric AS total_stock,
         COALESCE(SUM(ib.qty_available * ib.unit_cost) FILTER (WHERE NOT p.is_service), 0)::numeric AS total_value,
@@ -29,18 +29,18 @@ export async function GET(request: NextRequest) {
           WHERE NOT p.is_service
             AND EXISTS (
               SELECT 1 FROM inventory_batches ib2
-              WHERE ib2.product_id = p.id AND ib2.user_id = p.user_id
+              WHERE ib2.product_id = p.id AND ib2.org_id = p.org_id
                 AND ib2.qty_available > 0
             )
-            AND (SELECT COALESCE(SUM(qty_available), 0) FROM inventory_batches WHERE product_id = p.id AND user_id = p.user_id) < 10
+            AND (SELECT COALESCE(SUM(qty_available), 0) FROM inventory_batches WHERE product_id = p.id AND org_id = p.org_id) < 10
         )::int AS low_stock,
         COUNT(DISTINCT p.id) FILTER (
           WHERE NOT p.is_service
-            AND (SELECT COALESCE(SUM(qty_available), 0) FROM inventory_batches WHERE product_id = p.id AND user_id = p.user_id) = 0
+            AND (SELECT COALESCE(SUM(qty_available), 0) FROM inventory_batches WHERE product_id = p.id AND org_id = p.org_id) = 0
         )::int AS out_of_stock
       FROM products p
-      LEFT JOIN inventory_batches ib ON ib.product_id = p.id AND ib.user_id = p.user_id
-      WHERE p.user_id = ${userId} AND p.is_active = TRUE;
+      LEFT JOIN inventory_batches ib ON ib.product_id = p.id AND ib.org_id = p.org_id
+      WHERE p.org_id = ${orgId} AND p.is_active = TRUE;
     `;
 
     // ── Filtros dinámicos ─────────────────────────────────────────────
@@ -50,16 +50,16 @@ export async function GET(request: NextRequest) {
 
     const stockCondition =
       stockFilter === "services" ? sql`AND p.is_service = TRUE` :
-      stockFilter === "ok"       ? sql`AND (p.is_service = TRUE OR (SELECT COALESCE(SUM(qty_available),0) FROM inventory_batches WHERE product_id=p.id AND user_id=p.user_id) >= 10)` :
-      stockFilter === "low"      ? sql`AND p.is_service = FALSE AND (SELECT COALESCE(SUM(qty_available),0) FROM inventory_batches WHERE product_id=p.id AND user_id=p.user_id) > 0 AND (SELECT COALESCE(SUM(qty_available),0) FROM inventory_batches WHERE product_id=p.id AND user_id=p.user_id) < 10` :
-      stockFilter === "out"      ? sql`AND p.is_service = FALSE AND (SELECT COALESCE(SUM(qty_available),0) FROM inventory_batches WHERE product_id=p.id AND user_id=p.user_id) = 0` :
+      stockFilter === "ok"       ? sql`AND (p.is_service = TRUE OR (SELECT COALESCE(SUM(qty_available),0) FROM inventory_batches WHERE product_id=p.id AND org_id=p.org_id) >= 10)` :
+      stockFilter === "low"      ? sql`AND p.is_service = FALSE AND (SELECT COALESCE(SUM(qty_available),0) FROM inventory_batches WHERE product_id=p.id AND org_id=p.org_id) > 0 AND (SELECT COALESCE(SUM(qty_available),0) FROM inventory_batches WHERE product_id=p.id AND org_id=p.org_id) < 10` :
+      stockFilter === "out"      ? sql`AND p.is_service = FALSE AND (SELECT COALESCE(SUM(qty_available),0) FROM inventory_batches WHERE product_id=p.id AND org_id=p.org_id) = 0` :
                                    sql``;
 
     // ── Count para paginación ─────────────────────────────────────────
     const [{ count }] = await sql`
       SELECT COUNT(DISTINCT p.id)::int AS count
       FROM products p
-      WHERE p.user_id = ${userId} AND p.is_active = TRUE
+      WHERE p.org_id = ${orgId} AND p.is_active = TRUE
       ${searchCondition}
       ${stockCondition}
     `;
@@ -136,20 +136,20 @@ export async function GET(request: NextRequest) {
               END AS avg_cost,
               ROUND(COALESCE(SUM(qty_available * unit_cost), 0), 2) AS total_val
             FROM inventory_batches
-            WHERE user_id    = p.user_id
+            WHERE org_id     = p.org_id
               AND product_id = p.id
               AND variant_id = pv.id
           ) vib ON TRUE
           WHERE pv.product_id = p.id
-            AND pv.user_id    = p.user_id
+            AND pv.org_id     = p.org_id
             AND pv.is_active  = TRUE
         ) AS variants_stock
 
       FROM products p
       LEFT JOIN inventory_batches ib
         ON ib.product_id = p.id
-       AND ib.user_id    = p.user_id
-      WHERE p.user_id   = ${userId}
+       AND ib.org_id     = p.org_id
+      WHERE p.org_id    = ${orgId}
         AND p.is_active = TRUE
       ${searchCondition}
       ${stockCondition}

@@ -13,7 +13,7 @@ export async function DELETE(
   if (!isAuthSuccess(auth)) return createErrorResponse(auth.error, auth.status);
 
   try {
-    const { userId } = auth.data;
+    const { userId, orgId } = auth.data;
     const { id } = await params;
     const transactionId = Number(id);
 
@@ -23,7 +23,7 @@ export async function DELETE(
     const [transaction] = await sql`
       SELECT id, type, amount, account_id, to_account_id
       FROM transactions
-      WHERE id = ${transactionId} AND user_id = ${userId}
+      WHERE id = ${transactionId} AND org_id = ${orgId}
     `;
 
     if (!transaction) return createErrorResponse("Transacción no encontrada", 404);
@@ -35,30 +35,30 @@ export async function DELETE(
       // Se sumó al account → restar
       await sql`
         UPDATE accounts SET balance = balance - ${amt}
-        WHERE id = ${transaction.account_id} AND user_id = ${userId}
+        WHERE id = ${transaction.account_id} AND org_id = ${orgId}
       `;
     } else if (transaction.type === "EXPENSE") {
       // Se restó del account → sumar de vuelta
       await sql`
         UPDATE accounts SET balance = balance + ${amt}
-        WHERE id = ${transaction.account_id} AND user_id = ${userId}
+        WHERE id = ${transaction.account_id} AND org_id = ${orgId}
       `;
     } else if (transaction.type === "TRANSFER") {
       // Se restó del origen y se sumó al destino → invertir ambos
       await sql`
         UPDATE accounts SET balance = balance + ${amt}
-        WHERE id = ${transaction.account_id} AND user_id = ${userId}
+        WHERE id = ${transaction.account_id} AND org_id = ${orgId}
       `;
       await sql`
         UPDATE accounts SET balance = balance - ${amt}
-        WHERE id = ${transaction.to_account_id} AND user_id = ${userId}
+        WHERE id = ${transaction.to_account_id} AND org_id = ${orgId}
       `;
     }
 
     // 3. Eliminar la transacción
     await sql`
       DELETE FROM transactions
-      WHERE id = ${transactionId} AND user_id = ${userId}
+      WHERE id = ${transactionId} AND org_id = ${orgId}
     `;
 
     return Response.json({ message: "Transacción eliminada y balances revertidos" });
@@ -78,7 +78,7 @@ export async function PATCH(
   if (!isAuthSuccess(auth)) return createErrorResponse(auth.error, auth.status);
 
   try {
-    const { userId } = auth.data;
+    const { userId, orgId } = auth.data;
     const { id } = await params;
     const transactionId = Number(id);
 
@@ -91,7 +91,7 @@ export async function PATCH(
     const [old] = await sql`
       SELECT id, type, amount, account_id, to_account_id, reference_type
       FROM transactions
-      WHERE id = ${transactionId} AND user_id = ${userId}
+      WHERE id = ${transactionId} AND org_id = ${orgId}
     `;
 
     if (!old) return createErrorResponse("Transacción no encontrada", 404);
@@ -112,17 +112,17 @@ export async function PATCH(
 
     // 2. Revertir efecto de la transacción VIEJA
     if (old.type === "INCOME") {
-      await sql`UPDATE accounts SET balance = balance - ${oldAmt} WHERE id = ${old.account_id} AND user_id = ${userId}`;
+      await sql`UPDATE accounts SET balance = balance - ${oldAmt} WHERE id = ${old.account_id} AND org_id = ${orgId}`;
     } else if (old.type === "EXPENSE") {
-      await sql`UPDATE accounts SET balance = balance + ${oldAmt} WHERE id = ${old.account_id} AND user_id = ${userId}`;
+      await sql`UPDATE accounts SET balance = balance + ${oldAmt} WHERE id = ${old.account_id} AND org_id = ${orgId}`;
     } else if (old.type === "TRANSFER") {
-      await sql`UPDATE accounts SET balance = balance + ${oldAmt} WHERE id = ${old.account_id}    AND user_id = ${userId}`;
-      await sql`UPDATE accounts SET balance = balance - ${oldAmt} WHERE id = ${old.to_account_id} AND user_id = ${userId}`;
+      await sql`UPDATE accounts SET balance = balance + ${oldAmt} WHERE id = ${old.account_id}    AND org_id = ${orgId}`;
+      await sql`UPDATE accounts SET balance = balance - ${oldAmt} WHERE id = ${old.to_account_id} AND org_id = ${orgId}`;
     }
 
     // 3. Validar cuentas nuevas
     const [newAccount] = await sql`
-      SELECT id FROM accounts WHERE id = ${newAccountId} AND user_id = ${userId} AND is_active = TRUE
+      SELECT id FROM accounts WHERE id = ${newAccountId} AND org_id = ${orgId} AND is_active = TRUE
     `;
     if (!newAccount) return createErrorResponse("Cuenta origen no encontrada", 404);
 
@@ -131,19 +131,19 @@ export async function PATCH(
       if (newAccountId === newToAccountId) return createErrorResponse("Las cuentas deben ser diferentes", 400);
 
       const [newToAccount] = await sql`
-        SELECT id FROM accounts WHERE id = ${newToAccountId} AND user_id = ${userId} AND is_active = TRUE
+        SELECT id FROM accounts WHERE id = ${newToAccountId} AND org_id = ${orgId} AND is_active = TRUE
       `;
       if (!newToAccount) return createErrorResponse("Cuenta destino no encontrada", 404);
     }
 
     // 4. Aplicar efecto de la transacción NUEVA
     if (old.type === "INCOME") {
-      await sql`UPDATE accounts SET balance = balance + ${newAmt} WHERE id = ${newAccountId} AND user_id = ${userId}`;
+      await sql`UPDATE accounts SET balance = balance + ${newAmt} WHERE id = ${newAccountId} AND org_id = ${orgId}`;
     } else if (old.type === "EXPENSE") {
-      await sql`UPDATE accounts SET balance = balance - ${newAmt} WHERE id = ${newAccountId} AND user_id = ${userId}`;
+      await sql`UPDATE accounts SET balance = balance - ${newAmt} WHERE id = ${newAccountId} AND org_id = ${orgId}`;
     } else if (old.type === "TRANSFER") {
-      await sql`UPDATE accounts SET balance = balance - ${newAmt} WHERE id = ${newAccountId}    AND user_id = ${userId}`;
-      await sql`UPDATE accounts SET balance = balance + ${newAmt} WHERE id = ${newToAccountId} AND user_id = ${userId}`;
+      await sql`UPDATE accounts SET balance = balance - ${newAmt} WHERE id = ${newAccountId}    AND org_id = ${orgId}`;
+      await sql`UPDATE accounts SET balance = balance + ${newAmt} WHERE id = ${newToAccountId} AND org_id = ${orgId}`;
     }
 
     // 5. Actualizar la transacción
@@ -154,8 +154,9 @@ export async function PATCH(
         to_account_id = ${old.type === "TRANSFER" ? newToAccountId : null},
         category      = ${category    ?? old.category},
         description   = ${description ?? old.description},
-        occurred_at   = ${occurred_at ?? old.occurred_at}
-      WHERE id = ${transactionId} AND user_id = ${userId}
+        occurred_at   = ${occurred_at ?? old.occurred_at},
+        updated_by    = ${userId}
+      WHERE id = ${transactionId} AND org_id = ${orgId}
       RETURNING *
     `;
 

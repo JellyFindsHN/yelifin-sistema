@@ -13,7 +13,7 @@ export async function GET(
   if (!isAuthSuccess(auth)) return createErrorResponse(auth.error, auth.status);
 
   try {
-    const { userId } = auth.data;
+    const { userId, orgId } = auth.data;
     const { id } = await params;
 
     const [card] = await sql`
@@ -22,7 +22,7 @@ export async function GET(
         statement_closing_day, payment_due_day,
         balance, balance_usd, is_active, created_at, updated_at
       FROM credit_cards
-      WHERE id = ${Number(id)} AND user_id = ${userId}
+      WHERE id = ${Number(id)} AND org_id = ${orgId}
     `;
 
     if (!card) return createErrorResponse("Tarjeta no encontrada", 404);
@@ -51,7 +51,7 @@ export async function GET(
         ), 0) AS statement_balance_usd
       FROM credit_card_transactions
       WHERE credit_card_id = ${Number(id)}
-        AND user_id      = ${userId}
+        AND org_id       = ${orgId}
         AND occurred_at >= ${cycleStart.toISOString()}::timestamptz
     `;
 
@@ -77,12 +77,12 @@ export async function PATCH(
   if (!isAuthSuccess(auth)) return createErrorResponse(auth.error, auth.status);
 
   try {
-    const { userId } = auth.data;
+    const { userId, orgId } = auth.data;
     const { id } = await params;
     const body = await request.json();
 
     const [existing] = await sql`
-      SELECT id FROM credit_cards WHERE id = ${Number(id)} AND user_id = ${userId}
+      SELECT id FROM credit_cards WHERE id = ${Number(id)} AND org_id = ${orgId}
     `;
     if (!existing) return createErrorResponse("Tarjeta no encontrada", 404);
 
@@ -103,8 +103,9 @@ export async function PATCH(
         statement_closing_day = COALESCE(${statement_closing_day ?? null}, statement_closing_day),
         payment_due_day       = COALESCE(${payment_due_day ?? null}, payment_due_day),
         is_active             = COALESCE(${is_active ?? null}, is_active),
+        updated_by            = ${userId},
         updated_at            = NOW()
-      WHERE id = ${Number(id)} AND user_id = ${userId}
+      WHERE id = ${Number(id)} AND org_id = ${orgId}
       RETURNING *
     `;
 
@@ -125,12 +126,12 @@ export async function DELETE(
   if (!isAuthSuccess(auth)) return createErrorResponse(auth.error, auth.status);
 
   try {
-    const { userId } = auth.data;
+    const { userId, orgId } = auth.data;
     const { id } = await params;
 
     const [card] = await sql`
       SELECT id, balance, balance_usd FROM credit_cards
-      WHERE id = ${Number(id)} AND user_id = ${userId}
+      WHERE id = ${Number(id)} AND org_id = ${orgId}
     `;
     if (!card) return createErrorResponse("Tarjeta no encontrada", 404);
 
@@ -139,8 +140,8 @@ export async function DELETE(
 
     // Soft delete
     await sql`
-      UPDATE credit_cards SET is_active = FALSE, updated_at = NOW()
-      WHERE id = ${Number(id)} AND user_id = ${userId}
+      UPDATE credit_cards SET is_active = FALSE, updated_by = ${userId}, updated_at = NOW()
+      WHERE id = ${Number(id)} AND org_id = ${orgId}
     `;
 
     return Response.json({ message: "Tarjeta eliminada" });

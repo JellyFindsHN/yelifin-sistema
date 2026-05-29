@@ -13,7 +13,7 @@ export async function GET(
   if (!isAuthSuccess(auth)) return createErrorResponse(auth.error, auth.status);
 
   try {
-    const { userId } = auth.data;
+    const { userId, orgId } = auth.data;
     const { id }     = await params;
     const eventId    = Number(id);
 
@@ -21,7 +21,7 @@ export async function GET(
     const [event] = await sql`
       SELECT id, name, location, starts_at, ends_at, fixed_cost, notes, created_at
       FROM events
-      WHERE id = ${eventId} AND user_id = ${userId}
+      WHERE id = ${eventId} AND org_id = ${orgId}
     `;
     if (!event) return createErrorResponse("Evento no encontrado", 404);
 
@@ -47,8 +47,8 @@ export async function GET(
       FROM sales s
       LEFT JOIN customers c   ON c.id = s.customer_id
       LEFT JOIN accounts  a   ON a.id = s.account_id
-      LEFT JOIN sale_items si ON si.sale_id = s.id AND si.user_id = s.user_id
-      WHERE s.event_id = ${eventId} AND s.user_id = ${userId}
+      LEFT JOIN sale_items si ON si.sale_id = s.id AND si.org_id = s.org_id
+      WHERE s.event_id = ${eventId} AND s.org_id = ${orgId}
       GROUP BY s.id, c.name, a.name
       ORDER BY s.sold_at ASC
     `;
@@ -60,7 +60,7 @@ export async function GET(
       WHERE reference_type = 'EVENT'
         AND reference_id   = ${eventId}
         AND type           = 'EXPENSE'
-        AND user_id        = ${userId}
+        AND org_id         = ${orgId}
       ORDER BY occurred_at ASC
     `;
 
@@ -146,7 +146,7 @@ export async function PUT(
   if (!isAuthSuccess(auth)) return createErrorResponse(auth.error, auth.status);
 
   try {
-    const { userId } = auth.data;
+    const { userId, orgId } = auth.data;
     const { id }     = await params;
     const eventId    = Number(id);
 
@@ -159,9 +159,9 @@ export async function PUT(
     if (starts_at && ends_at && new Date(starts_at) > new Date(ends_at))
       return createErrorResponse("La fecha inicio debe ser antes o igual que la fecha fin", 400);
 
-    // Verificar que el evento pertenece al usuario
+    // Verificar que el evento pertenece a la organización
     const [existing] = await sql`
-      SELECT id FROM events WHERE id = ${eventId} AND user_id = ${userId}
+      SELECT id FROM events WHERE id = ${eventId} AND org_id = ${orgId}
     `;
     if (!existing) return createErrorResponse("Evento no encontrado", 404);
 
@@ -176,8 +176,9 @@ export async function PUT(
         starts_at  = COALESCE(${starts_at    ?? null},  starts_at),
         ends_at    = COALESCE(${ends_at      ?? null},  ends_at),
         fixed_cost = COALESCE(${fixed_cost   ?? null},  fixed_cost),
-        notes      = COALESCE(${notesVal     ?? null},  notes)
-      WHERE id = ${eventId} AND user_id = ${userId}
+        notes      = COALESCE(${notesVal     ?? null},  notes),
+        updated_by = ${userId}
+      WHERE id = ${eventId} AND org_id = ${orgId}
       RETURNING *
     `;
 
@@ -196,16 +197,16 @@ export async function DELETE(
   if (!isAuthSuccess(auth)) return createErrorResponse(auth.error, auth.status);
 
   try {
-    const { userId } = auth.data;
+    const { userId, orgId } = auth.data;
     const { id }     = await params;
     const eventId    = Number(id);
 
     const [existing] = await sql`
-      SELECT id FROM events WHERE id = ${eventId} AND user_id = ${userId}
+      SELECT id FROM events WHERE id = ${eventId} AND org_id = ${orgId}
     `;
     if (!existing) return createErrorResponse("Evento no encontrado", 404);
 
-    await sql`DELETE FROM events WHERE id = ${eventId} AND user_id = ${userId}`;
+    await sql`DELETE FROM events WHERE id = ${eventId} AND org_id = ${orgId}`;
 
     return Response.json({ success: true });
   } catch (error) {

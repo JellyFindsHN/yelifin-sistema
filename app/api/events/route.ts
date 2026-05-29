@@ -11,7 +11,7 @@ export async function GET(request: NextRequest) {
   if (!isAuthSuccess(auth)) return createErrorResponse(auth.error, auth.status);
 
   try {
-    const { userId } = auth.data;
+    const { userId, orgId } = auth.data;
 
     const rows = await sql`
       SELECT
@@ -36,11 +36,11 @@ export async function GET(request: NextRequest) {
           SUM(
             (SELECT COALESCE(SUM(si.line_total - si.unit_cost * si.quantity), 0)
              FROM sale_items si
-             WHERE si.sale_id = s.id AND si.user_id = s.user_id)
+             WHERE si.sale_id = s.id AND si.org_id = s.org_id)
             - COALESCE(s.tax, 0)
           ) AS total_profit
         FROM sales s
-        WHERE s.event_id = e.id AND s.user_id = e.user_id
+        WHERE s.event_id = e.id AND s.org_id = e.org_id
       ) s_agg ON true
 
       LEFT JOIN LATERAL (
@@ -49,10 +49,10 @@ export async function GET(request: NextRequest) {
         WHERE t.reference_type = 'EVENT'
           AND t.reference_id   = e.id
           AND t.type           = 'EXPENSE'
-          AND t.user_id        = e.user_id
+          AND t.org_id         = e.org_id
       ) t_agg ON true
 
-      WHERE e.user_id = ${userId}
+      WHERE e.org_id = ${orgId}
       ORDER BY e.starts_at DESC
     `;
 
@@ -106,7 +106,7 @@ export async function POST(request: NextRequest) {
   if (!isAuthSuccess(auth)) return createErrorResponse(auth.error, auth.status);
 
   try {
-    const { userId } = auth.data;
+    const { userId, orgId } = auth.data;
     const { name, location, starts_at, ends_at, fixed_cost = 0, notes } = await request.json();
 
     if (!name?.trim())
@@ -119,8 +119,9 @@ export async function POST(request: NextRequest) {
       return createErrorResponse("La fecha inicio debe ser antes que la fecha fin", 400);
 
     const [event] = await sql`
-      INSERT INTO events (user_id, name, location, starts_at, ends_at, fixed_cost, notes)
+      INSERT INTO events (org_id, created_by, name, location, starts_at, ends_at, fixed_cost, notes)
       VALUES (
+        ${orgId},
         ${userId},
         ${name.trim()},
         ${location?.trim() || null},

@@ -10,7 +10,7 @@ export async function GET(request: NextRequest) {
   if (!isAuthSuccess(auth)) return createErrorResponse(auth.error, auth.status);
 
   try {
-    const { userId } = auth.data;
+    const { userId, orgId } = auth.data;
     const { searchParams } = new URL(request.url);
     const lowStockThreshold = Number(searchParams.get("low_stock") ?? "5");
 
@@ -34,8 +34,8 @@ export async function GET(request: NextRequest) {
           ELSE null
         END                                                                    AS margin_pct
       FROM products p
-      LEFT JOIN inventory_batches ib ON ib.product_id = p.id AND ib.user_id = p.user_id
-      WHERE p.user_id = ${userId}
+      LEFT JOIN inventory_batches ib ON ib.product_id = p.id AND ib.org_id = p.org_id
+      WHERE p.org_id = ${orgId}
         AND p.is_active   = TRUE
         AND p.is_service  = FALSE
       GROUP BY p.id, p.name, p.sku, p.price
@@ -61,7 +61,7 @@ export async function GET(request: NextRequest) {
         im.notes
       FROM inventory_movements im
       JOIN products p ON p.id = im.product_id
-      WHERE im.user_id    = ${userId}
+      WHERE im.org_id     = ${orgId}
         AND im.created_at >= NOW() - INTERVAL '30 days'
       ORDER BY im.created_at DESC
       LIMIT 200

@@ -14,14 +14,14 @@ export async function GET(
   if (!isAuthSuccess(auth)) return createErrorResponse(auth.error, auth.status);
 
   try {
-    const { userId } = auth.data;
+    const { userId, orgId } = auth.data;
     const { id } = await params;
     const { searchParams } = new URL(request.url);
 
     const { startISO, endISO } = getUtcBounds(searchParams);
 
     const [card] = await sql`
-      SELECT id FROM credit_cards WHERE id = ${Number(id)} AND user_id = ${userId}
+      SELECT id FROM credit_cards WHERE id = ${Number(id)} AND org_id = ${orgId}
     `;
     if (!card) return createErrorResponse("Tarjeta no encontrada", 404);
 
@@ -46,7 +46,7 @@ export async function GET(
       LEFT JOIN transactions t ON t.id = cct.account_transaction_id
       LEFT JOIN accounts a ON a.id = t.account_id
       WHERE cct.credit_card_id = ${Number(id)}
-        AND cct.user_id = ${userId}
+        AND cct.org_id = ${orgId}
         AND cct.occurred_at >= ${startISO}::timestamptz
         AND cct.occurred_at <  ${endISO}::timestamptz
       ORDER BY cct.occurred_at DESC
@@ -62,7 +62,7 @@ export async function GET(
         COUNT(*)::int AS total_count
       FROM credit_card_transactions
       WHERE credit_card_id = ${Number(id)}
-        AND user_id = ${userId}
+        AND org_id = ${orgId}
         AND occurred_at >= ${startISO}::timestamptz
         AND occurred_at <  ${endISO}::timestamptz
     `;

@@ -13,7 +13,7 @@ export async function GET(request: NextRequest) {
   if (!isAuthSuccess(auth)) return createErrorResponse(auth.error, auth.status);
 
   try {
-    const { userId } = auth.data;
+    const { orgId } = auth.data;
     const { searchParams } = new URL(request.url);
     const type = searchParams.get("type");
 
@@ -27,7 +27,7 @@ export async function GET(request: NextRequest) {
     const categories = await sql`
       SELECT id, name, type, is_active, created_at
       FROM transaction_categories
-      WHERE user_id  = ${userId}
+      WHERE org_id   = ${orgId}
         AND (${type}::text IS NULL OR type = ${type})
         AND is_active = TRUE
       ORDER BY type, name
@@ -45,7 +45,7 @@ export async function POST(request: NextRequest) {
   if (!isAuthSuccess(auth)) return createErrorResponse(auth.error, auth.status);
 
   try {
-    const { userId } = auth.data;
+    const { userId, orgId } = auth.data;
     const body = await request.json();
     const { name, type } = body;
 
@@ -65,8 +65,8 @@ export async function POST(request: NextRequest) {
     }
 
     const [category] = await sql`
-      INSERT INTO transaction_categories (user_id, name, type)
-      VALUES (${userId}, ${name.trim()}, ${type})
+      INSERT INTO transaction_categories (org_id, created_by, name, type)
+      VALUES (${orgId}, ${userId}, ${name.trim()}, ${type})
       RETURNING *
     `;
 

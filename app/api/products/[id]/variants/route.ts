@@ -12,17 +12,17 @@ export async function POST(request: NextRequest, { params }: Params) {
   if (!isAuthSuccess(auth)) return createErrorResponse(auth.error, auth.status);
 
   try {
-    const { userId } = auth.data;
+    const { userId, orgId } = auth.data;
     const { id } = await params;
     const productId = Number(id);
 
     if (isNaN(productId)) return createErrorResponse("ID inválido", 400);
 
-    // Verificar que el producto padre existe y pertenece al usuario
+    // Verificar que el producto padre existe y pertenece a la org
     const [product] = await sql`
       SELECT id FROM products
-      WHERE id      = ${productId}
-        AND user_id = ${userId}
+      WHERE id        = ${productId}
+        AND org_id    = ${orgId}
         AND is_active = TRUE
       LIMIT 1
     `;
@@ -46,8 +46,8 @@ export async function POST(request: NextRequest, { params }: Params) {
 
     const [skuConflict] = await sql`
       SELECT id FROM product_variants
-      WHERE user_id = ${userId}
-        AND sku     = ${finalSku}
+      WHERE org_id = ${orgId}
+        AND sku    = ${finalSku}
       LIMIT 1
     `;
     if (skuConflict) {
@@ -56,7 +56,8 @@ export async function POST(request: NextRequest, { params }: Params) {
 
     const [variant] = await sql`
       INSERT INTO product_variants (
-        user_id,
+        org_id,
+        created_by,
         product_id,
         variant_name,
         sku,
@@ -65,6 +66,7 @@ export async function POST(request: NextRequest, { params }: Params) {
         image_url
       )
       VALUES (
+        ${orgId},
         ${userId},
         ${productId},
         ${variant_name.trim()},

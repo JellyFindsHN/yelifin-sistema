@@ -13,7 +13,7 @@ export async function PATCH(request: NextRequest, { params }: Params) {
   if (!isAuthSuccess(auth)) return createErrorResponse(auth.error, auth.status);
 
   try {
-    const { userId } = auth.data;
+    const { userId, orgId } = auth.data;
     const { id }     = await params;
     const purchaseId = Number(id);
 
@@ -26,7 +26,7 @@ export async function PATCH(request: NextRequest, { params }: Params) {
     const [purchase] = await sql`
       SELECT id, account_id, shipping_account_id, status, shipping, subtotal, total, purchased_at, notes
       FROM purchase_batches
-      WHERE id = ${purchaseId} AND user_id = ${userId}
+      WHERE id = ${purchaseId} AND org_id = ${orgId}
     `;
 
     if (!purchase)
@@ -38,7 +38,7 @@ export async function PATCH(request: NextRequest, { params }: Params) {
     const items = await sql`
       SELECT id, product_id, variant_id, quantity, unit_cost_usd, unit_cost, total_cost
       FROM purchase_batch_items
-      WHERE purchase_batch_id = ${purchaseId} AND user_id = ${userId}
+      WHERE purchase_batch_id = ${purchaseId} AND org_id = ${orgId}
     `;
 
     if (items.length === 0)
@@ -83,7 +83,7 @@ export async function PATCH(request: NextRequest, { params }: Params) {
             UPDATE purchase_batch_items
             SET unit_cost  = ${item.unit_cost},
                 total_cost = ${item.total_cost}
-            WHERE id = ${item.id} AND user_id = ${userId}
+            WHERE id = ${item.id} AND org_id = ${orgId}
           `;
         }
 
@@ -93,7 +93,7 @@ export async function PATCH(request: NextRequest, { params }: Params) {
           SET shipping = ${shippingFinal},
               subtotal = ${newTotal},
               total    = ${newTotal}
-          WHERE id = ${purchaseId} AND user_id = ${userId}
+          WHERE id = ${purchaseId} AND org_id = ${orgId}
         `;
 
         if (shippingAccId) {
@@ -102,7 +102,7 @@ export async function PATCH(request: NextRequest, { params }: Params) {
             SELECT id FROM transactions
             WHERE reference_type = 'PURCHASE_SHIPPING'
               AND reference_id   = ${purchaseId}
-              AND user_id        = ${userId}
+              AND org_id         = ${orgId}
           `;
           if (existingShippingTx) {
             await sql`
@@ -113,23 +113,23 @@ export async function PATCH(request: NextRequest, { params }: Params) {
             await sql`
               UPDATE accounts
               SET balance = balance - ${shippingDelta}
-              WHERE id = ${shippingAccId} AND user_id = ${userId}
+              WHERE id = ${shippingAccId} AND org_id = ${orgId}
             `;
           } else {
             // No existía tx de envío — crearla con el monto final
             await sql`
               INSERT INTO transactions (
-                user_id, account_id, type, amount,
+                org_id, created_by, account_id, type, amount,
                 description, reference_type, reference_id, occurred_at
               ) VALUES (
-                ${userId}, ${shippingAccId}, 'EXPENSE', ${shippingFinal},
+                ${orgId}, ${userId}, ${shippingAccId}, 'EXPENSE', ${shippingFinal},
                 'Pago de envío', 'PURCHASE_SHIPPING', ${purchaseId}, ${occurredAt}
               )
             `;
             await sql`
               UPDATE accounts
               SET balance = balance - ${shippingFinal}
-              WHERE id = ${shippingAccId} AND user_id = ${userId}
+              WHERE id = ${shippingAccId} AND org_id = ${orgId}
             `;
           }
         } else if (purchase.account_id) {
@@ -139,12 +139,12 @@ export async function PATCH(request: NextRequest, { params }: Params) {
             SET amount = ${newTotal}
             WHERE reference_type = 'PURCHASE'
               AND reference_id   = ${purchaseId}
-              AND user_id        = ${userId}
+              AND org_id         = ${orgId}
           `;
           await sql`
             UPDATE accounts
             SET balance = balance - ${shippingDelta}
-            WHERE id = ${purchase.account_id} AND user_id = ${userId}
+            WHERE id = ${purchase.account_id} AND org_id = ${orgId}
           `;
         }
         // Para compras CC sin shipping_account: no ajustamos la CC (edge case)
@@ -154,22 +154,22 @@ export async function PATCH(request: NextRequest, { params }: Params) {
           SELECT id FROM transactions
           WHERE reference_type = 'PURCHASE_SHIPPING'
             AND reference_id   = ${purchaseId}
-            AND user_id        = ${userId}
+            AND org_id         = ${orgId}
         `;
         if (!existingShippingTx) {
           await sql`
             INSERT INTO transactions (
-              user_id, account_id, type, amount,
+              org_id, created_by, account_id, type, amount,
               description, reference_type, reference_id, occurred_at
             ) VALUES (
-              ${userId}, ${shippingAccId}, 'EXPENSE', ${shippingFinal},
+              ${orgId}, ${userId}, ${shippingAccId}, 'EXPENSE', ${shippingFinal},
               'Pago de envío', 'PURCHASE_SHIPPING', ${purchaseId}, ${occurredAt}
             )
           `;
           await sql`
             UPDATE accounts
             SET balance = balance - ${shippingFinal}
-            WHERE id = ${shippingAccId} AND user_id = ${userId}
+            WHERE id = ${shippingAccId} AND org_id = ${orgId}
           `;
         }
       }
@@ -178,20 +178,20 @@ export async function PATCH(request: NextRequest, { params }: Params) {
       for (const item of updatedItems) {
         await sql`
           INSERT INTO inventory_batches (
-            user_id, product_id, variant_id, purchase_batch_item_id,
+            org_id, created_by, product_id, variant_id, purchase_batch_item_id,
             qty_in, qty_available, unit_cost, received_at
           ) VALUES (
-            ${userId}, ${item.product_id}, ${item.variant_id}, ${item.id},
+            ${orgId}, ${userId}, ${item.product_id}, ${item.variant_id}, ${item.id},
             ${item.quantity}, ${item.quantity}, ${item.unit_cost}, ${occurredAt}
           )
         `;
 
         await sql`
           INSERT INTO inventory_movements (
-            user_id, movement_type, product_id, variant_id,
+            org_id, created_by, movement_type, product_id, variant_id,
             quantity, reference_type, reference_id, notes
           ) VALUES (
-            ${userId}, 'IN', ${item.product_id}, ${item.variant_id},
+            ${orgId}, ${userId}, 'IN', ${item.product_id}, ${item.variant_id},
             ${item.quantity}, 'PURCHASE', ${purchaseId}, ${purchase.notes ?? null}
           )
         `;
@@ -201,7 +201,7 @@ export async function PATCH(request: NextRequest, { params }: Params) {
       await sql`
         UPDATE purchase_batches
         SET status = 'COMPLETED'
-        WHERE id = ${purchaseId} AND user_id = ${userId}
+        WHERE id = ${purchaseId} AND org_id = ${orgId}
       `;
 
       await sql`COMMIT`;

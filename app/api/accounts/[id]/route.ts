@@ -12,7 +12,7 @@ export async function PATCH(request: NextRequest, { params }: Params) {
   if (!isAuthSuccess(auth)) return createErrorResponse(auth.error, auth.status);
 
   try {
-    const { userId } = auth.data;
+    const { userId, orgId } = auth.data;
     const { id } = await params;
     const accountId = Number(id);
 
@@ -22,10 +22,11 @@ export async function PATCH(request: NextRequest, { params }: Params) {
 
     const [updated] = await sql`
       UPDATE accounts SET
-        name      = COALESCE(${name ?? null}, name),
-        type      = COALESCE(${type ?? null}, type),
-        is_active = COALESCE(${is_active !== undefined ? is_active : null}, is_active)
-      WHERE id = ${accountId} AND user_id = ${userId}
+        name       = COALESCE(${name ?? null}, name),
+        type       = COALESCE(${type ?? null}, type),
+        is_active  = COALESCE(${is_active !== undefined ? is_active : null}, is_active),
+        updated_by = ${userId}
+      WHERE id = ${accountId} AND org_id = ${orgId}
       RETURNING *
     `;
 
@@ -44,15 +45,15 @@ export async function DELETE(request: NextRequest, { params }: Params) {
   if (!isAuthSuccess(auth)) return createErrorResponse(auth.error, auth.status);
 
   try {
-    const { userId } = auth.data;
+    const { userId, orgId } = auth.data;
     const { id } = await params;
     const accountId = Number(id);
 
     if (isNaN(accountId)) return createErrorResponse("ID inválido", 400);
 
     await sql`
-      UPDATE accounts SET is_active = FALSE
-      WHERE id = ${accountId} AND user_id = ${userId}
+      UPDATE accounts SET is_active = FALSE, updated_by = ${userId}
+      WHERE id = ${accountId} AND org_id = ${orgId}
     `;
 
     return Response.json({ message: "Cuenta eliminada correctamente" });

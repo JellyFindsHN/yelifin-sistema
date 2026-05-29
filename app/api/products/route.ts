@@ -10,12 +10,12 @@ export async function GET(request: NextRequest) {
   if (!isAuthSuccess(auth)) return createErrorResponse(auth.error, auth.status);
 
   try {
-    const { userId } = auth.data;
+    const { orgId } = auth.data;
 
     const products = await sql`
       SELECT
         p.id,
-        p.user_id,
+        p.org_id,
         p.name,
         p.description,
         p.is_service,
@@ -46,14 +46,13 @@ export async function GET(request: NextRequest) {
           )
           FROM product_variants pv
           WHERE pv.product_id = p.id
-            AND pv.user_id    = p.user_id
             AND pv.is_active  = TRUE
         ) AS variants
       FROM products p
       LEFT JOIN inventory_batches ib
         ON ib.product_id = p.id
-       AND ib.user_id    = p.user_id
-      WHERE p.user_id   = ${userId}
+       AND ib.org_id     = p.org_id
+      WHERE p.org_id    = ${orgId}
         AND p.is_active = TRUE
       GROUP BY p.id
       ORDER BY p.created_at DESC
@@ -74,7 +73,7 @@ export async function POST(request: NextRequest) {
   if (!isAuthSuccess(auth)) return createErrorResponse(auth.error, auth.status);
 
   try {
-    const { userId } = auth.data;
+    const { userId, orgId } = auth.data;
     const body = await request.json();
     const { name, description, sku, price, image_url, is_service } = body;
 
@@ -95,12 +94,12 @@ export async function POST(request: NextRequest) {
         (
           SELECT COUNT(*)
           FROM products p
-          WHERE p.user_id  = us.user_id
+          WHERE p.org_id   = ${orgId}
             AND p.is_active = TRUE
         )::int AS current_count
-      FROM user_subscriptions us
+      FROM org_subscriptions us
       JOIN subscription_plans sp ON sp.id = us.plan_id
-      WHERE us.user_id = ${userId}
+      WHERE us.org_id = ${orgId}
       ORDER BY us.created_at DESC
       LIMIT 1
     `;
@@ -122,8 +121,8 @@ export async function POST(request: NextRequest) {
 
     const [existing] = await sql`
       SELECT id FROM products
-      WHERE user_id = ${userId}
-        AND sku     = ${finalSku}
+      WHERE org_id = ${orgId}
+        AND sku    = ${finalSku}
       LIMIT 1
     `;
     if (existing) {
@@ -131,8 +130,9 @@ export async function POST(request: NextRequest) {
     }
 
     const [product] = await sql`
-      INSERT INTO products (user_id, name, description, sku, barcode, price, image_url, is_service)
+      INSERT INTO products (org_id, created_by, name, description, sku, barcode, price, image_url, is_service)
       VALUES (
+        ${orgId},
         ${userId},
         ${name.trim()},
         ${description  ?? null},

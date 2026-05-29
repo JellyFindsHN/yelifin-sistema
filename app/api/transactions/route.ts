@@ -11,7 +11,7 @@ export async function GET(request: NextRequest) {
   if (!isAuthSuccess(auth)) return createErrorResponse(auth.error, auth.status);
 
   try {
-    const { userId } = auth.data;
+    const { userId, orgId } = auth.data;
     const { searchParams } = new URL(request.url);
 
     const accountId = searchParams.get("account_id");
@@ -38,7 +38,7 @@ export async function GET(request: NextRequest) {
       FROM transactions t
       JOIN accounts a ON a.id = t.account_id
       LEFT JOIN accounts ta ON ta.id = t.to_account_id
-      WHERE t.user_id = ${userId}
+      WHERE t.org_id = ${orgId}
         AND t.occurred_at >= ${startISO}::timestamptz
         AND t.occurred_at <  ${endISO}::timestamptz
         ${accountId ? sql`AND (t.account_id = ${Number(accountId)} OR t.to_account_id = ${Number(accountId)})` : sql``}
@@ -54,7 +54,7 @@ export async function GET(request: NextRequest) {
         COALESCE(SUM(CASE WHEN type = 'TRANSFER' THEN amount ELSE 0 END), 0) AS total_transfer,
         COUNT(*)::int AS total_count
       FROM transactions t
-      WHERE t.user_id = ${userId}
+      WHERE t.org_id = ${orgId}
         AND t.occurred_at >= ${startISO}::timestamptz
         AND t.occurred_at <  ${endISO}::timestamptz
         ${accountId ? sql`AND (t.account_id = ${Number(accountId)} OR t.to_account_id = ${Number(accountId)})` : sql``}
@@ -80,7 +80,7 @@ export async function POST(request: NextRequest) {
   if (!isAuthSuccess(auth)) return createErrorResponse(auth.error, auth.status);
 
   try {
-    const { userId } = auth.data;
+    const { userId, orgId } = auth.data;
     const body = await request.json();
     const {
       type, account_id, to_account_id, amount,
@@ -111,7 +111,7 @@ export async function POST(request: NextRequest) {
     if (isCreditCardExpense) {
       const [card] = await sql`
         SELECT id, balance, balance_usd FROM credit_cards
-        WHERE id = ${Number(credit_card_id)} AND user_id = ${userId} AND is_active = TRUE
+        WHERE id = ${Number(credit_card_id)} AND org_id = ${orgId} AND is_active = TRUE
       `;
       if (!card) return createErrorResponse("Tarjeta no encontrada", 404);
 
@@ -121,10 +121,10 @@ export async function POST(request: NextRequest) {
 
       const [ccTxn] = await sql`
         INSERT INTO credit_card_transactions (
-          user_id, credit_card_id, type, description,
+          org_id, created_by, credit_card_id, type, description,
           amount, currency, exchange_rate, amount_local, category, occurred_at
         ) VALUES (
-          ${userId}, ${Number(credit_card_id)}, 'CHARGE',
+          ${orgId}, ${userId}, ${Number(credit_card_id)}, 'CHARGE',
           ${description ?? null},
           ${amt}, ${currency ?? "LOCAL"}, ${rateNum}, ${amountLocal},
           ${category ?? null},
@@ -134,9 +134,9 @@ export async function POST(request: NextRequest) {
       `;
 
       if (isUsd) {
-        await sql`UPDATE credit_cards SET balance_usd = balance_usd + ${amt}, updated_at = NOW() WHERE id = ${Number(credit_card_id)} AND user_id = ${userId}`;
+        await sql`UPDATE credit_cards SET balance_usd = balance_usd + ${amt}, updated_at = NOW() WHERE id = ${Number(credit_card_id)} AND org_id = ${orgId}`;
       } else {
-        await sql`UPDATE credit_cards SET balance = balance + ${amt}, updated_at = NOW() WHERE id = ${Number(credit_card_id)} AND user_id = ${userId}`;
+        await sql`UPDATE credit_cards SET balance = balance + ${amt}, updated_at = NOW() WHERE id = ${Number(credit_card_id)} AND org_id = ${orgId}`;
       }
 
       return Response.json(
@@ -154,17 +154,17 @@ export async function POST(request: NextRequest) {
 
     const [account] = await sql`
       SELECT id, balance FROM accounts
-      WHERE id = ${account_id} AND user_id = ${userId} AND is_active = TRUE
+      WHERE id = ${account_id} AND org_id = ${orgId} AND is_active = TRUE
     `;
     if (!account) return createErrorResponse("Cuenta no encontrada", 404);
 
     const [transaction] = await sql`
       INSERT INTO transactions (
-        user_id, type, account_id, to_account_id,
+        org_id, created_by, type, account_id, to_account_id,
         amount, category, description,
         reference_type, reference_id, occurred_at
       ) VALUES (
-        ${userId}, ${type}, ${account_id}, ${to_account_id ?? null},
+        ${orgId}, ${userId}, ${type}, ${account_id}, ${to_account_id ?? null},
         ${amt}, ${category ?? null}, ${description ?? null},
         ${refType}, ${refId}, ${occurredAt}
       )
@@ -172,16 +172,16 @@ export async function POST(request: NextRequest) {
     `;
 
     if (type === "INCOME") {
-      await sql`UPDATE accounts SET balance = balance + ${amt} WHERE id = ${account_id} AND user_id = ${userId}`;
+      await sql`UPDATE accounts SET balance = balance + ${amt} WHERE id = ${account_id} AND org_id = ${orgId}`;
     } else if (type === "EXPENSE") {
-      await sql`UPDATE accounts SET balance = balance - ${amt} WHERE id = ${account_id} AND user_id = ${userId}`;
+      await sql`UPDATE accounts SET balance = balance - ${amt} WHERE id = ${account_id} AND org_id = ${orgId}`;
     } else if (type === "TRANSFER") {
       const [toAccount] = await sql`
-        SELECT id FROM accounts WHERE id = ${to_account_id} AND user_id = ${userId} AND is_active = TRUE
+        SELECT id FROM accounts WHERE id = ${to_account_id} AND org_id = ${orgId} AND is_active = TRUE
       `;
       if (!toAccount) return createErrorResponse("Cuenta destino no encontrada", 404);
-      await sql`UPDATE accounts SET balance = balance - ${amt} WHERE id = ${account_id}    AND user_id = ${userId}`;
-      await sql`UPDATE accounts SET balance = balance + ${amt} WHERE id = ${to_account_id} AND user_id = ${userId}`;
+      await sql`UPDATE accounts SET balance = balance - ${amt} WHERE id = ${account_id}    AND org_id = ${orgId}`;
+      await sql`UPDATE accounts SET balance = balance + ${amt} WHERE id = ${to_account_id} AND org_id = ${orgId}`;
     }
 
     return Response.json(

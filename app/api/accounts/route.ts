@@ -10,12 +10,12 @@ export async function GET(request: NextRequest) {
   if (!isAuthSuccess(auth)) return createErrorResponse(auth.error, auth.status);
 
   try {
-    const { userId } = auth.data;
+    const { userId, orgId } = auth.data;
 
     const accounts = await sql`
       SELECT id, name, type, balance, is_active, created_at
       FROM accounts
-      WHERE user_id = ${userId} AND is_active = TRUE
+      WHERE org_id = ${orgId} AND is_active = TRUE
       ORDER BY name ASC
     `;
 
@@ -32,15 +32,15 @@ export async function POST(request: NextRequest) {
   if (!isAuthSuccess(auth)) return createErrorResponse(auth.error, auth.status);
 
   try {
-    const { userId } = auth.data;
+    const { userId, orgId } = auth.data;
     const { name, type, balance } = await request.json();
 
     if (!name) return createErrorResponse("El nombre es requerido", 400);
     if (!type) return createErrorResponse("El tipo es requerido", 400);
 
     const [account] = await sql`
-      INSERT INTO accounts (user_id, name, type, balance)
-      VALUES (${userId}, ${name}, ${type}, ${Number(balance) || 0})
+      INSERT INTO accounts (org_id, name, type, balance, created_by)
+      VALUES (${orgId}, ${name}, ${type}, ${Number(balance) || 0}, ${userId})
       RETURNING *
     `;
 

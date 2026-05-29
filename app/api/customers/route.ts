@@ -10,7 +10,7 @@ export async function GET(request: NextRequest) {
   if (!isAuthSuccess(auth)) return createErrorResponse(auth.error, auth.status);
 
   try {
-    const { userId }       = auth.data;
+    const { userId, orgId } = auth.data;
     const { searchParams } = new URL(request.url);
 
     const search = searchParams.get("search")?.trim() || null;
@@ -25,14 +25,14 @@ export async function GET(request: NextRequest) {
         COALESCE(SUM(total_spent),  0)::numeric        AS total_spent,
         COALESCE(SUM(total_orders), 0)::int            AS total_orders
       FROM customers
-      WHERE user_id = ${userId}
+      WHERE org_id = ${orgId}
     `;
 
     // ── Count para paginación ─────────────────────────────────────────
     const [{ count }] = await sql`
       SELECT COUNT(*)::int AS count
       FROM customers
-      WHERE user_id = ${userId}
+      WHERE org_id = ${orgId}
         AND (
           ${search}::text IS NULL OR
           name  ILIKE ${'%' + (search ?? '') + '%'} OR
@@ -47,7 +47,7 @@ export async function GET(request: NextRequest) {
     const customers = await sql`
       SELECT id, name, phone, email, notes, total_orders, total_spent, created_at
       FROM customers
-      WHERE user_id = ${userId}
+      WHERE org_id = ${orgId}
         AND (
           ${search}::text IS NULL OR
           name  ILIKE ${'%' + (search ?? '') + '%'} OR
@@ -82,14 +82,14 @@ export async function POST(request: NextRequest) {
   if (!isAuthSuccess(auth)) return createErrorResponse(auth.error, auth.status);
 
   try {
-    const { userId } = auth.data;
+    const { userId, orgId } = auth.data;
     const { name, phone, email, notes } = await request.json();
 
     if (!name) return createErrorResponse("El nombre es requerido", 400);
 
     const [customer] = await sql`
-      INSERT INTO customers (user_id, name, phone, email, notes)
-      VALUES (${userId}, ${name}, ${phone ?? null}, ${email ?? null}, ${notes ?? null})
+      INSERT INTO customers (org_id, created_by, name, phone, email, notes)
+      VALUES (${orgId}, ${userId}, ${name}, ${phone ?? null}, ${email ?? null}, ${notes ?? null})
       RETURNING *
     `;
 

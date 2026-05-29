@@ -10,7 +10,7 @@ export async function POST(request: NextRequest) {
   if (!isAuthSuccess(auth)) return createErrorResponse(auth.error, auth.status);
 
   try {
-    const { userId } = auth.data;
+    const { userId, orgId } = auth.data;
     const body       = await request.json();
 
     const {
@@ -42,12 +42,12 @@ export async function POST(request: NextRequest) {
     // ── Validar cuenta o tarjeta ────────────────────────────────────
     if (!isCreditCard) {
       const [account] = await sql`
-        SELECT id FROM accounts WHERE id = ${account_id} AND user_id = ${userId} AND is_active = TRUE
+        SELECT id FROM accounts WHERE id = ${account_id} AND org_id = ${orgId} AND is_active = TRUE
       `;
       if (!account) return createErrorResponse("Cuenta no encontrada", 404);
     } else {
       const [card] = await sql`
-        SELECT id FROM credit_cards WHERE id = ${Number(credit_card_id)} AND user_id = ${userId} AND is_active = TRUE
+        SELECT id FROM credit_cards WHERE id = ${Number(credit_card_id)} AND org_id = ${orgId} AND is_active = TRUE
       `;
       if (!card) return createErrorResponse("Tarjeta de crédito no encontrada", 404);
     }
@@ -57,7 +57,7 @@ export async function POST(request: NextRequest) {
     for (const item of items) {
       const [product] = await sql`
         SELECT id, name, sku, is_service FROM products
-        WHERE id = ${item.product_id} AND user_id = ${userId} AND is_active = TRUE
+        WHERE id = ${item.product_id} AND org_id = ${orgId} AND is_active = TRUE
       `;
       if (!product)
         return createErrorResponse(`Producto #${item.product_id} no encontrado`, 404);
@@ -73,7 +73,7 @@ export async function POST(request: NextRequest) {
           SELECT id FROM product_variants
           WHERE id         = ${Number(item.variant_id)}
             AND product_id = ${item.product_id}
-            AND user_id    = ${userId}
+            AND org_id     = ${orgId}
             AND is_active  = TRUE
         `;
         if (!variant)
@@ -138,11 +138,11 @@ export async function POST(request: NextRequest) {
       // 1. Crear purchase_batch
       const [batch] = await sql`
         INSERT INTO purchase_batches (
-          user_id, account_id, shipping_account_id, currency, exchange_rate,
+          org_id, created_by, account_id, shipping_account_id, currency, exchange_rate,
           subtotal, shipping, tax, total,
           is_paid, purchased_at, notes, status
         ) VALUES (
-          ${userId}, ${isCreditCard ? null : account_id}, ${shippingAccId},
+          ${orgId}, ${userId}, ${isCreditCard ? null : account_id}, ${shippingAccId},
           ${curr}, ${rate},
           ${subtotal}, ${shippingTotal}, ${0}, ${total},
           ${false}, ${occurredAt}, ${notes ?? null}, ${status}
@@ -155,10 +155,10 @@ export async function POST(request: NextRequest) {
       for (const item of processedItems) {
         const [batchItem] = await sql`
           INSERT INTO purchase_batch_items (
-            user_id, purchase_batch_id, product_id, variant_id,
+            org_id, created_by, purchase_batch_id, product_id, variant_id,
             quantity, unit_cost_usd, unit_cost, total_cost
           ) VALUES (
-            ${userId}, ${purchaseBatchId},
+            ${orgId}, ${userId}, ${purchaseBatchId},
             ${item.product_id}, ${item.variant_id},
             ${item.quantity}, ${item.unit_cost_usd},
             ${item.unit_cost}, ${item.total_cost}
@@ -169,20 +169,20 @@ export async function POST(request: NextRequest) {
         if (status === "COMPLETED") {
           await sql`
             INSERT INTO inventory_batches (
-              user_id, product_id, variant_id, purchase_batch_item_id,
+              org_id, created_by, product_id, variant_id, purchase_batch_item_id,
               qty_in, qty_available, unit_cost, received_at
             ) VALUES (
-              ${userId}, ${item.product_id}, ${item.variant_id}, ${batchItem.id},
+              ${orgId}, ${userId}, ${item.product_id}, ${item.variant_id}, ${batchItem.id},
               ${item.quantity}, ${item.quantity}, ${item.unit_cost}, ${occurredAt}
             )
           `;
 
           await sql`
             INSERT INTO inventory_movements (
-              user_id, movement_type, product_id, variant_id,
+              org_id, created_by, movement_type, product_id, variant_id,
               quantity, reference_type, reference_id, notes
             ) VALUES (
-              ${userId}, 'IN', ${item.product_id}, ${item.variant_id},
+              ${orgId}, ${userId}, 'IN', ${item.product_id}, ${item.variant_id},
               ${item.quantity}, 'PURCHASE', ${purchaseBatchId}, ${notes ?? null}
             )
           `;
@@ -196,65 +196,65 @@ export async function POST(request: NextRequest) {
         const ccAmountLocal = hasShippingAccount ? productsLocal : totalLocal;
         await sql`
           INSERT INTO credit_card_transactions (
-            user_id, credit_card_id, type, description,
+            org_id, created_by, credit_card_id, type, description,
             amount, currency, exchange_rate, amount_local,
             occurred_at
           ) VALUES (
-            ${userId}, ${Number(credit_card_id)}, 'CHARGE', ${txDescription},
+            ${orgId}, ${userId}, ${Number(credit_card_id)}, 'CHARGE', ${txDescription},
             ${ccAmount}, ${curr}, ${isUsd ? rate : null}, ${ccAmountLocal},
             ${occurredAt}
           )
         `;
         if (isUsd) {
-          await sql`UPDATE credit_cards SET balance_usd = balance_usd + ${ccAmount}, updated_at = NOW() WHERE id = ${Number(credit_card_id)} AND user_id = ${userId}`;
+          await sql`UPDATE credit_cards SET balance_usd = balance_usd + ${ccAmount}, updated_at = NOW() WHERE id = ${Number(credit_card_id)} AND org_id = ${orgId}`;
         } else {
-          await sql`UPDATE credit_cards SET balance = balance + ${ccAmount}, updated_at = NOW() WHERE id = ${Number(credit_card_id)} AND user_id = ${userId}`;
+          await sql`UPDATE credit_cards SET balance = balance + ${ccAmount}, updated_at = NOW() WHERE id = ${Number(credit_card_id)} AND org_id = ${orgId}`;
         }
         if (hasShippingAccount) {
           await sql`
             INSERT INTO transactions (
-              user_id, account_id, type, amount,
+              org_id, created_by, account_id, type, amount,
               description, reference_type, reference_id, occurred_at
             ) VALUES (
-              ${userId}, ${shippingAccId}, 'EXPENSE', ${shippingTotal},
+              ${orgId}, ${userId}, ${shippingAccId}, 'EXPENSE', ${shippingTotal},
               ${'Pago de envío'}, 'PURCHASE_SHIPPING', ${purchaseBatchId}, ${occurredAt}
             )
           `;
-          await sql`UPDATE accounts SET balance = balance - ${shippingTotal} WHERE id = ${shippingAccId} AND user_id = ${userId}`;
+          await sql`UPDATE accounts SET balance = balance - ${shippingTotal} WHERE id = ${shippingAccId} AND org_id = ${orgId}`;
         }
       } else if (hasShippingAccount) {
         // Productos desde cuenta principal; envío desde cuenta separada
         await sql`
           INSERT INTO transactions (
-            user_id, account_id, type, amount,
+            org_id, created_by, account_id, type, amount,
             description, reference_type, reference_id, occurred_at
           ) VALUES (
-            ${userId}, ${account_id}, 'EXPENSE', ${productsLocal},
+            ${orgId}, ${userId}, ${account_id}, 'EXPENSE', ${productsLocal},
             ${txDescription}, 'PURCHASE', ${purchaseBatchId}, ${occurredAt}
           )
         `;
-        await sql`UPDATE accounts SET balance = balance - ${productsLocal} WHERE id = ${account_id} AND user_id = ${userId}`;
+        await sql`UPDATE accounts SET balance = balance - ${productsLocal} WHERE id = ${account_id} AND org_id = ${orgId}`;
         await sql`
           INSERT INTO transactions (
-            user_id, account_id, type, amount,
+            org_id, created_by, account_id, type, amount,
             description, reference_type, reference_id, occurred_at
           ) VALUES (
-            ${userId}, ${shippingAccId}, 'EXPENSE', ${shippingTotal},
+            ${orgId}, ${userId}, ${shippingAccId}, 'EXPENSE', ${shippingTotal},
             ${'Pago de envío'}, 'PURCHASE_SHIPPING', ${purchaseBatchId}, ${occurredAt}
           )
         `;
-        await sql`UPDATE accounts SET balance = balance - ${shippingTotal} WHERE id = ${shippingAccId} AND user_id = ${userId}`;
+        await sql`UPDATE accounts SET balance = balance - ${shippingTotal} WHERE id = ${shippingAccId} AND org_id = ${orgId}`;
       } else {
         await sql`
           INSERT INTO transactions (
-            user_id, account_id, type, amount,
+            org_id, created_by, account_id, type, amount,
             description, reference_type, reference_id, occurred_at
           ) VALUES (
-            ${userId}, ${account_id}, 'EXPENSE', ${total},
+            ${orgId}, ${userId}, ${account_id}, 'EXPENSE', ${total},
             ${txDescription}, 'PURCHASE', ${purchaseBatchId}, ${occurredAt}
           )
         `;
-        await sql`UPDATE accounts SET balance = balance - ${total} WHERE id = ${account_id} AND user_id = ${userId}`;
+        await sql`UPDATE accounts SET balance = balance - ${total} WHERE id = ${account_id} AND org_id = ${orgId}`;
       }
 
       await sql`COMMIT`;
@@ -289,7 +289,7 @@ export async function GET(request: NextRequest) {
   if (!isAuthSuccess(auth)) return createErrorResponse(auth.error, auth.status);
 
   try {
-    const { userId }     = auth.data;
+    const { userId, orgId } = auth.data;
     const { searchParams } = new URL(request.url);
     const statusFilter   = searchParams.get("status") || null;
     const withItems      = searchParams.get("with_items") === "true";
@@ -332,7 +332,7 @@ export async function GET(request: NextRequest) {
       LEFT JOIN accounts             a   ON a.id  = pb.account_id
       LEFT JOIN accounts             sa  ON sa.id = pb.shipping_account_id
       LEFT JOIN purchase_batch_items pbi ON pbi.purchase_batch_id = pb.id
-      WHERE pb.user_id = ${userId}
+      WHERE pb.org_id = ${orgId}
         AND (${statusFilter}::text IS NULL OR pb.status = ${statusFilter})
       GROUP BY pb.id, a.name, sa.name
       ORDER BY pb.purchased_at DESC

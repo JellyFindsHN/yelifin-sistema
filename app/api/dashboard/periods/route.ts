@@ -10,14 +10,14 @@ export async function GET(request: NextRequest) {
   if (!isAuthSuccess(auth)) return createErrorResponse(auth.error, auth.status);
 
   try {
-    const { userId } = auth.data;
+    const { userId, orgId } = auth.data;
 
     const periods = await sql`
       SELECT DISTINCT
         EXTRACT(YEAR  FROM sold_at)::int AS year,
         EXTRACT(MONTH FROM sold_at)::int AS month
       FROM sales
-      WHERE user_id = ${userId}
+      WHERE org_id = ${orgId}
       ORDER BY year DESC, month DESC
     `;
 

@@ -10,7 +10,7 @@ export async function GET(request: NextRequest) {
   if (!isAuthSuccess(auth)) return createErrorResponse(auth.error, auth.status);
 
   try {
-    const { userId }       = auth.data;
+    const { orgId }        = auth.data;
     const { searchParams } = new URL(request.url);
 
     const date      = searchParams.get("date");
@@ -57,13 +57,13 @@ export async function GET(request: NextRequest) {
       SELECT COUNT(*)::int AS count
       FROM inventory_movements im
       JOIN products p ON p.id = im.product_id
-      LEFT JOIN product_variants pv ON pv.id = im.variant_id AND pv.user_id = im.user_id
+      LEFT JOIN product_variants pv ON pv.id = im.variant_id AND pv.org_id = im.org_id
       LEFT JOIN sales s2
         ON  im.reference_type = 'SALE'
         AND s2.id             = im.reference_id
-        AND s2.user_id        = im.user_id
+        AND s2.org_id         = im.org_id
       LEFT JOIN customers c2 ON c2.id = s2.customer_id
-      WHERE im.user_id    = ${userId}
+      WHERE im.org_id     = ${orgId}
         AND im.created_at >= ${startISO}::timestamptz
         AND im.created_at <  ${endISO}::timestamptz
         ${productId ? sql`AND im.product_id = ${Number(productId)}` : sql``}
@@ -152,32 +152,32 @@ export async function GET(request: NextRequest) {
 
       -- Variante (opcional)
       LEFT JOIN product_variants pv
-        ON pv.id      = im.variant_id
-       AND pv.user_id = im.user_id
+        ON pv.id     = im.variant_id
+       AND pv.org_id = im.org_id
 
       -- PURCHASE joins — filtrar por variant_id para evitar duplicados
       LEFT JOIN purchase_batch_items pbi
         ON  im.reference_type     = 'PURCHASE'
         AND pbi.purchase_batch_id = im.reference_id
         AND pbi.product_id        = im.product_id
-        AND pbi.user_id           = im.user_id
+        AND pbi.org_id            = im.org_id
         AND (
           (im.variant_id IS NULL AND pbi.variant_id IS NULL)
           OR pbi.variant_id = im.variant_id
         )
       LEFT JOIN purchase_batches pb
-        ON  pb.id      = pbi.purchase_batch_id
-       AND pb.user_id = im.user_id
+        ON  pb.id     = pbi.purchase_batch_id
+       AND pb.org_id  = im.org_id
       LEFT JOIN inventory_batches ib
         ON  ib.purchase_batch_item_id = pbi.id
-        AND ib.user_id                = im.user_id
+        AND ib.org_id                 = im.org_id
 
       -- SALE joins — filtrar por variant_id para evitar duplicados
       LEFT JOIN sale_items si
         ON  im.reference_type = 'SALE'
         AND si.sale_id        = im.reference_id
         AND si.product_id     = im.product_id
-        AND si.user_id        = im.user_id
+        AND si.org_id         = im.org_id
         AND (
           (im.variant_id IS NULL AND si.variant_id IS NULL)
           OR si.variant_id = im.variant_id
@@ -189,9 +189,9 @@ export async function GET(request: NextRequest) {
       LEFT JOIN sales se
         ON  im.reference_type = 'SALE_EDITED'
         AND se.id             = im.reference_id
-        AND se.user_id        = im.user_id
+        AND se.org_id         = im.org_id
 
-      WHERE im.user_id    = ${userId}
+      WHERE im.org_id     = ${orgId}
         AND im.created_at >= ${startISO}::timestamptz
         AND im.created_at <  ${endISO}::timestamptz
         ${productId ? sql`AND im.product_id = ${Number(productId)}` : sql``}

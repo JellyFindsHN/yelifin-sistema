@@ -13,7 +13,7 @@ export async function POST(
   if (!isAuthSuccess(auth)) return createErrorResponse(auth.error, auth.status);
 
   try {
-    const { userId } = auth.data;
+    const { userId, orgId } = auth.data;
     const { id } = await params;
 
     const {
@@ -37,13 +37,13 @@ export async function POST(
     const [card] = await sql`
       SELECT id, balance, balance_usd
       FROM credit_cards
-      WHERE id = ${Number(id)} AND user_id = ${userId} AND is_active = TRUE
+      WHERE id = ${Number(id)} AND org_id = ${orgId} AND is_active = TRUE
     `;
     if (!card) return createErrorResponse("Tarjeta no encontrada", 404);
 
     const [account] = await sql`
       SELECT id, balance FROM accounts
-      WHERE id = ${Number(account_id)} AND user_id = ${userId} AND is_active = TRUE
+      WHERE id = ${Number(account_id)} AND org_id = ${orgId} AND is_active = TRUE
     `;
     if (!account) return createErrorResponse("Cuenta no encontrada", 404);
 
@@ -65,10 +65,10 @@ export async function POST(
       // 1. Crear la transacción de egreso en la cuenta
       const [txn] = await sql`
         INSERT INTO transactions (
-          user_id, type, account_id, amount,
+          org_id, created_by, type, account_id, amount,
           category, description, reference_type, credit_card_id, occurred_at
         ) VALUES (
-          ${userId}, 'EXPENSE', ${Number(account_id)}, ${localDeduction},
+          ${orgId}, ${userId}, 'EXPENSE', ${Number(account_id)}, ${localDeduction},
           ${category?.trim() || null}, ${desc}, 'CREDIT_CARD_PAYMENT', ${Number(id)}, ${occurredAtVal}
         )
         RETURNING id
@@ -78,17 +78,17 @@ export async function POST(
       await sql`
         UPDATE accounts
         SET balance = balance - ${localDeduction}
-        WHERE id = ${Number(account_id)} AND user_id = ${userId}
+        WHERE id = ${Number(account_id)} AND org_id = ${orgId}
       `;
 
       // 3. Registrar en credit_card_transactions
       const [ccTxn] = await sql`
         INSERT INTO credit_card_transactions (
-          user_id, credit_card_id, type, description,
+          org_id, created_by, credit_card_id, type, description,
           amount, currency, exchange_rate, amount_local,
           account_transaction_id, occurred_at
         ) VALUES (
-          ${userId}, ${Number(id)}, 'PAYMENT', ${desc},
+          ${orgId}, ${userId}, ${Number(id)}, 'PAYMENT', ${desc},
           ${amountNum}, ${currency}, ${isUsd ? rateNum : null},
           ${amountLocal}, ${txn.id}, ${occurredAtVal}
         )
@@ -101,14 +101,14 @@ export async function POST(
           UPDATE credit_cards
           SET balance_usd = GREATEST(0, balance_usd - ${amountNum}),
               updated_at  = NOW()
-          WHERE id = ${Number(id)} AND user_id = ${userId}
+          WHERE id = ${Number(id)} AND org_id = ${orgId}
         `;
       } else {
         await sql`
           UPDATE credit_cards
           SET balance    = GREATEST(0, balance - ${amountNum}),
               updated_at = NOW()
-          WHERE id = ${Number(id)} AND user_id = ${userId}
+          WHERE id = ${Number(id)} AND org_id = ${orgId}
         `;
       }
 

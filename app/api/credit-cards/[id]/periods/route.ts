@@ -13,11 +13,11 @@ export async function GET(
   if (!isAuthSuccess(auth)) return createErrorResponse(auth.error, auth.status);
 
   try {
-    const { userId } = auth.data;
+    const { userId, orgId } = auth.data;
     const { id } = await params;
 
     const [card] = await sql`
-      SELECT id FROM credit_cards WHERE id = ${Number(id)} AND user_id = ${userId}
+      SELECT id FROM credit_cards WHERE id = ${Number(id)} AND org_id = ${orgId}
     `;
     if (!card) return createErrorResponse("Tarjeta no encontrada", 404);
 
@@ -27,7 +27,7 @@ export async function GET(
         EXTRACT(MONTH FROM occurred_at)::int AS month
       FROM credit_card_transactions
       WHERE credit_card_id = ${Number(id)}
-        AND user_id = ${userId}
+        AND org_id = ${orgId}
       ORDER BY year DESC, month DESC
     `;
 

@@ -1,0 +1,1 @@
+- [Migración multi-org](project_multi_org_migration.md) — Reglas user_id→org_id, archivos ya migrados, excepciones (admin routes)

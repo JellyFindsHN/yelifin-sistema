@@ -12,7 +12,7 @@ export async function PATCH(request: NextRequest, { params }: Params) {
   if (!isAuthSuccess(auth)) return createErrorResponse(auth.error, auth.status);
 
   try {
-    const { userId } = auth.data;
+    const { userId, orgId } = auth.data;
     const { id } = await params;
     const categoryId = Number(id);
 
@@ -29,9 +29,10 @@ export async function PATCH(request: NextRequest, { params }: Params) {
       UPDATE transaction_categories SET
         name       = COALESCE(${name      ?? null}, name),
         is_active  = COALESCE(${is_active !== undefined ? is_active : null}, is_active),
-        updated_at = NOW()
+        updated_at = NOW(),
+        updated_by = ${userId}
       WHERE id      = ${categoryId}
-        AND user_id = ${userId}
+        AND org_id  = ${orgId}
       RETURNING *
     `;
 
@@ -55,7 +56,7 @@ export async function DELETE(request: NextRequest, { params }: Params) {
   if (!isAuthSuccess(auth)) return createErrorResponse(auth.error, auth.status);
 
   try {
-    const { userId } = auth.data;
+    const { userId, orgId } = auth.data;
     const { id } = await params;
     const categoryId = Number(id);
 
@@ -64,9 +65,10 @@ export async function DELETE(request: NextRequest, { params }: Params) {
     const [category] = await sql`
       UPDATE transaction_categories SET
         is_active  = FALSE,
-        updated_at = NOW()
+        updated_at = NOW(),
+        updated_by = ${userId}
       WHERE id      = ${categoryId}
-        AND user_id = ${userId}
+        AND org_id  = ${orgId}
       RETURNING id
     `;
 

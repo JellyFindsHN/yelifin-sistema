@@ -10,7 +10,7 @@ export async function PATCH(request: NextRequest, { params }: Params) {
   const auth = await verifyAuth(request);
   if (!isAuthSuccess(auth)) return createErrorResponse(auth.error, auth.status);
 
-  const { userId } = auth.data;
+  const { userId, orgId } = auth.data;
   const { id } = await params;
   const policyId = Number(id);
   if (isNaN(policyId)) return createErrorResponse("ID inválido", 400);
@@ -31,8 +31,9 @@ export async function PATCH(request: NextRequest, { params }: Params) {
         discount_pct = ${Number(discount_pct)},
         is_active    = ${is_active  !== undefined ? Boolean(is_active) : true},
         sort_order   = ${Number(sort_order ?? 0)},
-        updated_at   = NOW()
-      WHERE id = ${policyId} AND user_id = ${userId}
+        updated_at   = NOW(),
+        updated_by   = ${userId}
+      WHERE id = ${policyId} AND org_id = ${orgId}
       RETURNING *
     `;
 
@@ -49,13 +50,13 @@ export async function DELETE(request: NextRequest, { params }: Params) {
   const auth = await verifyAuth(request);
   if (!isAuthSuccess(auth)) return createErrorResponse(auth.error, auth.status);
 
-  const { userId } = auth.data;
+  const { userId, orgId } = auth.data;
   const { id } = await params;
   const policyId = Number(id);
   if (isNaN(policyId)) return createErrorResponse("ID inválido", 400);
 
   try {
-    await sql`DELETE FROM loyalty_policies WHERE id = ${policyId} AND user_id = ${userId}`;
+    await sql`DELETE FROM loyalty_policies WHERE id = ${policyId} AND org_id = ${orgId}`;
     return Response.json({ message: "Política eliminada" });
   } catch (error) {
     console.error("DELETE /api/customers/loyalty/[id]:", error);

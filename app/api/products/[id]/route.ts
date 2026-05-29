@@ -12,7 +12,7 @@ export async function GET(request: NextRequest, { params }: Params) {
   if (!isAuthSuccess(auth)) return createErrorResponse(auth.error, auth.status);
 
   try {
-    const { userId } = auth.data;
+    const { orgId } = auth.data;
     const { id } = await params;
     const productId = Number(id);
 
@@ -21,7 +21,7 @@ export async function GET(request: NextRequest, { params }: Params) {
     const [product] = await sql`
       SELECT
         p.id,
-        p.user_id,
+        p.org_id,
         p.name,
         p.description,
         p.is_service,
@@ -52,15 +52,14 @@ export async function GET(request: NextRequest, { params }: Params) {
           )
           FROM product_variants pv
           WHERE pv.product_id = p.id
-            AND pv.user_id    = p.user_id
             AND pv.is_active  = TRUE
         ) AS variants
       FROM products p
       LEFT JOIN inventory_batches ib
         ON ib.product_id = p.id
-       AND ib.user_id    = p.user_id
-      WHERE p.id       = ${productId}
-        AND p.user_id  = ${userId}
+       AND ib.org_id     = p.org_id
+      WHERE p.id      = ${productId}
+        AND p.org_id  = ${orgId}
       GROUP BY p.id
     `;
 
@@ -78,7 +77,7 @@ export async function PATCH(request: NextRequest, { params }: Params) {
   if (!isAuthSuccess(auth)) return createErrorResponse(auth.error, auth.status);
 
   try {
-    const { userId } = auth.data;
+    const { userId, orgId } = auth.data;
     const { id } = await params;
     const productId = Number(id);
 
@@ -86,8 +85,8 @@ export async function PATCH(request: NextRequest, { params }: Params) {
 
     const [existing] = await sql`
       SELECT id FROM products
-      WHERE id      = ${productId}
-        AND user_id = ${userId}
+      WHERE id     = ${productId}
+        AND org_id = ${orgId}
       LIMIT 1
     `;
     if (!existing) return createErrorResponse("Producto no encontrado", 404);
@@ -99,9 +98,9 @@ export async function PATCH(request: NextRequest, { params }: Params) {
     if (sku) {
       const [skuConflict] = await sql`
         SELECT id FROM products
-        WHERE user_id = ${userId}
-          AND sku     = ${sku}
-          AND id     != ${productId}
+        WHERE org_id = ${orgId}
+          AND sku    = ${sku}
+          AND id    != ${productId}
         LIMIT 1
       `;
       if (skuConflict) {
@@ -118,9 +117,10 @@ export async function PATCH(request: NextRequest, { params }: Params) {
         image_url   = COALESCE(${image_url  ?? null}, image_url),
         is_active   = COALESCE(${is_active  !== undefined ? is_active   : null}, is_active),
         is_service  = COALESCE(${is_service !== undefined ? is_service  : null}, is_service),
-        updated_at  = CURRENT_TIMESTAMP
-      WHERE id      = ${productId}
-        AND user_id = ${userId}
+        updated_at  = CURRENT_TIMESTAMP,
+        updated_by  = ${userId}
+      WHERE id     = ${productId}
+        AND org_id = ${orgId}
       RETURNING *
     `;
 
@@ -136,7 +136,7 @@ export async function DELETE(request: NextRequest, { params }: Params) {
   if (!isAuthSuccess(auth)) return createErrorResponse(auth.error, auth.status);
 
   try {
-    const { userId } = auth.data;
+    const { userId, orgId } = auth.data;
     const { id } = await params;
     const productId = Number(id);
 
@@ -144,8 +144,8 @@ export async function DELETE(request: NextRequest, { params }: Params) {
 
     const [existing] = await sql`
       SELECT id FROM products
-      WHERE id      = ${productId}
-        AND user_id = ${userId}
+      WHERE id     = ${productId}
+        AND org_id = ${orgId}
       LIMIT 1
     `;
     if (!existing) return createErrorResponse("Producto no encontrado", 404);
@@ -158,7 +158,7 @@ export async function DELETE(request: NextRequest, { params }: Params) {
     `;
 
     if (Number(usage.total) === 0) {
-      await sql`DELETE FROM products WHERE id = ${productId} AND user_id = ${userId}`;
+      await sql`DELETE FROM products WHERE id = ${productId} AND org_id = ${orgId}`;
       return Response.json({ message: "Producto eliminado permanentemente" });
     }
 
@@ -166,16 +166,17 @@ export async function DELETE(request: NextRequest, { params }: Params) {
     await sql`
       UPDATE products SET
         is_active  = FALSE,
-        updated_at = CURRENT_TIMESTAMP
-      WHERE id      = ${productId}
-        AND user_id = ${userId}
+        updated_at = CURRENT_TIMESTAMP,
+        updated_by = ${userId}
+      WHERE id     = ${productId}
+        AND org_id = ${orgId}
     `;
 
     // Hard-delete variants with no history; soft-delete those that have history
     const variants = await sql`
       SELECT id FROM product_variants
       WHERE product_id = ${productId}
-        AND user_id    = ${userId}
+        AND org_id     = ${orgId}
     `;
 
     for (const v of variants) {
@@ -186,14 +187,15 @@ export async function DELETE(request: NextRequest, { params }: Params) {
         ) AS total
       `;
       if (Number(vUsage.total) === 0) {
-        await sql`DELETE FROM product_variants WHERE id = ${v.id} AND user_id = ${userId}`;
+        await sql`DELETE FROM product_variants WHERE id = ${v.id} AND org_id = ${orgId}`;
       } else {
         await sql`
           UPDATE product_variants SET
             is_active  = FALSE,
-            updated_at = CURRENT_TIMESTAMP
-          WHERE id      = ${v.id}
-            AND user_id = ${userId}
+            updated_at = CURRENT_TIMESTAMP,
+            updated_by = ${userId}
+          WHERE id     = ${v.id}
+            AND org_id = ${orgId}
         `;
       }
     }

@@ -11,7 +11,7 @@ export async function GET(request: NextRequest) {
   if (!isAuthSuccess(auth)) return createErrorResponse(auth.error, auth.status);
 
   try {
-    const { userId } = auth.data;
+    const { userId, orgId } = auth.data;
     const { searchParams } = new URL(request.url);
 
     const cardId = searchParams.get("card_id");
@@ -42,7 +42,7 @@ export async function GET(request: NextRequest) {
       LEFT JOIN sales s ON s.id = cct.sale_id
       LEFT JOIN transactions t ON t.id = cct.account_transaction_id
       LEFT JOIN accounts a ON a.id = t.account_id
-      WHERE cct.user_id = ${userId}
+      WHERE cct.org_id = ${orgId}
         AND cct.occurred_at >= ${startISO}::timestamptz
         AND cct.occurred_at <  ${endISO}::timestamptz
         ${cardId ? sql`AND cct.credit_card_id = ${Number(cardId)}` : sql``}

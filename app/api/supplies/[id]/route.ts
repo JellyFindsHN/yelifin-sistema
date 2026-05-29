@@ -12,7 +12,7 @@ export async function PUT(request: NextRequest, { params }: Params) {
   if (!isAuthSuccess(auth)) return createErrorResponse(auth.error, auth.status);
 
   try {
-    const { userId } = auth.data;
+    const { userId, orgId } = auth.data;
     const { id } = await params;
     const supplyId = Number(id);
     if (!supplyId || isNaN(supplyId)) return createErrorResponse("ID inválido", 400);
@@ -26,8 +26,8 @@ export async function PUT(request: NextRequest, { params }: Params) {
 
     await sql`
       UPDATE supplies
-      SET name = ${name}, unit = ${unit}, min_stock = ${min_stock}
-      WHERE id = ${supplyId} AND user_id = ${userId}
+      SET name = ${name}, unit = ${unit}, min_stock = ${min_stock}, updated_by = ${userId}
+      WHERE id = ${supplyId} AND org_id = ${orgId}
     `;
 
     return Response.json({ message: "Suministro actualizado" });
@@ -44,12 +44,12 @@ export async function DELETE(request: NextRequest, { params }: Params) {
   if (!isAuthSuccess(auth)) return createErrorResponse(auth.error, auth.status);
 
   try {
-    const { userId } = auth.data;
+    const { userId, orgId } = auth.data;
     const { id } = await params;
     const supplyId = Number(id);
     if (!supplyId || isNaN(supplyId)) return createErrorResponse("ID inválido", 400);
 
-    await sql`DELETE FROM supplies WHERE id = ${supplyId} AND user_id = ${userId}`;
+    await sql`DELETE FROM supplies WHERE id = ${supplyId} AND org_id = ${orgId}`;
 
     return Response.json({ message: "Suministro eliminado" });
   } catch (error) {

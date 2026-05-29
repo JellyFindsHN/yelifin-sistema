@@ -10,7 +10,7 @@ export async function GET(request: NextRequest) {
   if (!isAuthSuccess(auth)) return createErrorResponse(auth.error, auth.status);
 
   try {
-    const { userId } = auth.data;
+    const { userId, orgId } = auth.data;
 
     const cards = await sql`
       SELECT
@@ -18,7 +18,7 @@ export async function GET(request: NextRequest) {
         statement_closing_day, payment_due_day,
         balance, balance_usd, is_active, created_at, updated_at
       FROM credit_cards
-      WHERE user_id = ${userId} AND is_active = TRUE
+      WHERE org_id = ${orgId} AND is_active = TRUE
       ORDER BY name ASC
     `;
 
@@ -34,7 +34,7 @@ export async function POST(request: NextRequest) {
   if (!isAuthSuccess(auth)) return createErrorResponse(auth.error, auth.status);
 
   try {
-    const { userId } = auth.data;
+    const { userId, orgId } = auth.data;
     const {
       name,
       last_four,
@@ -55,10 +55,11 @@ export async function POST(request: NextRequest) {
 
     const [card] = await sql`
       INSERT INTO credit_cards (
-        user_id, name, last_four, credit_limit,
+        org_id, created_by, name, last_four, credit_limit,
         statement_closing_day, payment_due_day,
         balance, balance_usd
       ) VALUES (
+        ${orgId},
         ${userId},
         ${name.trim()},
         ${last_four ?? null},

@@ -10,7 +10,7 @@ export async function GET(request: NextRequest, { params }: Params) {
   const auth = await verifyAuth(request);
   if (!isAuthSuccess(auth)) return createErrorResponse(auth.error, auth.status);
 
-  const { userId } = auth.data;
+  const { userId, orgId } = auth.data;
   const { id } = await params;
   const customerId = Number(id);
   if (isNaN(customerId)) return createErrorResponse("ID inválido", 400);
@@ -27,9 +27,9 @@ export async function GET(request: NextRequest, { params }: Params) {
         END AS avg_order_value
       FROM customers c
       LEFT JOIN sales s ON s.customer_id = c.id
-        AND s.user_id = c.user_id
+        AND s.org_id = c.org_id
         AND s.status != 'CANCELLED'
-      WHERE c.id = ${customerId} AND c.user_id = ${userId}
+      WHERE c.id = ${customerId} AND c.org_id = ${orgId}
       GROUP BY c.id
     `;
 
@@ -38,7 +38,7 @@ export async function GET(request: NextRequest, { params }: Params) {
     const recentSales = await sql`
       SELECT id, sale_number, total, sold_at, status, discount, shipping_cost
       FROM sales
-      WHERE customer_id = ${customerId} AND user_id = ${userId}
+      WHERE customer_id = ${customerId} AND org_id = ${orgId}
       ORDER BY sold_at DESC
       LIMIT 6
     `;

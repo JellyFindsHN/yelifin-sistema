@@ -12,7 +12,7 @@ export async function GET(request: NextRequest, { params }: Params) {
   if (!isAuthSuccess(auth)) return createErrorResponse(auth.error, auth.status);
 
   try {
-    const { userId } = auth.data;
+    const { userId, orgId } = auth.data;
     const { id } = await params;
     const productId = Number(id);
 
@@ -32,8 +32,8 @@ export async function GET(request: NextRequest, { params }: Params) {
         p.is_service,
         p.created_at
       FROM products p
-      WHERE p.id      = ${productId}
-        AND p.user_id = ${userId}
+      WHERE p.id     = ${productId}
+        AND p.org_id = ${orgId}
     `;
 
     if (!product) return createErrorResponse("Producto no encontrado", 404);
@@ -43,7 +43,7 @@ export async function GET(request: NextRequest, { params }: Params) {
       SELECT COALESCE(SUM(qty_available), 0) AS total_stock
       FROM inventory_batches
       WHERE product_id = ${productId}
-        AND user_id    = ${userId}
+        AND org_id     = ${orgId}
     `;
 
     // ── 3. avg_cost and last_cost (base product, no variant) ─────────
@@ -56,7 +56,7 @@ export async function GET(request: NextRequest, { params }: Params) {
         END AS avg_cost
       FROM inventory_batches
       WHERE product_id = ${productId}
-        AND user_id    = ${userId}
+        AND org_id     = ${orgId}
         AND variant_id IS NULL
         AND qty_available > 0
     `;
@@ -65,7 +65,7 @@ export async function GET(request: NextRequest, { params }: Params) {
       SELECT unit_cost AS last_cost
       FROM inventory_batches
       WHERE product_id = ${productId}
-        AND user_id    = ${userId}
+        AND org_id     = ${orgId}
         AND variant_id IS NULL
       ORDER BY received_at DESC
       LIMIT 1
@@ -89,10 +89,10 @@ export async function GET(request: NextRequest, { params }: Params) {
       FROM product_variants pv
       LEFT JOIN inventory_batches ib
         ON  ib.variant_id = pv.id
-        AND ib.user_id    = ${userId}
+        AND ib.org_id     = ${orgId}
         AND ib.qty_available > 0
       WHERE pv.product_id = ${productId}
-        AND pv.user_id    = ${userId}
+        AND pv.org_id     = ${orgId}
       GROUP BY pv.id, pv.variant_name, pv.sku, pv.price_override, pv.image_url, pv.is_active
       ORDER BY pv.id
     `;
@@ -109,10 +109,10 @@ export async function GET(request: NextRequest, { params }: Params) {
         pv.variant_name
       FROM inventory_batches ib
       LEFT JOIN product_variants pv
-        ON  pv.id      = ib.variant_id
-        AND pv.user_id = ${userId}
+        ON  pv.id     = ib.variant_id
+        AND pv.org_id = ${orgId}
       WHERE ib.product_id = ${productId}
-        AND ib.user_id    = ${userId}
+        AND ib.org_id     = ${orgId}
       ORDER BY ib.received_at DESC
       LIMIT 8
     `;
@@ -128,10 +128,10 @@ export async function GET(request: NextRequest, { params }: Params) {
         pv.variant_name
       FROM inventory_batches ib
       LEFT JOIN product_variants pv
-        ON  pv.id      = ib.variant_id
-        AND pv.user_id = ${userId}
+        ON  pv.id     = ib.variant_id
+        AND pv.org_id = ${orgId}
       WHERE ib.product_id = ${productId}
-        AND ib.user_id    = ${userId}
+        AND ib.org_id     = ${orgId}
         AND ib.unit_cost  > 0
       ORDER BY ib.received_at ASC
       LIMIT 50
@@ -157,11 +157,11 @@ export async function GET(request: NextRequest, { params }: Params) {
         MAX(s.sold_at)                                              AS last_sold_at
       FROM sale_items si
       JOIN sales s
-        ON  s.id      = si.sale_id
-        AND s.user_id = ${userId}
-        AND s.status  = 'COMPLETED'
+        ON  s.id     = si.sale_id
+        AND s.org_id = ${orgId}
+        AND s.status = 'COMPLETED'
       WHERE si.product_id = ${productId}
-        AND si.user_id    = ${userId}
+        AND si.org_id     = ${orgId}
     `;
 
     // ── 7. Purchase history (last 20 for chart) ─────────────────────
@@ -176,16 +176,16 @@ export async function GET(request: NextRequest, { params }: Params) {
         pv.variant_name
       FROM purchase_batch_items pbi
       JOIN purchase_batches pb
-        ON  pb.id      = pbi.purchase_batch_id
-        AND pb.user_id = ${userId}
+        ON  pb.id     = pbi.purchase_batch_id
+        AND pb.org_id = ${orgId}
       LEFT JOIN suppliers s
-        ON  s.id      = pb.supplier_id
-        AND s.user_id = ${userId}
+        ON  s.id     = pb.supplier_id
+        AND s.org_id = ${orgId}
       LEFT JOIN product_variants pv
-        ON  pv.id      = pbi.variant_id
-        AND pv.user_id = ${userId}
+        ON  pv.id     = pbi.variant_id
+        AND pv.org_id = ${orgId}
       WHERE pbi.product_id = ${productId}
-        AND pbi.user_id    = ${userId}
+        AND pbi.org_id     = ${orgId}
       ORDER BY pb.purchased_at DESC
       LIMIT 20
     `;
@@ -203,10 +203,10 @@ export async function GET(request: NextRequest, { params }: Params) {
         im.created_at
       FROM inventory_movements im
       LEFT JOIN product_variants pv
-        ON  pv.id      = im.variant_id
-        AND pv.user_id = ${userId}
+        ON  pv.id     = im.variant_id
+        AND pv.org_id = ${orgId}
       WHERE im.product_id = ${productId}
-        AND im.user_id    = ${userId}
+        AND im.org_id     = ${orgId}
       ORDER BY im.created_at DESC
       LIMIT 10
     `;
