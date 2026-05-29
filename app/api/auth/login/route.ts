@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { adminAuth } from "@/lib/firebase-admin";
 import { neon } from "@neondatabase/serverless";
 import { rateLimit, getClientIP } from "@/lib/rate-limit";
+import { ensureOrgExists } from "@/lib/auth";
 
 const sql = neon(process.env.DATABASE_URL!);
 
@@ -58,14 +59,12 @@ export async function POST(req: NextRequest) {
         u.display_name,
         u.is_active,
         up.business_name,
-        us.status AS subscription_status,
-        sp.slug  AS plan_slug
+        up.timezone,
+        up.currency,
+        up.locale
       FROM users u
       LEFT JOIN user_profile up ON up.user_id = u.id
-      LEFT JOIN user_subscriptions us ON us.user_id = u.id
-      LEFT JOIN subscription_plans sp ON sp.id = us.plan_id
       WHERE u.firebase_uid = ${uid}
-      ORDER BY us.created_at DESC
       LIMIT 1
     `;
 
@@ -76,7 +75,24 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // 3. Construir respuesta JSON
+    // 3. Asegurar que el usuario tiene org (crea una si no tiene — fallback de migración)
+    const { orgId, roleName } = await ensureOrgExists(
+      user.id,
+      user.business_name || user.display_name || user.email,
+      user.timezone  || "America/Tegucigalpa",
+      user.currency  || "HNL",
+      user.locale    || "es-HN"
+    );
+
+    // 4. Obtener suscripción de la org
+    const [orgSub] = await sql`
+      SELECT os.status, sp.slug AS plan_slug
+      FROM org_subscriptions os
+      JOIN subscription_plans sp ON sp.id = os.plan_id
+      WHERE os.org_id = ${orgId}
+    `;
+
+    // 5. Construir respuesta JSON
     const response = NextResponse.json({
       message: "Login exitoso",
       data: {
@@ -87,9 +103,13 @@ export async function POST(req: NextRequest) {
           display_name: user.display_name,
           business_name: user.business_name,
         },
+        org: {
+          id: orgId,
+          role: roleName,
+        },
         subscription: {
-          status: user.subscription_status,
-          plan: user.plan_slug,
+          status: orgSub?.status ?? "TRIAL",
+          plan: orgSub?.plan_slug ?? "trial",
         },
       },
     });
