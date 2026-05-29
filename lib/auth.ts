@@ -266,35 +266,29 @@ export async function getModulePermissions(
 }
 
 // ── verifyResourceLimit ────────────────────────────────────────────────
-// NOTA TRANSITIONAL: durante la migración gradual, products y sales
-// aún filtran por user_id. Se actualizará módulo a módulo.
 
 export async function verifyResourceLimit(
-  userId: number,
   orgId: number,
   resourceType: "products" | "sales"
 ) {
   try {
-    const limits: Record<
-      string,
-      { column: string; countQuery: (id: number) => Promise<number> }
-    > = {
+    const limits: Record<string, { column: string; countQuery: () => Promise<number> }> = {
       products: {
         column: "max_products",
-        countQuery: async (id) => {
+        countQuery: async () => {
           const [r] = await sql`
             SELECT COUNT(*) AS count FROM products
-            WHERE user_id = ${id} AND is_active = TRUE
+            WHERE org_id = ${orgId} AND is_active = TRUE
           `;
           return Number(r.count);
         },
       },
       sales: {
         column: "max_sales_per_month",
-        countQuery: async (id) => {
+        countQuery: async () => {
           const [r] = await sql`
             SELECT COUNT(*) AS count FROM sales
-            WHERE user_id = ${id}
+            WHERE org_id = ${orgId}
               AND DATE_TRUNC('month', sold_at) = DATE_TRUNC('month', NOW())
           `;
           return Number(r.count);
@@ -319,7 +313,7 @@ export async function verifyResourceLimit(
       return { error: null, status: 200, withinLimit: true };
     }
 
-    const currentCount = await limits[resourceType].countQuery(userId);
+    const currentCount = await limits[resourceType].countQuery();
 
     if (currentCount >= limitValue) {
       const messages = {
@@ -339,6 +333,21 @@ export async function verifyResourceLimit(
   } catch (error) {
     console.error("Error en verifyResourceLimit:", error);
     return { error: "Error al verificar límites", status: 500, withinLimit: false };
+  }
+}
+
+// ── getOrgTimezone ─────────────────────────────────────────────────────
+// Helper para routes que necesitan el timezone de la org (reemplaza la
+// consulta a user_profile que usaban antes de la migración multi-org).
+
+export async function getOrgTimezone(orgId: number): Promise<string> {
+  try {
+    const [org] = await sql`
+      SELECT timezone FROM organizations WHERE id = ${orgId}
+    `;
+    return org?.timezone ?? "America/Tegucigalpa";
+  } catch {
+    return "America/Tegucigalpa";
   }
 }
 
