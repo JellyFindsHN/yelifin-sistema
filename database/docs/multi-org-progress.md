@@ -2,145 +2,176 @@
 
 > **Rama:** `feat/multi-org-migration`  
 > **Última sesión:** 30 de mayo de 2026  
-> **Estado:** Migración completa. Pendiente solo: sidebar nav por permisos de rol, flujo de invitación por email (futuro).
+> **Estado global:** ✅ Migración completa y funcional. Solo quedan tareas futuras opcionales.
 
 ---
 
-## Lo que ya está hecho
+## Resumen ejecutivo
+
+La arquitectura pasó de **1 usuario = 1 negocio** a **1 organización = N usuarios con roles**.  
+Todos los datos del tenant usan `org_id` como clave de aislamiento.  
+Los permisos se verifican en cada ruta API. La UI de gestión de equipo está construida.  
+La rama está lista para merge a `main` cuando se valide en staging.
+
+---
+
+## Arquitectura implementada
+
+```
+Firebase Auth (UID)
+  └─► users (id, firebase_uid, is_active)
+        └─► organization_members (org_id, role_id)
+              ├─► organizations (id, name, owner_user_id, timezone, currency, locale, logo_url)
+              │     └─► org_subscriptions (plan_id, status)
+              └─► org_roles (id, name, is_owner)
+                    └─► org_role_permissions (module, can_view, can_edit, can_delete, show_costs, show_profit)
+```
+
+**Módulos con permisos:** `PRODUCTS` · `INVENTORY` · `SALES` · `CUSTOMERS` · `FINANCES` · `EVENTS` · `REPORTS` · `ADMIN`
+
+---
+
+## ✅ Completado
 
 ### Base de datos
 
-| Script | Descripción | Ejecutado en Neon |
-|--------|-------------|-------------------|
-| `v4-multi-org-infrastructure.sql` | Crea `organizations`, `org_roles`, `org_role_permissions`, `organization_members`, `org_subscriptions`. Migra todos los usuarios existentes a su propia org con rol "Dueño" y suscripción migrada. | ✅ |
-| `v4.1-add-org-id-to-data-tables.sql` | Agrega `org_id` (nullable → NOT NULL) a las 24 tablas de datos. Popula desde `user_id`. Actualiza UNIQUE constraints e índices. | ✅ |
-| `v4.2-add-audit-fields.sql` | Agrega `created_by` y `updated_by` (FK → users) a las 24 tablas. Backfill de `created_by = user_id` en registros existentes. | ✅ |
+| Script | Descripción |
+|--------|-------------|
+| `database/migrations/v4-multi-org-infrastructure.sql` | Crea las 5 tablas nuevas. Migra usuarios existentes a su propia org con rol "Dueño" y suscripción. |
+| `database/migrations/v4.1-add-org-id-to-data-tables.sql` | Agrega `org_id NOT NULL` a las 24 tablas de datos. Popula desde `user_id`. |
+| `database/migrations/v4.2-add-audit-fields.sql` | Agrega `created_by` y `updated_by` a las 24 tablas. Backfill desde `user_id`. |
 
-### Modelo de roles
+Todos ejecutados en Neon ✅.
 
-- Roles **personalizados por organización** (no fijos) — el OWNER crea roles con nombre libre (Cajero, Bodeguero, Contador, etc.)
-- Permisos por rol y módulo: `can_view`, `can_edit`, `can_delete`, `show_costs`, `show_profit`
-- El OWNER identificado en `organizations.owner_user_id` tiene bypass total en el código
-- Al crear una org se genera automáticamente el rol "Dueño" con todos los permisos activados
+---
 
 ### `lib/auth.ts`
 
-- `AuthUser` ahora incluye: `orgId`, `roleId`, `roleName`, `isOwner`
-- `verifyAuth()` resuelve la org y rol del usuario en un solo query con JOINs
-- `verifySubscription(orgId)` usa `org_subscriptions`
-- `verifyFeatureAccess(orgId, featureKey)` usa `org_subscriptions`
-- `verifyResourceLimit(orgId, type)` simplificado — ya no recibe `userId`, usa `org_id` en conteos
-- `verifyModuleAccess(auth, module, permission)` — verifica un permiso puntual con bypass para OWNER
-- `getModulePermissions(auth, module)` — retorna los 5 flags para condicionar qué datos se exponen
-- `getOrgTimezone(orgId)` — helper que reemplaza la consulta a `user_profile`
-- `ensureOrgExists(userId, name, ...)` — crea org + rol + membership + suscripción para usuarios nuevos
-
-### API Routes (58 archivos migrados)
-
-Todos los routes en `app/api/` (excepto admin) fueron migrados:
-
-- `const { userId, orgId } = auth.data` en cada handler
-- `WHERE user_id = ${userId}` → `WHERE org_id = ${orgId}` en todas las queries de lectura
-- INSERT: columna `user_id` → `org_id` + agrega `created_by = ${userId}`
-- UPDATE iniciado por usuario: agrega `updated_by = ${userId}` en SET
-- UPDATE de sistema (balance, stock): solo cambia WHERE a `org_id`, sin `updated_by`
-- Timezone: consulta migrada de `user_profile` a `organizations`
-- Advisory lock en ventas: `pg_advisory_xact_lock(${userId})` → `pg_advisory_xact_lock(${orgId})`
-- Sale number sequence ahora es por org (no por usuario)
-
-### Login route
-
-- Llama `ensureOrgExists()` como fallback — si un usuario no tiene org la crea automáticamente
-- Retorna `org.id` y `role` en la respuesta de login
+| Función | Descripción |
+|---------|-------------|
+| `verifyAuth(request)` | Resuelve usuario + org + rol en un JOIN. Devuelve `{ userId, orgId, roleId, roleName, isOwner }`. |
+| `verifySubscription(orgId)` | Usa `org_subscriptions`. |
+| `verifyFeatureAccess(orgId, featureKey)` | Usa `org_subscriptions`. |
+| `verifyResourceLimit(orgId, type)` | Cuenta por `org_id`. |
+| `verifyModuleAccess(auth, module, permission)` | Verifica permiso del rol. OWNER → bypass inmediato sin DB. |
+| `getModulePermissions(auth, module)` | Devuelve los 5 flags del rol en un módulo. |
+| `requireModule(auth, module, permission)` | Helper: devuelve `Response 403 \| null`. Uso en routes: `const deny = await requireModule(auth.data, 'SALES', 'canEdit'); if (deny) return deny;` |
+| `getOrgTimezone(orgId)` | Reemplaza la consulta a `user_profile`. |
+| `ensureOrgExists(userId, name, ...)` | Crea org + rol + membership + suscripción. Usado en login y creación de usuarios. |
 
 ---
 
-## Lo que falta
+### API Routes
 
-### 1. ~~Ejecutar scripts SQL en Neon~~ ✅
+**58 rutas de negocio** migradas de `user_id` → `org_id` + `requireModule` en cada handler:
 
----
+| Rutas | Módulo |
+|-------|--------|
+| `/api/products/*` | `PRODUCTS` |
+| `/api/inventory/*`, `/api/purchases/*`, `/api/supplies/*`, `/api/supply-purchases/*` | `INVENTORY` |
+| `/api/sales/*` | `SALES` |
+| `/api/customers/*` | `CUSTOMERS` |
+| `/api/transactions/*`, `/api/accounts/*`, `/api/credit-cards/*`, `/api/credit-card-transactions/*`, `/api/transaction-categories/*`, `/api/finances/*` | `FINANCES` |
+| `/api/events/*` | `EVENTS` |
+| `/api/reports/*` | `REPORTS` |
 
-### 2. ~~Rutas admin~~ ✅
+**Rutas admin** migradas a `org_subscriptions`:
+- `GET /api/admin/users` — JOIN via `organizations → org_subscriptions`
+- `GET/PATCH /api/admin/users/[id]` — suscripción via org; toggle `is_active` sincroniza con Firebase `disabled`
+- `GET /api/admin/stats` — cuenta orgs por estado de suscripción
+- `GET /api/admin/storage` — topUsers usando `org_id`
 
-- `admin/users` y `admin/users/[id]` — migrados a `org_subscriptions` + `org_id`
-- `admin/stats` — migrado a `org_subscriptions` (cuenta orgs, no user_subscriptions)
-- `admin/storage` — migrado a `org_id` en query de topUsers
-- `admin/plans` y `admin/plans/[id]` — sin cambios necesarios (datos de plataforma)
-- Sidebar — usa `org.name` y `org.logo_url` como fallback para miembros sin business_name
-
----
-
-### 3. ~~UI de gestión de organización~~ ✅
-
-| Pantalla | Ruta | Estado |
-|----------|------|--------|
-| Perfil de organización | `/settings/organization` | ✅ Migrado a `/api/organization` |
-| Gestión de miembros | `/settings/members` | ✅ Nuevo |
-| Gestión de roles | `/settings/roles` | ✅ Nuevo |
-| Invitación | `/invite/[token]` | ⬜ Pendiente (requiere flujo de email) |
-
-Sidebar actualizado: "Equipo" y "Roles" visibles solo para `isOwner`.
-
-APIs implementadas ✅:
+**Rutas nuevas de organización:**
 - `GET/PATCH /api/organization` — perfil de la org
-- `GET/POST /api/organization/members` — listar e invitar miembros (por email directo)
+- `GET /api/organization/members` — listar miembros
+- `POST /api/organization/members/create-user` — crear usuario nuevo y agregarlo al equipo (OWNER only; crea en Firebase + PostgreSQL)
 - `PATCH/DELETE /api/organization/members/[id]` — cambiar rol / revocar acceso
-- `GET/POST /api/organization/roles` — listar y crear roles con permisos
-- `PATCH/DELETE /api/organization/roles/[id]` — editar y eliminar roles
-
-APIs pendientes:
-- `POST /api/organization/invite` — enviar email de invitación (requiere servicio de email)
-- `POST /api/organization/invite/accept` — aceptar invitación con token
+- `GET/POST /api/organization/roles` — listar / crear roles con permisos
+- `PATCH/DELETE /api/organization/roles/[id]` — editar / eliminar roles
+- `POST /api/admin/users` — crear usuario completo desde panel admin
 
 ---
 
-### 4. Flujo de invitación por email
+### Frontend
 
-- El OWNER ingresa el email del nuevo miembro
-- Se genera un token único y se envía por email (Firebase o servicio externo)
-- El invitado hace clic en el link → se registra o hace login → se une a la org con el rol asignado
-- Token debe expirar (ej: 48 horas)
+**Hooks:**
+- `useMe()` — expone `orgId`, `roleId`, `isOwner`, `org`, `role`, `permissions`, `getModulePermissions(module)`
+- `useModulePermissions(module)` — hook standalone con los 5 flags + `isLoading`
+- `hooks/swr/use-organization.ts` — CRUD completo para org, miembros y roles
 
-Tabla sugerida:
+**Tipos nuevos en `types/index.ts`:**
+`OrgModule` · `ModulePermissions` · `OrgInfo` · `OrgRole` · `OrgMember` · `OrgPermissions`
+
+**Páginas nuevas/actualizadas:**
+- `/settings/organization` — edita nombre, logo, timezone, moneda (solo owner)
+- `/settings/members` — lista miembros, crea usuarios nuevos con email + contraseña, cambia rol, revoca acceso
+- `/settings/roles` — crea/edita/elimina roles; grilla de permisos 8 módulos × 5 flags
+
+**Sidebar:**
+- "Equipo" y "Roles" aparecen solo cuando `isOwner = true`
+- Muestra `org.name` y `org.logo_url` como fallback para miembros sin `business_name`
+
+**`/api/auth/me`:**
+- Migrado a `org_subscriptions`
+- Respuesta incluye `org`, `role`, `permissions` (todos los módulos)
+
+---
+
+## ⬜ Pendiente (futuro — no bloquea)
+
+### 1. Sidebar dinámico por permisos de rol
+Los ítems del menú principal (Inventario, Ventas, Finanzas, etc.) se muestran a todos los miembros aunque su rol no tenga `can_view` en ese módulo. El API ya devuelve 403, pero el link sigue visible.
+
+**Cómo retomarlo:** En `components/app-sidebar.tsx`, importar `useMe()` y filtrar `mainNav` según `getModulePermissions(module).canView`. El módulo de cada item del nav ya está mapeado.
+
+---
+
+### 2. Flujo de invitación por email
+Para cuando el usuario ya tiene cuenta en otra plataforma y quiere unirse a una org sin que el dueño le cree las credenciales.
+
+**Diseño:**
 ```sql
 CREATE TABLE org_invitations (
-  id         BIGSERIAL PRIMARY KEY,
-  org_id     BIGINT NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
-  role_id    BIGINT NOT NULL REFERENCES org_roles(id) ON DELETE CASCADE,
-  email      VARCHAR(255) NOT NULL,
-  token      VARCHAR(255) UNIQUE NOT NULL,
-  invited_by BIGINT REFERENCES users(id) ON DELETE SET NULL,
-  expires_at TIMESTAMP NOT NULL,
+  id          BIGSERIAL PRIMARY KEY,
+  org_id      BIGINT NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+  role_id     BIGINT NOT NULL REFERENCES org_roles(id)     ON DELETE CASCADE,
+  email       VARCHAR(255) NOT NULL,
+  token       VARCHAR(255) UNIQUE NOT NULL,
+  invited_by  BIGINT REFERENCES users(id) ON DELETE SET NULL,
+  expires_at  TIMESTAMP NOT NULL,
   accepted_at TIMESTAMP,
-  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+  created_at  TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 ```
 
----
-
-### 5. ~~Contexto de org en el cliente~~ ✅
-
-- `useMe()` expone: `orgId`, `roleId`, `isOwner`, `org`, `role`, `permissions`, `getModulePermissions(module)`
-- `useModulePermissions(module)` — hook standalone que retorna los 5 flags + `isLoading`
-- `/api/auth/me` GET migrado a `org_subscriptions` + agrega `org`, `role`, `permissions` en respuesta
-- `types/index.ts` — agregados `OrgModule`, `ModulePermissions`, `OrgInfo`, `OrgRole`, `OrgMember`, `OrgPermissions`
+**APIs necesarias:**
+- `POST /api/organization/invite` — genera token, envía email (requiere Resend / SendGrid)
+- `POST /api/organization/invite/accept` — verifica token, crea membership
+- `GET /invite/[token]` — página landing para aceptar
 
 ---
 
-### 6. Selector de org (multi-org futuro)
+### 3. Selector de org (multi-org)
+Cuando un usuario sea miembro de múltiples orgs. `verifyAuth()` hoy toma la primera por `joined_at ASC`.
 
-Si en el futuro un usuario pertenece a múltiples orgs:
-- Agregar selector de org activa en el header
-- Pasar `X-Org-ID` header en requests o almacenar en cookie
-- Modificar `verifyAuth()` para leer el org activo del header/cookie en lugar de tomar el primero
-
-Por ahora `verifyAuth()` toma la primera org ordenada por `joined_at ASC` — suficiente para el caso 1 usuario = 1 org.
+**Cómo retomarlo:** Agregar `X-Org-ID` header en los requests del cliente; `verifyAuth()` lo lee si existe, sino usa el primero.
 
 ---
 
-### 7. Limpiar `user_id` como tenant key (Fase 5 — futuro)
+### 4. DROP de `user_id` como tenant key
+Las 24 tablas de datos aún tienen la columna `user_id` original. Ya no se usa como filtro, pero existe.
 
-Una vez que todo el código funciona con `org_id`, se puede eliminar `user_id` como tenant key de las tablas de datos. Por ahora se mantiene como referencia histórica.
+**Cuándo hacerlo:** Una vez que la rama esté en producción estable por 1–2 semanas. Crear `v5-drop-user-id.sql`.
 
-El campo quedó como `created_by` en el sentido conceptual — pero la columna `user_id` original sigue existiendo hasta que se decida hacer el DROP en una migración futura.
+---
+
+## Decisiones de diseño tomadas
+
+| Decisión | Razón |
+|----------|-------|
+| Roles personalizados por org (no roles fijos del sistema) | Cada negocio nombra sus roles como quiere (Cajero, Bodeguero, etc.) |
+| OWNER tiene bypass total sin consulta a DB | Performance — la mayoría de usuarios son owners |
+| "Agregar usuario existente por email" fue eliminado | Brecha de seguridad — un owner podría agregar a cualquier usuario sin consentimiento |
+| Los miembros se crean con credenciales completas (email + password) | Control total del owner; no requiere servicio de email |
+| `user_id` se mantiene en tablas de datos como `created_by` | Auditoría de quién creó cada registro |
+| `org_subscriptions` tiene `UNIQUE (org_id)` — una suscripción por org | El dueño paga por la org, no por cada miembro |
