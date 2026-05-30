@@ -1,7 +1,7 @@
 // app/api/sales/[id]/route.ts
 import { NextRequest } from "next/server";
 import { neon } from "@neondatabase/serverless";
-import { verifyAuth, createErrorResponse, isAuthSuccess } from "@/lib/auth";
+import { verifyAuth, createErrorResponse, isAuthSuccess, requireModule } from "@/lib/auth";
 
 const sql = neon(process.env.DATABASE_URL!);
 
@@ -16,6 +16,8 @@ function itemKey(productId: number, variantId: number | null) {
 export async function GET(request: NextRequest, { params }: Params) {
   const auth = await verifyAuth(request);
   if (!isAuthSuccess(auth)) return createErrorResponse(auth.error, auth.status);
+  const deny = await requireModule(auth.data, 'SALES', 'canView');
+  if (deny) return deny;
 
   try {
     const { userId, orgId } = auth.data;
@@ -90,6 +92,8 @@ export async function GET(request: NextRequest, { params }: Params) {
 export async function PATCH(request: NextRequest, { params }: Params) {
   const auth = await verifyAuth(request);
   if (!isAuthSuccess(auth)) return createErrorResponse(auth.error, auth.status);
+  const deny = await requireModule(auth.data, 'SALES', 'canEdit');
+  if (deny) return deny;
 
   try {
     const { userId, orgId } = auth.data;
@@ -767,6 +771,8 @@ export async function PATCH(request: NextRequest, { params }: Params) {
 export async function DELETE(request: NextRequest, { params }: Params) {
   const auth = await verifyAuth(request);
   if (!isAuthSuccess(auth)) return createErrorResponse(auth.error, auth.status);
+  const deny = await requireModule(auth.data, 'SALES', 'canDelete');
+  if (deny) return deny;
 
   try {
     const { userId, orgId } = auth.data;

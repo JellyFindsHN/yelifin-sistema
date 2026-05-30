@@ -1,7 +1,7 @@
 // app/api/products/[id]/detail/route.ts
 import { NextRequest } from "next/server";
 import { neon } from "@neondatabase/serverless";
-import { verifyAuth, createErrorResponse, isAuthSuccess } from "@/lib/auth";
+import { verifyAuth, createErrorResponse, isAuthSuccess, requireModule } from "@/lib/auth";
 
 const sql = neon(process.env.DATABASE_URL!);
 
@@ -10,6 +10,8 @@ type Params = { params: Promise<{ id: string }> };
 export async function GET(request: NextRequest, { params }: Params) {
   const auth = await verifyAuth(request);
   if (!isAuthSuccess(auth)) return createErrorResponse(auth.error, auth.status);
+  const deny = await requireModule(auth.data, 'PRODUCTS', 'canView');
+  if (deny) return deny;
 
   try {
     const { userId, orgId } = auth.data;

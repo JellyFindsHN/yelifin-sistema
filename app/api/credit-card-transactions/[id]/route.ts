@@ -1,6 +1,6 @@
 import { NextRequest } from "next/server";
 import { neon } from "@neondatabase/serverless";
-import { verifyAuth, createErrorResponse, isAuthSuccess } from "@/lib/auth";
+import { verifyAuth, createErrorResponse, isAuthSuccess, requireModule } from "@/lib/auth";
 
 const sql = neon(process.env.DATABASE_URL!);
 
@@ -10,6 +10,8 @@ export async function PATCH(
 ) {
   const auth = await verifyAuth(request);
   if (!isAuthSuccess(auth)) return createErrorResponse(auth.error, auth.status);
+  const deny = await requireModule(auth.data, 'FINANCES', 'canEdit');
+  if (deny) return deny;
 
   try {
     const { userId, orgId } = auth.data;
@@ -100,6 +102,8 @@ export async function DELETE(
 ) {
   const auth = await verifyAuth(request);
   if (!isAuthSuccess(auth)) return createErrorResponse(auth.error, auth.status);
+  const deny = await requireModule(auth.data, 'FINANCES', 'canDelete');
+  if (deny) return deny;
 
   try {
     const { userId, orgId } = auth.data;

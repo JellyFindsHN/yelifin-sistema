@@ -1,12 +1,14 @@
-﻿// app/(dashboard)/admin/users/page.tsx
+// app/(dashboard)/admin/users/page.tsx
 "use client";
 
 import { useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import { useAdminUsers } from "@/hooks/swr/use-admin";
+import { toast } from "sonner";
+import { useAdminUsers, useAdminPlans, useAdminCreateUser } from "@/hooks/swr/use-admin";
 import { Input }    from "@/components/ui/input";
 import { Button }   from "@/components/ui/button";
 import { Badge }    from "@/components/ui/badge";
+import { Label }    from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
@@ -15,7 +17,10 @@ import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
 import {
-  ArrowLeft, Search, CheckCircle2, XCircle, Clock,
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
+} from "@/components/ui/dialog";
+import {
+  ArrowLeft, Search, CheckCircle2, XCircle, Clock, UserPlus, Loader2, Eye, EyeOff,
 } from "lucide-react";
 import {
   Pagination, PaginationContent, PaginationItem,
@@ -23,57 +28,255 @@ import {
 } from "@/components/ui/pagination";
 import { useDebounce } from "@/hooks/use-debounce";
 
+// ── Helpers ────────────────────────────────────────────────────────────────
+
 function relativeTime(date: string | null): string {
   if (!date) return "—";
   const diff = Date.now() - new Date(date).getTime();
   const mins  = Math.floor(diff / 60_000);
-  if (mins < 1)    return "hace un momento";
-  if (mins < 60)   return `hace ${mins}m`;
+  if (mins < 1)   return "hace un momento";
+  if (mins < 60)  return `hace ${mins}m`;
   const hours = Math.floor(mins / 60);
-  if (hours < 24)  return `hace ${hours}h`;
-  const days  = Math.floor(hours / 24);
-  if (days < 30)   return `hace ${days}d`;
+  if (hours < 24) return `hace ${hours}h`;
+  const days = Math.floor(hours / 24);
+  if (days < 30)  return `hace ${days}d`;
   return new Date(date).toLocaleDateString("es-HN", { day: "numeric", month: "short", year: "numeric" });
 }
 
 const STATUS_LABEL: Record<string, string> = {
-  TRIAL:     "Prueba",
-  ACTIVE:    "Activa",
-  CANCELLED: "Cancelada",
-  EXPIRED:   "Vencida",
-  PAST_DUE:  "Pendiente",
+  TRIAL: "Prueba", ACTIVE: "Activa", CANCELLED: "Cancelada",
+  EXPIRED: "Vencida", PAST_DUE: "Pendiente",
 };
 const STATUS_COLOR: Record<string, string> = {
-  TRIAL:     "bg-blue-100 text-blue-700 border-blue-200",
-  ACTIVE:    "bg-green-100 text-green-700 border-green-200",
+  TRIAL: "bg-blue-100 text-blue-700 border-blue-200",
+  ACTIVE: "bg-green-100 text-green-700 border-green-200",
   CANCELLED: "bg-red-100 text-red-700 border-red-200",
-  EXPIRED:   "bg-gray-100 text-gray-600 border-gray-200",
-  PAST_DUE:  "bg-amber-100 text-amber-700 border-amber-200",
+  EXPIRED: "bg-gray-100 text-gray-600 border-gray-200",
+  PAST_DUE: "bg-amber-100 text-amber-700 border-amber-200",
 };
+
+const TIMEZONES = [
+  { value: "America/Tegucigalpa", label: "Honduras" },
+  { value: "America/Guatemala",   label: "Guatemala" },
+  { value: "America/El_Salvador", label: "El Salvador" },
+  { value: "America/Managua",     label: "Nicaragua" },
+  { value: "America/Costa_Rica",  label: "Costa Rica" },
+  { value: "America/Mexico_City", label: "México" },
+  { value: "America/Bogota",      label: "Colombia" },
+  { value: "America/New_York",    label: "EE.UU. Este" },
+  { value: "UTC",                 label: "UTC" },
+];
+
+const CURRENCIES = [
+  { value: "HNL", label: "HNL — Lempira" },
+  { value: "USD", label: "USD — Dólar" },
+  { value: "GTQ", label: "GTQ — Quetzal" },
+  { value: "MXN", label: "MXN — Peso MX" },
+  { value: "COP", label: "COP — Peso CO" },
+  { value: "EUR", label: "EUR — Euro" },
+];
+
+// ── Create user dialog ─────────────────────────────────────────────────────
+
+function CreateUserDialog({
+  open,
+  onClose,
+  onCreated,
+}: {
+  open: boolean;
+  onClose: () => void;
+  onCreated: () => void;
+}) {
+  const { plans } = useAdminPlans();
+  const { createUser, isCreating } = useAdminCreateUser();
+
+  const [email,        setEmail]        = useState("");
+  const [password,     setPassword]     = useState("");
+  const [showPass,     setShowPass]     = useState(false);
+  const [displayName,  setDisplayName]  = useState("");
+  const [businessName, setBusinessName] = useState("");
+  const [timezone,     setTimezone]     = useState("America/Tegucigalpa");
+  const [currency,     setCurrency]     = useState("HNL");
+  const [planId,       setPlanId]       = useState<string>("");
+
+  const reset = () => {
+    setEmail(""); setPassword(""); setDisplayName(""); setBusinessName("");
+    setTimezone("America/Tegucigalpa"); setCurrency("HNL"); setPlanId(""); setShowPass(false);
+  };
+
+  const handleClose = () => { reset(); onClose(); };
+
+  const handleSubmit = async () => {
+    if (!email.trim())    { toast.error("El email es requerido"); return; }
+    if (!password.trim()) { toast.error("La contraseña es requerida"); return; }
+    if (password.length < 6) { toast.error("La contraseña debe tener al menos 6 caracteres"); return; }
+
+    try {
+      await createUser({
+        email:          email.trim(),
+        password,
+        display_name:   displayName.trim() || undefined,
+        business_name:  businessName.trim() || undefined,
+        timezone,
+        currency,
+        plan_id:        planId ? Number(planId) : undefined,
+        email_verified: true,
+      });
+      toast.success("Usuario creado exitosamente");
+      onCreated();
+      handleClose();
+    } catch (err: any) {
+      toast.error(err.message || "Error al crear usuario");
+    }
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={(v) => { if (!v) handleClose(); }}>
+      <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>Crear nuevo usuario</DialogTitle>
+        </DialogHeader>
+
+        <div className="space-y-4 py-1">
+          {/* Email */}
+          <div className="space-y-1.5">
+            <Label htmlFor="cu-email">Email <span className="text-destructive">*</span></Label>
+            <Input
+              id="cu-email"
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="usuario@ejemplo.com"
+              disabled={isCreating}
+            />
+          </div>
+
+          {/* Contraseña */}
+          <div className="space-y-1.5">
+            <Label htmlFor="cu-password">Contraseña <span className="text-destructive">*</span></Label>
+            <div className="relative">
+              <Input
+                id="cu-password"
+                type={showPass ? "text" : "password"}
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="Mínimo 6 caracteres"
+                disabled={isCreating}
+                className="pr-10"
+              />
+              <button
+                type="button"
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                onClick={() => setShowPass((v) => !v)}
+                tabIndex={-1}
+              >
+                {showPass ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
+              </button>
+            </div>
+          </div>
+
+          {/* Nombre visible */}
+          <div className="space-y-1.5">
+            <Label htmlFor="cu-name">Nombre visible</Label>
+            <Input
+              id="cu-name"
+              value={displayName}
+              onChange={(e) => setDisplayName(e.target.value)}
+              placeholder="Nombre o apodo del usuario"
+              disabled={isCreating}
+            />
+          </div>
+
+          {/* Nombre del negocio */}
+          <div className="space-y-1.5">
+            <Label htmlFor="cu-biz">Nombre del negocio</Label>
+            <Input
+              id="cu-biz"
+              value={businessName}
+              onChange={(e) => setBusinessName(e.target.value)}
+              placeholder="Ej. Tienda Don José"
+              disabled={isCreating}
+            />
+          </div>
+
+          {/* Zona horaria + Moneda */}
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1.5">
+              <Label>Zona horaria</Label>
+              <Select value={timezone} onValueChange={setTimezone} disabled={isCreating}>
+                <SelectTrigger className="h-9 text-sm"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {TIMEZONES.map((tz) => (
+                    <SelectItem key={tz.value} value={tz.value}>{tz.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1.5">
+              <Label>Moneda</Label>
+              <Select value={currency} onValueChange={setCurrency} disabled={isCreating}>
+                <SelectTrigger className="h-9 text-sm"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {CURRENCIES.map((c) => (
+                    <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          {/* Plan */}
+          <div className="space-y-1.5">
+            <Label>Plan inicial</Label>
+            <Select value={planId} onValueChange={setPlanId} disabled={isCreating}>
+              <SelectTrigger className="h-9 text-sm">
+                <SelectValue placeholder="Prueba gratuita (por defecto)" />
+              </SelectTrigger>
+              <SelectContent>
+                {plans.map((p) => (
+                  <SelectItem key={p.id} value={String(p.id)}>
+                    {p.name} {p.price_usd > 0 ? `· $${p.price_usd}` : "· Gratis"}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <p className="text-xs text-muted-foreground">
+              Si no seleccionás un plan, el usuario quedará en estado de prueba.
+            </p>
+          </div>
+        </div>
+
+        <DialogFooter>
+          <Button variant="outline" onClick={handleClose} disabled={isCreating}>Cancelar</Button>
+          <Button onClick={handleSubmit} disabled={isCreating} className="gap-2">
+            {isCreating ? <Loader2 className="size-3.5 animate-spin" /> : <UserPlus className="size-3.5" />}
+            Crear usuario
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+// ── Page ───────────────────────────────────────────────────────────────────
 
 export default function AdminUsersPage() {
   const { back, push } = useRouter();
-  const [search,  setSearch]  = useState("");
-  const [status,  setStatus]  = useState("all");
-  const [page,    setPage]    = useState(1);
+  const [search, setSearch] = useState("");
+  const [status, setStatus] = useState("all");
+  const [page,   setPage]   = useState(1);
+  const [showCreate, setShowCreate] = useState(false);
 
   const debouncedSearch = useDebounce(search, 350);
 
-  const { users, total, pages, isLoading } = useAdminUsers({
+  const { users, total, pages, isLoading, mutate } = useAdminUsers({
     search: debouncedSearch,
     status,
     page,
   });
 
-  const handleSearch = useCallback((v: string) => {
-    setSearch(v);
-    setPage(1);
-  }, []);
-
-  const handleStatus = useCallback((v: string) => {
-    setStatus(v);
-    setPage(1);
-  }, []);
+  const handleSearch = useCallback((v: string) => { setSearch(v); setPage(1); }, []);
+  const handleStatus = useCallback((v: string) => { setStatus(v); setPage(1); }, []);
 
   return (
     <div className="space-y-4 pb-10">
@@ -88,6 +291,10 @@ export default function AdminUsersPage() {
             {isLoading ? "Cargando..." : `${total} usuario${total !== 1 ? "s" : ""} registrados`}
           </p>
         </div>
+        <Button size="sm" className="gap-2 shrink-0" onClick={() => setShowCreate(true)}>
+          <UserPlus className="size-4" />
+          <span className="hidden sm:inline">Crear usuario</span>
+        </Button>
       </div>
 
       {/* Filters */}
@@ -102,9 +309,7 @@ export default function AdminUsersPage() {
           />
         </div>
         <Select value={status} onValueChange={handleStatus}>
-          <SelectTrigger className="w-full sm:w-44">
-            <SelectValue />
-          </SelectTrigger>
+          <SelectTrigger className="w-full sm:w-44"><SelectValue /></SelectTrigger>
           <SelectContent>
             <SelectItem value="all">Todos los estados</SelectItem>
             <SelectItem value="TRIAL">Prueba</SelectItem>
@@ -153,9 +358,7 @@ export default function AdminUsersPage() {
                   onClick={() => push(`/admin/users/${u.id}`)}
                 >
                   <TableCell>
-                    <p className="font-medium text-sm">
-                      {u.business_name || u.display_name || "—"}
-                    </p>
+                    <p className="font-medium text-sm">{u.business_name || u.display_name || "—"}</p>
                     <p className="text-xs text-muted-foreground">{u.email}</p>
                   </TableCell>
                   <TableCell className="text-sm">{u.plan_name ?? "—"}</TableCell>
@@ -169,19 +372,15 @@ export default function AdminUsersPage() {
                   <TableCell>
                     {u.is_active
                       ? <CheckCircle2 className="size-4 text-green-600" />
-                      : <XCircle    className="size-4 text-destructive" />}
+                      : <XCircle      className="size-4 text-destructive" />}
                   </TableCell>
                   <TableCell className="text-xs text-muted-foreground" suppressHydrationWarning>
-                    {new Date(u.created_at).toLocaleDateString("es-HN", {
-                      day: "numeric", month: "short", year: "numeric",
-                    })}
+                    {new Date(u.created_at).toLocaleDateString("es-HN", { day: "numeric", month: "short", year: "numeric" })}
                   </TableCell>
                   <TableCell>
                     <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
                       <Clock className="size-3 shrink-0" />
-                      <span title={u.last_refresh_time ?? u.last_sign_in_time ?? "—"}>
-                        {relativeTime(u.last_refresh_time ?? u.last_sign_in_time)}
-                      </span>
+                      <span>{relativeTime(u.last_refresh_time ?? u.last_sign_in_time)}</span>
                     </div>
                   </TableCell>
                   <TableCell>
@@ -208,16 +407,12 @@ export default function AdminUsersPage() {
                 >
                   <div className="flex items-start justify-between gap-2">
                     <div className="min-w-0">
-                      <p className="font-medium text-sm truncate">
-                        {u.business_name || u.display_name || "—"}
-                      </p>
+                      <p className="font-medium text-sm truncate">{u.business_name || u.display_name || "—"}</p>
                       <p className="text-xs text-muted-foreground truncate">{u.email}</p>
                     </div>
-                    <div className="flex items-center gap-1.5 shrink-0">
-                      {u.is_active
-                        ? <CheckCircle2 className="size-3.5 text-green-600" />
-                        : <XCircle    className="size-3.5 text-destructive" />}
-                    </div>
+                    {u.is_active
+                      ? <CheckCircle2 className="size-3.5 text-green-600 shrink-0" />
+                      : <XCircle      className="size-3.5 text-destructive shrink-0" />}
                   </div>
                   <div className="flex items-center gap-2 mt-2">
                     <span className="text-xs text-muted-foreground">{u.plan_name ?? "Sin plan"}</span>
@@ -260,12 +455,10 @@ export default function AdminUsersPage() {
                 }, [])
                 .map((p, i) =>
                   p === "…" ? (
-                    <PaginationItem key={`ellipsis-${i}`}><PaginationEllipsis /></PaginationItem>
+                    <PaginationItem key={`e-${i}`}><PaginationEllipsis /></PaginationItem>
                   ) : (
                     <PaginationItem key={p}>
-                      <PaginationLink isActive={p === page} onClick={() => setPage(p as number)} className="cursor-pointer">
-                        {p}
-                      </PaginationLink>
+                      <PaginationLink isActive={p === page} onClick={() => setPage(p as number)} className="cursor-pointer">{p}</PaginationLink>
                     </PaginationItem>
                   )
                 )}
@@ -280,6 +473,12 @@ export default function AdminUsersPage() {
           </Pagination>
         </div>
       )}
+
+      <CreateUserDialog
+        open={showCreate}
+        onClose={() => setShowCreate(false)}
+        onCreated={() => mutate()}
+      />
     </div>
   );
 }

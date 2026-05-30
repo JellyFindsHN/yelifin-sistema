@@ -6,9 +6,13 @@ import { verifyAuth, createErrorResponse, isAuthSuccess } from "@/lib/auth";
 
 const sql = neon(process.env.DATABASE_URL!);
 
+const ALL_MODULES = [
+  "PRODUCTS", "INVENTORY", "SALES", "CUSTOMERS",
+  "FINANCES", "EVENTS", "REPORTS", "ADMIN",
+] as const;
+
 export async function GET(request: NextRequest) {
   try {
-    // 1. Verificar token
     const authHeader = request.headers.get("Authorization");
     if (!authHeader?.startsWith("Bearer ")) {
       return Response.json({ error: "No autorizado" }, { status: 401 });
@@ -19,14 +23,11 @@ export async function GET(request: NextRequest) {
     try {
       decodedToken = await adminAuth.verifyIdToken(token);
     } catch {
-      return Response.json(
-        { error: "Token inválido o expirado" },
-        { status: 401 }
-      );
+      return Response.json({ error: "Token inválido o expirado" }, { status: 401 });
     }
 
-    // 2. Usuario + perfil + suscripción
-    const [userData] = await sql`
+    // Usuario + org + rol + suscripción en un solo query
+    const [row] = await sql`
       SELECT
         u.id,
         u.firebase_uid,
@@ -38,16 +39,26 @@ export async function GET(request: NextRequest) {
 
         up.business_name,
         up.business_logo_url,
-        up.timezone,
-        up.currency,
-        up.locale,
         up.onboarding_completed,
 
-        us.id               AS subscription_id,
-        us.status           AS subscription_status,
-        us.current_period_start,
-        us.current_period_end,
-        us.cancel_at_period_end,
+        o.id            AS org_id,
+        o.name          AS org_name,
+        o.slug          AS org_slug,
+        o.logo_url      AS org_logo_url,
+        o.timezone,
+        o.currency,
+        o.locale,
+        o.owner_user_id,
+
+        r.id            AS role_id,
+        r.name          AS role_name,
+        r.is_owner      AS role_is_owner,
+
+        os.id                   AS subscription_id,
+        os.status               AS subscription_status,
+        os.current_period_start,
+        os.current_period_end,
+        os.cancel_at_period_end,
 
         sp.id               AS plan_id,
         sp.name             AS plan_name,
@@ -59,106 +70,128 @@ export async function GET(request: NextRequest) {
         sp.max_storage_mb
 
       FROM users u
-      LEFT JOIN user_profile up ON up.user_id = u.id
-      LEFT JOIN user_subscriptions us ON us.user_id = u.id
-      LEFT JOIN subscription_plans sp ON sp.id = us.plan_id
+      LEFT JOIN user_profile      up ON up.user_id  = u.id
+      JOIN  organization_members  om ON om.user_id  = u.id  AND om.is_active = TRUE
+      JOIN  organizations         o  ON o.id        = om.org_id AND o.is_active = TRUE
+      JOIN  org_roles             r  ON r.id        = om.role_id
+      JOIN  org_subscriptions     os ON os.org_id   = o.id
+      JOIN  subscription_plans    sp ON sp.id       = os.plan_id
       WHERE u.firebase_uid = ${decodedToken.uid}
-        AND u.is_active = TRUE
-      ORDER BY us.created_at DESC
+        AND u.is_active    = TRUE
+      ORDER BY om.joined_at ASC
       LIMIT 1
     `;
 
-    if (!userData) {
-      return Response.json(
-        { error: "Usuario no encontrado" },
-        { status: 404 }
+    if (!row) {
+      return Response.json({ error: "Usuario no encontrado" }, { status: 404 });
+    }
+
+    // Features del plan
+    const features = await sql`
+      SELECT sf.feature_key, sf.feature_name, sf.category
+      FROM org_subscriptions os
+      JOIN plan_features  pf ON pf.plan_id = os.plan_id
+      JOIN system_features sf ON sf.id = pf.feature_id
+      WHERE os.org_id = ${row.org_id}
+        AND os.status IN ('TRIAL', 'ACTIVE')
+        AND pf.is_enabled = TRUE
+        AND sf.is_active  = TRUE
+    `;
+
+    const featuresByCategory = features.reduce((acc: Record<string, any[]>, f) => {
+      if (!acc[f.category]) acc[f.category] = [];
+      acc[f.category].push({ key: f.feature_key, name: f.feature_name, category: f.category });
+      return acc;
+    }, {});
+
+    // Permisos por módulo del rol actual
+    const isOwner = row.role_is_owner === true || row.owner_user_id === row.id;
+
+    let permissionsMap: Record<string, object>;
+
+    if (isOwner) {
+      permissionsMap = Object.fromEntries(
+        ALL_MODULES.map((m) => [m, {
+          can_view: true, can_edit: true, can_delete: true,
+          show_costs: true, show_profit: true,
+        }])
+      );
+    } else {
+      const perms = await sql`
+        SELECT module, can_view, can_edit, can_delete, show_costs, show_profit
+        FROM org_role_permissions
+        WHERE role_id = ${row.role_id}
+      `;
+      permissionsMap = Object.fromEntries(
+        perms.map((p) => [p.module, {
+          can_view: p.can_view, can_edit: p.can_edit, can_delete: p.can_delete,
+          show_costs: p.show_costs, show_profit: p.show_profit,
+        }])
       );
     }
 
-    // 3. Features del plan
-    const features = await sql`
-      SELECT
-        sf.feature_key,
-        sf.feature_name,
-        sf.category
-      FROM user_subscriptions us
-      JOIN plan_features pf ON pf.plan_id = us.plan_id
-      JOIN system_features sf ON sf.id = pf.feature_id
-      WHERE us.user_id = ${userData.id}
-        AND us.status IN ('TRIAL', 'ACTIVE')
-        AND pf.is_enabled = TRUE
-        AND sf.is_active = TRUE
-      ORDER BY us.created_at DESC
-    `;
-
-    // Agrupar features por categoría
-    const featuresByCategory = features.reduce(
-      (acc: Record<string, any[]>, f) => {
-        if (!acc[f.category]) acc[f.category] = [];
-        acc[f.category].push({
-          key: f.feature_key,
-          name: f.feature_name,
-          category: f.category,
-        });
-        return acc;
+    return Response.json({
+      user: {
+        id:           row.id,
+        firebase_uid: row.firebase_uid,
+        email:        row.email,
+        display_name: row.display_name,
+        photo_url:    row.photo_url,
+        is_active:    row.is_active,
+        created_at:   row.created_at,
       },
-      {}
-    );
-
-    // 4. Construir respuesta
-    return Response.json(
-      {
-        user: {
-          id: userData.id,
-          firebase_uid: userData.firebase_uid,
-          email: userData.email,
-          display_name: userData.display_name,
-          photo_url: userData.photo_url,
-          is_active: userData.is_active,
-          created_at: userData.created_at,
-        },
-        profile: {
-          user_id: userData.id,
-          business_name: userData.business_name,
-          business_logo_url: userData.business_logo_url,
-          timezone: userData.timezone ?? "America/Tegucigalpa",
-          currency: userData.currency ?? "HNL",
-          locale: userData.locale ?? "es-HN",
-          onboarding_completed: userData.onboarding_completed ?? false,
-        },
-        subscription: {
-          id: userData.subscription_id,
-          status: userData.subscription_status,
-          plan: {
-            id: userData.plan_id,
-            name: userData.plan_name,
-            slug: userData.plan_slug,
-            price_usd: userData.price_usd,
-            billing_interval: userData.billing_interval,
-            limits: {
-              max_products: userData.max_products,
-              max_sales_per_month: userData.max_sales_per_month,
-              max_storage_mb: userData.max_storage_mb,
-            },
+      profile: {
+        user_id:              row.id,
+        business_name:        row.business_name,
+        business_logo_url:    row.business_logo_url,
+        timezone:             row.timezone ?? "America/Tegucigalpa",
+        currency:             row.currency ?? "HNL",
+        locale:               row.locale   ?? "es-HN",
+        onboarding_completed: row.onboarding_completed ?? false,
+      },
+      org: {
+        id:       row.org_id,
+        name:     row.org_name,
+        slug:     row.org_slug,
+        logo_url: row.org_logo_url,
+        timezone: row.timezone ?? "America/Tegucigalpa",
+        currency: row.currency ?? "HNL",
+        locale:   row.locale   ?? "es-HN",
+      },
+      role: {
+        id:       row.role_id,
+        name:     row.role_name,
+        is_owner: isOwner,
+      },
+      permissions: permissionsMap,
+      subscription: {
+        id:                   row.subscription_id,
+        status:               row.subscription_status,
+        plan: {
+          id:               row.plan_id,
+          name:             row.plan_name,
+          slug:             row.plan_slug,
+          price_usd:        row.price_usd,
+          billing_interval: row.billing_interval,
+          limits: {
+            max_products:        row.max_products,
+            max_sales_per_month: row.max_sales_per_month,
+            max_storage_mb:      row.max_storage_mb,
           },
-          current_period_start: userData.current_period_start,
-          current_period_end: userData.current_period_end,
-          cancel_at_period_end: userData.cancel_at_period_end,
         },
-        features: featuresByCategory,
+        current_period_start: row.current_period_start,
+        current_period_end:   row.current_period_end,
+        cancel_at_period_end: row.cancel_at_period_end,
       },
-      { status: 200 }
-    );
+      features: featuresByCategory,
+    });
   } catch (error: any) {
     console.error("Error en /api/auth/me:", error);
-    return Response.json(
-      { error: "Error al obtener información del usuario" },
-      { status: 500 }
-    );
+    return Response.json({ error: "Error al obtener información del usuario" }, { status: 500 });
   }
 }
 
-// ── PATCH /api/auth/me — actualizar perfil ─────────────────────────────
+// ── PATCH /api/auth/me — actualizar perfil de usuario ─────────────────────────
 export async function PATCH(request: NextRequest) {
   const auth = await verifyAuth(request);
   if (!isAuthSuccess(auth)) return createErrorResponse(auth.error, auth.status);
@@ -166,24 +199,18 @@ export async function PATCH(request: NextRequest) {
   try {
     const { userId } = auth.data;
     const body = await request.json() as Record<string, unknown>;
-
     const has = (k: string) => k in body;
 
-    // ── Tabla users: display_name ───────────────────────────────────
     if (has("display_name")) {
       const val = typeof body.display_name === "string" ? body.display_name.trim() || null : null;
-      await sql`
-        UPDATE users SET display_name = ${val}, updated_at = NOW()
-        WHERE id = ${userId}
-      `;
+      await sql`UPDATE users SET display_name = ${val}, updated_at = NOW() WHERE id = ${userId}`;
     }
 
-    // ── Tabla user_profile: campos del negocio ──────────────────────
-    const patchProfile = has("business_name") || has("business_logo_url") ||
-                         has("timezone") || has("currency") || has("locale");
+    const patchProfile =
+      has("business_name") || has("business_logo_url") ||
+      has("timezone")      || has("currency")           || has("locale");
 
     if (patchProfile) {
-      // Obtener valores actuales para no pisar lo que no llegó
       const [current] = await sql`
         SELECT business_name, business_logo_url, timezone, currency, locale
         FROM user_profile WHERE user_id = ${userId}
@@ -208,8 +235,7 @@ export async function PATCH(request: NextRequest) {
       `;
     }
 
-    return Response.json({ message: "Perfil actualizado exitosamente" }, { status: 200 });
-
+    return Response.json({ message: "Perfil actualizado exitosamente" });
   } catch (error: any) {
     console.error("PATCH /api/auth/me:", error);
     return createErrorResponse("Error al actualizar el perfil", 500);

@@ -1,4 +1,4 @@
-﻿// app/(dashboard)/settings/organization/page.tsx
+// app/(dashboard)/settings/organization/page.tsx
 "use client";
 
 import { useState, useEffect, useRef } from "react";
@@ -7,13 +7,12 @@ import Image from "next/image";
 import { toast } from "sonner";
 
 import { useMe, useUpdateProfile, useUploadLogo } from "@/hooks/swr/use-me";
-import { Button }    from "@/components/ui/button";
-import { Input }     from "@/components/ui/input";
-import { Label }     from "@/components/ui/label";
-import { Skeleton }  from "@/components/ui/skeleton";
-import {
-  Card, CardContent, CardHeader, CardTitle,
-} from "@/components/ui/card";
+import { useUpdateOrganization } from "@/hooks/swr/use-organization";
+import { Button }   from "@/components/ui/button";
+import { Input }    from "@/components/ui/input";
+import { Label }    from "@/components/ui/label";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
@@ -21,26 +20,24 @@ import {
   ArrowLeft, Building2, Upload, X, Loader2, Save, ImageIcon,
 } from "lucide-react";
 
-// ── Opciones ──────────────────────────────────────────────────────────
-
 const TIMEZONES = [
-  { value: "America/Tegucigalpa",         label: "Honduras (Tegucigalpa)" },
-  { value: "America/Guatemala",           label: "Guatemala" },
-  { value: "America/El_Salvador",         label: "El Salvador" },
-  { value: "America/Managua",             label: "Nicaragua" },
-  { value: "America/Costa_Rica",          label: "Costa Rica" },
-  { value: "America/Panama",              label: "Panamá" },
-  { value: "America/Mexico_City",         label: "México (Ciudad de México)" },
-  { value: "America/Bogota",              label: "Colombia (Bogotá)" },
-  { value: "America/Lima",               label: "Perú (Lima)" },
-  { value: "America/Santiago",            label: "Chile (Santiago)" },
-  { value: "America/Argentina/Buenos_Aires", label: "Argentina (Buenos Aires)" },
-  { value: "America/Caracas",             label: "Venezuela (Caracas)" },
-  { value: "America/New_York",            label: "EE.UU. Este (New York)" },
-  { value: "America/Chicago",             label: "EE.UU. Central (Chicago)" },
-  { value: "America/Los_Angeles",         label: "EE.UU. Pacífico (Los Ángeles)" },
-  { value: "Europe/Madrid",               label: "España (Madrid)" },
-  { value: "UTC",                         label: "UTC" },
+  { value: "America/Tegucigalpa",             label: "Honduras (Tegucigalpa)" },
+  { value: "America/Guatemala",               label: "Guatemala" },
+  { value: "America/El_Salvador",             label: "El Salvador" },
+  { value: "America/Managua",                 label: "Nicaragua" },
+  { value: "America/Costa_Rica",              label: "Costa Rica" },
+  { value: "America/Panama",                  label: "Panamá" },
+  { value: "America/Mexico_City",             label: "México (Ciudad de México)" },
+  { value: "America/Bogota",                  label: "Colombia (Bogotá)" },
+  { value: "America/Lima",                    label: "Perú (Lima)" },
+  { value: "America/Santiago",                label: "Chile (Santiago)" },
+  { value: "America/Argentina/Buenos_Aires",  label: "Argentina (Buenos Aires)" },
+  { value: "America/Caracas",                 label: "Venezuela (Caracas)" },
+  { value: "America/New_York",                label: "EE.UU. Este (New York)" },
+  { value: "America/Chicago",                 label: "EE.UU. Central (Chicago)" },
+  { value: "America/Los_Angeles",             label: "EE.UU. Pacífico (Los Ángeles)" },
+  { value: "Europe/Madrid",                   label: "España (Madrid)" },
+  { value: "UTC",                             label: "UTC" },
 ];
 
 const CURRENCIES = [
@@ -55,40 +52,36 @@ const CURRENCIES = [
   { value: "EUR", label: "EUR — Euro" },
 ];
 
-// ── Componente ────────────────────────────────────────────────────────
-
 export default function OrganizationSettingsPage() {
   const { back } = useRouter();
-  const { user, profile, isLoading, mutate } = useMe();
-  const { updateProfile, isSaving }           = useUpdateProfile();
-  const { uploadLogo, isUploading }           = useUploadLogo();
+  const { user, org, isOwner, isLoading, mutate } = useMe();
+  const { updateProfile, isSaving: isSavingProfile }    = useUpdateProfile();
+  const { updateOrg,     isSaving: isSavingOrg }        = useUpdateOrganization();
+  const { uploadLogo,    isUploading }                   = useUploadLogo();
 
-  // Form state
-  const [displayName,   setDisplayName]   = useState("");
-  const [businessName,  setBusinessName]  = useState("");
-  const [logoUrl,       setLogoUrl]       = useState<string | null>(null);
-  const [logoPreview,   setLogoPreview]   = useState<string | null>(null);
-  const [pendingFile,   setPendingFile]   = useState<File | null>(null);
-  const [timezone,      setTimezone]      = useState("");
-  const [currency,      setCurrency]      = useState("");
+  const [displayName, setDisplayName] = useState("");
+  const [orgName,     setOrgName]     = useState("");
+  const [logoUrl,     setLogoUrl]     = useState<string | null>(null);
+  const [logoPreview, setLogoPreview] = useState<string | null>(null);
+  const [pendingFile, setPendingFile] = useState<File | null>(null);
+  const [timezone,    setTimezone]    = useState("");
+  const [currency,    setCurrency]    = useState("");
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Inicializar form con datos actuales
   useEffect(() => {
-    if (user && profile) {
+    if (user && org) {
       setDisplayName(user.display_name ?? "");
-      setBusinessName(profile.business_name ?? "");
-      setLogoUrl(profile.business_logo_url ?? null);
-      setTimezone(profile.timezone ?? "America/Tegucigalpa");
-      setCurrency(profile.currency ?? "HNL");
+      setOrgName(org.name ?? "");
+      setLogoUrl(org.logo_url ?? null);
+      setTimezone(org.timezone ?? "America/Tegucigalpa");
+      setCurrency(org.currency ?? "HNL");
     }
-  }, [user, profile]);
+  }, [user, org]);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-
     if (!file.type.startsWith("image/")) {
       toast.error("Solo se permiten imágenes (JPG, PNG, WebP, GIF)");
       return;
@@ -97,7 +90,6 @@ export default function OrganizationSettingsPage() {
       toast.error("La imagen no puede superar 2 MB");
       return;
     }
-
     setPendingFile(file);
     setLogoPreview(URL.createObjectURL(file));
   };
@@ -112,8 +104,6 @@ export default function OrganizationSettingsPage() {
   const handleSave = async () => {
     try {
       let finalLogoUrl = logoUrl;
-
-      // Subir imagen si hay una pendiente
       if (pendingFile) {
         finalLogoUrl = await uploadLogo(pendingFile);
         setPendingFile(null);
@@ -121,14 +111,26 @@ export default function OrganizationSettingsPage() {
         setLogoUrl(finalLogoUrl);
       }
 
-      await updateProfile({
-        display_name:     displayName.trim() || null,
-        business_name:    businessName.trim() || null,
-        business_logo_url: finalLogoUrl,
-        timezone,
-        currency,
-      });
+      const promises: Promise<any>[] = [];
 
+      // Datos personales → /api/auth/me
+      if (displayName.trim() !== (user?.display_name ?? "")) {
+        promises.push(updateProfile({ display_name: displayName.trim() || null }));
+      }
+
+      // Datos de la org → /api/organization (solo si es owner)
+      if (isOwner) {
+        promises.push(
+          updateOrg({
+            name:     orgName.trim() || undefined,
+            logo_url: finalLogoUrl ?? undefined,
+            timezone,
+            currency,
+          })
+        );
+      }
+
+      await Promise.all(promises);
       await mutate();
       toast.success("Datos actualizados correctamente");
     } catch (err: any) {
@@ -137,9 +139,8 @@ export default function OrganizationSettingsPage() {
   };
 
   const currentLogo = logoPreview ?? logoUrl;
-  const busy        = isSaving || isUploading;
+  const busy = isSavingProfile || isSavingOrg || isUploading;
 
-  // ── Skeleton ────────────────────────────────────────────────────────
   if (isLoading) {
     return (
       <div className="space-y-4 pb-24 md:space-y-6 max-w-2xl mx-auto">
@@ -153,7 +154,6 @@ export default function OrganizationSettingsPage() {
   return (
     <div className="space-y-4 pb-28 md:space-y-6 max-w-2xl mx-auto">
 
-      {/* Header */}
       <div className="flex items-center gap-3">
         <Button variant="ghost" size="icon" onClick={() => back()}>
           <ArrowLeft className="size-4" />
@@ -161,98 +161,90 @@ export default function OrganizationSettingsPage() {
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Mi negocio</h1>
           <p className="text-muted-foreground text-sm">
-            Actualizá el nombre, logo y configuración de tu negocio.
+            Nombre, logo y configuración regional de tu organización.
           </p>
         </div>
       </div>
 
-      {/* Logo del negocio */}
-      <Card>
-        <CardHeader className="pb-3">
-          <CardTitle className="text-base flex items-center gap-2">
-            <Building2 className="size-4 text-muted-foreground" />
-            Logo del negocio
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="flex items-center gap-4">
-            {/* Preview */}
-            <div className="size-20 rounded-xl border bg-muted/40 flex items-center justify-center shrink-0 overflow-hidden">
-              {currentLogo ? (
-                <Image
-                  src={currentLogo}
-                  alt="Logo del negocio"
-                  width={80}
-                  height={80}
-                  className="object-contain w-full h-full"
-                  unoptimized
-                />
-              ) : (
-                <ImageIcon className="size-8 text-muted-foreground/40" />
-              )}
-            </div>
-
-            {/* Acciones */}
-            <div className="flex flex-col gap-2">
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept="image/jpeg,image/png,image/webp,image/gif"
-                className="hidden"
-                onChange={handleFileChange}
-              />
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                className="gap-2"
-                onClick={() => fileInputRef.current?.click()}
-                disabled={busy}
-              >
-                {isUploading ? (
-                  <Loader2 className="size-3.5 animate-spin" />
+      {/* Logo */}
+      {isOwner && (
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base flex items-center gap-2">
+              <Building2 className="size-4 text-muted-foreground" />
+              Logo del negocio
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="flex items-center gap-4">
+              <div className="size-20 rounded-xl border bg-muted/40 flex items-center justify-center shrink-0 overflow-hidden">
+                {currentLogo ? (
+                  <Image
+                    src={currentLogo}
+                    alt="Logo del negocio"
+                    width={80}
+                    height={80}
+                    className="object-contain w-full h-full"
+                    unoptimized
+                  />
                 ) : (
-                  <Upload className="size-3.5" />
+                  <ImageIcon className="size-8 text-muted-foreground/40" />
                 )}
-                {currentLogo ? "Cambiar imagen" : "Subir logo"}
-              </Button>
-              {currentLogo && (
+              </div>
+              <div className="flex flex-col gap-2">
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp,image/gif"
+                  className="hidden"
+                  onChange={handleFileChange}
+                />
                 <Button
                   type="button"
-                  variant="ghost"
+                  variant="outline"
                   size="sm"
-                  className="gap-2 text-destructive hover:text-destructive"
-                  onClick={handleRemoveLogo}
+                  className="gap-2"
+                  onClick={() => fileInputRef.current?.click()}
                   disabled={busy}
                 >
-                  <X className="size-3.5" />
-                  Eliminar logo
+                  {isUploading ? <Loader2 className="size-3.5 animate-spin" /> : <Upload className="size-3.5" />}
+                  {currentLogo ? "Cambiar imagen" : "Subir logo"}
                 </Button>
-              )}
+                {currentLogo && (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="gap-2 text-destructive hover:text-destructive"
+                    onClick={handleRemoveLogo}
+                    disabled={busy}
+                  >
+                    <X className="size-3.5" />
+                    Eliminar logo
+                  </Button>
+                )}
+              </div>
             </div>
-          </div>
-
-          {pendingFile && (
+            {pendingFile && (
+              <p className="text-xs text-muted-foreground">
+                Imagen seleccionada: <span className="font-medium">{pendingFile.name}</span>. Se subirá al guardar.
+              </p>
+            )}
             <p className="text-xs text-muted-foreground">
-              Imagen seleccionada: <span className="font-medium">{pendingFile.name}</span>.
-              Se subirá al guardar.
+              JPG, PNG, WebP o GIF · Máximo 2 MB · Recomendado: cuadrado, min. 200×200 px.
             </p>
-          )}
+          </CardContent>
+        </Card>
+      )}
 
-          <p className="text-xs text-muted-foreground">
-            JPG, PNG, WebP o GIF · Máximo 2 MB · Recomendado: cuadrado, min. 200×200 px.
-          </p>
-        </CardContent>
-      </Card>
-
-      {/* Datos del negocio */}
+      {/* Información */}
       <Card>
         <CardHeader className="pb-3">
           <CardTitle className="text-base">Información general</CardTitle>
         </CardHeader>
         <CardContent className="space-y-5">
           <div className="space-y-1.5">
-            <Label htmlFor="displayName">Nombre visible</Label>
+            <Label htmlFor="displayName">Tu nombre visible</Label>
             <Input
               id="displayName"
               value={displayName}
@@ -260,71 +252,63 @@ export default function OrganizationSettingsPage() {
               placeholder="Tu nombre o apodo"
               disabled={busy}
             />
-            <p className="text-xs text-muted-foreground">
-              Cómo aparecés en el sistema.
-            </p>
+            <p className="text-xs text-muted-foreground">Cómo aparecés vos en el sistema.</p>
           </div>
 
           <div className="space-y-1.5">
-            <Label htmlFor="businessName">Nombre del negocio</Label>
+            <Label htmlFor="orgName">Nombre del negocio</Label>
             <Input
-              id="businessName"
-              value={businessName}
-              onChange={(e) => setBusinessName(e.target.value)}
+              id="orgName"
+              value={orgName}
+              onChange={(e) => setOrgName(e.target.value)}
               placeholder="Ej. Tienda Don José"
-              disabled={busy}
+              disabled={busy || !isOwner}
             />
+            {!isOwner && (
+              <p className="text-xs text-muted-foreground">Solo el dueño puede cambiar el nombre del negocio.</p>
+            )}
           </div>
 
-          <div className="space-y-1.5">
-            <Label htmlFor="timezone">Zona horaria</Label>
-            <Select value={timezone} onValueChange={setTimezone} disabled={busy}>
-              <SelectTrigger id="timezone" className="h-10">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {TIMEZONES.map((tz) => (
-                  <SelectItem key={tz.value} value={tz.value}>
-                    {tz.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
+          {isOwner && (
+            <>
+              <div className="space-y-1.5">
+                <Label htmlFor="timezone">Zona horaria</Label>
+                <Select value={timezone} onValueChange={setTimezone} disabled={busy}>
+                  <SelectTrigger id="timezone" className="h-10"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {TIMEZONES.map((tz) => (
+                      <SelectItem key={tz.value} value={tz.value}>{tz.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
 
-          <div className="space-y-1.5">
-            <Label htmlFor="currency">Moneda principal</Label>
-            <Select value={currency} onValueChange={setCurrency} disabled={busy}>
-              <SelectTrigger id="currency" className="h-10">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {CURRENCIES.map((c) => (
-                  <SelectItem key={c.value} value={c.value}>
-                    {c.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <p className="text-xs text-muted-foreground">
-              Se usa para mostrar precios y calcular totales en el sistema.
-            </p>
-          </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="currency">Moneda principal</Label>
+                <Select value={currency} onValueChange={setCurrency} disabled={busy}>
+                  <SelectTrigger id="currency" className="h-10"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {CURRENCIES.map((c) => (
+                      <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground">
+                  Se usa para mostrar precios y calcular totales en el sistema.
+                </p>
+              </div>
+            </>
+          )}
         </CardContent>
       </Card>
 
-      {/* Botón de guardar — fijo en la parte inferior en mobile */}
+      {/* Save bar */}
       <div className="fixed bottom-0 left-0 right-0 z-50 px-4 pb-4 pt-3 bg-background/95 backdrop-blur border-t md:static md:border-0 md:bg-transparent md:backdrop-blur-none md:px-0 md:pt-0 md:pb-0">
-        <Button
-          className="w-full md:w-auto gap-2"
-          onClick={handleSave}
-          disabled={busy}
-        >
-          {busy ? (
-            <><Loader2 className="size-4 animate-spin" />Guardando…</>
-          ) : (
-            <><Save className="size-4" />Guardar cambios</>
-          )}
+        <Button className="w-full md:w-auto gap-2" onClick={handleSave} disabled={busy}>
+          {busy
+            ? <><Loader2 className="size-4 animate-spin" />Guardando…</>
+            : <><Save className="size-4" />Guardar cambios</>
+          }
         </Button>
       </div>
     </div>

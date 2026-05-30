@@ -269,3 +269,32 @@ export function useAdminUpdateUser(id: number | null) {
   };
   return { updateUser, isSaving };
 }
+
+export type CreateUserInput = {
+  email:          string;
+  password:       string;
+  display_name?:  string;
+  business_name?: string;
+  timezone?:      string;
+  currency?:      string;
+  locale?:        string;
+  plan_id?:       number;
+  email_verified?: boolean;
+};
+
+export function useAdminCreateUser() {
+  const authFetch = useAuthFetch();
+  const [isCreating, setIsCreating] = useState(false);
+  const createUser = async (input: CreateUserInput) => {
+    setIsCreating(true);
+    try {
+      return await authFetch("/api/admin/users", {
+        method: "POST",
+        body: JSON.stringify(input),
+      });
+    } finally {
+      setIsCreating(false);
+    }
+  };
+  return { createUser, isCreating };
+}

@@ -24,31 +24,34 @@ export async function GET(request: NextRequest) {
       LIMIT 15
     `;
 
+    // Top orgs por volumen de datos (usando org_id en las tablas de datos)
     const topUsers = await sql`
       SELECT
         u.id,
         u.email,
-        COALESCE(up.business_name, u.display_name, u.email) AS display_name,
+        COALESCE(o.name, up.business_name, u.display_name, u.email) AS display_name,
         (
-          (SELECT COUNT(*) FROM products                WHERE user_id = u.id)::int +
-          (SELECT COUNT(*) FROM sales                   WHERE user_id = u.id)::int +
-          (SELECT COUNT(*) FROM transactions            WHERE user_id = u.id)::int +
-          (SELECT COUNT(*) FROM customers               WHERE user_id = u.id)::int +
-          (SELECT COUNT(*) FROM credit_card_transactions WHERE user_id = u.id)::int +
-          (SELECT COUNT(*) FROM inventory_movements     WHERE user_id = u.id)::int +
-          (SELECT COUNT(*) FROM events                  WHERE user_id = u.id)::int
+          (SELECT COUNT(*) FROM products                WHERE org_id = o.id)::int +
+          (SELECT COUNT(*) FROM sales                   WHERE org_id = o.id)::int +
+          (SELECT COUNT(*) FROM transactions            WHERE org_id = o.id)::int +
+          (SELECT COUNT(*) FROM customers               WHERE org_id = o.id)::int +
+          (SELECT COUNT(*) FROM credit_card_transactions WHERE org_id = o.id)::int +
+          (SELECT COUNT(*) FROM inventory_movements     WHERE org_id = o.id)::int +
+          (SELECT COUNT(*) FROM events                  WHERE org_id = o.id)::int
         ) AS total_rows
       FROM users u
-      LEFT JOIN user_profile up ON up.user_id = u.id
+      LEFT JOIN user_profile  up ON up.user_id      = u.id
+      LEFT JOIN organizations  o ON o.owner_user_id = u.id
+      WHERE o.id IS NOT NULL
       ORDER BY total_rows DESC
       LIMIT 10
     `;
 
     const imageCount = await sql`
       SELECT
-        (SELECT COUNT(*) FROM users        WHERE photo_url          IS NOT NULL)::int AS user_photos,
-        (SELECT COUNT(*) FROM user_profile WHERE business_logo_url  IS NOT NULL)::int AS logos,
-        (SELECT COUNT(*) FROM products     WHERE image_url          IS NOT NULL)::int AS product_images
+        (SELECT COUNT(*) FROM users        WHERE photo_url         IS NOT NULL)::int AS user_photos,
+        (SELECT COUNT(*) FROM organizations WHERE logo_url         IS NOT NULL)::int AS logos,
+        (SELECT COUNT(*) FROM products     WHERE image_url         IS NOT NULL)::int AS product_images
     `;
 
     return Response.json({
@@ -57,7 +60,7 @@ export async function GET(request: NextRequest) {
         tablename:  r.tablename,
         size_bytes: Number(r.size_bytes),
       })),
-      top_users:   topUsers.map((r) => ({
+      top_users: topUsers.map((r) => ({
         id:           Number(r.id),
         email:        r.email,
         display_name: r.display_name,

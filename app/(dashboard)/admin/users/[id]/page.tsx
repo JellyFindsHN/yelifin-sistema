@@ -24,6 +24,7 @@ import {
   ArrowLeft, Building2, Mail, Calendar, ShoppingCart,
   Package, ReceiptText, Crown, AlertTriangle, CheckCircle2,
   XCircle, Loader2, Save, Clock, RefreshCw, Database, Image,
+  KeyRound, Eye, EyeOff,
 } from "lucide-react";
 
 const STATUS_LABEL: Record<string, string> = {
@@ -55,6 +56,9 @@ export default function AdminUserDetailPage({ params }: { params: Promise<{ id: 
   const [subStatus,       setSubStatus]       = useState<string>("");
   const [trialEndDate,    setTrialEndDate]    = useState<string>("");
   const [periodEndDate,   setPeriodEndDate]   = useState<string>("");
+  const [newPassword,     setNewPassword]     = useState<string>("");
+  const [showNewPass,     setShowNewPass]     = useState(false);
+  const [isSavingPass,    setIsSavingPass]    = useState(false);
 
   useEffect(() => {
     if (user) {
@@ -77,6 +81,21 @@ export default function AdminUserDetailPage({ params }: { params: Promise<{ id: 
       toast.success("Suscripción actualizada");
     } catch (err: any) {
       toast.error(err.message || "Error al actualizar");
+    }
+  };
+
+  const handleResetPassword = async () => {
+    if (!newPassword.trim()) { toast.error("Ingresá la nueva contraseña"); return; }
+    if (newPassword.length < 6) { toast.error("La contraseña debe tener al menos 6 caracteres"); return; }
+    setIsSavingPass(true);
+    try {
+      await updateUser({ new_password: newPassword });
+      setNewPassword("");
+      toast.success("Contraseña actualizada exitosamente");
+    } catch (err: any) {
+      toast.error(err.message || "Error al cambiar contraseña");
+    } finally {
+      setIsSavingPass(false);
     }
   };
 
@@ -265,6 +284,42 @@ export default function AdminUserDetailPage({ params }: { params: Promise<{ id: 
           <Button onClick={handleSaveSub} disabled={isSaving} size="sm" className="gap-2">
             {isSaving ? <Loader2 className="size-3.5 animate-spin" /> : <Save className="size-3.5" />}
             Guardar cambios
+          </Button>
+        </CardContent>
+      </Card>
+
+      {/* Cambiar contraseña */}
+      <Card className="pt-1 pb-1">
+        <CardHeader className="px-3.5 pt-3 pb-2">
+          <CardTitle className="text-xs font-medium text-muted-foreground flex items-center gap-1.5">
+            <KeyRound className="size-3.5" /> Cambiar contraseña
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="px-3.5 pb-3 space-y-3">
+          <div className="space-y-1.5">
+            <Label className="text-xs">Nueva contraseña</Label>
+            <div className="relative">
+              <Input
+                type={showNewPass ? "text" : "password"}
+                value={newPassword}
+                onChange={(e) => setNewPassword(e.target.value)}
+                placeholder="Mínimo 6 caracteres"
+                disabled={isSavingPass}
+                className="pr-10 h-9 text-sm"
+              />
+              <button
+                type="button"
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                onClick={() => setShowNewPass((v) => !v)}
+                tabIndex={-1}
+              >
+                {showNewPass ? <EyeOff className="size-3.5" /> : <Eye className="size-3.5" />}
+              </button>
+            </div>
+          </div>
+          <Button onClick={handleResetPassword} disabled={isSavingPass || !newPassword} size="sm" className="gap-2">
+            {isSavingPass ? <Loader2 className="size-3.5 animate-spin" /> : <KeyRound className="size-3.5" />}
+            Cambiar contraseña
           </Button>
         </CardContent>
       </Card>

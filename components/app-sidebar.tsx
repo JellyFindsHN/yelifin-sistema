@@ -5,13 +5,14 @@ import {
   BarChart3, Box, Calendar, ChevronDown, CreditCard,
   Home, ShoppingCart, Users, Warehouse, Settings,
   LogOut, User, Zap, Building2, Crown, Receipt,
-  Shield, Tags, Wallet, ArrowLeftRight,
+  Shield, Tags, Wallet, ArrowLeftRight, UserCog,
 } from "lucide-react"
 import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
 import { signOut } from "firebase/auth"
 import { auth } from "@/lib/firebase"
 import { useAuth } from "@/hooks/use-auth"
+import { useMe }   from "@/hooks/swr/use-me"
 import { toast } from "sonner"
 import { useSidebar } from "@/components/ui/sidebar"
 
@@ -96,19 +97,16 @@ const adminNav = [
   },
 ]
 
-const settingsNav = [
-  {
-    title: "Configuración", url: "/settings", icon: Settings,
-    submenu: [
-      { title: "Mi Perfil",           url: "/settings/profile",       icon: User },
-      { title: "Mi Negocio",          url: "/settings/organization",  icon: Building2 },
-      { title: "Categorías",          url: "/settings/categories",    icon: Tags },
-      { title: "Suscripción",         url: "/settings/billing",       icon: Receipt },
+const settingsNavBase = [
+  { title: "Mi Perfil",   url: "/settings/profile",       icon: User },
+  { title: "Mi Negocio",  url: "/settings/organization",  icon: Building2 },
+  { title: "Categorías",  url: "/settings/categories",    icon: Tags },
+  { title: "Suscripción", url: "/settings/billing",       icon: Receipt },
+]
 
-      //debe de ser para el panel Admin, no para todos los usuarios
-  //  { title: "Usuarios",            url: "/settings/users",         icon: UserPlus },
-    ],
-  },
+const settingsNavOwner = [
+  { title: "Equipo",      url: "/settings/members",       icon: Users },
+  { title: "Roles",       url: "/settings/roles",         icon: UserCog },
 ]
 
 // ── Icon-only item (collapsed) ─────────────────────────────────────────
@@ -217,6 +215,11 @@ export function AppSidebar() {
   const { user, firebaseUser }  = useAuth()
   const { isMobile, setOpenMobile, state } = useSidebar()
 
+  const { isOwner, org } = useMe()
+  const isAdmin      = user?.subscription?.plan?.slug === "admin"
+  const planSlug     = user?.subscription?.plan?.slug ?? null
+  const isFinanzas   = planSlug === "finanzas"
+
   const isCollapsed  = !isMobile && state === "collapsed"
   const closeOnMobile = () => { if (isMobile) setOpenMobile(false) }
 
@@ -238,17 +241,16 @@ export function AppSidebar() {
   }
 
   const displayName =
-    user?.profile?.business_name ||
-    firebaseUser?.displayName    ||
+    user?.profile?.business_name      ||
+    org?.name                         ||
+    firebaseUser?.displayName         ||
     firebaseUser?.email?.split("@")[0] ||
     "Usuario"
 
   const getUserInitials = () =>
     displayName.split(" ").map((n: string) => n[0]).join("").toUpperCase().slice(0, 2)
 
-  const isAdmin      = user?.subscription?.plan?.slug === "admin"
-  const planSlug     = user?.subscription?.plan?.slug ?? null
-  const isFinanzas   = planSlug === "finanzas"
+
 
   const renderNav = (items: typeof mainNav) =>
     items.map((item) =>
@@ -319,7 +321,15 @@ export function AppSidebar() {
           <SidebarGroup>
             {!isCollapsed && <SidebarGroupLabel>Sistema</SidebarGroupLabel>}
             <SidebarGroupContent>
-              <SidebarMenu>{renderNav(settingsNav)}</SidebarMenu>
+              <SidebarMenu>
+                {renderNav([{
+                  title: "Configuración", url: "/settings", icon: Settings,
+                  submenu: [
+                    ...settingsNavBase,
+                    ...(isOwner ? settingsNavOwner : []),
+                  ],
+                }])}
+              </SidebarMenu>
             </SidebarGroupContent>
           </SidebarGroup>
 
@@ -334,7 +344,7 @@ export function AppSidebar() {
               <button className={`flex w-full items-center rounded-lg p-2 hover:bg-sidebar-accent transition-colors ${isCollapsed ? "justify-center" : "gap-3"}`}>
                 <Avatar className="size-8 shrink-0">
                   <AvatarImage
-                    src={user?.profile?.business_logo_url ?? undefined}
+                    src={org?.logo_url ?? user?.profile?.business_logo_url ?? undefined}
                     alt={displayName}
                     className="object-cover"
                   />

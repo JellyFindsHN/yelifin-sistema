@@ -42,7 +42,9 @@
       "Bash(node_modules\\\\.bin\\\\next lint *)",
       "Bash(npx --no-install next lint -- .)",
       "Bash(node_modules/.bin/tsc --noEmit)",
-      "Bash(Select-String -Pattern \"inventory\\\\\\\\\\\\[id\\\\\\\\\\\\]|detail/route|purchase_history\")"
+      "Bash(Select-String -Pattern \"inventory\\\\\\\\\\\\[id\\\\\\\\\\\\]|detail/route|purchase_history\")",
+      "Bash(mkdir -p \"C:\\\\Users\\\\DEVSLS\\\\Documents\\\\GitHub\\\\yelifin-sistema\\\\app\\\\api\\\\organization\\\\members\\\\[id]\")",
+      "Bash(mkdir -p \"C:\\\\Users\\\\DEVSLS\\\\Documents\\\\GitHub\\\\yelifin-sistema\\\\app\\\\api\\\\organization\\\\roles\\\\[id]\")"
     ]
   }
 }

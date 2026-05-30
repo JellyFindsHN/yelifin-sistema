@@ -1,8 +1,8 @@
 # Multi-Org Migration — Estado del Trabajo
 
 > **Rama:** `feat/multi-org-migration`  
-> **Última sesión:** 29 de mayo de 2026  
-> **Estado:** Infraestructura y backend completados. Pendiente: UI y admin routes.
+> **Última sesión:** 30 de mayo de 2026  
+> **Estado:** Migración completa. Pendiente solo: sidebar nav por permisos de rol, flujo de invitación por email (futuro).
 
 ---
 
@@ -13,8 +13,8 @@
 | Script | Descripción | Ejecutado en Neon |
 |--------|-------------|-------------------|
 | `v4-multi-org-infrastructure.sql` | Crea `organizations`, `org_roles`, `org_role_permissions`, `organization_members`, `org_subscriptions`. Migra todos los usuarios existentes a su propia org con rol "Dueño" y suscripción migrada. | ✅ |
-| `v4.1-add-org-id-to-data-tables.sql` | Agrega `org_id` (nullable → NOT NULL) a las 24 tablas de datos. Popula desde `user_id`. Actualiza UNIQUE constraints e índices. | ⬜ Pendiente |
-| `v4.2-add-audit-fields.sql` | Agrega `created_by` y `updated_by` (FK → users) a las 24 tablas. Backfill de `created_by = user_id` en registros existentes. | ⬜ Pendiente |
+| `v4.1-add-org-id-to-data-tables.sql` | Agrega `org_id` (nullable → NOT NULL) a las 24 tablas de datos. Popula desde `user_id`. Actualiza UNIQUE constraints e índices. | ✅ |
+| `v4.2-add-audit-fields.sql` | Agrega `created_by` y `updated_by` (FK → users) a las 24 tablas. Backfill de `created_by = user_id` en registros existentes. | ✅ |
 
 ### Modelo de roles
 
@@ -57,48 +57,40 @@ Todos los routes en `app/api/` (excepto admin) fueron migrados:
 
 ## Lo que falta
 
-### 1. Ejecutar scripts SQL en Neon (inmediato)
-
-```
-v4.1-add-org-id-to-data-tables.sql   ← agrega org_id a las 24 tablas
-v4.2-add-audit-fields.sql            ← agrega created_by / updated_by
-```
-
-Recordar verificar que la Sección 3 del v4.1 devuelva todos 0 antes de ejecutar la Sección 4.
+### 1. ~~Ejecutar scripts SQL en Neon~~ ✅
 
 ---
 
-### 2. Rutas admin (no migradas)
+### 2. ~~Rutas admin~~ ✅
 
-Los routes en `app/api/admin/` no fueron tocados porque son de plataforma (no de tenant). Hay que revisar si alguno necesita `orgId`:
-
-- `app/api/admin/stats/route.ts`
-- `app/api/admin/users/route.ts`
-- `app/api/admin/users/[id]/route.ts`
-- `app/api/admin/plans/route.ts`
-- `app/api/admin/plans/[id]/route.ts`
-- `app/api/admin/storage/route.ts`
+- `admin/users` y `admin/users/[id]` — migrados a `org_subscriptions` + `org_id`
+- `admin/stats` — migrado a `org_subscriptions` (cuenta orgs, no user_subscriptions)
+- `admin/storage` — migrado a `org_id` en query de topUsers
+- `admin/plans` y `admin/plans/[id]` — sin cambios necesarios (datos de plataforma)
+- Sidebar — usa `org.name` y `org.logo_url` como fallback para miembros sin business_name
 
 ---
 
-### 3. UI de gestión de organización
+### 3. ~~UI de gestión de organización~~ ✅
 
-Pantallas nuevas que hay que crear:
+| Pantalla | Ruta | Estado |
+|----------|------|--------|
+| Perfil de organización | `/settings/organization` | ✅ Migrado a `/api/organization` |
+| Gestión de miembros | `/settings/members` | ✅ Nuevo |
+| Gestión de roles | `/settings/roles` | ✅ Nuevo |
+| Invitación | `/invite/[token]` | ⬜ Pendiente (requiere flujo de email) |
 
-| Pantalla | Ruta sugerida | Descripción |
-|----------|---------------|-------------|
-| Perfil de organización | `/settings/organization` | Editar nombre, logo, timezone, moneda |
-| Gestión de miembros | `/settings/members` | Listar miembros, invitar, revocar acceso |
-| Gestión de roles | `/settings/roles` | Crear roles, asignar permisos por módulo (with/without valores) |
-| Invitación | `/invite/[token]` | Landing para aceptar invitación |
+Sidebar actualizado: "Equipo" y "Roles" visibles solo para `isOwner`.
 
-APIs necesarias:
+APIs implementadas ✅:
 - `GET/PATCH /api/organization` — perfil de la org
-- `GET/POST /api/organization/members` — listar e invitar miembros
-- `DELETE /api/organization/members/[id]` — revocar acceso
-- `GET/POST /api/organization/roles` — listar y crear roles
+- `GET/POST /api/organization/members` — listar e invitar miembros (por email directo)
+- `PATCH/DELETE /api/organization/members/[id]` — cambiar rol / revocar acceso
+- `GET/POST /api/organization/roles` — listar y crear roles con permisos
 - `PATCH/DELETE /api/organization/roles/[id]` — editar y eliminar roles
-- `POST /api/organization/invite` — enviar email de invitación
+
+APIs pendientes:
+- `POST /api/organization/invite` — enviar email de invitación (requiere servicio de email)
 - `POST /api/organization/invite/accept` — aceptar invitación con token
 
 ---
@@ -127,11 +119,12 @@ CREATE TABLE org_invitations (
 
 ---
 
-### 5. Contexto de org en el cliente
+### 5. ~~Contexto de org en el cliente~~ ✅
 
-- El hook `useMe()` necesita exponer `orgId`, `roleId`, `roleName`, `isOwner`
-- Los componentes de UI deben mostrar/ocultar elementos según `isOwner` o permisos del rol
-- Implementar `useModulePermissions(module)` hook cliente para condicionar columnas de costos/ganancias
+- `useMe()` expone: `orgId`, `roleId`, `isOwner`, `org`, `role`, `permissions`, `getModulePermissions(module)`
+- `useModulePermissions(module)` — hook standalone que retorna los 5 flags + `isLoading`
+- `/api/auth/me` GET migrado a `org_subscriptions` + agrega `org`, `role`, `permissions` en respuesta
+- `types/index.ts` — agregados `OrgModule`, `ModulePermissions`, `OrgInfo`, `OrgRole`, `OrgMember`, `OrgPermissions`
 
 ---
 

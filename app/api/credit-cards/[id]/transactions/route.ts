@@ -1,7 +1,7 @@
 // app/api/credit-cards/[id]/transactions/route.ts
 import { NextRequest } from "next/server";
 import { neon } from "@neondatabase/serverless";
-import { verifyAuth, createErrorResponse, isAuthSuccess } from "@/lib/auth";
+import { verifyAuth, createErrorResponse, isAuthSuccess, requireModule } from "@/lib/auth";
 import { getUtcBounds } from "@/lib/date-bounds";
 
 const sql = neon(process.env.DATABASE_URL!);
@@ -12,6 +12,8 @@ export async function GET(
 ) {
   const auth = await verifyAuth(request);
   if (!isAuthSuccess(auth)) return createErrorResponse(auth.error, auth.status);
+  const deny = await requireModule(auth.data, 'FINANCES', 'canView');
+  if (deny) return deny;
 
   try {
     const { userId, orgId } = auth.data;

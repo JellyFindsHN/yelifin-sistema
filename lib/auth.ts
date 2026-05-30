@@ -454,6 +454,21 @@ export async function ensureOrgExists(
   return { orgId: org.id, roleId: ownerRole.id, roleName: ownerRole.name };
 }
 
+// ── requireModule ──────────────────────────────────────────────────────
+// Devuelve Response 403 si el rol no tiene el permiso, null si está OK.
+// Uso: const deny = await requireModule(auth.data, 'SALES', 'canEdit');
+//      if (deny) return deny;
+export async function requireModule(
+  auth: AuthUser,
+  module: OrgModule,
+  permission: keyof ModulePermissions
+): Promise<Response | null> {
+  if (auth.isOwner) return null;
+  const { allowed, error } = await verifyModuleAccess(auth, module, permission);
+  if (!allowed) return createErrorResponse(error ?? "Sin acceso a este módulo", 403);
+  return null;
+}
+
 // ── createErrorResponse ────────────────────────────────────────────────
 
 export function createErrorResponse(
