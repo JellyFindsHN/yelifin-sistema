@@ -8,6 +8,7 @@ const sql = neon(process.env.DATABASE_URL!);
 // ── Tipos ─────────────────────────────────────────────────────────────
 
 export type OrgModule =
+  | "DASHBOARD"
   | "PRODUCTS"
   | "INVENTORY"
   | "SALES"
@@ -426,7 +427,7 @@ export async function ensureOrgExists(
     INSERT INTO org_role_permissions (role_id, module, can_view, can_edit, can_delete, show_costs, show_profit)
     SELECT ${ownerRole.id}, m.module, TRUE, TRUE, TRUE, TRUE, TRUE
     FROM (VALUES
-      ('PRODUCTS'), ('INVENTORY'), ('SALES'), ('CUSTOMERS'),
+      ('DASHBOARD'), ('PRODUCTS'), ('INVENTORY'), ('SALES'), ('CUSTOMERS'),
       ('FINANCES'), ('EVENTS'), ('REPORTS'), ('ADMIN')
     ) AS m(module)
   `;

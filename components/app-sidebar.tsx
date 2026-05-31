@@ -13,6 +13,7 @@ import { signOut } from "firebase/auth"
 import { auth } from "@/lib/firebase"
 import { useAuth } from "@/hooks/use-auth"
 import { useMe }   from "@/hooks/swr/use-me"
+import type { OrgModule } from "@/types"
 import { toast } from "sonner"
 import { useSidebar } from "@/components/ui/sidebar"
 
@@ -44,10 +45,13 @@ const financesOnlyNav = [
 ]
 
 // ── Nav config ──────────────────────────────────────────────────────────
-const mainNav = [
-  { title: "Dashboard",    url: "/dashboard",  icon: Home },
+const mainNav: Array<{
+  title: string; url: string; icon: any; module?: OrgModule;
+  submenu?: Array<{ title: string; url: string }>;
+}> = [
+  { title: "Dashboard",    url: "/dashboard",  icon: Home, module: "DASHBOARD" as OrgModule },
   {
-    title: "Inventario", url: "/inventory", icon: Warehouse,
+    title: "Inventario", url: "/inventory", icon: Warehouse, module: "INVENTORY",
     submenu: [
       { title: "Productos",    url: "/inventory" },
       { title: "Movimientos",  url: "/inventory/movements" },
@@ -55,28 +59,31 @@ const mainNav = [
     ],
   },
   {
-    title: "Ventas", url: "/sales", icon: ShoppingCart,
+    title: "Ventas", url: "/sales", icon: ShoppingCart, module: "SALES",
     submenu: [
       { title: "Lista de Ventas",    url: "/sales" },
       { title: "Nueva Venta (POS)", url: "/sales/new" },
     ],
   },
-  { title: "Clientes",    url: "/customers", icon: Users },
+  { title: "Clientes",    url: "/customers", icon: Users,     module: "CUSTOMERS" },
   {
-    title: "Finanzas", url: "/finances", icon: CreditCard,
+    title: "Finanzas", url: "/finances", icon: CreditCard, module: "FINANCES",
     submenu: [
       { title: "Cuentas",          url: "/finances" },
       { title: "Transacciones",    url: "/finances/transactions" },
       { title: "Tarjetas crédito", url: "/finances/credit-cards" },
     ],
   },
-  { title: "Eventos",     url: "/events",   icon: Calendar },
-  { title: "Suministros", url: "/supplies", icon: Box },
+  { title: "Eventos",     url: "/events",   icon: Calendar,  module: "EVENTS" },
+  { title: "Suministros", url: "/supplies", icon: Box,        module: "INVENTORY" },
 ]
 
-const secondaryNav = [
+const secondaryNav: Array<{
+  title: string; url: string; icon: any; module?: OrgModule;
+  submenu?: Array<{ title: string; url: string }>;
+}> = [
   {
-    title: "Reportes", url: "/reports", icon: BarChart3,
+    title: "Reportes", url: "/reports", icon: BarChart3, module: "REPORTS",
     submenu: [
       { title: "Ventas",        url: "/reports/sales" },
       { title: "Inventario",    url: "/reports/inventory" },
@@ -215,7 +222,7 @@ export function AppSidebar() {
   const { user, firebaseUser }  = useAuth()
   const { isMobile, setOpenMobile, state } = useSidebar()
 
-  const { isOwner, org } = useMe()
+  const { isOwner, org, getModulePermissions, isLoading: meIsLoading } = useMe()
   const isAdmin      = user?.subscription?.plan?.slug === "admin"
   const planSlug     = user?.subscription?.plan?.slug ?? null
   const isFinanzas   = planSlug === "finanzas"
@@ -251,6 +258,14 @@ export function AppSidebar() {
     displayName.split(" ").map((n: string) => n[0]).join("").toUpperCase().slice(0, 2)
 
 
+
+  const canViewModule = (module?: OrgModule) => {
+    if (!module || meIsLoading) return true
+    return getModulePermissions(module).can_view
+  }
+
+  const visibleMainNav = mainNav.filter(item => canViewModule(item.module))
+  const visibleSecondaryNav = secondaryNav.filter(item => canViewModule(item.module))
 
   const renderNav = (items: typeof mainNav) =>
     items.map((item) =>
@@ -294,15 +309,15 @@ export function AppSidebar() {
               <SidebarGroup>
                 {!isCollapsed && <SidebarGroupLabel>Menú Principal</SidebarGroupLabel>}
                 <SidebarGroupContent>
-                  <SidebarMenu>{renderNav(mainNav)}</SidebarMenu>
+                  <SidebarMenu>{renderNav(visibleMainNav)}</SidebarMenu>
                 </SidebarGroupContent>
               </SidebarGroup>
 
-              {isAdmin && (
+              {visibleSecondaryNav.length > 0 && (
                 <SidebarGroup>
                   {!isCollapsed && <SidebarGroupLabel>Análisis</SidebarGroupLabel>}
                   <SidebarGroupContent>
-                    <SidebarMenu>{renderNav(secondaryNav)}</SidebarMenu>
+                    <SidebarMenu>{renderNav(visibleSecondaryNav)}</SidebarMenu>
                   </SidebarGroupContent>
                 </SidebarGroup>
               )}

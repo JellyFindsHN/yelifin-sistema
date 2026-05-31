@@ -109,6 +109,7 @@ export type FeaturesByCategory = Partial<Record<FeatureCategory, Feature[]>>;
 // ============================================
 
 export type OrgModule =
+  | 'DASHBOARD'
   | 'PRODUCTS'
   | 'INVENTORY'
   | 'SALES'

@@ -32,18 +32,54 @@ import {
 import {
   ArrowLeft, Plus, Pencil, Trash2, Loader2, Crown, Shield,
 } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 // ── Constants ──────────────────────────────────────────────────────────────
 
-const MODULES: { key: OrgModule; label: string }[] = [
-  { key: "PRODUCTS",   label: "Productos"   },
-  { key: "INVENTORY",  label: "Inventario"  },
-  { key: "SALES",      label: "Ventas"      },
-  { key: "CUSTOMERS",  label: "Clientes"    },
-  { key: "FINANCES",   label: "Finanzas"    },
-  { key: "EVENTS",     label: "Eventos"     },
-  { key: "REPORTS",    label: "Reportes"    },
-  { key: "ADMIN",      label: "Admin"       },
+const MODULES: { key: OrgModule; label: string; subitems?: string[] }[] = [
+  {
+    key: "DASHBOARD",
+    label: "Dashboard",
+    subitems: ["Inicio / resumen del negocio"],
+  },
+  {
+    key: "PRODUCTS",
+    label: "Productos",
+    subitems: ["Catálogo de productos"],
+  },
+  {
+    key: "INVENTORY",
+    label: "Inventario",
+    subitems: ["Inventario", "Movimientos", "En camino", "Suministros"],
+  },
+  {
+    key: "SALES",
+    label: "Ventas",
+    subitems: ["Lista de ventas", "Nueva venta (POS)"],
+  },
+  {
+    key: "CUSTOMERS",
+    label: "Clientes",
+  },
+  {
+    key: "FINANCES",
+    label: "Finanzas",
+    subitems: ["Cuentas", "Transacciones", "Tarjetas de crédito"],
+  },
+  {
+    key: "EVENTS",
+    label: "Eventos",
+  },
+  {
+    key: "REPORTS",
+    label: "Reportes",
+    subitems: ["Ventas", "Inventario", "Rentabilidad", "Eventos"],
+  },
+  {
+    key: "ADMIN",
+    label: "Administración",
+    subitems: ["Equipo", "Roles"],
+  },
 ];
 
 const PERM_COLS: { key: keyof ModulePermissions; label: string; short: string }[] = [
@@ -98,7 +134,7 @@ function PermGrid({
       <table className="w-full text-xs">
         <thead>
           <tr className="border-b">
-            <th className="text-left py-2 pr-3 font-medium text-muted-foreground w-28">Módulo</th>
+            <th className="text-left py-2 pr-3 font-medium text-muted-foreground w-40">Sección</th>
             {PERM_COLS.map((c) => (
               <th key={c.key} className="text-center py-2 px-1 font-medium text-muted-foreground min-w-[48px]">
                 <span className="hidden sm:inline">{c.label}</span>
@@ -108,11 +144,22 @@ function PermGrid({
           </tr>
         </thead>
         <tbody>
-          {MODULES.map(({ key, label }) => (
+          {MODULES.map(({ key, label, subitems }) => (
             <tr key={key} className="border-b last:border-0 hover:bg-muted/30">
-              <td className="py-2.5 pr-3 font-medium text-sm">{label}</td>
+              <td className="py-2.5 pr-3">
+                <span className="font-medium text-sm">{label}</span>
+                {subitems && subitems.length > 0 && (
+                  <ul className="mt-0.5 space-y-0.5">
+                    {subitems.map((s) => (
+                      <li key={s} className="text-[10px] text-muted-foreground flex items-center gap-1">
+                        <span className="opacity-50">›</span> {s}
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </td>
               {PERM_COLS.map((col) => (
-                <td key={col.key} className="py-2.5 px-1 text-center">
+                <td key={col.key} className="py-2.5 px-1 text-center align-top pt-3">
                   <Checkbox
                     checked={perms[key][col.key]}
                     onCheckedChange={() => toggle(key, col.key)}
@@ -168,12 +215,35 @@ function RoleDialog({
 
   return (
     <Dialog open onOpenChange={(v) => { if (!v) onClose(); }}>
-      <DialogContent className="max-w-lg">
-        <DialogHeader>
+      <DialogContent
+        className={cn(
+          "fixed bottom-0 left-0 right-0 top-auto translate-x-0 translate-y-0",
+          "w-full max-w-full rounded-t-2xl rounded-b-none border-t border-x-0 border-b-0",
+          "max-h-[92dvh] flex flex-col p-0",
+          "sm:bottom-auto sm:left-1/2 sm:right-auto sm:top-1/2",
+          "sm:-translate-x-1/2 sm:-translate-y-1/2",
+          "sm:w-full sm:max-w-xl",
+          "sm:rounded-2xl sm:border",
+          "sm:max-h-[90vh]",
+          "data-[state=open]:animate-in data-[state=closed]:animate-out",
+          "data-[state=open]:slide-in-from-bottom sm:data-[state=open]:slide-in-from-bottom-[48%]",
+          "data-[state=closed]:slide-out-to-bottom sm:data-[state=closed]:slide-out-to-bottom-[48%]",
+          "duration-300",
+        )}
+      >
+
+        <div className="sm:hidden flex justify-center pt-3 pb-1 shrink-0">
+          <div className="w-10 h-1 rounded-full bg-muted-foreground/30" />
+        </div>
+
+        <DialogHeader className="shrink-0 px-5 pt-2 pb-3 sm:pt-5 border-b">
           <DialogTitle>{isEdit ? "Editar rol" : "Nuevo rol"}</DialogTitle>
         </DialogHeader>
 
-        <div className="space-y-4 py-1">
+        <div
+          className="flex-1 overflow-y-auto px-5 py-4 space-y-4"
+          style={{ scrollbarWidth: "none" } as React.CSSProperties}
+        >
           <div className="space-y-1.5">
             <Label htmlFor="roleName">Nombre del rol</Label>
             <Input
@@ -192,13 +262,13 @@ function RoleDialog({
           </div>
         </div>
 
-        <DialogFooter>
-          <Button variant="outline" onClick={onClose} disabled={busy}>Cancelar</Button>
-          <Button onClick={handleSave} disabled={busy} className="gap-2">
+        <div className="shrink-0 px-5 py-4 border-t flex gap-3">
+          <Button variant="outline" onClick={onClose} disabled={busy} className="flex-1">Cancelar</Button>
+          <Button onClick={handleSave} disabled={busy} className="flex-1 gap-2">
             {busy && <Loader2 className="size-3.5 animate-spin" />}
             {isEdit ? "Guardar cambios" : "Crear rol"}
           </Button>
-        </DialogFooter>
+        </div>
       </DialogContent>
     </Dialog>
   );

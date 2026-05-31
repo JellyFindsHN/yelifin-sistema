@@ -119,10 +119,8 @@ Todos ejecutados en Neon ✅.
 
 ## ⬜ Pendiente (futuro — no bloquea)
 
-### 1. Sidebar dinámico por permisos de rol
-Los ítems del menú principal (Inventario, Ventas, Finanzas, etc.) se muestran a todos los miembros aunque su rol no tenga `can_view` en ese módulo. El API ya devuelve 403, pero el link sigue visible.
-
-**Cómo retomarlo:** En `components/app-sidebar.tsx`, importar `useMe()` y filtrar `mainNav` según `getModulePermissions(module).canView`. El módulo de cada item del nav ya está mapeado.
+### ~~1. Sidebar dinámico por permisos de rol~~ ✅ Completado
+Cada ítem del nav ahora tiene `module?: OrgModule`. El sidebar filtra con `getModulePermissions(module).can_view` antes de renderizar. Durante la carga (`meIsLoading`) se muestran todos los ítems para evitar layout shift. Dashboard no tiene módulo y siempre es visible.
 
 ---
 

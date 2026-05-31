@@ -6,7 +6,7 @@ import { verifyAuth, createErrorResponse, isAuthSuccess, OrgModule } from "@/lib
 const sql = neon(process.env.DATABASE_URL!);
 
 const MODULES: OrgModule[] = [
-  "PRODUCTS", "INVENTORY", "SALES", "CUSTOMERS",
+  "DASHBOARD", "PRODUCTS", "INVENTORY", "SALES", "CUSTOMERS",
   "FINANCES", "EVENTS", "REPORTS", "ADMIN",
 ];
 
