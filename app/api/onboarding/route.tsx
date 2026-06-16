@@ -38,7 +38,7 @@ export async function POST(request: NextRequest) {
   if (!isAuthSuccess(auth)) return createErrorResponse(auth.error, auth.status);
 
   try {
-    const { userId } = auth.data;
+    const { userId, orgId } = auth.data;
     const body = await request.json();
 
     const currency = (body?.currency ?? "HNL").toString().trim().toUpperCase();
@@ -82,9 +82,9 @@ export async function POST(request: NextRequest) {
         const balance = Number(acc.balance ?? 0);
 
         await sql`
-          INSERT INTO accounts (user_id, name, type, balance, is_active)
-          VALUES (${userId}, ${name}, ${type}, ${balance}, TRUE)
-          ON CONFLICT (user_id, name) DO NOTHING
+          INSERT INTO accounts (org_id, created_by, name, type, balance, is_active)
+          VALUES (${orgId}, ${userId}, ${name}, ${type}, ${balance}, TRUE)
+          ON CONFLICT (org_id, name) DO NOTHING
         `;
       }
 
