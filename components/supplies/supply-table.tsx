@@ -34,11 +34,15 @@ export function SupplyTable({
   onEdit,
   onDelete,
   onAddPurchase,
+  canEdit = true,
+  canDelete = true,
 }: {
   supplies: Supply[];
   onEdit: (s: Supply) => void;
   onDelete: (s: Supply) => void;
   onAddPurchase: (s: Supply) => void;
+  canEdit?: boolean;
+  canDelete?: boolean;
 }) {
   if (supplies.length === 0) {
     return (
@@ -93,32 +97,38 @@ export function SupplyTable({
 
                 {/* Actions */}
                 <div className="flex gap-2">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="flex-1 gap-1.5"
-                    onClick={() => onAddPurchase(s)}
-                  >
-                    <PackagePlus className="size-3.5" />
-                    Compra
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="flex-1 gap-1.5"
-                    onClick={() => onEdit(s)}
-                  >
-                    <Pencil className="size-3.5" />
-                    Editar
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="text-destructive hover:text-destructive hover:bg-destructive/10"
-                    onClick={() => onDelete(s)}
-                  >
-                    <Trash2 className="size-3.5" />
-                  </Button>
+                  {canEdit && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="flex-1 gap-1.5"
+                      onClick={() => onAddPurchase(s)}
+                    >
+                      <PackagePlus className="size-3.5" />
+                      Compra
+                    </Button>
+                  )}
+                  {canEdit && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="flex-1 gap-1.5"
+                      onClick={() => onEdit(s)}
+                    >
+                      <Pencil className="size-3.5" />
+                      Editar
+                    </Button>
+                  )}
+                  {canDelete && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                      onClick={() => onDelete(s)}
+                    >
+                      <Trash2 className="size-3.5" />
+                    </Button>
+                  )}
                 </div>
               </CardContent>
             </Card>
@@ -160,31 +170,37 @@ export function SupplyTable({
                     <TableCell className="text-right">{getStatusBadge(stock, min)}</TableCell>
                     <TableCell className="text-right">
                       <div className="inline-flex items-center gap-1">
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="size-8"
-                          title="Registrar compra"
-                          onClick={() => onAddPurchase(s)}
-                        >
-                          <PackagePlus className="size-3.5" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="size-8"
-                          onClick={() => onEdit(s)}
-                        >
-                          <Pencil className="size-3.5" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="size-8 text-destructive"
-                          onClick={() => onDelete(s)}
-                        >
-                          <Trash2 className="size-3.5" />
-                        </Button>
+                        {canEdit && (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="size-8"
+                            title="Registrar compra"
+                            onClick={() => onAddPurchase(s)}
+                          >
+                            <PackagePlus className="size-3.5" />
+                          </Button>
+                        )}
+                        {canEdit && (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="size-8"
+                            onClick={() => onEdit(s)}
+                          >
+                            <Pencil className="size-3.5" />
+                          </Button>
+                        )}
+                        {canDelete && (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="size-8 text-destructive"
+                            onClick={() => onDelete(s)}
+                          >
+                            <Trash2 className="size-3.5" />
+                          </Button>
+                        )}
                       </div>
                     </TableCell>
                   </TableRow>

@@ -9,6 +9,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Calendar, TrendingUp, DollarSign, BarChart3, CalendarPlus } from "lucide-react";
 import { useEvents, Event } from "@/hooks/swr/use-events";
 import { useCurrency }      from "@/hooks/swr/use-currency";
+import { useModulePermissions } from "@/hooks/use-module-permissions";
 
 import { EventCard }           from "@/components/events/event-card";
 import { CreateEventDialog }   from "@/components/events/create-event-dialog";
@@ -21,6 +22,7 @@ export default function EventsPage() {
   const { push }                      = useRouter();
   const { events, isLoading, mutate } = useEvents();
   const { format }                    = useCurrency();
+  const { show_profit: showProfit, can_edit: canEdit, can_delete: canDelete } = useModulePermissions("EVENTS");
 
   const [createOpen,   setCreateOpen]   = useState(false);
   const [editEvent,    setEditEvent]    = useState<Event | null>(null);
@@ -54,9 +56,9 @@ export default function EventsPage() {
         {[
           { title: "Eventos",       value: String(events.length),    sub: `${activeCount} activos`,    icon: Calendar,   cls: "" },
           { title: "Ventas",        value: format(totalSales),       sub: "total acumulado",           icon: DollarSign, cls: "" },
-          { title: "Ganancia neta", value: format(totalProfit),      sub: "ingresos − gastos",         icon: TrendingUp, cls: totalProfit >= 0 ? "text-green-600" : "text-destructive" },
-          { title: "ROI promedio",  value: `${avgRoi.toFixed(1)}%`,  sub: "retorno sobre inversión",   icon: BarChart3,  cls: avgRoi >= 0 ? "text-green-600" : "text-destructive" },
-        ].map((s) => (
+          { title: "Ganancia neta", value: format(totalProfit),      sub: "ingresos − gastos",         icon: TrendingUp, cls: totalProfit >= 0 ? "text-green-600" : "text-destructive", hidden: !showProfit },
+          { title: "ROI promedio",  value: `${avgRoi.toFixed(1)}%`,  sub: "retorno sobre inversión",   icon: BarChart3,  cls: avgRoi >= 0 ? "text-green-600" : "text-destructive",        hidden: !showProfit },
+        ].filter((s) => !(s as any).hidden).map((s) => (
           <Card key={s.title} >
             <CardContent>
               <div className="flex items-center justify-between mb-1.5">
@@ -99,6 +101,8 @@ export default function EventsPage() {
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
           {events.map((event) => (
             <EventCard
+              canEdit={canEdit}
+              canDelete={canDelete}
               key={event.id}
               event={event}
               onView={(e) => push(`/events/${e.id}`)}
@@ -111,11 +115,13 @@ export default function EventsPage() {
       )}
 
       {/* FAB */}
-      <Fab
-        actions={[
-          { label: "Nuevo evento", icon: CalendarPlus, onClick: () => setCreateOpen(true) },
-        ]}
-      />
+      {canEdit && (
+        <Fab
+          actions={[
+            { label: "Nuevo evento", icon: CalendarPlus, onClick: () => setCreateOpen(true) },
+          ]}
+        />
+      )}
 
       {/* Dialogs */}
       <CreateEventDialog

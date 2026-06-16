@@ -6,6 +6,7 @@ import { useSalesReport } from "@/hooks/swr/use-reports";
 import { useCurrency }    from "@/hooks/swr/use-currency";
 import { useAuth }        from "@/hooks/use-auth";
 import { fmtN }           from "@/lib/export";
+import { useModulePermissions } from "@/hooks/use-module-permissions";
 import { ReportShell, StatCard, useDateRange } from "@/components/reports/report-shell";
 import { PaginationControls } from "@/components/shared/pagination-controls";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -22,6 +23,7 @@ export default function SalesReportPage() {
   const { firebaseUser }             = useAuth();
   const { summary, byDay, byProduct, isLoading } = useSalesReport(from, to);
   const [productPage, setProductPage] = useState(1);
+  const { show_profit: showProfit, show_costs: showCosts } = useModulePermissions("REPORTS");
 
   useEffect(() => { setProductPage(1); }, [from, to]);
 
@@ -73,8 +75,8 @@ export default function SalesReportPage() {
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
           <StatCard label="Ventas"           value={String(summary.total_sales)}          />
           <StatCard label="Ingresos"         value={format(summary.total_revenue)}        accent="blue"  />
-          <StatCard label="Utilidad bruta"   value={format(summary.gross_profit)}         accent="green" />
-          <StatCard label="Margen"           value={`${fmtN(marginPct, 1)}%`}             accent={marginPct >= 20 ? "green" : "amber"} sub={`Descuentos: ${format(summary.total_discount)}`} />
+          {showProfit && <StatCard label="Utilidad bruta"   value={format(summary.gross_profit)}         accent="green" />}
+          {showProfit && <StatCard label="Margen"           value={`${fmtN(marginPct, 1)}%`}             accent={marginPct >= 20 ? "green" : "amber"} sub={`Descuentos: ${format(summary.total_discount)}`} />}
         </div>
       )}
 
@@ -96,7 +98,7 @@ export default function SalesReportPage() {
                 labelFormatter={l => new Date(l + "T12:00:00").toLocaleDateString("es-HN", { day: "numeric", month: "long" })}
               />
               <Bar dataKey="revenue" fill="hsl(var(--primary))"    radius={[4,4,0,0]} name="revenue" />
-              <Bar dataKey="profit"  fill="hsl(142 76% 36%)"       radius={[4,4,0,0]} name="profit"  />
+              {showProfit && <Bar dataKey="profit"  fill="hsl(142 76% 36%)"       radius={[4,4,0,0]} name="profit"  />}
             </BarChart>
           </ResponsiveContainer>
         </div>
@@ -117,9 +119,9 @@ export default function SalesReportPage() {
                     <th className="text-left px-4 py-2 hidden sm:table-cell">SKU</th>
                     <th className="text-right px-4 py-2">Cant.</th>
                     <th className="text-right px-4 py-2">Ingresos</th>
-                    <th className="text-right px-4 py-2 hidden md:table-cell">Costo</th>
-                    <th className="text-right px-4 py-2">Utilidad</th>
-                    <th className="text-right px-4 py-2">Margen</th>
+                    {showCosts  && <th className="text-right px-4 py-2 hidden md:table-cell">Costo</th>}
+                    {showProfit && <th className="text-right px-4 py-2">Utilidad</th>}
+                    {showProfit && <th className="text-right px-4 py-2">Margen</th>}
                   </tr>
                 </thead>
                 <tbody>
@@ -131,13 +133,15 @@ export default function SalesReportPage() {
                         <td className="px-4 py-2.5 text-muted-foreground hidden sm:table-cell">{p.sku || "—"}</td>
                         <td className="px-4 py-2.5 text-right">{p.qty_sold}</td>
                         <td className="px-4 py-2.5 text-right font-medium">{format(p.revenue)}</td>
-                        <td className="px-4 py-2.5 text-right text-muted-foreground hidden md:table-cell">{format(p.cogs)}</td>
-                        <td className="px-4 py-2.5 text-right text-green-700 dark:text-green-400 font-medium">{format(p.profit)}</td>
-                        <td className="px-4 py-2.5 text-right">
-                          <Badge variant="outline" className={`text-xs ${p.margin_pct >= 30 ? "border-green-200 text-green-700" : p.margin_pct >= 10 ? "border-amber-200 text-amber-700" : "border-red-200 text-red-700"}`}>
-                            {fmtN(p.margin_pct, 1)}%
-                          </Badge>
-                        </td>
+                        {showCosts  && <td className="px-4 py-2.5 text-right text-muted-foreground hidden md:table-cell">{format(p.cogs)}</td>}
+                        {showProfit && <td className="px-4 py-2.5 text-right text-green-700 dark:text-green-400 font-medium">{format(p.profit)}</td>}
+                        {showProfit && (
+                          <td className="px-4 py-2.5 text-right">
+                            <Badge variant="outline" className={`text-xs ${p.margin_pct >= 30 ? "border-green-200 text-green-700" : p.margin_pct >= 10 ? "border-amber-200 text-amber-700" : "border-red-200 text-red-700"}`}>
+                              {fmtN(p.margin_pct, 1)}%
+                            </Badge>
+                          </td>
+                        )}
                       </tr>
                     ))}
                 </tbody>

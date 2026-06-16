@@ -39,6 +39,7 @@ import {
 } from "@/hooks/swr/use-transactions";
 import { useSWRConfig } from "swr";
 import { Fab } from "@/components/ui/fab";
+import { useModulePermissions } from "@/hooks/use-module-permissions";
 import { useAccounts } from "@/hooks/swr/use-accounts";
 import { useCurrency } from "@/hooks/swr/use-currency";
 import { useCreditCards, useAllCreditCardTransactions, AllCardTransaction } from "@/hooks/swr/use-credit-cards";
@@ -118,13 +119,17 @@ function ActionsMenu({
   isEditable,
   onEdit,
   onDelete,
+  canEdit,
+  canDelete,
 }: {
   t: Transaction;
   isEditable: (t: Transaction) => boolean;
   onEdit: (t: Transaction) => void;
   onDelete: (t: Transaction) => void;
+  canEdit: boolean;
+  canDelete: boolean;
 }) {
-  if (!isEditable(t)) return <div className="w-8" />;
+  if (!isEditable(t) || (!canEdit && !canDelete)) return <div className="w-8" />;
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
@@ -138,18 +143,24 @@ function ActionsMenu({
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end">
-        <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onEdit(t); }}>
-          <Pencil className="size-4 mr-2" />
-          Editar
-        </DropdownMenuItem>
-        <DropdownMenuSeparator />
-        <DropdownMenuItem
-          className="text-destructive focus:text-destructive"
-          onClick={(e) => { e.stopPropagation(); onDelete(t); }}
-        >
-          <Trash2 className="size-4 mr-2" />
-          Eliminar
-        </DropdownMenuItem>
+        {canEdit && (
+          <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onEdit(t); }}>
+            <Pencil className="size-4 mr-2" />
+            Editar
+          </DropdownMenuItem>
+        )}
+        {canDelete && (
+          <>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem
+              className="text-destructive focus:text-destructive"
+              onClick={(e) => { e.stopPropagation(); onDelete(t); }}
+            >
+              <Trash2 className="size-4 mr-2" />
+              Eliminar
+            </DropdownMenuItem>
+          </>
+        )}
       </DropdownMenuContent>
     </DropdownMenu>
   );
@@ -213,6 +224,7 @@ export default function TransactionsPage() {
   const { accounts } = useAccounts();
   const { creditCards } = useCreditCards();
   const { format } = useCurrency();
+  const { can_edit: canEdit, can_delete: canDelete } = useModulePermissions("FINANCES");
 
   const isLoading = loadingAcc || loadingCC;
 
@@ -368,7 +380,7 @@ export default function TransactionsPage() {
                         {cfg.label}
                       </Badge>
                     </div>
-                    <ActionsMenu t={t} isEditable={isEditable} onEdit={setEditingTx} onDelete={setDeletingTx} />
+                    <ActionsMenu t={t} isEditable={isEditable} onEdit={setEditingTx} onDelete={setDeletingTx} canEdit={canEdit} canDelete={canDelete} />
                   </div>
                 </div>
               </div>
@@ -465,7 +477,7 @@ export default function TransactionsPage() {
             {cfg.sign}{format(Number(t.amount))}
           </TableCell>
           <TableCell>
-            <ActionsMenu t={t} isEditable={isEditable} onEdit={setEditingTx} onDelete={setDeletingTx} />
+            <ActionsMenu t={t} isEditable={isEditable} onEdit={setEditingTx} onDelete={setDeletingTx} canEdit={canEdit} canDelete={canDelete} />
           </TableCell>
         </TableRow>
       );
@@ -878,13 +890,15 @@ export default function TransactionsPage() {
       )}
 
       {/* FAB */}
-      <Fab
-        actions={[{
-          label: "Nueva transacción",
-          icon: ArrowLeftRight,
-          onClick: () => setModalOpen(true),
-        }]}
-      />
+      {canEdit && (
+        <Fab
+          actions={[{
+            label: "Nueva transacción",
+            icon: ArrowLeftRight,
+            onClick: () => setModalOpen(true),
+          }]}
+        />
+      )}
 
       {/* Modal crear */}
       <CreateTransactionModal

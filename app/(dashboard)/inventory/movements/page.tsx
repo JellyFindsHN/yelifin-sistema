@@ -23,6 +23,7 @@ import { useMovements, Movement } from "@/hooks/swr/use-movements";
 import { useProducts } from "@/hooks/swr/use-products";
 import { useMovementPeriods } from "@/hooks/swr/use-movements";
 import { useCurrency } from "@/hooks/swr/use-currency";
+import { useModulePermissions } from "@/hooks/use-module-permissions";
 import { Fab } from "@/components/ui/fab";
 import {
   Pagination, PaginationContent, PaginationItem,
@@ -148,7 +149,7 @@ function ProductCell({ m }: { m: Movement }) {
 
 // ── MovementDetail (tabla desktop) ────────────────────────────────────
 
-function MovementDetail({ m, format }: { m: Movement; format: FormatFn }) {
+function MovementDetail({ m, format, showCosts }: { m: Movement; format: FormatFn; showCosts: boolean }) {
   if (m.reference_type === "ADJUSTMENT" || m.reference_type === "INITIAL") {
     return (
       <p className="text-xs text-muted-foreground italic">
@@ -164,6 +165,7 @@ function MovementDetail({ m, format }: { m: Movement; format: FormatFn }) {
     );
   }
   if (m.movement_type === "IN") {
+    if (!showCosts) return <span className="text-muted-foreground text-xs">—</span>;
     const isUSD = m.purchase_currency === "USD";
     return (
       <div className="text-xs space-y-0.5">
@@ -196,9 +198,11 @@ function MovementDetail({ m, format }: { m: Movement; format: FormatFn }) {
       <p className="text-muted-foreground">
         Precio: <span className="text-foreground font-medium">{format(m.unit_price)}</span>
       </p>
-      <p className="text-muted-foreground">
-        Costo: <span className="text-foreground font-medium">{format(m.unit_cost)}</span>
-      </p>
+      {showCosts && (
+        <p className="text-muted-foreground">
+          Costo: <span className="text-foreground font-medium">{format(m.unit_cost)}</span>
+        </p>
+      )}
       {m.customer_name && (
         <p className="text-muted-foreground">
           Cliente: <span className="text-foreground font-medium">{m.customer_name}</span>
@@ -240,7 +244,7 @@ function MovementProfit({ m, format }: { m: Movement; format: FormatFn }) {
 
 // ── MobileDetail ───────────────────────────────────────────────────────
 
-function MobileDetail({ m, format }: { m: Movement; format: FormatFn }) {
+function MobileDetail({ m, format, showCosts, showProfit }: { m: Movement; format: FormatFn; showCosts: boolean; showProfit: boolean }) {
   if (m.reference_type === "ADJUSTMENT" || m.reference_type === "INITIAL") {
     return (
       <div className="pt-3 border-t">
@@ -257,6 +261,11 @@ function MobileDetail({ m, format }: { m: Movement; format: FormatFn }) {
   }
   if (m.movement_type === "IN") {
     const isUSD = m.purchase_currency === "USD";
+    if (!showCosts) {
+      return (
+        <div className="pt-3 border-t text-center text-xs text-muted-foreground">—</div>
+      );
+    }
     return (
       <div className="pt-3 border-t">
         <div className="grid grid-cols-3 gap-2 text-center text-xs">
@@ -292,23 +301,28 @@ function MobileDetail({ m, format }: { m: Movement; format: FormatFn }) {
     );
   }
   // OUT — venta
+  const colCount = showCosts && showProfit ? 3 : showCosts || showProfit ? 2 : 1;
   return (
     <div className="pt-3 border-t space-y-2">
-      <div className="grid grid-cols-3 gap-2 text-center text-xs">
+      <div className={`grid grid-cols-${colCount} gap-2 text-center text-xs`}>
         <div>
           <p className="text-muted-foreground">Precio</p>
           <p className="font-medium">{format(m.unit_price)}</p>
         </div>
-        <div>
-          <p className="text-muted-foreground">Total</p>
-          <p className="font-bold">{format(m.line_total)}</p>
-        </div>
-        <div>
-          <p className="text-muted-foreground">Ganancia</p>
-          <p className={`font-bold ${Number(m.profit) >= 0 ? "text-green-600" : "text-destructive"}`}>
-            {format(m.profit)}
-          </p>
-        </div>
+        {showCosts && (
+          <div>
+            <p className="text-muted-foreground">Costo</p>
+            <p className="font-medium">{format(m.unit_cost)}</p>
+          </div>
+        )}
+        {showProfit && (
+          <div>
+            <p className="text-muted-foreground">Ganancia</p>
+            <p className={`font-bold ${Number(m.profit) >= 0 ? "text-green-600" : "text-destructive"}`}>
+              {format(m.profit)}
+            </p>
+          </div>
+        )}
       </div>
       {(m.customer_name || m.sale_number) && (
         <div className="flex justify-between text-xs pt-1.5 border-t text-muted-foreground">
@@ -359,6 +373,7 @@ export default function MovementsPage() {
   const { products }              = useProducts();
   const { periods }               = useMovementPeriods();
   const { format: formatCurrency } = useCurrency();
+  const { show_costs: showCosts, show_profit: showProfit } = useModulePermissions("INVENTORY");
 
   const format = (v: number | null | undefined): string => {
     if (v == null) return "—";
@@ -516,8 +531,8 @@ export default function MovementsPage() {
                 <TableHead>Tipo</TableHead>
                 <TableHead>Cant.</TableHead>
                 <TableHead>Detalle</TableHead>
-                <TableHead className="text-right">Total</TableHead>
-                <TableHead className="text-right">Ganancia</TableHead>
+                {showCosts  && <TableHead className="text-right">Total</TableHead>}
+                {showProfit && <TableHead className="text-right">Ganancia</TableHead>}
                 <TableHead>Fecha</TableHead>
               </TableRow>
             </TableHeader>
@@ -526,14 +541,14 @@ export default function MovementsPage() {
                 /* skeleton - index key ok */
                 Array.from({ length: 6 }).map((_, i) => (
                   <TableRow key={i}>
-                    {Array.from({ length: 7 }).map((_, j) => (
+                    {Array.from({ length: 5 + (showCosts ? 1 : 0) + (showProfit ? 1 : 0) }).map((_, j) => (
                       <TableCell key={j}><Skeleton className="h-4 w-full" /></TableCell>
                     ))}
                   </TableRow>
                 ))
               ) : movements.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={7} className="text-center py-12 text-muted-foreground">
+                  <TableCell colSpan={5 + (showCosts ? 1 : 0) + (showProfit ? 1 : 0)} className="text-center py-12 text-muted-foreground">
                     No hay movimientos en este período
                   </TableCell>
                 </TableRow>
@@ -543,9 +558,9 @@ export default function MovementsPage() {
                     <TableCell><ProductCell m={m} /></TableCell>
                     <TableCell><TypeBadge m={m} /></TableCell>
                     <TableCell className="font-medium">{m.quantity}</TableCell>
-                    <TableCell><MovementDetail m={m} format={format} /></TableCell>
-                    <TableCell className="text-right"><MovementTotal m={m} format={format} /></TableCell>
-                    <TableCell className="text-right"><MovementProfit m={m} format={format} /></TableCell>
+                    <TableCell><MovementDetail m={m} format={format} showCosts={showCosts} /></TableCell>
+                    {showCosts  && <TableCell className="text-right"><MovementTotal m={m} format={format} /></TableCell>}
+                    {showProfit && <TableCell className="text-right"><MovementProfit m={m} format={format} /></TableCell>}
                     <TableCell className="text-muted-foreground text-sm whitespace-nowrap">
                       {formatDateOnly(m.created_at)}
                     </TableCell>
@@ -603,7 +618,7 @@ export default function MovementsPage() {
                     <span className="text-xs text-muted-foreground">{m.quantity} uds</span>
                   </div>
                 </div>
-                <MobileDetail m={m} format={format} />
+                <MobileDetail m={m} format={format} showCosts={showCosts} showProfit={showProfit} />
               </CardContent>
             </Card>
           ))

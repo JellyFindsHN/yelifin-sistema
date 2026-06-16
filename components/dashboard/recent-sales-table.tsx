@@ -19,9 +19,9 @@ const paymentLabel: Record<string, { label: string; icon: any }> = {
   OTHER:       { label: "Otro",           icon: HelpCircle },
 };
 
-type Props = { recentSales: any[]; isLoading: boolean };
+type Props = { recentSales: any[]; isLoading: boolean; showProfit?: boolean };
 
-export function RecentSalesTable({ recentSales, isLoading }: Props) {
+export function RecentSalesTable({ recentSales, isLoading, showProfit = true }: Props) {
   const { push } = useRouter();
   const { format: formatCurrency } = useCurrency();
   const tz = useTimezone();
@@ -43,21 +43,21 @@ export function RecentSalesTable({ recentSales, isLoading }: Props) {
               <TableHead>Método</TableHead>
               <TableHead>Fecha</TableHead>
               <TableHead className="text-right">Total</TableHead>
-              <TableHead className="text-right">Ganancia</TableHead>
+              {showProfit && <TableHead className="text-right">Ganancia</TableHead>}
             </TableRow>
           </TableHeader>
           <TableBody>
             {isLoading ? (
               Array.from({ length: 5 }).map((_, i) => (
                 <TableRow key={i}>
-                  {Array.from({ length: 6 }).map((_, j) => (
+                  {Array.from({ length: showProfit ? 6 : 5 }).map((_, j) => (
                     <TableCell key={j}><Skeleton className="h-4 w-full" /></TableCell>
                   ))}
                 </TableRow>
               ))
             ) : !recentSales.length ? (
               <TableRow>
-                <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
+                <TableCell colSpan={showProfit ? 6 : 5} className="text-center py-8 text-muted-foreground">
                   Sin ventas en este período
                 </TableCell>
               </TableRow>
@@ -76,7 +76,9 @@ export function RecentSalesTable({ recentSales, isLoading }: Props) {
                     </TableCell>
                     <TableCell className="text-muted-foreground text-sm">{formatDateFull(sale.sold_at)}</TableCell>
                     <TableCell className="text-right font-medium">{formatCurrency(Number(sale.total))}</TableCell>
-                    <TableCell className="text-right text-green-600 font-medium">{formatCurrency(Number(sale.profit))}</TableCell>
+                    {showProfit && (
+                      <TableCell className="text-right text-green-600 font-medium">{formatCurrency(Number(sale.profit))}</TableCell>
+                    )}
                   </TableRow>
                 );
               })

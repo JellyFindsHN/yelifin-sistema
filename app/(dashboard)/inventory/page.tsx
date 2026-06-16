@@ -56,6 +56,7 @@ import { useAccounts }                from "@/hooks/swr/use-accounts";
 import { useCreditCards }             from "@/hooks/swr/use-credit-cards";
 import { usePurchases }               from "@/hooks/swr/use-purchases";
 import { useMe }                      from "@/hooks/swr/use-me";
+import { useModulePermissions }        from "@/hooks/use-module-permissions";
 
 // ── Helpers ────────────────────────────────────────────────────────────
 
@@ -80,6 +81,8 @@ function ProductActionsMenu({
   setEditProduct,
   setDeleteProduct,
   onViewDetail,
+  canEdit,
+  canDelete,
 }: {
   item: InventoryItem;
   findProduct: (id: number) => Product | null;
@@ -89,6 +92,8 @@ function ProductActionsMenu({
   setEditProduct: (p: Product | null) => void;
   setDeleteProduct: (p: Product | null) => void;
   onViewDetail: (id: number) => void;
+  canEdit: boolean;
+  canDelete: boolean;
 }) {
   return (
     <DropdownMenu>
@@ -102,9 +107,9 @@ function ProductActionsMenu({
           <Eye className="size-4 mr-2 text-muted-foreground" />
           Ver detalle
         </DropdownMenuItem>
-        <DropdownMenuSeparator />
-        {!item.is_service && (
+        {canEdit && !item.is_service && (
           <>
+            <DropdownMenuSeparator />
             <DropdownMenuItem onClick={() => { const p = findProduct(item.product_id); if (p) setInventoryProduct(p); }}>
               <PackagePlus className="size-4 mr-2 text-primary" />
               Agregar stock
@@ -117,20 +122,26 @@ function ProductActionsMenu({
               <Layers className="size-4 mr-2 text-muted-foreground" />
               Agregar variante
             </DropdownMenuItem>
-            <DropdownMenuSeparator />
           </>
         )}
-        <DropdownMenuItem onClick={() => { const p = findProduct(item.product_id); if (p) setEditProduct(p); }}>
-          <Pencil className="size-4 mr-2" />
-          {item.is_service ? "Editar servicio" : "Editar producto"}
-        </DropdownMenuItem>
-        <DropdownMenuItem
-          className="text-destructive focus:text-destructive"
-          onClick={() => { const p = findProduct(item.product_id); if (p) setDeleteProduct(p); }}
-        >
-          <Trash2 className="size-4 mr-2" />
-          Eliminar
-        </DropdownMenuItem>
+        {canEdit && (
+          <>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem onClick={() => { const p = findProduct(item.product_id); if (p) setEditProduct(p); }}>
+              <Pencil className="size-4 mr-2" />
+              {item.is_service ? "Editar servicio" : "Editar producto"}
+            </DropdownMenuItem>
+          </>
+        )}
+        {canDelete && (
+          <DropdownMenuItem
+            className="text-destructive focus:text-destructive"
+            onClick={() => { const p = findProduct(item.product_id); if (p) setDeleteProduct(p); }}
+          >
+            <Trash2 className="size-4 mr-2" />
+            Eliminar
+          </DropdownMenuItem>
+        )}
       </DropdownMenuContent>
     </DropdownMenu>
   );
@@ -142,13 +153,18 @@ function VariantActionsMenu({
   setAdjustVariant,
   setEditVariant,
   setDeleteVariantTarget,
+  canEdit,
+  canDelete,
 }: {
   product: Product;
   variant: ProductVariant;
   setAdjustVariant: (v: { product: Product; variant: ProductVariant } | null) => void;
   setEditVariant: (v: { product: Product; variant: ProductVariant } | null) => void;
   setDeleteVariantTarget: (v: { product: Product; variant: ProductVariant } | null) => void;
+  canEdit: boolean;
+  canDelete: boolean;
 }) {
+  if (!canEdit && !canDelete) return null;
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
@@ -157,23 +173,31 @@ function VariantActionsMenu({
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end">
-        <DropdownMenuItem onClick={() => setAdjustVariant({ product, variant })}>
-          <SlidersHorizontal className="size-4 mr-2 text-muted-foreground" />
-          Ajuste de inventario
-        </DropdownMenuItem>
-        <DropdownMenuSeparator />
-        <DropdownMenuItem onClick={() => setEditVariant({ product, variant })}>
-          <Pencil className="size-4 mr-2" />
-          Editar variante
-        </DropdownMenuItem>
-        <DropdownMenuSeparator />
-        <DropdownMenuItem
-          className="text-destructive focus:text-destructive"
-          onClick={() => setDeleteVariantTarget({ product, variant })}
-        >
-          <Trash2 className="size-4 mr-2" />
-          Eliminar variante
-        </DropdownMenuItem>
+        {canEdit && (
+          <>
+            <DropdownMenuItem onClick={() => setAdjustVariant({ product, variant })}>
+              <SlidersHorizontal className="size-4 mr-2 text-muted-foreground" />
+              Ajuste de inventario
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem onClick={() => setEditVariant({ product, variant })}>
+              <Pencil className="size-4 mr-2" />
+              Editar variante
+            </DropdownMenuItem>
+          </>
+        )}
+        {canDelete && (
+          <>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem
+              className="text-destructive focus:text-destructive"
+              onClick={() => setDeleteVariantTarget({ product, variant })}
+            >
+              <Trash2 className="size-4 mr-2" />
+              Eliminar variante
+            </DropdownMenuItem>
+          </>
+        )}
       </DropdownMenuContent>
     </DropdownMenu>
   );
@@ -182,9 +206,11 @@ function VariantActionsMenu({
 function BaseTableRow({
   item,
   format,
+  showCosts,
 }: {
   item: InventoryItem;
   format: (v: number) => string;
+  showCosts: boolean;
 }) {
   return (
     <TableRow className="bg-muted/20 hover:bg-muted/30">
@@ -206,9 +232,11 @@ function BaseTableRow({
         {item.sku ?? "—"}
       </TableCell>
       <TableCell>{getStockBadge(Number(item.base_stock))}</TableCell>
-      <TableCell className="text-sm">
-        {Number(item.base_stock) > 0 ? format(item.base_avg_unit_cost) : "—"}
-      </TableCell>
+      {showCosts && (
+        <TableCell className="text-sm">
+          {Number(item.base_stock) > 0 ? format(item.base_avg_unit_cost) : "—"}
+        </TableCell>
+      )}
       <TableCell className="text-sm">{format(item.price)}</TableCell>
       <TableCell className="text-right text-sm font-medium">
         {Number(item.base_stock) > 0 ? format(item.base_total_value) : "—"}
@@ -222,6 +250,9 @@ function VariantTableRow({
   variantStock,
   product,
   format,
+  showCosts,
+  canEdit,
+  canDelete,
   findVariant,
   setAdjustVariant,
   setEditVariant,
@@ -230,6 +261,9 @@ function VariantTableRow({
   variantStock: VariantStock;
   product: Product | null;
   format: (v: number) => string;
+  showCosts: boolean;
+  canEdit: boolean;
+  canDelete: boolean;
   findVariant: (product: Product, variantId: number) => ProductVariant | null;
   setAdjustVariant: (v: { product: Product; variant: ProductVariant } | null) => void;
   setEditVariant: (v: { product: Product; variant: ProductVariant } | null) => void;
@@ -270,9 +304,11 @@ function VariantTableRow({
         {variantStock.sku || "—"}
       </TableCell>
       <TableCell>{getStockBadge(Number(variantStock.stock))}</TableCell>
-      <TableCell className="text-sm">
-        {Number(variantStock.stock) > 0 ? format(variantStock.avg_unit_cost) : "—"}
-      </TableCell>
+      {showCosts && (
+        <TableCell className="text-sm">
+          {Number(variantStock.stock) > 0 ? format(variantStock.avg_unit_cost) : "—"}
+        </TableCell>
+      )}
       <TableCell className="text-sm">
         {variantStock.price_override != null
           ? format(variantStock.price_override)
@@ -292,6 +328,8 @@ function VariantTableRow({
             setAdjustVariant={setAdjustVariant}
             setEditVariant={setEditVariant}
             setDeleteVariantTarget={setDeleteVariantTarget}
+            canEdit={canEdit}
+            canDelete={canDelete}
           />
         )}
       </TableCell>
@@ -302,9 +340,11 @@ function VariantTableRow({
 function BaseCard({
   item,
   format,
+  showCosts,
 }: {
   item: InventoryItem;
   format: (v: number) => string;
+  showCosts: boolean;
 }) {
   return (
     <div className="rounded-lg border bg-muted/20 overflow-hidden">
@@ -325,13 +365,15 @@ function BaseCard({
           </div>
         </div>
       </div>
-      <div className="grid grid-cols-3 gap-2 px-3 pb-2.5 text-center border-t">
-        <div className="pt-2">
-          <p className="text-xs text-muted-foreground">Costo prom.</p>
-          <p className="text-sm font-medium">
-            {Number(item.base_stock) > 0 ? format(item.base_avg_unit_cost) : "—"}
-          </p>
-        </div>
+      <div className={`grid gap-2 px-3 pb-2.5 text-center border-t ${showCosts ? "grid-cols-3" : "grid-cols-2"}`}>
+        {showCosts && (
+          <div className="pt-2">
+            <p className="text-xs text-muted-foreground">Costo prom.</p>
+            <p className="text-sm font-medium">
+              {Number(item.base_stock) > 0 ? format(item.base_avg_unit_cost) : "—"}
+            </p>
+          </div>
+        )}
         <div className="pt-2">
           <p className="text-xs text-muted-foreground">Precio venta</p>
           <p className="text-sm font-medium">{format(item.price)}</p>
@@ -351,6 +393,9 @@ function VariantCard({
   variantStock,
   product,
   format,
+  showCosts,
+  canEdit,
+  canDelete,
   findVariant,
   setAdjustVariant,
   setEditVariant,
@@ -359,6 +404,9 @@ function VariantCard({
   variantStock: VariantStock;
   product: Product | null;
   format: (v: number) => string;
+  showCosts: boolean;
+  canEdit: boolean;
+  canDelete: boolean;
   findVariant: (product: Product, variantId: number) => ProductVariant | null;
   setAdjustVariant: (v: { product: Product; variant: ProductVariant } | null) => void;
   setEditVariant: (v: { product: Product; variant: ProductVariant } | null) => void;
@@ -409,19 +457,23 @@ function VariantCard({
                   setAdjustVariant={setAdjustVariant}
                   setEditVariant={setEditVariant}
                   setDeleteVariantTarget={setDeleteVariantTarget}
+                  canEdit={canEdit}
+                  canDelete={canDelete}
                 />
               )}
             </div>
           </div>
         </div>
       </div>
-      <div className="grid grid-cols-3 gap-2 px-3 pb-2.5 text-center border-t">
-        <div className="pt-2">
-          <p className="text-xs text-muted-foreground">Costo prom.</p>
-          <p className="text-sm font-medium">
-            {Number(variantStock.stock) > 0 ? format(variantStock.avg_unit_cost) : "—"}
-          </p>
-        </div>
+      <div className={`grid gap-2 px-3 pb-2.5 text-center border-t ${showCosts ? "grid-cols-3" : "grid-cols-2"}`}>
+        {showCosts && (
+          <div className="pt-2">
+            <p className="text-xs text-muted-foreground">Costo prom.</p>
+            <p className="text-sm font-medium">
+              {Number(variantStock.stock) > 0 ? format(variantStock.avg_unit_cost) : "—"}
+            </p>
+          </div>
+        )}
         <div className="pt-2">
           <p className="text-xs text-muted-foreground">Precio venta</p>
           <p className="text-sm font-medium">{format(salePrice)}</p>
@@ -481,6 +533,7 @@ export default function InventoryPage() {
   const { format }     = useCurrency();
   const { purchases, mutate: mutatePurchases } = usePurchases();
   const { features, subscription }             = useMe();
+  const { show_costs: showCosts, can_edit: canEdit, can_delete: canDelete } = useModulePermissions("INVENTORY");
 
   const isAdmin = (features?.ADMIN ?? []).length > 0 || subscription?.plan?.slug === "admin";
 
@@ -541,10 +594,10 @@ export default function InventoryPage() {
       <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
         {[
           { title: "Unidades",   value: stats.total_stock,         sub: `${stats.total_products} productos`, icon: Warehouse },
-          { title: "Valor",      value: format(stats.total_value), sub: "costo adquisición",                 icon: DollarSign },
+          { title: "Valor",      value: format(stats.total_value), sub: "costo adquisición",                 icon: DollarSign, hiddenWhenNoCosts: true },
           { title: "Stock bajo", value: stats.low_stock,           sub: "menos de 10 uds",                   icon: AlertTriangle, cls: "text-yellow-600" },
           { title: "Agotados",   value: stats.out_of_stock,        sub: "sin stock",                         icon: Package,       cls: "text-destructive" },
-        ].map((stat) => (
+        ].filter((s) => !(s as any).hiddenWhenNoCosts || showCosts).map((stat) => (
           <Card key={stat.title}>
             <CardContent className="pl-3">
               <div className="flex items-center justify-between mb-1.5">
@@ -617,7 +670,7 @@ export default function InventoryPage() {
                 <TableHead>Producto</TableHead>
                 <TableHead>SKU</TableHead>
                 <TableHead>Stock</TableHead>
-                <TableHead>Costo prom.</TableHead>
+                {showCosts && <TableHead>Costo prom.</TableHead>}
                 <TableHead>Precio venta</TableHead>
                 <TableHead className="text-right">Valor total</TableHead>
                 <TableHead className="w-10" />
@@ -628,14 +681,14 @@ export default function InventoryPage() {
                 /* skeleton - index key ok */
                 Array.from({ length: 5 }).map((_, i) => (
                   <TableRow key={i}>
-                    {Array.from({ length: 7 }).map((_, j) => (
+                    {Array.from({ length: showCosts ? 7 : 6 }).map((_, j) => (
                       <TableCell key={j}><Skeleton className="h-4 w-full" /></TableCell>
                     ))}
                   </TableRow>
                 ))
               ) : inventory.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={7} className="text-center py-12 text-muted-foreground">
+                  <TableCell colSpan={showCosts ? 7 : 6} className="text-center py-12 text-muted-foreground">
                     {hasFilters ? "No se encontraron productos" : "Agrega productos para visualizarlos aquí"}
                   </TableCell>
                 </TableRow>
@@ -689,7 +742,7 @@ export default function InventoryPage() {
                         <TableCell onClick={(e) => e.stopPropagation()}>
                           {getStockBadge(Number(item.stock), item.is_service)}
                         </TableCell>
-                        <TableCell>{item.is_service ? "—" : format(item.avg_unit_cost)}</TableCell>
+                        {showCosts && <TableCell>{item.is_service ? "—" : format(item.avg_unit_cost)}</TableCell>}
                         <TableCell>{format(item.price)}</TableCell>
                         <TableCell className="text-right font-medium">
                           {item.is_service ? format(item.price) : format(item.total_value)}
@@ -704,6 +757,8 @@ export default function InventoryPage() {
                             setEditProduct={setEditProduct}
                             setDeleteProduct={setDeleteProduct}
                             onViewDetail={(id) => push(`/inventory/${id}`)}
+                            canEdit={canEdit}
+                            canDelete={canDelete}
                           />
                         </TableCell>
                       </TableRow>
@@ -711,13 +766,16 @@ export default function InventoryPage() {
                       {/* Acordeón: base + variantes */}
                       {hasVariants && isExpanded && (
                         <>
-                          <BaseTableRow item={item} format={format} />
+                          <BaseTableRow item={item} format={format} showCosts={showCosts} />
                           {item.variants_stock.map((vs) => (
                             <VariantTableRow
                               key={`vs-${vs.variant_id}`}
                               variantStock={vs}
                               product={product}
                               format={format}
+                              showCosts={showCosts}
+                              canEdit={canEdit}
+                              canDelete={canDelete}
                               findVariant={findVariant}
                               setAdjustVariant={setAdjustVariant}
                               setEditVariant={setEditVariant}
@@ -795,6 +853,8 @@ export default function InventoryPage() {
                               setEditProduct={setEditProduct}
                               setDeleteProduct={setDeleteProduct}
                               onViewDetail={(id) => push(`/inventory/${id}`)}
+                              canEdit={canEdit}
+                              canDelete={canDelete}
                             />
                           </div>
                         </div>
@@ -806,11 +866,13 @@ export default function InventoryPage() {
                   </div>
 
                   {/* Resumen general del producto */}
-                  <div className="grid grid-cols-3 gap-2 mt-3 pt-3 border-t text-center">
-                    <div>
-                      <p className="text-xs text-muted-foreground">Costo prom.</p>
-                      <p className="text-sm font-medium">{item.is_service ? "—" : format(item.avg_unit_cost)}</p>
-                    </div>
+                  <div className={`grid gap-2 mt-3 pt-3 border-t text-center ${showCosts ? "grid-cols-3" : "grid-cols-2"}`}>
+                    {showCosts && (
+                      <div>
+                        <p className="text-xs text-muted-foreground">Costo prom.</p>
+                        <p className="text-sm font-medium">{item.is_service ? "—" : format(item.avg_unit_cost)}</p>
+                      </div>
+                    )}
                     <div>
                       <p className="text-xs text-muted-foreground">Precio venta</p>
                       <p className="text-sm font-medium">{format(item.price)}</p>
@@ -842,13 +904,16 @@ export default function InventoryPage() {
 
                       {isExpanded && (
                         <div className="mt-2 space-y-2">
-                          <BaseCard item={item} format={format} />
+                          <BaseCard item={item} format={format} showCosts={showCosts} />
                           {item.variants_stock.map((vs) => (
                             <VariantCard
                               key={vs.variant_id}
                               variantStock={vs}
                               product={product}
                               format={format}
+                              showCosts={showCosts}
+                              canEdit={canEdit}
+                              canDelete={canDelete}
                               findVariant={findVariant}
                               setAdjustVariant={setAdjustVariant}
                               setEditVariant={setEditVariant}
@@ -927,7 +992,7 @@ export default function InventoryPage() {
         actions={[
           { label: "Nueva transacción", icon: ArrowLeftRight, onClick: () => setTransactionOpen(true) },
           { label: "Nueva venta",       icon: ShoppingCart,   onClick: () => push("/sales/new") },
-          { label: "Nuevo producto",    icon: Plus,           onClick: () => setCreateOpen(true) },
+          ...(canEdit ? [{ label: "Nuevo producto", icon: Plus, onClick: () => setCreateOpen(true) }] : []),
         ]}
       />
 

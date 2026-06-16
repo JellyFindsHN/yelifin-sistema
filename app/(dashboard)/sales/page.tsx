@@ -36,6 +36,7 @@ import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import { useSales, usePatchSale, useDeleteSale, Sale } from "@/hooks/swr/use-sales";
 import { useDebounce } from "@/hooks/use-debounce";
 import { useAccounts } from "@/hooks/swr/use-accounts";
+import { useModulePermissions } from "@/hooks/use-module-permissions";
 
 // ── Utils ──────────────────────────────────────────────────────────────
 const formatDateOnly = (dateString: string) =>
@@ -66,9 +67,10 @@ const PRESET_LABELS: Record<Preset, string> = {
 const getTaxRate = (v: any): number => Number(v) || 0;
 
 // ── Acciones para venta PENDIENTE ─────────────────────────────────────
-function PendingActions({ saleId, onMutate }: { saleId: number; onMutate: () => void }) {
+function PendingActions({ saleId, onMutate, canEdit }: { saleId: number; onMutate: () => void; canEdit: boolean }) {
   const { push } = useRouter();
   const { confirmSale, cancelSale, isPatching } = usePatchSale(saleId);
+  if (!canEdit) return null;
 
   const handleConfirm = async () => {
     try {
@@ -128,11 +130,14 @@ function PendingActions({ saleId, onMutate }: { saleId: number; onMutate: () => 
 function CompletedActions({
   sale,
   onDeleteRequest,
+  canDelete,
 }: {
   sale: Sale;
   onDeleteRequest: (sale: Sale) => void;
+  canDelete: boolean;
 }) {
   const { push } = useRouter();
+  if (!canDelete) return null;
   return (
     <div onClick={(e) => e.stopPropagation()}>
       <DropdownMenu>
@@ -162,6 +167,7 @@ function CompletedActions({
 export default function SalesPage() {
   const { push }   = useRouter();
   const { format } = useCurrency();
+  const { show_profit: showProfit, can_edit: canEdit, can_delete: canDelete } = useModulePermissions("SALES");
 
   const [preset,         setPreset]         = useState<Preset>("7d");
   const [dateFrom,       setDateFrom]       = useState("");
@@ -272,24 +278,26 @@ export default function SalesPage() {
             }
           </CardContent>
         </Card>
-        <Card className="pt-2 pb-2">
-          <CardContent className="pl-3.5 py-3">
-            <div className="flex items-center justify-between mb-1">
-              <span className="text-xs font-medium text-muted-foreground">Ganancia</span>
-              <TrendingUp className="size-3.5 text-muted-foreground shrink-0" />
-            </div>
-            {isLoading ? <Skeleton className="h-6 w-20" /> : (
-              <div className="flex items-baseline gap-1.5">
-                <p className="text-base font-bold text-green-600 sm:text-lg truncate">{format(stats.total_profit)}</p>
-                {stats.total_revenue > 0 && (
-                  <span className="text-xs text-muted-foreground shrink-0">
-                    {((stats.total_profit / stats.total_revenue) * 100).toFixed(0)}%
-                  </span>
-                )}
+        {showProfit && (
+          <Card className="pt-2 pb-2">
+            <CardContent className="pl-3.5 py-3">
+              <div className="flex items-center justify-between mb-1">
+                <span className="text-xs font-medium text-muted-foreground">Ganancia</span>
+                <TrendingUp className="size-3.5 text-muted-foreground shrink-0" />
               </div>
-            )}
-          </CardContent>
-        </Card>
+              {isLoading ? <Skeleton className="h-6 w-20" /> : (
+                <div className="flex items-baseline gap-1.5">
+                  <p className="text-base font-bold text-green-600 sm:text-lg truncate">{format(stats.total_profit)}</p>
+                  {stats.total_revenue > 0 && (
+                    <span className="text-xs text-muted-foreground shrink-0">
+                      {((stats.total_profit / stats.total_revenue) * 100).toFixed(0)}%
+                    </span>
+                  )}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        )}
       </div>
 
       {/* Filtros */}
@@ -393,18 +401,18 @@ export default function SalesPage() {
                       </p>
                     </div>
                     {isPending
-                      ? <PendingActions saleId={sale.id} onMutate={mutate} />
+                      ? <PendingActions saleId={sale.id} onMutate={mutate} canEdit={canEdit} />
                       : (
                         <div className="flex items-center gap-1 shrink-0">
                           <Badge variant="outline" className="gap-1 text-xs">
                             <PayIcon className="size-3" /> {(sale as any).account_name}
                           </Badge>
-                          <CompletedActions sale={sale} onDeleteRequest={setDeletingSale} />
+                          <CompletedActions sale={sale} onDeleteRequest={setDeletingSale} canDelete={canDelete} />
                         </div>
                       )
                     }
                   </div>
-                  <div className={`grid gap-1 pt-2 border-t text-center ${isPending ? "grid-cols-2" : "grid-cols-3"}`}>
+                  <div className={`grid gap-1 pt-2 border-t text-center ${(!isPending && showProfit) ? "grid-cols-3" : "grid-cols-2"}`}>
                     <div>
                       <p className="text-[10px] text-muted-foreground mb-0.5">Productos</p>
                       <p className="text-sm font-semibold">{sale.items_count}</p>
@@ -413,7 +421,7 @@ export default function SalesPage() {
                       <p className="text-[10px] text-muted-foreground mb-0.5">Total</p>
                       <p className="text-sm font-bold truncate">{format(Number(sale.total))}</p>
                     </div>
-                    {!isPending && (
+                    {!isPending && showProfit && (
                       <div>
                         <p className="text-[10px] text-muted-foreground mb-0.5">Ganancia</p>
                         <p className="text-sm font-bold text-green-600 truncate">
@@ -444,7 +452,7 @@ export default function SalesPage() {
                 <TableHead>Cuenta</TableHead>
                 <TableHead className="text-right">ISV</TableHead>
                 <TableHead className="text-right">Total</TableHead>
-                <TableHead className="text-right">Ganancia</TableHead>
+                {showProfit && <TableHead className="text-right">Ganancia</TableHead>}
                 <TableHead />
               </TableRow>
             </TableHeader>
@@ -453,14 +461,14 @@ export default function SalesPage() {
                 /* skeleton - index key ok */
                 Array.from({ length: 5 }).map((_, i) => (
                   <TableRow key={i}>
-                    {Array.from({ length: 11 }).map((__, j) => (
+                    {Array.from({ length: showProfit ? 11 : 10 }).map((__, j) => (
                       <TableCell key={j}><Skeleton className="h-4 w-full" /></TableCell>
                     ))}
                   </TableRow>
                 ))
               ) : sales.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={11} className="text-center py-12 text-muted-foreground">
+                  <TableCell colSpan={showProfit ? 11 : 10} className="text-center py-12 text-muted-foreground">
                     Aún no se han registrado ventas en este período
                   </TableCell>
                 </TableRow>
@@ -510,16 +518,18 @@ export default function SalesPage() {
                         }
                       </TableCell>
                       <TableCell className="text-right font-medium">{format(Number(sale.total))}</TableCell>
-                      <TableCell className="text-right">
-                        {isPending
-                          ? <span className="text-muted-foreground text-xs">—</span>
-                          : <span className="text-green-600 font-medium">{format(Number(sale.net_profit - sale.discount))}</span>
-                        }
-                      </TableCell>
+                      {showProfit && (
+                        <TableCell className="text-right">
+                          {isPending
+                            ? <span className="text-muted-foreground text-xs">—</span>
+                            : <span className="text-green-600 font-medium">{format(Number(sale.net_profit - sale.discount))}</span>
+                          }
+                        </TableCell>
+                      )}
                       <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
                         {isPending
-                          ? <PendingActions saleId={sale.id} onMutate={mutate} />
-                          : <CompletedActions sale={sale} onDeleteRequest={setDeletingSale} />
+                          ? <PendingActions saleId={sale.id} onMutate={mutate} canEdit={canEdit} />
+                          : <CompletedActions sale={sale} onDeleteRequest={setDeletingSale} canDelete={canDelete} />
                         }
                       </TableCell>
                     </TableRow>

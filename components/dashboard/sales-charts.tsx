@@ -22,9 +22,10 @@ type Props = {
   paymentMethods: any[];
   periodLabel:    string;
   isLoading:      boolean;
+  showProfit?:    boolean;
 };
 
-export function SalesCharts({ salesChart, paymentMethods, periodLabel, isLoading }: Props) {
+export function SalesCharts({ salesChart, paymentMethods, periodLabel, isLoading, showProfit = true }: Props) {
   const { format: formatCurrency } = useCurrency();
   
   return (
@@ -32,7 +33,7 @@ export function SalesCharts({ salesChart, paymentMethods, periodLabel, isLoading
       {/* Ventas vs Ganancias */}
       <Card className="lg:col-span-4">
         <CardHeader className="pb-3 pt-5 px-5">
-          <CardTitle className="text-lg font-bold tracking-tight">Ventas vs Ganancias</CardTitle>
+          <CardTitle className="text-lg font-bold tracking-tight">{showProfit ? "Ventas vs Ganancias" : "Ventas"}</CardTitle>
           <CardDescription className="text-sm font-medium">{periodLabel}</CardDescription>
         </CardHeader>
         <CardContent className="px-2 pb-1">
@@ -69,14 +70,16 @@ export function SalesCharts({ salesChart, paymentMethods, periodLabel, isLoading
                   dot={false} 
                   name="Ventas" 
                 />
-                <Line 
-                  type="monotone" 
-                  dataKey="profit"  
-                  stroke="#10B981" 
-                  strokeWidth={2.5} 
-                  dot={false} 
-                  name="Ganancia" 
-                />
+                {showProfit && (
+                  <Line
+                    type="monotone"
+                    dataKey="profit"
+                    stroke="#10B981"
+                    strokeWidth={2.5}
+                    dot={false}
+                    name="Ganancia"
+                  />
+                )}
               </LineChart>
             </ResponsiveContainer>
           )}

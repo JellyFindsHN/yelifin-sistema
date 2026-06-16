@@ -6,6 +6,7 @@ import { useProfitReport } from "@/hooks/swr/use-reports";
 import { useCurrency }     from "@/hooks/swr/use-currency";
 import { useAuth }         from "@/hooks/use-auth";
 import { fmtN, fmtPct } from "@/lib/export";
+import { useModulePermissions } from "@/hooks/use-module-permissions";
 import { ReportShell, StatCard, useDateRange } from "@/components/reports/report-shell";
 import { PaginationControls } from "@/components/shared/pagination-controls";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -22,6 +23,7 @@ export default function ProfitReportPage() {
   const { firebaseUser }             = useAuth();
   const { summary, byMonth, byProduct, expenses, isLoading } = useProfitReport(from, to);
   const [productPage, setProductPage] = useState(1);
+  const { show_profit: showProfit, show_costs: showCosts } = useModulePermissions("REPORTS");
 
   useEffect(() => { setProductPage(1); }, [from, to]);
 
@@ -65,12 +67,14 @@ export default function ProfitReportPage() {
       ) : summary && (
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
           <StatCard label="Ingresos brutos"   value={format(summary.revenue)}        accent="blue" />
-          <StatCard label="Costo mercancía"   value={format(summary.cogs)}           accent="red" />
-          <StatCard label="Utilidad bruta"    value={format(summary.gross_profit)}   accent="green" />
-          <StatCard label="Margen bruto"      value={fmtPct(summary.margin_pct)}
-            accent={summary.margin_pct >= 20 ? "green" : summary.margin_pct >= 10 ? "amber" : "red"}
-            sub={`${summary.total_sales} ventas`}
-          />
+          {showCosts  && <StatCard label="Costo mercancía"   value={format(summary.cogs)}           accent="red" />}
+          {showProfit && <StatCard label="Utilidad bruta"    value={format(summary.gross_profit)}   accent="green" />}
+          {showProfit && (
+            <StatCard label="Margen bruto"      value={fmtPct(summary.margin_pct)}
+              accent={summary.margin_pct >= 20 ? "green" : summary.margin_pct >= 10 ? "amber" : "red"}
+              sub={`${summary.total_sales} ventas`}
+            />
+          )}
         </div>
       )}
 
@@ -119,9 +123,9 @@ export default function ProfitReportPage() {
                     <th className="text-left px-4 py-2">Producto</th>
                     <th className="text-right px-4 py-2">Cant.</th>
                     <th className="text-right px-4 py-2">Ingresos</th>
-                    <th className="text-right px-4 py-2 hidden md:table-cell">Costo</th>
-                    <th className="text-right px-4 py-2">Utilidad</th>
-                    <th className="text-right px-4 py-2">Margen</th>
+                    {showCosts  && <th className="text-right px-4 py-2 hidden md:table-cell">Costo</th>}
+                    {showProfit && <th className="text-right px-4 py-2">Utilidad</th>}
+                    {showProfit && <th className="text-right px-4 py-2">Margen</th>}
                   </tr>
                 </thead>
                 <tbody>
@@ -135,13 +139,15 @@ export default function ProfitReportPage() {
                         </td>
                         <td className="px-4 py-2.5 text-right text-muted-foreground">{p.qty_sold}</td>
                         <td className="px-4 py-2.5 text-right">{format(p.revenue)}</td>
-                        <td className="px-4 py-2.5 text-right text-muted-foreground hidden md:table-cell">{format(p.cogs)}</td>
-                        <td className="px-4 py-2.5 text-right font-medium text-green-700 dark:text-green-400">{format(p.profit)}</td>
-                        <td className="px-4 py-2.5 text-right">
-                          <Badge variant="outline" className={`text-xs ${p.margin_pct >= 30 ? "border-green-200 text-green-700" : p.margin_pct >= 10 ? "border-amber-200 text-amber-700" : "border-red-200 text-red-700"}`}>
-                            {fmtPct(p.margin_pct)}
-                          </Badge>
-                        </td>
+                        {showCosts  && <td className="px-4 py-2.5 text-right text-muted-foreground hidden md:table-cell">{format(p.cogs)}</td>}
+                        {showProfit && <td className="px-4 py-2.5 text-right font-medium text-green-700 dark:text-green-400">{format(p.profit)}</td>}
+                        {showProfit && (
+                          <td className="px-4 py-2.5 text-right">
+                            <Badge variant="outline" className={`text-xs ${p.margin_pct >= 30 ? "border-green-200 text-green-700" : p.margin_pct >= 10 ? "border-amber-200 text-amber-700" : "border-red-200 text-red-700"}`}>
+                              {fmtPct(p.margin_pct)}
+                            </Badge>
+                          </td>
+                        )}
                       </tr>
                     ))}
                 </tbody>

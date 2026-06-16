@@ -28,6 +28,7 @@ import {
   PaginationLink, PaginationNext, PaginationPrevious, PaginationEllipsis,
 } from "@/components/ui/pagination";
 import { useCurrency }             from "@/hooks/swr/use-currency";
+import { useModulePermissions }    from "@/hooks/use-module-permissions";
 import { CreateCustomerDialog }    from "@/components/customers/create-customer-dialog";
 import { EditCustomerDialog }      from "@/components/customers/edit-customer-dialog";
 import { DeleteCustomerDialog }    from "@/components/customers/delete-customer-dialog";
@@ -53,6 +54,7 @@ export default function CustomersPage() {
   });
   const { policies } = useLoyaltyPolicies();
   const { format }   = useCurrency();
+  const { can_edit: canEdit, can_delete: canDelete } = useModulePermissions("CUSTOMERS");
 
   const [createOpen,      setCreateOpen]      = useState(false);
   const [loyaltyOpen,     setLoyaltyOpen]     = useState(false);
@@ -169,6 +171,8 @@ export default function CustomersPage() {
                           onView={()   => setSummaryCustomer(customer)}
                           onEdit={()   => setEditCustomer(customer)}
                           onDelete={() => setDeleteCustomer(customer)}
+                          canEdit={canEdit}
+                          canDelete={canDelete}
                         />
                       </TableCell>
                     </TableRow>
@@ -230,6 +234,8 @@ export default function CustomersPage() {
                           onView={()   => setSummaryCustomer(customer)}
                           onEdit={()   => setEditCustomer(customer)}
                           onDelete={() => setDeleteCustomer(customer)}
+                          canEdit={canEdit}
+                          canDelete={canDelete}
                         />
                       </div>
                     </div>
@@ -311,8 +317,8 @@ export default function CustomersPage() {
 
       <Fab
         actions={[
-          { label: "Nuevo cliente", icon: Users, onClick: () => setCreateOpen(true) },
-          { label: "Fidelización",  icon: Star,  onClick: () => setLoyaltyOpen(true) },
+          ...(canEdit ? [{ label: "Nuevo cliente", icon: Users, onClick: () => setCreateOpen(true) }] : []),
+          { label: "Fidelización", icon: Star, onClick: () => setLoyaltyOpen(true) },
         ]}
       />
     </div>
@@ -320,11 +326,13 @@ export default function CustomersPage() {
 }
 
 function ActionsDropdown({
-  onView, onEdit, onDelete,
+  onView, onEdit, onDelete, canEdit, canDelete,
 }: {
-  onView:   () => void;
-  onEdit:   () => void;
-  onDelete: () => void;
+  onView:    () => void;
+  onEdit:    () => void;
+  onDelete:  () => void;
+  canEdit:   boolean;
+  canDelete: boolean;
 }) {
   return (
     <DropdownMenu>
@@ -337,16 +345,22 @@ function ActionsDropdown({
         <DropdownMenuItem onClick={onView} className="gap-2 cursor-pointer">
           <Eye className="size-4" /> Ver resumen
         </DropdownMenuItem>
-        <DropdownMenuItem onClick={onEdit} className="gap-2 cursor-pointer">
-          <Pencil className="size-4" /> Editar
-        </DropdownMenuItem>
-        <DropdownMenuSeparator />
-        <DropdownMenuItem
-          onClick={onDelete}
-          className="gap-2 cursor-pointer text-destructive focus:text-destructive"
-        >
-          <Trash2 className="size-4" /> Eliminar
-        </DropdownMenuItem>
+        {canEdit && (
+          <DropdownMenuItem onClick={onEdit} className="gap-2 cursor-pointer">
+            <Pencil className="size-4" /> Editar
+          </DropdownMenuItem>
+        )}
+        {canDelete && (
+          <>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem
+              onClick={onDelete}
+              className="gap-2 cursor-pointer text-destructive focus:text-destructive"
+            >
+              <Trash2 className="size-4" /> Eliminar
+            </DropdownMenuItem>
+          </>
+        )}
       </DropdownMenuContent>
     </DropdownMenu>
   );

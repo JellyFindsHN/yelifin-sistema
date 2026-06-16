@@ -22,6 +22,7 @@ import {
 import { useDashboard, useDashboardPeriods } from "@/hooks/swr/use-dashboard";
 import { useAccounts } from "@/hooks/swr/use-accounts";
 import { useCreditCards } from "@/hooks/swr/use-credit-cards";
+import { useModulePermissions } from "@/hooks/use-module-permissions";
 import { Fab } from "@/components/ui/fab";
 import { CreateTransactionModal } from "@/components/transactions/create-transaction-modal";
 
@@ -63,6 +64,7 @@ export default function DashboardPage() {
   const { periods } = useDashboardPeriods();
   const { accounts } = useAccounts();
   const { creditCards } = useCreditCards();
+  const { show_profit: showProfit, show_costs: showCosts } = useModulePermissions("DASHBOARD");
 
   const availableYears = [...new Set(periods.map((p) => p.year))].sort(
     (a, b) => b - a
@@ -203,7 +205,7 @@ export default function DashboardPage() {
         </DropdownMenu>
       </div>
 
-      <MetricsGrid metrics={m} isLoading={isLoading} />
+      <MetricsGrid metrics={m} isLoading={isLoading} showProfit={showProfit} />
       <CreditCardDebtWidget
         debtLocal={m?.credit_card_debt?.local ?? 0}
         debtUsd={m?.credit_card_debt?.usd ?? 0}
@@ -213,15 +215,17 @@ export default function DashboardPage() {
         lowStock={data?.low_stock ?? []}
         recentSales={data?.recent_sales ?? []}
         isLoading={isLoading}
+        showProfit={showProfit}
       />
-      <SecondaryStats metrics={m} isLoading={isLoading} />
+      <SecondaryStats metrics={m} isLoading={isLoading} showCosts={showCosts} />
       <SalesCharts
         salesChart={salesChart}
         paymentMethods={paymentMethods}
         periodLabel={periodLabel()}
         isLoading={isLoading}
+        showProfit={showProfit}
       />
-      <TopProductsStock 
+      <TopProductsStock
         topProducts={topProducts}
         lowStock={data?.low_stock ?? []}
         isLoading={isLoading}
@@ -229,6 +233,7 @@ export default function DashboardPage() {
       <RecentSalesTable
         recentSales={data?.recent_sales ?? []}
         isLoading={isLoading}
+        showProfit={showProfit}
       />
 
       {/* FAB */}

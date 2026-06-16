@@ -18,11 +18,11 @@ function ChangeIndicator({ value }: { value: number | null }) {
   );
 }
 
-type Props = { metrics: any; isLoading: boolean };
+type Props = { metrics: any; isLoading: boolean; showProfit?: boolean };
 
-export function MetricsGrid({ metrics: m, isLoading }: Props) {
+export function MetricsGrid({ metrics: m, isLoading, showProfit = true }: Props) {
   const { format: formatCurrency } = useCurrency();
-  const stats = [
+  const allStats = [
     {
       title: "Ingresos",
       value: m ? formatCurrency(Number(m.revenue ?? 0)) : null,
@@ -35,6 +35,7 @@ export function MetricsGrid({ metrics: m, isLoading }: Props) {
       sub:   <ChangeIndicator value={m?.profit_change ?? null} />,
       icon:  TrendingUp,
       valueClass: "text-green-600",
+      hidden: !showProfit,
     },
     {
       title: "Clientes",
@@ -49,9 +50,10 @@ export function MetricsGrid({ metrics: m, isLoading }: Props) {
       icon:  Wallet,
     },
   ];
+  const stats = allStats.filter((s) => !(s as any).hidden);
 
   return (
-    <div className="grid grid-cols-2 gap-2.5 lg:grid-cols-4 lg:gap-3">
+    <div className={`grid grid-cols-2 gap-2.5 lg:gap-3 ${stats.length === 4 ? "lg:grid-cols-4" : "lg:grid-cols-3"}`}>
       {stats.map((stat) => (
         <Card key={stat.title}>
           <CardContent className="pl-3">

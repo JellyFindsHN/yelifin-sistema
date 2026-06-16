@@ -10,9 +10,9 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Package, AlertTriangle } from "lucide-react";
 
-type Props = { lowStock: any[]; recentSales: any[]; isLoading: boolean };
+type Props = { lowStock: any[]; recentSales: any[]; isLoading: boolean; showProfit?: boolean };
 
-export function MobileSummary({ lowStock, recentSales, isLoading }: Props) {
+export function MobileSummary({ lowStock, recentSales, isLoading, showProfit = true }: Props) {
   const { push } = useRouter();
   const { format } = useCurrency();
   const tz = useTimezone();
@@ -73,7 +73,9 @@ export function MobileSummary({ lowStock, recentSales, isLoading }: Props) {
                     </div>
                     <div className="text-right shrink-0 ml-3">
                       <p className="font-bold text-sm">{format(Number(sale.total))}</p>
-                      <p className="text-xs text-green-600">{format(Number(sale.profit))}</p>
+                      {showProfit && (
+                        <p className="text-xs text-green-600">{format(Number(sale.profit))}</p>
+                      )}
                     </div>
                   </div>
                 ))

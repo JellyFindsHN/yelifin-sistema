@@ -38,10 +38,12 @@ type Props = {
   onEdit:       (event: Event) => void;
   onDelete:     (event: Event) => void;
   onAddExpense: (event: Event) => void;
+  canEdit?:     boolean;
+  canDelete?:   boolean;
 };
 
 // ── Component ──────────────────────────────────────────────────────────
-export function EventCard({ event, onView, onEdit, onDelete, onAddExpense }: Props) {
+export function EventCard({ event, onView, onEdit, onDelete, onAddExpense, canEdit = true, canDelete = true }: Props) {
   const { push }   = useRouter();
   const { format } = useCurrency();
 
@@ -95,16 +97,22 @@ export function EventCard({ event, onView, onEdit, onDelete, onAddExpense }: Pro
             <DropdownMenuItem onClick={() => onView(event)}>
               <Eye className="size-4 mr-2" /> Ver detalle
             </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => onEdit(event)}>
-              <Pencil className="size-4 mr-2" /> Editar
-            </DropdownMenuItem>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem
-              className="text-destructive focus:text-destructive"
-              onClick={() => onDelete(event)}
-            >
-              <Trash2 className="size-4 mr-2" /> Eliminar
-            </DropdownMenuItem>
+            {canEdit && (
+              <DropdownMenuItem onClick={() => onEdit(event)}>
+                <Pencil className="size-4 mr-2" /> Editar
+              </DropdownMenuItem>
+            )}
+            {canDelete && (
+              <>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                  className="text-destructive focus:text-destructive"
+                  onClick={() => onDelete(event)}
+                >
+                  <Trash2 className="size-4 mr-2" /> Eliminar
+                </DropdownMenuItem>
+              </>
+            )}
           </DropdownMenuContent>
         </DropdownMenu>
       </div>

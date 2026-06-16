@@ -6,6 +6,7 @@ import { useInventoryReport } from "@/hooks/swr/use-reports";
 import { useCurrency }        from "@/hooks/swr/use-currency";
 import { useAuth }            from "@/hooks/use-auth";
 import { fmtN } from "@/lib/export";
+import { useModulePermissions } from "@/hooks/use-module-permissions";
 import { ReportShell, StatCard } from "@/components/reports/report-shell";
 import { PaginationControls } from "@/components/shared/pagination-controls";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -27,6 +28,7 @@ export default function InventoryReportPage() {
   const { format, symbol }                          = useCurrency();
   const { firebaseUser }                            = useAuth();
   const { summary, products, movements, isLoading } = useInventoryReport();
+  const { show_costs: showCosts, show_profit: showProfit } = useModulePermissions("REPORTS");
   const [search,       setSearch]       = useState("");
   const [tab,          setTab]          = useState<"stock" | "movements">("stock");
   const [productPage,  setProductPage]  = useState(1);
@@ -78,7 +80,7 @@ export default function InventoryReportPage() {
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
           <StatCard label="Productos activos"  value={String(summary.total_products)} />
           <StatCard label="Unidades totales"   value={summary.total_stock.toLocaleString("es-HN")} accent="blue" />
-          <StatCard label="Valor en inventario" value={format(summary.total_stock_value)} accent="green" />
+          {showCosts && <StatCard label="Valor en inventario" value={format(summary.total_stock_value)} accent="green" />}
           <StatCard label="Stock bajo / agotado"
             value={`${summary.low_stock_count} / ${summary.zero_stock_count}`}
             accent={summary.low_stock_count + summary.zero_stock_count > 0 ? "red" : "green"}
@@ -119,9 +121,9 @@ export default function InventoryReportPage() {
                     <th className="text-left px-4 py-2 hidden sm:table-cell">SKU</th>
                     <th className="text-right px-4 py-2">Stock</th>
                     <th className="text-right px-4 py-2 hidden md:table-cell">Precio</th>
-                    <th className="text-right px-4 py-2 hidden md:table-cell">Costo prom.</th>
-                    <th className="text-right px-4 py-2">Valor inv.</th>
-                    <th className="text-right px-4 py-2 hidden lg:table-cell">Margen</th>
+                    {showCosts  && <th className="text-right px-4 py-2 hidden md:table-cell">Costo prom.</th>}
+                    {showCosts  && <th className="text-right px-4 py-2">Valor inv.</th>}
+                    {showProfit && <th className="text-right px-4 py-2 hidden lg:table-cell">Margen</th>}
                   </tr>
                 </thead>
                 <tbody>
@@ -137,19 +139,21 @@ export default function InventoryReportPage() {
                           </span>
                         </td>
                         <td className="px-4 py-2.5 text-right hidden md:table-cell">{format(p.price)}</td>
-                        <td className="px-4 py-2.5 text-right text-muted-foreground hidden md:table-cell">{format(p.avg_cost)}</td>
-                        <td className="px-4 py-2.5 text-right font-medium">{format(p.stock_value)}</td>
-                        <td className="px-4 py-2.5 text-right hidden lg:table-cell">
-                          {p.margin_pct != null ? (
-                            <Badge variant="outline" className={`text-xs ${p.margin_pct >= 30 ? "border-green-200 text-green-700" : p.margin_pct >= 10 ? "border-amber-200 text-amber-700" : "border-red-200 text-red-700"}`}>
-                              {fmtN(p.margin_pct, 1)}%
-                            </Badge>
-                          ) : "—"}
-                        </td>
+                        {showCosts  && <td className="px-4 py-2.5 text-right text-muted-foreground hidden md:table-cell">{format(p.avg_cost)}</td>}
+                        {showCosts  && <td className="px-4 py-2.5 text-right font-medium">{format(p.stock_value)}</td>}
+                        {showProfit && (
+                          <td className="px-4 py-2.5 text-right hidden lg:table-cell">
+                            {p.margin_pct != null ? (
+                              <Badge variant="outline" className={`text-xs ${p.margin_pct >= 30 ? "border-green-200 text-green-700" : p.margin_pct >= 10 ? "border-amber-200 text-amber-700" : "border-red-200 text-red-700"}`}>
+                                {fmtN(p.margin_pct, 1)}%
+                              </Badge>
+                            ) : "—"}
+                          </td>
+                        )}
                       </tr>
                     ))}
                   {filtered.length === 0 && (
-                    <tr><td colSpan={7} className="px-4 py-10 text-center text-muted-foreground">Sin resultados</td></tr>
+                    <tr><td colSpan={showCosts && showProfit ? 7 : showCosts ? 6 : 5} className="px-4 py-10 text-center text-muted-foreground">Sin resultados</td></tr>
                   )}
                 </tbody>
               </table>

@@ -33,6 +33,7 @@ import { CreateAccountDialog } from "@/components/accounts/create-account-dialog
 import { EditAccountDialog } from "@/components/accounts/edit-account-dialog";
 import { DeleteAccountDialog } from "@/components/accounts/delete-account-dialog";
 import { Fab } from "@/components/ui/fab";
+import { useModulePermissions } from "@/hooks/use-module-permissions";
 
 const MONTH_NAMES = [
   "", "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
@@ -79,6 +80,7 @@ export default function FinancesPage() {
   const { accounts, mutate: mutateAccounts } = useAccounts();
   const { format } = useCurrency();
   const { creditCards } = useCreditCards();
+  const { can_edit: canEdit, can_delete: canDelete } = useModulePermissions("FINANCES");
 
   const availableYears = [...new Set(periods.map((p) => p.year))].sort((a, b) => b - a);
   const monthsForYear = (y: number) => {
@@ -294,18 +296,24 @@ export default function FinancesPage() {
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
-                          <DropdownMenuItem onClick={(e) => { e.stopPropagation(); fullAccount && setEditAccount(fullAccount); }}>
-                            <Pencil className="size-4 mr-2" />
-                            Editar
-                          </DropdownMenuItem>
-                          <DropdownMenuSeparator />
-                          <DropdownMenuItem
-                            className="text-destructive focus:text-destructive"
-                            onClick={(e) => { e.stopPropagation(); fullAccount && setDeleteAccount(fullAccount); }}
-                          >
-                            <Trash2 className="size-4 mr-2" />
-                            Eliminar
-                          </DropdownMenuItem>
+                          {canEdit && (
+                            <DropdownMenuItem onClick={(e) => { e.stopPropagation(); fullAccount && setEditAccount(fullAccount); }}>
+                              <Pencil className="size-4 mr-2" />
+                              Editar
+                            </DropdownMenuItem>
+                          )}
+                          {canDelete && (
+                            <>
+                              <DropdownMenuSeparator />
+                              <DropdownMenuItem
+                                className="text-destructive focus:text-destructive"
+                                onClick={(e) => { e.stopPropagation(); fullAccount && setDeleteAccount(fullAccount); }}
+                              >
+                                <Trash2 className="size-4 mr-2" />
+                                Eliminar
+                              </DropdownMenuItem>
+                            </>
+                          )}
                         </DropdownMenuContent>
                       </DropdownMenu>
                     </div>
@@ -419,8 +427,8 @@ export default function FinancesPage() {
 
       <Fab
         actions={[
-          { label: "Nueva cuenta", icon: Wallet, onClick: () => setCreateAccountOpen(true) },
-          { label: "Nueva transacción", icon: ArrowLeftRight, onClick: () => setTransactionOpen(true) },
+          ...(canEdit ? [{ label: "Nueva cuenta", icon: Wallet, onClick: () => setCreateAccountOpen(true) }] : []),
+          ...(canEdit ? [{ label: "Nueva transacción", icon: ArrowLeftRight, onClick: () => setTransactionOpen(true) }] : []),
         ]}
       />
 

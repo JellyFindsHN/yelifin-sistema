@@ -15,6 +15,7 @@ import { DeleteSupplyDialog } from "@/components/supplies/delete-supply-dialog";
 import { AddSupplyPurchaseDialog } from "@/components/supplies/add-supply-purchase-dialog";
 import { Fab } from "@/components/ui/fab";
 import { SearchBar } from "@/components/shared/search-bar";
+import { useModulePermissions } from "@/hooks/use-module-permissions";
 import { useDebounce } from "@/hooks/use-debounce";
 import {
   Pagination, PaginationContent, PaginationItem,
@@ -35,6 +36,7 @@ export default function SuppliesPage() {
     limit: pageLimit,
   });
 
+  const { can_edit: canEdit, can_delete: canDelete } = useModulePermissions("INVENTORY");
   const [createOpen, setCreateOpen] = useState(false);
   const [editSupply, setEditSupply] = useState<Supply | null>(null);
   const [deleteSupply, setDeleteSupply] = useState<Supply | null>(null);
@@ -77,6 +79,8 @@ export default function SuppliesPage() {
               onEdit={setEditSupply}
               onDelete={setDeleteSupply}
               onAddPurchase={setPurchaseSupply}
+              canEdit={canEdit}
+              canDelete={canDelete}
             />
       )}
 
@@ -153,14 +157,13 @@ export default function SuppliesPage() {
         onSuccess={() => mutate()}
       />
 
-      <Fab
-        actions={[
-          {
-            label: "Nuevo Cliente",
-            icon: Box,
-            onClick: () => setCreateOpen(true),
-          }
-        ]}/>
+      {canEdit && (
+        <Fab
+          actions={[
+            { label: "Nuevo suministro", icon: Box, onClick: () => setCreateOpen(true) },
+          ]}
+        />
+      )}
     </div>
   );
 }
