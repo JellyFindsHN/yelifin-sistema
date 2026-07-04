@@ -43,28 +43,28 @@ import { useProducts, useDeleteVariant } from "@/hooks/swr/use-products";
 import { Fab } from "@/components/ui/fab";
 import { Product, ProductVariant } from "@/types";
 
-import { CreateProductDialog }        from "@/components/products/create-product-dialog";
+import { CreateProductDialog } from "@/components/products/create-product-dialog";
 import { CreateProductVariantDialog } from "@/components/products/create-product-variant-dialog";
-import { EditProductDialog }          from "@/components/products/edit-product-dialog";
-import { EditProductVariantDialog }   from "@/components/products/edit-product-variant-dialog";
-import { DeleteProductDialog }        from "@/components/products/delete-product-dialog";
-import { AddInventoryDialog }         from "@/components/products/add-inventory-dialog";
-import { AdjustInventoryDialog }      from "@/components/products/adjust-inventory-dialog";
-import { useCurrency }                from "@/hooks/swr/use-currency";
-import { CreateTransactionModal }     from "@/components/transactions/create-transaction-modal";
-import { useAccounts }                from "@/hooks/swr/use-accounts";
-import { useCreditCards }             from "@/hooks/swr/use-credit-cards";
-import { usePurchases }               from "@/hooks/swr/use-purchases";
-import { useMe }                      from "@/hooks/swr/use-me";
-import { useModulePermissions }        from "@/hooks/use-module-permissions";
+import { EditProductDialog } from "@/components/products/edit-product-dialog";
+import { EditProductVariantDialog } from "@/components/products/edit-product-variant-dialog";
+import { DeleteProductDialog } from "@/components/products/delete-product-dialog";
+import { AddInventoryDialog } from "@/components/products/add-inventory-dialog";
+import { AdjustInventoryDialog } from "@/components/products/adjust-inventory-dialog";
+import { useCurrency } from "@/hooks/swr/use-currency";
+import { CreateTransactionModal } from "@/components/transactions/create-transaction-modal";
+import { useAccounts } from "@/hooks/swr/use-accounts";
+import { useCreditCards } from "@/hooks/swr/use-credit-cards";
+import { usePurchases } from "@/hooks/swr/use-purchases";
+import { useMe } from "@/hooks/swr/use-me";
+import { useModulePermissions } from "@/hooks/use-module-permissions";
 
 // ── Helpers ────────────────────────────────────────────────────────────
 
 const getStockBadge = (stock: number, is_service?: boolean) => {
   if (is_service) return <Badge className="bg-blue-100 text-blue-700 border-blue-200">Servicio</Badge>;
   if (stock === 0) return <Badge variant="destructive">Agotado</Badge>;
-  if (stock < 5)   return <Badge className="bg-orange-100 text-orange-700 border-orange-200">{stock} uds</Badge>;
-  if (stock < 10)  return <Badge className="bg-yellow-100 text-yellow-700 border-yellow-200">{stock} uds</Badge>;
+  if (stock < 5) return <Badge className="bg-orange-100 text-orange-700 border-orange-200">{stock} uds</Badge>;
+  if (stock < 10) return <Badge className="bg-yellow-100 text-yellow-700 border-yellow-200">{stock} uds</Badge>;
   return <Badge className="bg-green-100 text-green-700 border-green-200">{stock} uds</Badge>;
 };
 
@@ -278,11 +278,11 @@ function VariantTableRow({
           <div className="relative size-8 rounded-md overflow-hidden bg-muted flex items-center justify-center shrink-0">
             {(variantStock.image_url ?? product?.image_url)
               ? <Image
-                  src={(variantStock.image_url ?? product?.image_url)!}
-                  alt={variantStock.variant_name}
-                  fill
-                  className="object-cover"
-                />
+                src={(variantStock.image_url ?? product?.image_url)!}
+                alt={variantStock.variant_name}
+                fill
+                className="object-cover"
+              />
               : <Layers className="size-3.5 text-muted-foreground/40" />
             }
           </div>
@@ -313,8 +313,8 @@ function VariantTableRow({
         {variantStock.price_override != null
           ? format(variantStock.price_override)
           : product
-          ? <span className="text-xs text-muted-foreground">Base: {format(product.price)}</span>
-          : "—"
+            ? <span className="text-xs text-muted-foreground">Base: {format(product.price)}</span>
+            : "—"
         }
       </TableCell>
       <TableCell className="text-right text-sm font-medium">
@@ -423,11 +423,11 @@ function VariantCard({
         <div className="relative size-9 rounded-md overflow-hidden bg-muted flex items-center justify-center shrink-0">
           {(variantStock.image_url ?? product?.image_url)
             ? <Image
-                src={(variantStock.image_url ?? product?.image_url)!}
-                alt={variantStock.variant_name}
-                fill
-                className="object-cover"
-              />
+              src={(variantStock.image_url ?? product?.image_url)!}
+              alt={variantStock.variant_name}
+              fill
+              className="object-cover"
+            />
             : <Layers className="size-3.5 text-muted-foreground/40" />
           }
         </div>
@@ -494,9 +494,9 @@ function VariantCard({
 export default function InventoryPage() {
   const { push } = useRouter();
 
-  const [search,      setSearch]      = useState("");
+  const [search, setSearch] = useState("");
   const [stockFilter, setStockFilter] = useState("in_stock");
-  const [page,        setPage]        = useState(1);
+  const [page, setPage] = useState(1);
   const pageLimit = 15;
 
   const debouncedSearch = useDebounce(search, 300);
@@ -505,34 +505,34 @@ export default function InventoryPage() {
 
   const { inventory, stats, total, totalPages, isLoading: loadingInventory, mutate: mutateInventory } = useInventory({
     search: debouncedSearch || undefined,
-    stock:  stockFilter !== "all" ? stockFilter : undefined,  // "all" omits the param so API returns everything
+    stock: stockFilter !== "all" ? stockFilter : undefined,  // "all" omits the param so API returns everything
     page,
-    limit:  pageLimit,
+    limit: pageLimit,
   });
   const { products, mutate: mutateProducts } = useProducts();
   const { deleteVariant, isDeleting: isDeletingVariant } = useDeleteVariant();
 
-  const [expanded,    setExpanded]    = useState<Set<number>>(new Set());
+  const [expanded, setExpanded] = useState<Set<number>>(new Set());
 
   // Diálogos de producto
-  const [createOpen,       setCreateOpen]       = useState(false);
-  const [transactionOpen,  setTransactionOpen]  = useState(false);
-  const [editProduct,      setEditProduct]      = useState<Product | null>(null);
-  const [deleteProduct,    setDeleteProduct]    = useState<Product | null>(null);
+  const [createOpen, setCreateOpen] = useState(false);
+  const [transactionOpen, setTransactionOpen] = useState(false);
+  const [editProduct, setEditProduct] = useState<Product | null>(null);
+  const [deleteProduct, setDeleteProduct] = useState<Product | null>(null);
   const [inventoryProduct, setInventoryProduct] = useState<Product | null>(null);
-  const [adjustProduct,    setAdjustProduct]    = useState<Product | null>(null);
+  const [adjustProduct, setAdjustProduct] = useState<Product | null>(null);
 
   // Diálogos de variante
-  const [variantProduct,      setVariantProduct]      = useState<Product | null>(null);
-  const [editVariant,         setEditVariant]         = useState<{ product: Product; variant: ProductVariant } | null>(null);
+  const [variantProduct, setVariantProduct] = useState<Product | null>(null);
+  const [editVariant, setEditVariant] = useState<{ product: Product; variant: ProductVariant } | null>(null);
   const [deleteVariantTarget, setDeleteVariantTarget] = useState<{ product: Product; variant: ProductVariant } | null>(null);
-  const [adjustVariant,       setAdjustVariant]       = useState<{ product: Product; variant: ProductVariant } | null>(null);
+  const [adjustVariant, setAdjustVariant] = useState<{ product: Product; variant: ProductVariant } | null>(null);
 
   const { accounts, mutate: mutateAccounts } = useAccounts();
   const { creditCards } = useCreditCards();
-  const { format }     = useCurrency();
+  const { format } = useCurrency();
   const { purchases, mutate: mutatePurchases } = usePurchases();
-  const { features, subscription }             = useMe();
+  const { features, subscription } = useMe();
   const { show_costs: showCosts, can_edit: canEdit, can_delete: canDelete } = useModulePermissions("INVENTORY");
 
   const isAdmin = (features?.ADMIN ?? []).length > 0 || subscription?.plan?.slug === "admin";
@@ -593,10 +593,10 @@ export default function InventoryPage() {
       {/* Stats */}
       <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
         {[
-          { title: "Unidades",   value: stats.total_stock,         sub: `${stats.total_products} productos`, icon: Warehouse },
-          { title: "Valor",      value: format(stats.total_value), sub: "costo adquisición",                 icon: DollarSign, hiddenWhenNoCosts: true },
-          { title: "Stock bajo", value: stats.low_stock,           sub: "menos de 10 uds",                   icon: AlertTriangle, cls: "text-yellow-600" },
-          { title: "Agotados",   value: stats.out_of_stock,        sub: "sin stock",                         icon: Package,       cls: "text-destructive" },
+          { title: "Unidades", value: stats.total_stock, sub: `${stats.total_products} productos`, icon: Warehouse },
+          { title: "Valor", value: format(stats.total_value), sub: "costo adquisición", icon: DollarSign, hiddenWhenNoCosts: true },
+          { title: "Stock bajo", value: stats.low_stock, sub: "menos de 10 uds", icon: AlertTriangle, cls: "text-yellow-600" },
+          { title: "Agotados", value: stats.out_of_stock, sub: "sin stock", icon: Package, cls: "text-destructive" },
         ].filter((s) => !(s as any).hiddenWhenNoCosts || showCosts).map((stat) => (
           <Card key={stat.title}>
             <CardContent className="pl-3">
@@ -643,12 +643,12 @@ export default function InventoryPage() {
             <SelectValue placeholder="Estado de stock" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="in_stock">Con stock</SelectItem>
-            <SelectItem value="all">Todo el inventario</SelectItem>
+            <SelectItem value="all">Todo</SelectItem>
+            <SelectItem value="in_stock">Disponible</SelectItem>
+            <SelectItem value="ok">Suficiente</SelectItem>
+            <SelectItem value="low">Bajo</SelectItem>
+            <SelectItem value="out">Agotado</SelectItem>
             <SelectItem value="services">Servicios</SelectItem>
-            <SelectItem value="ok">Stock suficiente</SelectItem>
-            <SelectItem value="low">Stock bajo</SelectItem>
-            <SelectItem value="out">Agotados</SelectItem>
           </SelectContent>
         </Select>
         {hasFilters && (
@@ -695,9 +695,9 @@ export default function InventoryPage() {
                 </TableRow>
               ) : (
                 inventory.map((item) => {
-                  const product     = findProduct(item.product_id);
+                  const product = findProduct(item.product_id);
                   const hasVariants = item.variants_stock.length > 0 && !item.is_service;
-                  const isExpanded  = expanded.has(item.product_id);
+                  const isExpanded = expanded.has(item.product_id);
 
                   return (
                     <>
@@ -812,9 +812,9 @@ export default function InventoryPage() {
           </Card>
         ) : (
           inventory.map((item) => {
-            const product     = findProduct(item.product_id);
+            const product = findProduct(item.product_id);
             const hasVariants = item.variants_stock.length > 0 && !item.is_service;
-            const isExpanded  = expanded.has(item.product_id);
+            const isExpanded = expanded.has(item.product_id);
 
             return (
               <Card
@@ -992,7 +992,7 @@ export default function InventoryPage() {
       <Fab
         actions={[
           { label: "Nueva transacción", icon: ArrowLeftRight, onClick: () => setTransactionOpen(true) },
-          { label: "Nueva venta",       icon: ShoppingCart,   onClick: () => push("/sales/new") },
+          { label: "Nueva venta", icon: ShoppingCart, onClick: () => push("/sales/new") },
           ...(canEdit ? [{ label: "Nuevo producto", icon: Plus, onClick: () => setCreateOpen(true) }] : []),
         ]}
       />
