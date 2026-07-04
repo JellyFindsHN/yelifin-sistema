@@ -202,11 +202,16 @@ export async function GET(request: NextRequest, { params }: Params) {
         im.reference_id,
         im.variant_id,
         pv.variant_name,
-        im.created_at
+        im.created_at,
+        s.sale_number
       FROM inventory_movements im
       LEFT JOIN product_variants pv
         ON  pv.id     = im.variant_id
         AND pv.org_id = ${orgId}
+      LEFT JOIN sales s
+        ON  s.id      = im.reference_id
+        AND im.reference_type = 'SALE'
+        AND s.org_id  = ${orgId}
       WHERE im.product_id = ${productId}
         AND im.org_id     = ${orgId}
       ORDER BY im.created_at DESC

@@ -69,6 +69,7 @@ type MovementRow = {
   quantity: number;
   reference_type: string | null;
   reference_id: number | null;
+  sale_number: string | null;
   variant_id: number | null;
   variant_name: string | null;
   created_at: string;
@@ -180,11 +181,14 @@ function movementBadge(type: string) {
   return <Badge className="bg-blue-100 text-blue-700 border-blue-200">Ajuste</Badge>;
 }
 
-function referenceLabel(type: string | null, id: number | null): string {
-  if (!type) return "Ajuste";
-  if (type === "SALE") return `Venta #${id ?? ""}`;
+function referenceLabel(
+  type: string | null,
+  id: number | null,
+  saleNumber: string | null
+): string {
+  if (!type || type === "ADJUSTMENT" || type === "INITIAL") return "Ajuste";
+  if (type === "SALE") return `Venta ${saleNumber ?? `#${id ?? ""}`}`;
   if (type === "PURCHASE") return `Compra #${id ?? ""}`;
-  if (type === "ADJUSTMENT" || type === "INITIAL") return "Ajuste";
   return type;
 }
 
@@ -689,14 +693,18 @@ export default function ProductDetailPage({ params }: Props) {
                 </TableHeader>
                 <TableBody>
                   {product.movements.map((m) => (
-                    <TableRow key={m.id}>
+                    <TableRow
+                      key={m.id}
+                      onClick={() => m.reference_type === "SALE" && m.reference_id && push(`/sales/${m.reference_id}`)}
+                      className={m.reference_type === "SALE" ? "cursor-pointer" : undefined}
+                    >
                       <TableCell className="text-sm">
                         {formatInTZ(m.created_at, tz, dateOpts)}
                       </TableCell>
                       <TableCell>{movementBadge(m.movement_type)}</TableCell>
                       <TableCell className="text-right text-sm font-medium">{m.quantity}</TableCell>
                       <TableCell className="text-sm text-muted-foreground">
-                        {referenceLabel(m.reference_type, m.reference_id)}
+                        {referenceLabel(m.reference_type, m.reference_id, m.sale_number)}
                       </TableCell>
                       {hasVariants && (
                         <TableCell className="text-sm text-muted-foreground">
