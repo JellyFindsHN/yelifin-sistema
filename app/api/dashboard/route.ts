@@ -256,7 +256,7 @@ export async function GET(request: NextRequest) {
         COALESCE(SUM(ib.qty_available), 0)::int AS stock
       FROM products p
       LEFT JOIN inventory_batches ib ON ib.product_id = p.id AND ib.org_id = p.org_id
-      WHERE p.org_id = ${orgId} AND p.is_active = TRUE
+      WHERE p.org_id = ${orgId} AND p.is_active = TRUE AND p.is_service = FALSE
       GROUP BY p.id
       HAVING COALESCE(SUM(ib.qty_available), 0) < 10
       ORDER BY stock ASC

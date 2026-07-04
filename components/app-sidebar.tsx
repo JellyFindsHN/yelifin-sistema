@@ -16,6 +16,7 @@ import { useMe }   from "@/hooks/swr/use-me"
 import type { OrgModule } from "@/types"
 import { toast } from "sonner"
 import { useSidebar } from "@/components/ui/sidebar"
+import { cn } from "@/lib/utils"
 
 import {
   Sidebar, SidebarContent, SidebarFooter, SidebarGroup,
@@ -169,6 +170,8 @@ function CollapsedItem({
 }
 
 // ── Full item (expanded) ───────────────────────────────────────────────
+const navIconCls = "flex items-center justify-center size-7 rounded-full group-hover/navbtn:bg-sidebar-accent-foreground/10 transition-colors shrink-0"
+
 function ExpandedItem({
   item,
   isActive,
@@ -185,10 +188,17 @@ function ExpandedItem({
       {item.submenu ? (
         <Collapsible defaultOpen={isActive(item.url)} className="group/collapsible">
           <CollapsibleTrigger asChild>
-            <SidebarMenuButton isActive={isActive(item.url)}>
-              <item.icon className="size-4" />
+            <SidebarMenuButton
+              isActive={isActive(item.url)}
+              className="group/navbtn h-11 hover:rounded-xl"
+            >
+              <span className={navIconCls}>
+                <item.icon className="size-4 shrink-0" />
+              </span>
               <span>{item.title}</span>
-              <ChevronDown className="ml-auto size-4 transition-transform group-data-[state=open]/collapsible:rotate-180" />
+              <span className={cn(navIconCls, "ml-auto")}>
+                <ChevronDown className="size-4 shrink-0 transition-transform group-data-[state=open]/collapsible:rotate-180" />
+              </span>
             </SidebarMenuButton>
           </CollapsibleTrigger>
           <CollapsibleContent>
@@ -204,9 +214,15 @@ function ExpandedItem({
           </CollapsibleContent>
         </Collapsible>
       ) : (
-        <SidebarMenuButton asChild isActive={isActive(item.url)}>
+        <SidebarMenuButton
+          asChild
+          isActive={isActive(item.url)}
+          className="group/navbtn h-11 hover:rounded-xl"
+        >
           <Link href={item.url} onClick={closeOnMobile}>
-            <item.icon className="size-4" />
+            <span className={navIconCls}>
+              <item.icon className="size-4 shrink-0" />
+            </span>
             <span>{item.title}</span>
           </Link>
         </SidebarMenuButton>

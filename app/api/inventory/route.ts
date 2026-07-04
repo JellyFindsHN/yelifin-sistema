@@ -51,6 +51,7 @@ export async function GET(request: NextRequest) {
       : sql``;
 
     const stockCondition =
+      stockFilter === "in_stock" ? sql`AND (p.is_service = TRUE OR (SELECT COALESCE(SUM(qty_available),0) FROM inventory_batches WHERE product_id=p.id AND org_id=p.org_id) >= 1)` :
       stockFilter === "services" ? sql`AND p.is_service = TRUE` :
       stockFilter === "ok"       ? sql`AND (p.is_service = TRUE OR (SELECT COALESCE(SUM(qty_available),0) FROM inventory_batches WHERE product_id=p.id AND org_id=p.org_id) >= 10)` :
       stockFilter === "low"      ? sql`AND p.is_service = FALSE AND (SELECT COALESCE(SUM(qty_available),0) FROM inventory_batches WHERE product_id=p.id AND org_id=p.org_id) > 0 AND (SELECT COALESCE(SUM(qty_available),0) FROM inventory_batches WHERE product_id=p.id AND org_id=p.org_id) < 10` :

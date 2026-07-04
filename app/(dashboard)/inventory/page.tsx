@@ -63,7 +63,7 @@ import { useModulePermissions }        from "@/hooks/use-module-permissions";
 const getStockBadge = (stock: number, is_service?: boolean) => {
   if (is_service) return <Badge className="bg-blue-100 text-blue-700 border-blue-200">Servicio</Badge>;
   if (stock === 0) return <Badge variant="destructive">Agotado</Badge>;
-  if (stock < 5)   return <Badge variant="destructive">{stock} uds</Badge>;
+  if (stock < 5)   return <Badge className="bg-orange-100 text-orange-700 border-orange-200">{stock} uds</Badge>;
   if (stock < 10)  return <Badge className="bg-yellow-100 text-yellow-700 border-yellow-200">{stock} uds</Badge>;
   return <Badge className="bg-green-100 text-green-700 border-green-200">{stock} uds</Badge>;
 };
@@ -495,7 +495,7 @@ export default function InventoryPage() {
   const { push } = useRouter();
 
   const [search,      setSearch]      = useState("");
-  const [stockFilter, setStockFilter] = useState("all");
+  const [stockFilter, setStockFilter] = useState("in_stock");
   const [page,        setPage]        = useState(1);
   const pageLimit = 15;
 
@@ -505,7 +505,7 @@ export default function InventoryPage() {
 
   const { inventory, stats, total, totalPages, isLoading: loadingInventory, mutate: mutateInventory } = useInventory({
     search: debouncedSearch || undefined,
-    stock:  stockFilter !== "all" ? stockFilter : undefined,
+    stock:  stockFilter !== "all" ? stockFilter : undefined,  // "all" omits the param so API returns everything
     page,
     limit:  pageLimit,
   });
@@ -553,7 +553,7 @@ export default function InventoryPage() {
     });
   };
 
-  const hasFilters = search || stockFilter !== "all";
+  const hasFilters = search || stockFilter !== "in_stock";
 
   const handleSuccess = () => {
     mutateProducts();
@@ -643,6 +643,7 @@ export default function InventoryPage() {
             <SelectValue placeholder="Estado de stock" />
           </SelectTrigger>
           <SelectContent>
+            <SelectItem value="in_stock">Con stock</SelectItem>
             <SelectItem value="all">Todo el inventario</SelectItem>
             <SelectItem value="services">Servicios</SelectItem>
             <SelectItem value="ok">Stock suficiente</SelectItem>
@@ -654,7 +655,7 @@ export default function InventoryPage() {
           <Button
             variant="ghost" size="sm"
             className="gap-1.5 text-muted-foreground shrink-0"
-            onClick={() => { setSearch(""); setStockFilter("all"); setPage(1); }}
+            onClick={() => { setSearch(""); setStockFilter("in_stock"); setPage(1); }}
           >
             <X className="size-3.5" /> Limpiar
           </Button>
