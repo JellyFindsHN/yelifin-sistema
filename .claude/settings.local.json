@@ -44,7 +44,11 @@
       "Bash(node_modules/.bin/tsc --noEmit)",
       "Bash(Select-String -Pattern \"inventory\\\\\\\\\\\\[id\\\\\\\\\\\\]|detail/route|purchase_history\")",
       "Bash(mkdir -p \"C:\\\\Users\\\\DEVSLS\\\\Documents\\\\GitHub\\\\yelifin-sistema\\\\app\\\\api\\\\organization\\\\members\\\\[id]\")",
-      "Bash(mkdir -p \"C:\\\\Users\\\\DEVSLS\\\\Documents\\\\GitHub\\\\yelifin-sistema\\\\app\\\\api\\\\organization\\\\roles\\\\[id]\")"
+      "Bash(mkdir -p \"C:\\\\Users\\\\DEVSLS\\\\Documents\\\\GitHub\\\\yelifin-sistema\\\\app\\\\api\\\\organization\\\\roles\\\\[id]\")",
+      "Bash(curl -s -o /dev/null -w \"dashboard: %{http_code}\\\\n\" http://localhost:3000/dashboard)",
+      "Bash(curl -s -o /dev/null -w \"finances/transactions: %{http_code}\\\\n\" http://localhost:3000/finances/transactions)",
+      "Bash(curl -s -o /dev/null -w \"customers: %{http_code}\\\\n\" http://localhost:3000/customers)",
+      "Bash(curl -s -o /dev/null -w \"inventory: %{http_code}\\\\n\" http://localhost:3000/inventory)"
     ]
   }
 }

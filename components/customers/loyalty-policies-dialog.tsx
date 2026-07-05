@@ -2,7 +2,8 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { ResponsiveModal } from "@/components/shared/responsive-modal";
+import { DialogTitle } from "@/components/ui/dialog";
 import { Button }   from "@/components/ui/button";
 import { Input }    from "@/components/ui/input";
 import { Label }    from "@/components/ui/label";
@@ -127,55 +128,55 @@ export function LoyaltyPoliciesDialog({ open, onOpenChange }: Props) {
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent
-        className={cn(
-          "fixed bottom-0 left-0 right-0 top-auto translate-x-0 translate-y-0",
-          "w-full max-w-full rounded-t-2xl rounded-b-none border-t border-x-0 border-b-0",
-          "max-h-[92dvh] flex flex-col p-0",
-          "sm:bottom-auto sm:left-1/2 sm:right-auto sm:top-1/2",
-          "sm:-translate-x-1/2 sm:-translate-y-1/2",
-          "sm:w-full sm:max-w-md",
-          "sm:rounded-2xl sm:border",
-          "sm:max-h-[88vh]",
-          "data-[state=open]:animate-in data-[state=closed]:animate-out",
-          "data-[state=open]:slide-in-from-bottom sm:data-[state=open]:slide-in-from-bottom-[48%]",
-          "data-[state=closed]:slide-out-to-bottom sm:data-[state=closed]:slide-out-to-bottom-[48%]",
-          "duration-300",
-        )}
-      >
-        {/* Handle móvil */}
-        <div className="sm:hidden flex justify-center pt-3 pb-1 shrink-0">
-          <div className="w-10 h-1 rounded-full bg-muted-foreground/30" />
-        </div>
-
-        {/* Header */}
-        <DialogHeader className="shrink-0 px-5 pt-2 pb-3 sm:pt-5 border-b">
-          <div className="flex items-center gap-3">
-            {mode === "form" && (
-              <Button variant="ghost" size="icon" className="size-7 shrink-0" onClick={resetForm}>
-                <ChevronLeft className="size-4" />
-              </Button>
-            )}
-            <div>
-              <DialogTitle className="flex items-center gap-2 text-lg font-bold">
-                <Star className="size-4 text-primary" />
-                Programa de Fidelización
-              </DialogTitle>
-              <p className="text-xs text-muted-foreground mt-0.5">
-                {mode === "list"
-                  ? "Define niveles para recompensar a tus clientes frecuentes"
-                  : editPolicy ? "Editar nivel de fidelización" : "Nuevo nivel de fidelización"}
-              </p>
-            </div>
+    <ResponsiveModal
+      open={open}
+      onOpenChange={onOpenChange}
+      preventOutsideClose={false}
+      bodyClassName="space-y-0"
+      header={
+        <div className="flex items-center gap-3">
+          {mode === "form" && (
+            <Button variant="ghost" size="icon" className="size-7 shrink-0" onClick={resetForm}>
+              <ChevronLeft className="size-4" />
+            </Button>
+          )}
+          <div>
+            <DialogTitle className="flex items-center gap-2 text-lg font-bold">
+              <Star className="size-4 text-primary" />
+              Programa de Fidelización
+            </DialogTitle>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              {mode === "list"
+                ? "Define niveles para recompensar a tus clientes frecuentes"
+                : editPolicy ? "Editar nivel de fidelización" : "Nuevo nivel de fidelización"}
+            </p>
           </div>
-        </DialogHeader>
-
-        {/* Body */}
-        <div
-          className="flex-1 overflow-y-auto px-5 py-4"
-          style={{ scrollbarWidth: "none" } as React.CSSProperties}
-        >
+        </div>
+      }
+      footer={
+        mode === "list" ? (
+          <>
+            <Button variant="outline" className="flex-1" onClick={() => onOpenChange(false)}>
+              Cerrar
+            </Button>
+            <Button className="flex-1 gap-2" onClick={() => handleOpenForm()}>
+              <Plus className="size-4" /> Agregar nivel
+            </Button>
+          </>
+        ) : (
+          <>
+            <Button variant="outline" className="flex-1" onClick={resetForm} disabled={isSaving}>
+              Cancelar
+            </Button>
+            <Button className="flex-1 gap-2" onClick={handleSave} disabled={isSaving}>
+              {isSaving
+                ? <><Loader2 className="size-4 animate-spin" />Guardando…</>
+                : editPolicy ? "Guardar cambios" : "Crear nivel"}
+            </Button>
+          </>
+        )
+      }
+    >
           {/* ── LIST MODE ── */}
           {mode === "list" && (
             <div className="space-y-3">
@@ -366,33 +367,6 @@ export function LoyaltyPoliciesDialog({ open, onOpenChange }: Props) {
               </div>
             </div>
           )}
-        </div>
-
-        {/* Footer */}
-        <div className="shrink-0 px-5 py-4 border-t flex gap-3">
-          {mode === "list" ? (
-            <>
-              <Button variant="outline" className="flex-1" onClick={() => onOpenChange(false)}>
-                Cerrar
-              </Button>
-              <Button className="flex-1 gap-2" onClick={() => handleOpenForm()}>
-                <Plus className="size-4" /> Agregar nivel
-              </Button>
-            </>
-          ) : (
-            <>
-              <Button variant="outline" className="flex-1" onClick={resetForm} disabled={isSaving}>
-                Cancelar
-              </Button>
-              <Button className="flex-1 gap-2" onClick={handleSave} disabled={isSaving}>
-                {isSaving
-                  ? <><Loader2 className="size-4 animate-spin" />Guardando…</>
-                  : editPolicy ? "Guardar cambios" : "Crear nivel"}
-              </Button>
-            </>
-          )}
-        </div>
-      </DialogContent>
-    </Dialog>
+    </ResponsiveModal>
   );
 }

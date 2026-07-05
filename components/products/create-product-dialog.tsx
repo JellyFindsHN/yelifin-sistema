@@ -4,9 +4,7 @@ import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
-import {
-  Dialog, DialogContent, DialogHeader, DialogTitle,
-} from "@/components/ui/dialog";
+import { ResponsiveModal } from "@/components/shared/responsive-modal";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -180,43 +178,39 @@ export function CreateProductDialog({ open, onOpenChange, onSuccess }: Props) {
                     : "Crear producto";
 
   return (
-    <Dialog open={open} onOpenChange={(v) => !v && handleClose()}>
-      <DialogContent
-        className={cn(
-          "fixed bottom-0 left-0 right-0 top-auto translate-x-0 translate-y-0",
-          "w-full max-w-full rounded-t-2xl rounded-b-none border-t border-x-0 border-b-0",
-          "max-h-[92dvh] flex flex-col p-0",
-          "sm:bottom-auto sm:left-1/2 sm:right-auto sm:top-1/2",
-          "sm:-translate-x-1/2 sm:-translate-y-1/2",
-          "sm:w-full sm:max-w-md lg:max-w-xl xl:max-w-xl",
-          "sm:rounded-2xl sm:border sm:max-h-[88vh]",
-          "data-[state=open]:animate-in data-[state=closed]:animate-out",
-          "data-[state=open]:slide-in-from-bottom sm:data-[state=open]:slide-in-from-bottom-[48%]",
-          "data-[state=closed]:slide-out-to-bottom sm:data-[state=closed]:slide-out-to-bottom-[48%]",
-          "duration-300",
-        )}
-        onInteractOutside={(e) => e.preventDefault()}
-        onEscapeKeyDown={() => handleClose()}
-      >
-        {/* Handle móvil */}
-        <div className="sm:hidden flex justify-center pt-3 pb-1 shrink-0">
-          <div className="w-10 h-1 rounded-full bg-muted-foreground/30" />
-        </div>
-
-        {/* Header */}
-        <DialogHeader className="shrink-0 px-5 pt-2 pb-3 sm:pt-5 border-b">
-          <DialogTitle className="text-lg font-bold">
-            {isService ? "Nuevo servicio" : "Nuevo producto"}
-          </DialogTitle>
-        </DialogHeader>
-
-        {/* Scroll */}
-        <div
-          className="flex-1 overflow-y-auto px-5 py-4"
-          style={{ scrollbarWidth: "none" } as React.CSSProperties}
-        >
-          <form id="create-product-form" onSubmit={handleSubmit(onSubmit)} className="space-y-5">
-
+    <ResponsiveModal
+      open={open}
+      onOpenChange={(v) => !v && handleClose()}
+      title={isService ? "Nuevo servicio" : "Nuevo producto"}
+      width="wide"
+      as="form"
+      formProps={{ id: "create-product-form", onSubmit: handleSubmit(onSubmit) }}
+      bodyClassName="space-y-5"
+      footer={
+        <>
+          <Button
+            type="button"
+            variant="outline"
+            onClick={handleClose}
+            disabled={isLoading}
+            className="flex-1 h-11"
+          >
+            Cancelar
+          </Button>
+          <Button
+            type="submit"
+            form="create-product-form"
+            disabled={isLoading}
+            className="flex-1 h-11 gap-2"
+          >
+            {isLoading
+              ? <><Loader2 className="size-4 animate-spin" />{submitLabel}</>
+              : <><PackagePlus className="size-4" />{submitLabel}</>
+            }
+          </Button>
+        </>
+      }
+    >
             {/* Toggle de servicio — va primero para que cambie el contexto del form */}
             <div className={cn(
               "flex items-start justify-between gap-4 rounded-xl border p-4 transition-colors",
@@ -334,34 +328,7 @@ export function CreateProductDialog({ open, onOpenChange, onSuccess }: Props) {
               />
             )}
 
-          </form>
-        </div>
-
-        {/* Footer */}
-        <div className="shrink-0 px-5 py-4 border-t bg-transparent xl:bg-transparent md:bg-transparent sm:bg-background flex gap-3">
-          <Button
-            type="button"
-            variant="outline"
-            onClick={handleClose}
-            disabled={isLoading}
-            className="flex-1 h-11"
-          >
-            Cancelar
-          </Button>
-          <Button
-            type="submit"
-            form="create-product-form"
-            disabled={isLoading}
-            className="flex-1 h-11 gap-2"
-          >
-            {isLoading
-              ? <><Loader2 className="size-4 animate-spin" />{submitLabel}</>
-              : <><PackagePlus className="size-4" />{submitLabel}</>
-            }
-          </Button>
-        </div>
-      </DialogContent>
-    </Dialog>
+    </ResponsiveModal>
   );
 }
 
