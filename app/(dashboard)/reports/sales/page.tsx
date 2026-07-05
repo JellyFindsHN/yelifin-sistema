@@ -86,7 +86,7 @@ export default function SalesReportPage() {
           <p className="text-sm font-semibold mb-3">Ingresos y utilidad por día</p>
           <ResponsiveContainer width="100%" height={220}>
             <BarChart data={byDay} margin={{ top: 0, right: 8, left: 0, bottom: 0 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+              <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
               <XAxis dataKey="date" tick={{ fontSize: 10 }}
                 tickFormatter={d => new Date(d + "T12:00:00").toLocaleDateString("es-HN", { day: "numeric", month: "short" })}
               />
@@ -97,7 +97,7 @@ export default function SalesReportPage() {
                 formatter={(v: any, name: string) => [format(Number(v)), name === "revenue" ? "Ingresos" : "Utilidad"]}
                 labelFormatter={l => new Date(l + "T12:00:00").toLocaleDateString("es-HN", { day: "numeric", month: "long" })}
               />
-              <Bar dataKey="revenue" fill="hsl(var(--primary))"    radius={[4,4,0,0]} name="revenue" />
+              <Bar dataKey="revenue" fill="var(--primary)"    radius={[4,4,0,0]} name="revenue" />
               {showProfit && <Bar dataKey="profit"  fill="hsl(142 76% 36%)"       radius={[4,4,0,0]} name="profit"  />}
             </BarChart>
           </ResponsiveContainer>

@@ -188,8 +188,8 @@ export function CreateTransactionModal({
     >
           <div className="space-y-2">
             <Label className="text-sm font-medium">Tipo</Label>
-            <div className="grid grid-cols-3 rounded-xl border overflow-hidden">
-              {(["INCOME", "EXPENSE", "TRANSFER"] as const).map((t, i) => {
+            <div className="grid grid-cols-3 gap-1.5 rounded-xl border">
+              {(["INCOME", "EXPENSE", "TRANSFER"] as const).map((t) => {
                 const { label, icon: Icon } = TYPE_CONFIG[t];
                 return (
                   <button
@@ -197,11 +197,10 @@ export function CreateTransactionModal({
                     type="button"
                     onClick={() => setType(t)}
                     className={cn(
-                      "py-2.5 flex flex-col items-center gap-1 text-xs font-medium transition-colors",
-                      i > 0 && "border-l",
+                      "flex items-center justify-center gap-1.5 rounded-lg py-2.5 text-sm font-medium transition-all duration-200",
                       type === t
-                        ? "bg-primary text-primary-foreground"
-                        : "text-muted-foreground hover:bg-muted",
+                        ? "rounded-xl bg-primary/15 text-primary"
+                        : "text-muted-foreground hover:rounded-xl hover:bg-primary/15 hover:text-primary",
                     )}
                   >
                     <Icon className="size-3.5" />
@@ -215,13 +214,15 @@ export function CreateTransactionModal({
           <div className="grid-gap-4 flex flex-col ">
             {/* Toggle cuenta / tarjeta (solo para EXPENSE) */}
             {showCreditCardOption && (
-              <div className="grid grid-cols-2 gap-1.5 p-1 bg-muted rounded-lg">
+              <div className="grid grid-cols-2 gap-1.5 rounded-xl border mb-4">
                 <button
                   type="button"
                   onClick={() => setSourceMode("account")}
                   className={cn(
-                    "flex items-center justify-center gap-1.5 py-1.5 rounded-md text-xs font-medium transition-colors cursor-pointer",
-                    sourceMode === "account" ? "bg-background shadow-sm" : "text-muted-foreground hover:text-foreground"
+                    "flex items-center justify-center gap-1.5 rounded-lg py-1.5 text-xs font-medium transition-all duration-200 cursor-pointer",
+                    sourceMode === "account"
+                      ? "rounded-xl bg-primary/15 text-primary"
+                      : "text-muted-foreground hover:rounded-xl hover:bg-primary/15 hover:text-primary"
                   )}
                 >
                   <Wallet className="size-3" /> Cuenta
@@ -230,8 +231,10 @@ export function CreateTransactionModal({
                   type="button"
                   onClick={() => setSourceMode("credit_card")}
                   className={cn(
-                    "flex items-center justify-center gap-1.5 py-1.5 rounded-md text-xs font-medium transition-colors cursor-pointer",
-                    sourceMode === "credit_card" ? "bg-background shadow-sm" : "text-muted-foreground hover:text-foreground"
+                    "flex items-center justify-center gap-1.5 rounded-lg py-1.5 text-xs font-medium transition-all duration-200 cursor-pointer",
+                    sourceMode === "credit_card"
+                      ? "rounded-xl bg-primary/15 text-primary"
+                      : "text-muted-foreground hover:rounded-xl hover:bg-primary/15 hover:text-primary"
                   )}
                 >
                   <CreditCard className="size-3" /> Tarjeta
@@ -269,7 +272,7 @@ export function CreateTransactionModal({
             {/* Selector de tarjeta de crédito */}
             {isCreditCardMode && (
               <div className="space-y-3">
-                <div className="space-y-1.5">
+                <div className="space-y-1.5 mb-4">
                   <Label className="text-sm font-medium">
                     Tarjeta de crédito <span className="text-destructive text-xs">*</span>
                   </Label>
@@ -323,7 +326,7 @@ export function CreateTransactionModal({
             )}
 
             {type === "TRANSFER" && (
-              <div className="space-y-1.5 sm:mt-3">
+              <div className="space-y-1.5 sm:mt-3 mt-4">
                 <Label className="text-sm font-medium">
                   Cuenta destino{" "}
                   <span className="text-destructive text-xs">*</span>

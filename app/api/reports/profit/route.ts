@@ -27,19 +27,25 @@ export async function GET(request: NextRequest) {
 
     // ── Resumen global ─────────────────────────────────────────────
     const [summary] = await sql`
+      WITH item_costs AS (
+        SELECT sale_id, SUM(unit_cost * quantity) AS cogs
+        FROM sale_items
+        WHERE org_id = ${orgId}
+        GROUP BY sale_id
+      )
       SELECT
         COALESCE(SUM(s.total), 0)::float                                         AS revenue,
-        COALESCE(SUM(si.unit_cost * si.quantity), 0)::float                     AS cogs,
-        COALESCE(SUM(s.total) - SUM(si.unit_cost * si.quantity), 0)::float      AS gross_profit,
+        COALESCE(SUM(ic.cogs), 0)::float                                         AS cogs,
+        COALESCE(SUM(s.total) - SUM(ic.cogs), 0)::float                          AS gross_profit,
         COALESCE(SUM(s.discount), 0)::float                                      AS total_discount,
         CASE
           WHEN SUM(s.total) > 0
-          THEN ROUND(100.0 * (SUM(s.total) - SUM(si.unit_cost * si.quantity)) / SUM(s.total), 1)::float
+          THEN ROUND(100.0 * (SUM(s.total) - SUM(ic.cogs)) / SUM(s.total), 1)::float
           ELSE 0
         END                                                                       AS margin_pct,
         COUNT(DISTINCT s.id)::int                                                AS total_sales
       FROM sales s
-      LEFT JOIN sale_items si ON si.sale_id = s.id AND si.org_id = ${orgId}
+      LEFT JOIN item_costs ic ON ic.sale_id = s.id
       WHERE s.org_id = ${orgId}
         AND s.status  = 'COMPLETED'
         AND s.sold_at >= ${from}::date
@@ -48,15 +54,21 @@ export async function GET(request: NextRequest) {
 
     // ── Por mes ────────────────────────────────────────────────────
     const byMonth = await sql`
+      WITH item_costs AS (
+        SELECT sale_id, SUM(unit_cost * quantity) AS cogs
+        FROM sale_items
+        WHERE org_id = ${orgId}
+        GROUP BY sale_id
+      )
       SELECT
         TO_CHAR(s.sold_at, 'YYYY-MM')                                           AS month,
         TO_CHAR(s.sold_at, 'Mon YYYY')                                          AS month_label,
         COALESCE(SUM(s.total), 0)::float                                        AS revenue,
-        COALESCE(SUM(si.unit_cost * si.quantity), 0)::float                    AS cogs,
-        COALESCE(SUM(s.total) - SUM(si.unit_cost * si.quantity), 0)::float     AS profit,
+        COALESCE(SUM(ic.cogs), 0)::float                                        AS cogs,
+        COALESCE(SUM(s.total) - SUM(ic.cogs), 0)::float                         AS profit,
         COUNT(DISTINCT s.id)::int                                               AS sales_count
       FROM sales s
-      LEFT JOIN sale_items si ON si.sale_id = s.id AND si.org_id = ${orgId}
+      LEFT JOIN item_costs ic ON ic.sale_id = s.id
       WHERE s.org_id = ${orgId}
         AND s.status  = 'COMPLETED'
         AND s.sold_at >= ${from}::date

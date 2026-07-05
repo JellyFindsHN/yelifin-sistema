@@ -48,6 +48,7 @@ import { EditTransactionModal } from "@/components/transactions/edit-transaction
 import { toast } from "sonner";
 import { SearchBar } from "@/components/shared/search-bar";
 import { useDebounce } from "@/hooks/use-debounce";
+import { cn } from "@/lib/utils";
 
 // ── Helpers ────────────────────────────────────────────────────────────
 const formatDate = (d: string) =>
@@ -381,8 +382,9 @@ export default function TransactionsPage() {
                     </p>
                     <p className="text-xs text-muted-foreground">{formatDate(t.occurred_at)}</p>
                   </div>
-                  <div className="gap-1">
-                    <div className="text-right shrink-0">
+                  <div className="flex flex-col items-end gap-1 shrink-0">
+                    <ActionsMenu t={t} isEditable={isEditable} onEdit={setEditingTx} onDelete={setDeletingTx} canEdit={canEdit} canDelete={canDelete} />
+                    <div className="text-right">
                       <p className={`text-sm font-bold ${cfg.color}`}>
                         {cfg.sign}{format(Number(t.amount))}
                       </p>
@@ -390,7 +392,6 @@ export default function TransactionsPage() {
                         {cfg.label}
                       </Badge>
                     </div>
-                    <ActionsMenu t={t} isEditable={isEditable} onEdit={setEditingTx} onDelete={setDeletingTx} canEdit={canEdit} canDelete={canDelete} />
                   </div>
                 </div>
               </div>
@@ -593,13 +594,17 @@ export default function TransactionsPage() {
             </div>
 
             <div className={isSearching ? "opacity-50 pointer-events-none" : ""}>
-              <div className="grid grid-cols-2 rounded-lg border overflow-hidden">
-                {(["month", "date"] as const).map((mode, i) => (
+              <div className="grid grid-cols-2 gap-1.5 rounded-xl border">
+                {(["month", "date"] as const).map((mode) => (
                   <button
                     key={mode}
                     onClick={() => setFilterMode(mode)}
-                    className={`py-2 text-xs font-medium transition-colors ${i > 0 ? "border-l" : ""} ${filterMode === mode ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-muted"
-                      }`}
+                    className={cn(
+                      "rounded-lg py-2 text-sm font-medium transition-all duration-200",
+                      filterMode === mode
+                        ? "rounded-xl bg-primary/15 text-primary"
+                        : "text-muted-foreground hover:rounded-xl hover:bg-primary/15 hover:text-primary",
+                    )}
                   >
                     {mode === "month" ? "Por mes" : "Fecha exacta"}
                   </button>
@@ -693,13 +698,17 @@ export default function TransactionsPage() {
               <CardContent className="p-3">
                 <div className="flex items-center justify-between mb-3">
                   <p className="text-sm font-semibold">Por categoría</p>
-                  <div className="grid grid-cols-2 rounded-lg border overflow-hidden text-xs">
-                    {(["expense", "income"] as const).map((tab, i) => (
+                  <div className="grid grid-cols-2 gap-1.5 rounded-xl border text-xs">
+                    {(["expense", "income"] as const).map((tab) => (
                       <button
                         key={tab}
                         onClick={() => setAnalyticsTab(tab)}
-                        className={`px-3 py-1.5 font-medium transition-colors ${i > 0 ? "border-l" : ""} ${analyticsTab === tab ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-muted"
-                          }`}
+                        className={cn(
+                          "rounded-lg px-3 py-1.5 font-medium transition-all duration-200",
+                          analyticsTab === tab
+                            ? "rounded-xl bg-primary/15 text-primary"
+                            : "text-muted-foreground hover:rounded-xl hover:bg-primary/15 hover:text-primary",
+                        )}
                       >
                         {tab === "expense" ? "Egresos" : "Ingresos"}
                       </button>
@@ -709,16 +718,16 @@ export default function TransactionsPage() {
                 {(analyticsTab === "expense" ? categoryData.expenses : categoryData.income).length === 0 ? (
                   <p className="text-sm text-muted-foreground text-center py-6">Sin datos</p>
                 ) : (
-                  <ResponsiveContainer width="100%" height={220}>
+                  <ResponsiveContainer width="100%" height={300}>
                     <PieChart>
                       <Pie
                         data={analyticsTab === "expense" ? categoryData.expenses : categoryData.income}
                         dataKey="value"
                         nameKey="name"
                         cx="50%"
-                        cy="45%"
-                        innerRadius={52}
-                        outerRadius={80}
+                        cy="42%"
+                        innerRadius={46}
+                        outerRadius={72}
                         paddingAngle={2}
                       >
                         {(analyticsTab === "expense" ? categoryData.expenses : categoryData.income).map((cat, i) => (
@@ -727,14 +736,14 @@ export default function TransactionsPage() {
                       </Pie>
                       <Tooltip
                         formatter={(v: number) => format(v)}
-                        contentStyle={{ fontSize: 12, borderRadius: 8, border: "1px solid hsl(var(--border))", backgroundColor: "hsl(var(--card))", color: "hsl(var(--foreground))" }}
+                        contentStyle={{ fontSize: 12, borderRadius: 8, border: "1px solid var(--border)", backgroundColor: "var(--card)", color: "var(--foreground)" }}
                       />
                       <Legend
                         iconType="circle"
                         iconSize={8}
                         wrapperStyle={{ fontSize: 11, paddingTop: 8 }}
                         formatter={(value) => (
-                          <span style={{ color: "hsl(var(--foreground))", fontSize: 11 }}>
+                          <span style={{ color: "var(--foreground)", fontSize: 11 }}>
                             {value.length > 18 ? value.slice(0, 18) + "…" : value}
                           </span>
                         )}

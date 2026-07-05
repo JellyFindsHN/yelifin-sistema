@@ -32,6 +32,7 @@ import { CreateTransactionModal } from "@/components/transactions/create-transac
 import { CreateAccountDialog } from "@/components/accounts/create-account-dialog";
 import { EditAccountDialog } from "@/components/accounts/edit-account-dialog";
 import { DeleteAccountDialog } from "@/components/accounts/delete-account-dialog";
+import { CreateCreditCardDialog } from "@/components/credit-cards/create-credit-card-dialog";
 import { Fab } from "@/components/ui/fab";
 import { useModulePermissions } from "@/hooks/use-module-permissions";
 
@@ -72,6 +73,7 @@ export default function FinancesPage() {
   const [selectedYear, setSelectedYear] = useState<number | undefined>(now.getFullYear());
   const [transactionOpen, setTransactionOpen] = useState(false);
   const [createAccountOpen, setCreateAccountOpen] = useState(false);
+  const [createCardOpen, setCreateCardOpen] = useState(false);
   const [editAccount, setEditAccount] = useState<Account | null>(null);
   const [deleteAccount, setDeleteAccount] = useState<Account | null>(null);
 
@@ -79,7 +81,7 @@ export default function FinancesPage() {
   const { periods } = useFinancePeriods();
   const { accounts, mutate: mutateAccounts } = useAccounts();
   const { format } = useCurrency();
-  const { creditCards } = useCreditCards();
+  const { creditCards, mutate: mutateCreditCards } = useCreditCards();
   const { can_edit: canEdit, can_delete: canDelete } = useModulePermissions("FINANCES");
 
   const availableYears = [...new Set(periods.map((p) => p.year))].sort((a, b) => b - a);
@@ -225,8 +227,8 @@ export default function FinancesPage() {
                   <Tooltip
                     formatter={(v: number) => format(v)}
                     contentStyle={{
-                      backgroundColor: "hsl(var(--card))",
-                      border: "1px solid hsl(var(--border))",
+                      backgroundColor: "var(--card)",
+                      border: "1px solid var(--border)",
                       borderRadius: "8px",
                       fontSize: 12,
                     }}
@@ -428,6 +430,7 @@ export default function FinancesPage() {
       <Fab
         actions={[
           ...(canEdit ? [{ label: "Nueva cuenta", icon: Wallet, onClick: () => setCreateAccountOpen(true) }] : []),
+          ...(canEdit ? [{ label: "Nueva tarjeta de crédito", icon: CreditCard, onClick: () => setCreateCardOpen(true) }] : []),
           ...(canEdit ? [{ label: "Nueva transacción", icon: ArrowLeftRight, onClick: () => setTransactionOpen(true) }] : []),
         ]}
       />
@@ -443,6 +446,11 @@ export default function FinancesPage() {
         open={createAccountOpen}
         onOpenChange={setCreateAccountOpen}
         onSuccess={onAccountSuccess}
+      />
+      <CreateCreditCardDialog
+        open={createCardOpen}
+        onOpenChange={setCreateCardOpen}
+        onSuccess={() => mutateCreditCards()}
       />
       <EditAccountDialog
         account={editAccount}

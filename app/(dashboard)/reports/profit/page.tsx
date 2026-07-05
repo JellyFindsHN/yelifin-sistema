@@ -92,7 +92,7 @@ export default function ProfitReportPage() {
           <p className="text-sm font-semibold mb-3">Ingresos vs. utilidad por mes</p>
           <ResponsiveContainer width="100%" height={240}>
             <BarChart data={byMonth} margin={{ top: 0, right: 8, left: 0, bottom: 0 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+              <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
               <XAxis dataKey="month_label" tick={{ fontSize: 10 }} />
               <YAxis tick={{ fontSize: 10 }} width={65}
                 tickFormatter={v => `${symbol}${Number(v).toLocaleString("es-HN", { maximumFractionDigits: 0 })}`}
@@ -101,7 +101,7 @@ export default function ProfitReportPage() {
                 formatter={(v: any, name: string) => [format(Number(v)), name === "revenue" ? "Ingresos" : name === "cogs" ? "Costo" : "Utilidad"]}
               />
               <Legend formatter={(v) => v === "revenue" ? "Ingresos" : v === "cogs" ? "Costo" : "Utilidad"} />
-              <Bar dataKey="revenue" fill="hsl(var(--primary))" radius={[4,4,0,0]} />
+              <Bar dataKey="revenue" fill="var(--primary)" radius={[4,4,0,0]} />
               <Bar dataKey="cogs"    fill="hsl(0 84% 60%)"      radius={[4,4,0,0]} />
               <Bar dataKey="profit"  fill="hsl(142 76% 36%)"    radius={[4,4,0,0]} />
             </BarChart>

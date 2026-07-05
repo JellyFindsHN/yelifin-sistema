@@ -31,7 +31,7 @@ export function TopProductsStock({ topProducts, lowStock, isLoading }: Props) {
                 <CartesianGrid strokeDasharray="3 3" className="stroke-muted" horizontal={false} />
                 <XAxis type="number" tick={{ fontSize: 11 }} tickLine={false} axisLine={false} />
                 <YAxis dataKey="name" type="category" tick={{ fontSize: 11 }} tickLine={false} axisLine={false} width={110} />
-                <Tooltip contentStyle={{ backgroundColor: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: "8px" }} />
+                <Tooltip contentStyle={{ backgroundColor: "var(--card)", border: "1px solid var(--border)", borderRadius: "8px" }} />
                 <Bar dataKey="units_sold" radius={[0, 4, 4, 0]} name="Unidades">
                   {topProducts.map((p: any, i: number) => (
                     <Cell key={p.name} fill={CHART_COLORS[i % CHART_COLORS.length]} />

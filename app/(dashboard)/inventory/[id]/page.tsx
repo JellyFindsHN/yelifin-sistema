@@ -264,8 +264,8 @@ function PurchasePriceChart({
         <Tooltip
           formatter={(v: number) => format(v)}
           contentStyle={{
-            backgroundColor: "hsl(var(--card))",
-            border: "1px solid hsl(var(--border))",
+            backgroundColor: "var(--card)",
+            border: "1px solid var(--border)",
             borderRadius: "8px",
             fontWeight: 500,
           }}

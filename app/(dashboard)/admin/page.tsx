@@ -212,7 +212,7 @@ export default function AdminPage() {
                   <XAxis
                     type="number"
                     tickFormatter={(v) => fmtBytes(v)}
-                    tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }}
+                    tick={{ fontSize: 10, fill: "var(--muted-foreground)" }}
                     axisLine={false}
                     tickLine={false}
                   />
@@ -220,21 +220,21 @@ export default function AdminPage() {
                     type="category"
                     dataKey="name"
                     width={120}
-                    tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }}
+                    tick={{ fontSize: 10, fill: "var(--muted-foreground)" }}
                     axisLine={false}
                     tickLine={false}
                   />
                   <Tooltip
                     formatter={(value: number) => [fmtBytes(value), "Tamaño"]}
                     contentStyle={{
-                      background: "hsl(var(--popover))",
-                      border: "1px solid hsl(var(--border))",
+                      background: "var(--popover)",
+                      border: "1px solid var(--border)",
                       borderRadius: "8px",
                       fontSize: "12px",
-                      color: "hsl(var(--popover-foreground))",
+                      color: "var(--popover-foreground)",
                     }}
                   />
-                  <Bar dataKey="bytes" radius={[0, 4, 4, 0]} fill="hsl(var(--primary))" />
+                  <Bar dataKey="bytes" radius={[0, 4, 4, 0]} fill="var(--primary)" />
                 </BarChart>
               </ResponsiveContainer>
             )}

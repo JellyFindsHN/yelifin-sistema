@@ -81,7 +81,6 @@ export function ResponsiveModal({
   const bodyProps = {
     ...(as === "form" ? formProps : {}),
     className: cn("flex-1 overflow-y-auto px-5 py-4 space-y-4", bodyClassName),
-    style: { scrollbarWidth: "none" } as React.CSSProperties,
     children,
   };
 

@@ -23,13 +23,14 @@ import {
 import {
   CreditCard, ArrowLeft, Banknote, ShoppingBag,
   CalendarDays, TrendingUp, DollarSign, Tag,
-  MoreVertical, Pencil, Trash2,
+  MoreVertical, Pencil, Trash2, ArrowLeftRight,
 } from "lucide-react";
 import {
   useCreditCard,
   useCreditCardTransactions,
   useCreditCardPeriods,
   useDeleteCCTransaction,
+  useCreditCards,
   CreditCardTransaction,
 } from "@/hooks/swr/use-credit-cards";
 import { useAccounts } from "@/hooks/swr/use-accounts";
@@ -38,6 +39,7 @@ import { useTransactionCategories } from "@/hooks/swr/use-transaction-categories
 import { toast } from "sonner";
 import { PayCreditCardDialog } from "@/components/credit-cards/pay-credit-card-dialog";
 import { EditCCTransactionDialog } from "@/components/credit-cards/edit-cc-transaction-dialog";
+import { CreateTransactionModal } from "@/components/transactions/create-transaction-modal";
 import { Fab } from "@/components/ui/fab";
 
 const MONTH_NAMES = [
@@ -58,6 +60,7 @@ export default function CreditCardDetailPage({
   const [selectedMonth, setSelectedMonth] = useState<number>(now.getMonth() + 1);
   const [selectedYear, setSelectedYear] = useState<number>(now.getFullYear());
   const [payOpen, setPayOpen] = useState(false);
+  const [transactionOpen, setTransactionOpen] = useState(false);
   const [editingTxn, setEditingTxn] = useState<CreditCardTransaction | null>(null);
   const [deletingTxn, setDeletingTxn] = useState<CreditCardTransaction | null>(null);
 
@@ -69,6 +72,7 @@ export default function CreditCardDetailPage({
   });
   const { periods } = useCreditCardPeriods(cardId);
   const { accounts } = useAccounts();
+  const { creditCards } = useCreditCards();
   const { format, currency } = useCurrency();
   const { deleteTransaction, isDeleting } = useDeleteCCTransaction();
   const { categories: expenseCategories } = useTransactionCategories("EXPENSE");
@@ -314,15 +318,20 @@ export default function CreditCardDetailPage({
         </Card>
       </div>
 
-      {(Number(creditCard?.balance ?? 0) > 0 || Number(creditCard?.balance_usd ?? 0) > 0) && (
-        <Fab
-          actions={[{
+      <Fab
+        actions={[
+          {
+            label: "Nueva transacción",
+            icon: ArrowLeftRight,
+            onClick: () => setTransactionOpen(true),
+          },
+          ...((Number(creditCard?.balance ?? 0) > 0 || Number(creditCard?.balance_usd ?? 0) > 0) ? [{
             label: "Pagar tarjeta",
             icon: Banknote,
             onClick: () => setPayOpen(true),
-          }]}
-        />
-      )}
+          }] : []),
+        ]}
+      />
 
       <PayCreditCardDialog
         open={payOpen}
@@ -330,6 +339,14 @@ export default function CreditCardDetailPage({
         card={creditCard ?? null}
         accounts={accounts}
         onSuccess={handlePaySuccess}
+      />
+
+      <CreateTransactionModal
+        open={transactionOpen}
+        onOpenChange={setTransactionOpen}
+        accounts={accounts}
+        creditCards={creditCards}
+        onSuccess={() => { mutateCard(); mutateTxns(); }}
       />
 
       <EditCCTransactionDialog

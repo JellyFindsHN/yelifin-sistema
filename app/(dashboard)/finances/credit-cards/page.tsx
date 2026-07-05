@@ -2,7 +2,7 @@
 "use client";
 
 import { useState, useMemo } from "react";
-import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -11,8 +11,12 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import {
-  CreditCard, Plus, ChevronRight, Trash2,
-  CalendarDays, DollarSign, ArrowUpCircle, ArrowDownCircle,
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem,
+  DropdownMenuSeparator, DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
+  CreditCard, Plus, MoreVertical, Banknote, Trash2,
+  CalendarDays, DollarSign, ArrowUpCircle, ArrowDownCircle, ArrowLeftRight,
 } from "lucide-react";
 import {
   PieChart, Pie, Cell, Tooltip, Legend, ResponsiveContainer,
@@ -28,6 +32,7 @@ import { useCurrency } from "@/hooks/swr/use-currency";
 import { usePrivacyMode } from "@/context/privacy-mode-context";
 import { CreateCreditCardDialog } from "@/components/credit-cards/create-credit-card-dialog";
 import { PayCreditCardDialog } from "@/components/credit-cards/pay-credit-card-dialog";
+import { CreateTransactionModal } from "@/components/transactions/create-transaction-modal";
 import { Fab } from "@/components/ui/fab";
 
 const MONTH_NAMES = [
@@ -44,6 +49,7 @@ const formatDate = (d: string) =>
 
 export default function CreditCardsPage() {
   const now = new Date();
+  const { push } = useRouter();
 
   const { creditCards, isLoading, mutate } = useCreditCards();
   const { accounts } = useAccounts();
@@ -52,6 +58,7 @@ export default function CreditCardsPage() {
   const { isPrivate } = usePrivacyMode();
 
   const [createOpen, setCreateOpen] = useState(false);
+  const [transactionOpen, setTransactionOpen] = useState(false);
   const [payCard, setPayCard] = useState<CreditCardType | null>(null);
   const [selectedMonth, setSelectedMonth] = useState(now.getMonth() + 1);
   const [selectedYear, setSelectedYear] = useState(now.getFullYear());
@@ -59,7 +66,7 @@ export default function CreditCardsPage() {
 
   const { periods } = useCCTransactionPeriods();
 
-  const { transactions: ccTxs, isLoading: loadingTxs } = useAllCreditCardTransactions({
+  const { transactions: ccTxs, isLoading: loadingTxs, mutate: mutateTxs } = useAllCreditCardTransactions({
     month: selectedMonth,
     year: selectedYear,
     card_id: selectedCardId,
@@ -281,61 +288,73 @@ export default function CreditCardsPage() {
                 <div className="divide-y">
                   {creditCards.map((card) => (
                     <div key={card.id} className="flex items-center gap-3 p-3.5">
-                      <div className="size-10 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
-                        <CreditCard className="size-5 text-primary" />
+                      <div
+                        className="flex items-center gap-3 flex-1 min-w-0 cursor-pointer hover:bg-muted/50 rounded-lg transition-colors -m-1 p-1"
+                        onClick={() => push(`/finances/credit-cards/${card.id}`)}
+                      >
+                        <div className="size-10 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
+                          <CreditCard className="size-5 text-primary" />
+                        </div>
+
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <p className="text-sm font-medium truncate">{card.name}</p>
+                            {card.last_four && (
+                              <Badge variant="outline" className="text-[10px] font-mono">···· {card.last_four}</Badge>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-3 mt-0.5 flex-wrap">
+                            {Number(card.balance) > 0 && (
+                              <span className={`text-xs text-destructive font-medium ${isPrivate ? "blur-sm select-none" : ""}`}>
+                                {format(Number(card.balance))}
+                              </span>
+                            )}
+                            {Number(card.balance_usd) > 0 && (
+                              <span className={`text-xs text-destructive font-medium flex items-center gap-0.5 ${isPrivate ? "blur-sm select-none" : ""}`}>
+                                <DollarSign className="size-2.5" />
+                                {Number(card.balance_usd).toFixed(2)} USD
+                              </span>
+                            )}
+                            {Number(card.balance) === 0 && Number(card.balance_usd) === 0 && (
+                              <span className="text-xs text-muted-foreground">Sin deuda</span>
+                            )}
+                            {card.payment_due_day && (
+                              <span className="text-xs text-muted-foreground flex items-center gap-0.5">
+                                <CalendarDays className="size-2.5" />
+                                Pago día {card.payment_due_day}
+                              </span>
+                            )}
+                          </div>
+                        </div>
                       </div>
 
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-1.5 flex-wrap">
-                          <p className="text-sm font-medium truncate">{card.name}</p>
-                          {card.last_four && (
-                            <Badge variant="outline" className="text-[10px] font-mono">···· {card.last_four}</Badge>
-                          )}
-                        </div>
-                        <div className="flex items-center gap-3 mt-0.5 flex-wrap">
-                          {Number(card.balance) > 0 && (
-                            <span className={`text-xs text-destructive font-medium ${isPrivate ? "blur-sm select-none" : ""}`}>
-                              {format(Number(card.balance))}
-                            </span>
-                          )}
-                          {Number(card.balance_usd) > 0 && (
-                            <span className={`text-xs text-destructive font-medium flex items-center gap-0.5 ${isPrivate ? "blur-sm select-none" : ""}`}>
-                              <DollarSign className="size-2.5" />
-                              {Number(card.balance_usd).toFixed(2)} USD
-                            </span>
-                          )}
-                          {Number(card.balance) === 0 && Number(card.balance_usd) === 0 && (
-                            <span className="text-xs text-muted-foreground">Sin deuda</span>
-                          )}
-                          {card.payment_due_day && (
-                            <span className="text-xs text-muted-foreground flex items-center gap-0.5">
-                              <CalendarDays className="size-2.5" />
-                              Pago día {card.payment_due_day}
-                            </span>
-                          )}
-                        </div>
-                      </div>
-
-                      <div className="flex items-center gap-1 shrink-0">
-                        <Button
-                          variant="ghost" size="sm" className="h-8 text-xs gap-1"
-                          onClick={() => setPayCard(card)}
-                          disabled={Number(card.balance) === 0 && Number(card.balance_usd) === 0}
-                        >
-                          Pagar
-                        </Button>
-                        <Button
-                          variant="ghost" size="icon" className="size-7 text-destructive hover:text-destructive"
-                          onClick={() => handleDelete(card)}
-                        >
-                          <Trash2 className="size-3" />
-                        </Button>
-                        <Link href={`/finances/credit-cards/${card.id}`}>
-                          <Button variant="ghost" size="icon" className="size-7">
-                            <ChevronRight className="size-4" />
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button
+                            variant="ghost" size="icon" className="size-7 shrink-0"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            <MoreVertical className="size-4" />
                           </Button>
-                        </Link>
-                      </div>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem
+                            disabled={Number(card.balance) === 0 && Number(card.balance_usd) === 0}
+                            onClick={(e) => { e.stopPropagation(); setPayCard(card); }}
+                          >
+                            <Banknote className="size-4 mr-2" />
+                            Pagar
+                          </DropdownMenuItem>
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem
+                            className="text-destructive focus:text-destructive"
+                            onClick={(e) => { e.stopPropagation(); handleDelete(card); }}
+                          >
+                            <Trash2 className="size-4 mr-2" />
+                            Eliminar
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
                     </div>
                   ))}
                 </div>
@@ -440,7 +459,7 @@ export default function CreditCardsPage() {
                   Sin cargos en {MONTH_NAMES[selectedMonth]}
                 </p>
               ) : (
-                <ResponsiveContainer width="100%" height={280}>
+                <ResponsiveContainer width="100%" height={300}>
                   <PieChart>
                     <Pie
                       data={categoryData}
@@ -448,8 +467,8 @@ export default function CreditCardsPage() {
                       nameKey="name"
                       cx="50%"
                       cy="42%"
-                      innerRadius={52}
-                      outerRadius={80}
+                      innerRadius={46}
+                      outerRadius={72}
                       paddingAngle={2}
                     >
                       {categoryData.map((_, i) => (
@@ -461,9 +480,9 @@ export default function CreditCardsPage() {
                       contentStyle={{
                         fontSize: 12,
                         borderRadius: 8,
-                        border: "1px solid hsl(var(--border))",
-                        backgroundColor: "hsl(var(--card))",
-                        color: "hsl(var(--foreground))",
+                        border: "1px solid var(--border)",
+                        backgroundColor: "var(--card)",
+                        color: "var(--foreground)",
                       }}
                     />
                     <Legend
@@ -471,7 +490,7 @@ export default function CreditCardsPage() {
                       iconSize={8}
                       wrapperStyle={{ fontSize: 11, paddingTop: 8 }}
                       formatter={(value) => (
-                        <span style={{ color: "hsl(var(--foreground))", fontSize: 11 }}>
+                        <span style={{ color: "var(--foreground)", fontSize: 11 }}>
                           {value.length > 18 ? value.slice(0, 18) + "…" : value}
                         </span>
                       )}
@@ -486,6 +505,7 @@ export default function CreditCardsPage() {
 
       <Fab
         actions={[
+          { label: "Nueva transacción", icon: ArrowLeftRight, onClick: () => setTransactionOpen(true) },
           { label: "Nueva tarjeta", icon: CreditCard, onClick: () => setCreateOpen(true) },
         ]}
       />
@@ -494,6 +514,14 @@ export default function CreditCardsPage() {
         open={createOpen}
         onOpenChange={setCreateOpen}
         onSuccess={() => mutate()}
+      />
+
+      <CreateTransactionModal
+        open={transactionOpen}
+        onOpenChange={setTransactionOpen}
+        accounts={accounts}
+        creditCards={creditCards}
+        onSuccess={() => { mutate(); mutateTxs(); }}
       />
 
       <PayCreditCardDialog

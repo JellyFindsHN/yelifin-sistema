@@ -107,13 +107,13 @@ export default function EventsReportPage() {
           <p className="text-sm font-semibold mb-3">Ingresos vs. gastos por evento</p>
           <ResponsiveContainer width="100%" height={240}>
             <BarChart data={chartData} margin={{ top: 0, right: 8, left: 0, bottom: 0 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+              <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
               <XAxis dataKey="name" tick={{ fontSize: 9 }} />
               <YAxis tick={{ fontSize: 10 }} width={65}
                 tickFormatter={v => `${symbol}${Number(v).toLocaleString("es-HN", { maximumFractionDigits: 0 })}`}
               />
               <Tooltip formatter={(v: any, name: string) => [format(Number(v)), name === "ingresos" ? "Ingresos" : name === "gastos" ? "Gastos" : "Utilidad"]} />
-              <Bar dataKey="ingresos" fill="hsl(var(--primary))" radius={[4,4,0,0]} />
+              <Bar dataKey="ingresos" fill="var(--primary)" radius={[4,4,0,0]} />
               {showProfit && <Bar dataKey="gastos"   fill="hsl(0 84% 60%)"       radius={[4,4,0,0]} />}
               {showProfit && <Bar dataKey="utilidad" fill="hsl(142 76% 36%)"     radius={[4,4,0,0]} />}
             </BarChart>

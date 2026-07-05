@@ -27,14 +27,20 @@ export async function GET(request: NextRequest) {
 
     // ── Resumen ────────────────────────────────────────────────────
     const [summary] = await sql`
+      WITH item_costs AS (
+        SELECT sale_id, SUM(unit_cost * quantity) AS cogs
+        FROM sale_items
+        WHERE org_id = ${orgId}
+        GROUP BY sale_id
+      )
       SELECT
-        COUNT(DISTINCT s.id)::int                                              AS total_sales,
-        COALESCE(SUM(s.total),    0)::float                                    AS total_revenue,
-        COALESCE(SUM(s.discount), 0)::float                                    AS total_discount,
-        COALESCE(SUM(si.unit_cost * si.quantity), 0)::float                   AS total_cogs,
-        COALESCE(SUM(s.total) - SUM(si.unit_cost * si.quantity), 0)::float    AS gross_profit
+        COUNT(DISTINCT s.id)::int                                    AS total_sales,
+        COALESCE(SUM(s.total),    0)::float                          AS total_revenue,
+        COALESCE(SUM(s.discount), 0)::float                          AS total_discount,
+        COALESCE(SUM(ic.cogs), 0)::float                             AS total_cogs,
+        COALESCE(SUM(s.total) - SUM(ic.cogs), 0)::float              AS gross_profit
       FROM sales s
-      LEFT JOIN sale_items si ON si.sale_id = s.id AND si.org_id = ${orgId}
+      LEFT JOIN item_costs ic ON ic.sale_id = s.id
       WHERE s.org_id = ${orgId}
         AND s.status  = 'COMPLETED'
         AND s.sold_at >= ${from}::date
@@ -43,13 +49,19 @@ export async function GET(request: NextRequest) {
 
     // ── Por día ────────────────────────────────────────────────────
     const byDay = await sql`
+      WITH item_costs AS (
+        SELECT sale_id, SUM(unit_cost * quantity) AS cogs
+        FROM sale_items
+        WHERE org_id = ${orgId}
+        GROUP BY sale_id
+      )
       SELECT
         DATE(s.sold_at)::text                     AS date,
         COUNT(*)::int                             AS sales_count,
         COALESCE(SUM(s.total), 0)::float          AS revenue,
-        COALESCE(SUM(s.total) - SUM(si.unit_cost * si.quantity), 0)::float AS profit
+        COALESCE(SUM(s.total) - SUM(ic.cogs), 0)::float AS profit
       FROM sales s
-      LEFT JOIN sale_items si ON si.sale_id = s.id AND si.org_id = ${orgId}
+      LEFT JOIN item_costs ic ON ic.sale_id = s.id
       WHERE s.org_id = ${orgId}
         AND s.status  = 'COMPLETED'
         AND s.sold_at >= ${from}::date
