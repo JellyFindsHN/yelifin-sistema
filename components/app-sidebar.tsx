@@ -170,7 +170,7 @@ function CollapsedItem({
 }
 
 // ── Full item (expanded) ───────────────────────────────────────────────
-const navIconCls = "flex items-center justify-center size-7 rounded-full group-hover/navbtn:bg-sidebar-accent-foreground/10 transition-colors shrink-0"
+const navIconCls = "flex items-center justify-center size-7 rounded-full group-hover/navbtn:bg-sidebar-accent-foreground/10 group-data-[active=true]/navbtn:bg-sidebar-accent-foreground/10 transition-colors shrink-0"
 
 function ExpandedItem({
   item,
@@ -190,7 +190,7 @@ function ExpandedItem({
           <CollapsibleTrigger asChild>
             <SidebarMenuButton
               isActive={isActive(item.url)}
-              className="group/navbtn h-11 hover:rounded-xl"
+              className="group/navbtn h-11 hover:rounded-xl data-[active=true]:rounded-xl"
             >
               <span className={navIconCls}>
                 <item.icon className="size-4 shrink-0" />
@@ -217,7 +217,7 @@ function ExpandedItem({
         <SidebarMenuButton
           asChild
           isActive={isActive(item.url)}
-          className="group/navbtn h-11 hover:rounded-xl"
+          className="group/navbtn h-11 hover:rounded-xl data-[active=true]:rounded-xl"
         >
           <Link href={item.url} onClick={closeOnMobile}>
             <span className={navIconCls}>

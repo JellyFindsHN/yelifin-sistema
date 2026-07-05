@@ -46,6 +46,8 @@ import { useCreditCards, useAllCreditCardTransactions, AllCardTransaction } from
 import { CreateTransactionModal } from "@/components/transactions/create-transaction-modal";
 import { EditTransactionModal } from "@/components/transactions/edit-transaction-modal";
 import { toast } from "sonner";
+import { SearchBar } from "@/components/shared/search-bar";
+import { useDebounce } from "@/hooks/use-debounce";
 
 // ── Helpers ────────────────────────────────────────────────────────────
 const formatDate = (d: string) =>
@@ -182,9 +184,13 @@ export default function TransactionsPage() {
     return accountId ? accountId : "all";
   }); // "all" | "cc-{id}" | account_id
   const [typeFilter, setTypeFilter] = useState("all");
+  const [search, setSearch] = useState("");
   const [modalOpen, setModalOpen] = useState(false);
   const [page, setPage] = useState(1);
   const pageLimit = 15;
+
+  const debouncedSearch = useDebounce(search, 300);
+  const isSearching = debouncedSearch.trim().length > 0;
 
   const [editingTx, setEditingTx] = useState<Transaction | null>(null);
   const [deletingTx, setDeletingTx] = useState<Transaction | null>(null);
@@ -212,12 +218,14 @@ export default function TransactionsPage() {
   const { transactions, totals, isLoading: loadingAcc, mutate } = useTransactions({
     account_id: isAccountFilter ? Number(sourceFilter) : undefined,
     type: accountTypeFilter,
-    ...periodParams,
+    search: isSearching ? debouncedSearch.trim() : undefined,
+    ...(isSearching ? {} : periodParams),
   });
 
   const { transactions: ccTxs, isLoading: loadingCC } = useAllCreditCardTransactions({
     card_id: selectedCardId,
-    ...periodParams,
+    search: isSearching ? debouncedSearch.trim() : undefined,
+    ...(isSearching ? {} : periodParams),
   });
 
   const { periods } = useTransactionPeriods();
@@ -234,14 +242,16 @@ export default function TransactionsPage() {
 
   const neto = totals.income - totals.expense;
 
-  const periodLabel = filterMode === "date" && specificDate
-    ? formatDate(specificDate)
-    : `${MONTH_NAMES[selectedMonth]} ${selectedYear}`;
+  const periodLabel = isSearching
+    ? `Resultados para "${debouncedSearch.trim()}"`
+    : filterMode === "date" && specificDate
+      ? formatDate(specificDate)
+      : `${MONTH_NAMES[selectedMonth]} ${selectedYear}`;
 
   // Reset page on filter changes
   useEffect(() => { setPage(1); }, [
     typeFilter, sourceFilter, filterMode,
-    selectedMonth, selectedYear, specificDate,
+    selectedMonth, selectedYear, specificDate, debouncedSearch,
   ]);
 
   // ── Merge & filter ─────────────────────────────────────────────────
@@ -568,54 +578,70 @@ export default function TransactionsPage() {
           </div>
           {/* Filtros */}
           <div className="flex-1 space-y-2.5">
-            <div className="grid grid-cols-2 rounded-lg border overflow-hidden">
-              {(["month", "date"] as const).map((mode, i) => (
-                <button
-                  key={mode}
-                  onClick={() => setFilterMode(mode)}
-                  className={`py-2 text-xs font-medium transition-colors ${i > 0 ? "border-l" : ""} ${filterMode === mode ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-muted"
-                    }`}
-                >
-                  {mode === "month" ? "Por mes" : "Fecha exacta"}
-                </button>
-              ))}
+            <div>
+              <SearchBar
+                value={search}
+                onChange={setSearch}
+                size="full"
+                placeholder="Buscar por detalle de la transacción..."
+              />
+              {isSearching && (
+                <p className="text-[11px] text-muted-foreground mt-1">
+                  Búsqueda global: se ignora el filtro de periodo
+                </p>
+              )}
             </div>
 
-            {filterMode === "month" ? (
-              <div className="grid grid-cols-2 gap-2">
-                <Select value={String(selectedMonth)} onValueChange={(v) => setSelectedMonth(Number(v))}>
-                  <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    {monthsForYear(selectedYear).map((m) => (
-                      <SelectItem key={m} value={String(m)}>{MONTH_NAMES[m]}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <Select
-                  value={String(selectedYear)}
-                  onValueChange={(v) => {
-                    const y = Number(v);
-                    setSelectedYear(y);
-                    const months = periods.filter((p) => p.year === y).map((p) => p.month);
-                    if (months.length && !months.includes(selectedMonth)) setSelectedMonth(months[0]);
-                  }}
-                >
-                  <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    {availableYears.map((y) => (
-                      <SelectItem key={y} value={String(y)}>{y}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+            <div className={isSearching ? "opacity-50 pointer-events-none" : ""}>
+              <div className="grid grid-cols-2 rounded-lg border overflow-hidden">
+                {(["month", "date"] as const).map((mode, i) => (
+                  <button
+                    key={mode}
+                    onClick={() => setFilterMode(mode)}
+                    className={`py-2 text-xs font-medium transition-colors ${i > 0 ? "border-l" : ""} ${filterMode === mode ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-muted"
+                      }`}
+                  >
+                    {mode === "month" ? "Por mes" : "Fecha exacta"}
+                  </button>
+                ))}
               </div>
-            ) : (
-              <Input
-                type="date"
-                value={specificDate}
-                onChange={(e) => setSpecificDate(e.target.value)}
-                className="w-full"
-              />
-            )}
+
+              {filterMode === "month" ? (
+                <div className="grid grid-cols-2 gap-2 mt-2.5">
+                  <Select value={String(selectedMonth)} onValueChange={(v) => setSelectedMonth(Number(v))}>
+                    <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {monthsForYear(selectedYear).map((m) => (
+                        <SelectItem key={m} value={String(m)}>{MONTH_NAMES[m]}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <Select
+                    value={String(selectedYear)}
+                    onValueChange={(v) => {
+                      const y = Number(v);
+                      setSelectedYear(y);
+                      const months = periods.filter((p) => p.year === y).map((p) => p.month);
+                      if (months.length && !months.includes(selectedMonth)) setSelectedMonth(months[0]);
+                    }}
+                  >
+                    <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {availableYears.map((y) => (
+                        <SelectItem key={y} value={String(y)}>{y}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              ) : (
+                <Input
+                  type="date"
+                  value={specificDate}
+                  onChange={(e) => setSpecificDate(e.target.value)}
+                  className="w-full mt-2.5"
+                />
+              )}
+            </div>
 
             <div className="grid grid-cols-2 gap-2">
               {/* Fuente: cuentas + tarjetas */}

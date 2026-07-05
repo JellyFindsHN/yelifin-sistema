@@ -74,6 +74,7 @@ export function useTransactions(filters?: {
   year?: number;
   date?: string;
   type?: string;
+  search?: string;
   tz_offset?: number;
 }) {
   const { firebaseUser } = useAuth();
@@ -85,6 +86,7 @@ export function useTransactions(filters?: {
   if (filters?.year)       params.set("year",        String(filters.year));
   if (filters?.date)       params.set("date",        filters.date);
   if (filters?.type && filters.type !== "all") params.set("type", filters.type);
+  if (filters?.search)     params.set("search",      filters.search);
   if (filters?.tz_offset !== undefined) params.set("tz_offset", String(filters.tz_offset));
 
   const url = `${KEY}?${params.toString()}`;

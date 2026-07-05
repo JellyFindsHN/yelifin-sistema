@@ -18,8 +18,10 @@ export async function GET(request: NextRequest) {
 
     const accountId = searchParams.get("account_id");
     const type      = searchParams.get("type") || null; // INCOME | EXPENSE | TRANSFER | null
+    const search    = searchParams.get("search")?.trim() || null;
 
     const { startISO, endISO } = getUtcBounds(searchParams);
+    const limit = search ? 1000 : 500;
 
     const transactions = await sql`
       SELECT
@@ -41,12 +43,12 @@ export async function GET(request: NextRequest) {
       JOIN accounts a ON a.id = t.account_id
       LEFT JOIN accounts ta ON ta.id = t.to_account_id
       WHERE t.org_id = ${orgId}
-        AND t.occurred_at >= ${startISO}::timestamptz
-        AND t.occurred_at <  ${endISO}::timestamptz
+        ${search ? sql`` : sql`AND t.occurred_at >= ${startISO}::timestamptz AND t.occurred_at < ${endISO}::timestamptz`}
+        ${search ? sql`AND t.description ILIKE ${"%" + search + "%"}` : sql``}
         ${accountId ? sql`AND (t.account_id = ${Number(accountId)} OR t.to_account_id = ${Number(accountId)})` : sql``}
         ${type ? sql`AND t.type = ${type}` : sql``}
       ORDER BY t.occurred_at DESC
-      LIMIT 500
+      LIMIT ${limit}
     `;
 
     const [totals] = await sql`
@@ -57,8 +59,8 @@ export async function GET(request: NextRequest) {
         COUNT(*)::int AS total_count
       FROM transactions t
       WHERE t.org_id = ${orgId}
-        AND t.occurred_at >= ${startISO}::timestamptz
-        AND t.occurred_at <  ${endISO}::timestamptz
+        ${search ? sql`` : sql`AND t.occurred_at >= ${startISO}::timestamptz AND t.occurred_at < ${endISO}::timestamptz`}
+        ${search ? sql`AND t.description ILIKE ${"%" + search + "%"}` : sql``}
         ${accountId ? sql`AND (t.account_id = ${Number(accountId)} OR t.to_account_id = ${Number(accountId)})` : sql``}
     `;
 

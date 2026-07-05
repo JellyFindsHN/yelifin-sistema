@@ -187,6 +187,7 @@ export function useAllCreditCardTransactions(params?: {
   year?: number;
   date?: string;
   card_id?: number;
+  search?: string;
   tz_offset?: number;
 }) {
   const { firebaseUser } = useAuth();
@@ -197,6 +198,7 @@ export function useAllCreditCardTransactions(params?: {
   if (params?.year)     query.set('year',      String(params.year));
   if (params?.date)     query.set('date',      params.date);
   if (params?.card_id)  query.set('card_id',   String(params.card_id));
+  if (params?.search)   query.set('search',    params.search);
   if (params?.tz_offset !== undefined) query.set('tz_offset', String(params.tz_offset));
   const qs = query.toString();
 

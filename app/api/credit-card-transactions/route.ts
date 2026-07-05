@@ -17,8 +17,10 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
 
     const cardId = searchParams.get("card_id");
+    const search = searchParams.get("search")?.trim() || null;
 
     const { startISO, endISO } = getUtcBounds(searchParams);
+    const limit = search ? 1000 : 500;
 
     const rows = await sql`
       SELECT
@@ -45,11 +47,11 @@ export async function GET(request: NextRequest) {
       LEFT JOIN transactions t ON t.id = cct.account_transaction_id
       LEFT JOIN accounts a ON a.id = t.account_id
       WHERE cct.org_id = ${orgId}
-        AND cct.occurred_at >= ${startISO}::timestamptz
-        AND cct.occurred_at <  ${endISO}::timestamptz
+        ${search ? sql`` : sql`AND cct.occurred_at >= ${startISO}::timestamptz AND cct.occurred_at < ${endISO}::timestamptz`}
+        ${search ? sql`AND cct.description ILIKE ${"%" + search + "%"}` : sql``}
         ${cardId ? sql`AND cct.credit_card_id = ${Number(cardId)}` : sql``}
       ORDER BY cct.occurred_at DESC
-      LIMIT 500
+      LIMIT ${limit}
     `;
 
     return Response.json({ data: rows });
