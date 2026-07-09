@@ -9,15 +9,17 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Separator } from "@/components/ui/separator";
 import {
-  ArrowLeft, Clock, PackageCheck,
+  ArrowLeft, Clock, PackageCheck, XCircle,
   Wallet, CalendarDays, StickyNote, Truck, Package,
 } from "lucide-react";
 
-import { usePendingPurchases, PurchaseWithItems } from "@/hooks/swr/use-purchases";
+import { usePendingPurchases, PurchaseWithItems, Purchase } from "@/hooks/swr/use-purchases";
 import { useAccounts }   from "@/hooks/swr/use-accounts";
 import { useInventory }  from "@/hooks/swr/use-inventory";
 import { useCurrency }   from "@/hooks/swr/use-currency";
 import { ConfirmPurchaseArrivalDialog } from "@/components/products/confirm-purchase-arrival-dialog";
+import { CancelPurchaseDialog } from "@/components/products/cancel-purchase-dialog";
+import { StatCard } from "@/components/reports/report-shell";
 
 export default function PendingPurchasesPage() {
   const { back, push } = useRouter();
@@ -27,12 +29,25 @@ export default function PendingPurchasesPage() {
   const { format } = useCurrency();
 
   const [selected, setSelected] = useState<PurchaseWithItems | null>(null);
+  const [toCancel, setToCancel] = useState<Purchase | null>(null);
 
   const handleSuccess = () => {
     mutatePurchases();
     mutateInventory();
     mutateAccounts();
   };
+
+  const stats = purchases.reduce(
+    (acc, p) => {
+      acc.totalMoney += Number(p.total);
+      p.items.forEach((item) => {
+        acc.productKeys.add(`${item.product_id}-${item.variant_name ?? ""}`);
+        acc.totalUnits += Number(item.quantity);
+      });
+      return acc;
+    },
+    { totalMoney: 0, totalUnits: 0, productKeys: new Set<string>() }
+  );
 
   return (
     <div className="space-y-6 max-w-2xl mx-auto">
@@ -60,12 +75,16 @@ export default function PendingPurchasesPage() {
         )}
       </div>
 
-      {/* Loading */}
-      {isLoading && (
-        <div className="space-y-3">
-          {[1, 2, 3].map((i) => (
-            <Skeleton key={i} className="h-52 rounded-xl" />
-          ))}
+      {/* Stats */}
+      {isLoading ? (
+        <div className="grid grid-cols-3 gap-3">
+          {[1, 2, 3].map((i) => <Skeleton key={i} className="h-20 rounded-xl" />)}
+        </div>
+      ) : purchases.length > 0 && (
+        <div className="grid grid-cols-3 gap-3">
+          <StatCard label="Productos pendientes" value={String(stats.productKeys.size)} />
+          <StatCard label="Unidades totales" value={stats.totalUnits.toLocaleString("es-HN")} />
+          <StatCard label="Inversión" value={format(stats.totalMoney)} />
         </div>
       )}
 
@@ -89,6 +108,7 @@ export default function PendingPurchasesPage() {
           purchase={p}
           format={format}
           onConfirm={() => setSelected(p)}
+          onCancel={() => setToCancel(p)}
         />
       ))}
 
@@ -98,6 +118,14 @@ export default function PendingPurchasesPage() {
         accounts={accounts}
         open={!!selected}
         onOpenChange={(open) => !open && setSelected(null)}
+        onSuccess={handleSuccess}
+      />
+
+      {/* Dialog de cancelación */}
+      <CancelPurchaseDialog
+        purchase={toCancel}
+        open={!!toCancel}
+        onOpenChange={(open) => !open && setToCancel(null)}
         onSuccess={handleSuccess}
       />
     </div>
@@ -110,10 +138,12 @@ function PurchaseCard({
   purchase: p,
   format,
   onConfirm,
+  onCancel,
 }: {
   purchase: PurchaseWithItems;
   format: (v: number) => string;
   onConfirm: () => void;
+  onCancel: () => void;
 }) {
   const date = new Date(p.purchased_at).toLocaleDateString("es-HN", {
     day: "numeric", month: "long", year: "numeric",
@@ -200,11 +230,21 @@ function PurchaseCard({
           El dinero ya fue debitado de la cuenta. Al confirmar la llegada, el stock se acreditará al inventario.
         </div>
 
-        {/* Acción */}
-        <Button className="w-full gap-2" onClick={onConfirm}>
-          <PackageCheck className="size-4" />
-          Confirmar llegada
-        </Button>
+        {/* Acciones */}
+        <div className="flex gap-2">
+          <Button
+            variant="outline"
+            className="gap-2 text-destructive border-destructive/30 hover:bg-destructive/10 hover:text-destructive"
+            onClick={onCancel}
+          >
+            <XCircle className="size-4" />
+            Cancelar
+          </Button>
+          <Button className="flex-1 gap-2" onClick={onConfirm}>
+            <PackageCheck className="size-4" />
+            Confirmar llegada
+          </Button>
+        </div>
       </CardContent>
     </Card>
   );

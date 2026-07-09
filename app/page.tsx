@@ -1,5 +1,4 @@
 ﻿// app/page.tsx
-import Image from "next/image";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import {
@@ -8,6 +7,8 @@ import {
 } from "lucide-react";
 import { LandingHeader } from "@/components/landing/landing-header";
 import { LandingCta }    from "@/components/landing/landing-cta";
+import { KontaIcon } from "@/components/shared/konta-icon";
+import { KontaTitle } from "@/components/shared/konta-title";
 
 export default function Home() {
   return (
@@ -169,9 +170,8 @@ export default function Home() {
         <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-12">
           <div className="flex flex-col md:flex-row justify-between items-center gap-4 sm:gap-6">
             <div className="flex items-center gap-2">
-              <Image src="/icon.svg" alt="Konta" width={32} height={32} className="size-8 shadow-lg shadow-primary/30 rounded-lg" />
-              <Image src="/title-black.svg" alt="Konta" width={467} height={159} className="h-5 sm:h-6 w-auto dark:hidden" />
-              <Image src="/title-white.svg" alt="Konta" width={467} height={159} className="hidden h-5 sm:h-6 w-auto dark:block" />
+              <KontaIcon className="size-8 shadow-lg shadow-primary/30 rounded-lg" />
+              <KontaTitle className="h-5 sm:h-6" />
             </div>
             <p className="text-muted-foreground text-xs sm:text-sm text-center">
               © 2026 Konta. Sistema de gestión para emprendedores.

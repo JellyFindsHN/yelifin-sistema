@@ -6,7 +6,7 @@ import { useRequireAuth } from "@/hooks/use-require-auth";
 import { useOnboardingGuard } from "@/hooks/use-onboarding-guard";
 import { usePlanGuard } from "@/hooks/use-plan-guard";
 import { LoadingScreen } from "@/hooks/ui/loading-screen";
-import Image from "next/image";
+import { KontaTitle } from "@/components/shared/konta-title";
 import { SWRProvider } from "@/components/providers/swr-provider";
 import { PrivacyModeProvider } from "@/context/privacy-mode-context";
 import {
@@ -43,8 +43,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               <BreadcrumbList>
                 <BreadcrumbItem>
                   <BreadcrumbPage>
-                    <Image src="/title-black.svg" alt="Konta" width={467} height={159} className="h-4 w-auto dark:hidden" />
-                    <Image src="/title-white.svg" alt="Konta" width={467} height={159} className="hidden h-4 w-auto dark:block" />
+                    <KontaTitle className="h-4" />
                   </BreadcrumbPage>
                 </BreadcrumbItem>
               </BreadcrumbList>

@@ -200,11 +200,11 @@ export async function POST(request: NextRequest) {
           INSERT INTO credit_card_transactions (
             org_id, created_by, credit_card_id, type, description,
             amount, currency, exchange_rate, amount_local,
-            occurred_at
+            purchase_batch_id, occurred_at
           ) VALUES (
             ${orgId}, ${userId}, ${Number(credit_card_id)}, 'CHARGE', ${txDescription},
             ${ccAmount}, ${curr}, ${isUsd ? rate : null}, ${ccAmountLocal},
-            ${occurredAt}
+            ${purchaseBatchId}, ${occurredAt}
           )
         `;
         if (isUsd) {

@@ -1,7 +1,7 @@
 ﻿// app/(legal)/terms/page.tsx
-import Image from "next/image";
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
+import { KontaTitle } from "@/components/shared/konta-title";
 
 export const metadata = {
   title: "Términos de Uso — Konta",
@@ -20,8 +20,7 @@ export default function TermsPage() {
             <ArrowLeft className="size-4" />
             Volver al inicio
           </Link>
-          <Image src="/title-black.svg" alt="Konta" width={467} height={159} className="h-5 w-auto dark:hidden" />
-          <Image src="/title-white.svg" alt="Konta" width={467} height={159} className="hidden h-5 w-auto dark:block" />
+          <KontaTitle className="h-5" />
         </div>
       </header>
 

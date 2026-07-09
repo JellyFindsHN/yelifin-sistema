@@ -52,7 +52,11 @@
       "PowerShell(pnpm run *)",
       "PowerShell(pnpm *)",
       "PowerShell(Stop-Process *)",
-      "PowerShell(npm run *)"
+      "PowerShell(npm run *)",
+      "Skill(run)",
+      "PowerShell(Get-Command *)",
+      "PowerShell(Get-Job *)",
+      "PowerShell(Get-Process *)"
     ]
   }
 }

@@ -7,7 +7,6 @@ import {
   LogOut, User, Building2, Crown, Receipt,
   Shield, Tags, Wallet, ArrowLeftRight, UserCog,
 } from "lucide-react"
-import Image from "next/image"
 import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
 import { signOut } from "firebase/auth"
@@ -18,6 +17,8 @@ import type { OrgModule } from "@/types"
 import { toast } from "sonner"
 import { useSidebar } from "@/components/ui/sidebar"
 import { cn } from "@/lib/utils"
+import { KontaIcon } from "@/components/shared/konta-icon"
+import { KontaTitle } from "@/components/shared/konta-title"
 
 import {
   Sidebar, SidebarContent, SidebarFooter, SidebarGroup,
@@ -293,23 +294,18 @@ export function AppSidebar() {
 
   return (
     <TooltipProvider delayDuration={200}>
-      <Sidebar collapsible="icon" className="sticky top-0 h-svh">
+      <Sidebar collapsible="icon" variant="floating" className="sticky top-0 h-svh">
 
         {/* ── Header ── */}
-        <SidebarHeader className="border-b border-sidebar-border px-4 py-3">
+        <SidebarHeader className="px-4 py-3">
           <div className={`flex items-center ${isCollapsed ? "flex-col gap-2" : "justify-between gap-2"}`}>
             <Link
               href="/dashboard"
               onClick={closeOnMobile}
               className="flex items-center gap-2"
             >
-              <Image src="/icon.svg" alt="Konta" width={32} height={32} className="size-8 shrink-0" />
-              {!isCollapsed && (
-                <>
-                  <Image src="/title-black.svg" alt="Konta" width={467} height={159} className="h-5 w-auto dark:hidden" />
-                  <Image src="/title-white.svg" alt="Konta" width={467} height={159} className="hidden h-5 w-auto dark:block" />
-                </>
-              )}
+              <KontaIcon className="size-8" />
+              {!isCollapsed && <KontaTitle className="h-5" />}
             </Link>
 
             <button

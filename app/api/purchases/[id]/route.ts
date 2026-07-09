@@ -223,3 +223,111 @@ export async function PATCH(request: NextRequest, { params }: Params) {
     return createErrorResponse("Error al confirmar la llegada", 500);
   }
 }
+
+// ── DELETE /api/purchases/[id] — cancelar compra pendiente ─────────────
+export async function DELETE(request: NextRequest, { params }: Params) {
+  const auth = await verifyAuth(request);
+  if (!isAuthSuccess(auth)) return createErrorResponse(auth.error, auth.status);
+  const deny = await requireModule(auth.data, 'INVENTORY', 'canDelete');
+  if (deny) return deny;
+
+  try {
+    const { orgId }   = auth.data;
+    const { id }       = await params;
+    const purchaseId   = Number(id);
+
+    if (isNaN(purchaseId)) return createErrorResponse("ID inválido", 400);
+
+    const [purchase] = await sql`
+      SELECT id, account_id, status
+      FROM purchase_batches
+      WHERE id = ${purchaseId} AND org_id = ${orgId}
+    `;
+
+    if (!purchase) return createErrorResponse("Compra no encontrada", 404);
+    if (purchase.status !== "PENDING")
+      return createErrorResponse("Solo se pueden cancelar compras pendientes de llegada", 409);
+
+    // Las compras pagadas con tarjeta se guardan con account_id = NULL
+    const isCreditCardFunded = purchase.account_id === null;
+
+    // La reversión de cargos a tarjeta depende de credit_card_transactions.purchase_batch_id
+    // (migración v4.5). Se verifica antes de abrir la transacción para no ejecutar una
+    // columna inexistente dentro de un BEGIN/COMMIT si la migración aún no se aplicó.
+    const [ccLinkColumn] = await sql`
+      SELECT 1 FROM information_schema.columns
+      WHERE table_name = 'credit_card_transactions' AND column_name = 'purchase_batch_id'
+    `;
+    const hasCcLink = !!ccLinkColumn;
+
+    await sql`BEGIN`;
+    try {
+      // 1. Revertir transacciones de cuenta (compra + envío)
+      const txs = await sql`
+        SELECT id, account_id, amount FROM transactions
+        WHERE org_id = ${orgId}
+          AND reference_type IN ('PURCHASE', 'PURCHASE_SHIPPING')
+          AND reference_id   = ${purchaseId}
+      `;
+      for (const tx of txs) {
+        await sql`DELETE FROM transactions WHERE id = ${tx.id} AND org_id = ${orgId}`;
+        await sql`
+          UPDATE accounts SET balance = balance + ${tx.amount}
+          WHERE id = ${tx.account_id} AND org_id = ${orgId}
+        `;
+      }
+
+      // 2. Revertir cargo a tarjeta de crédito, si la compra se pagó así
+      let ccReversed = true;
+      if (isCreditCardFunded) {
+        if (hasCcLink) {
+          const [ccTx] = await sql`
+            SELECT id, amount, currency, credit_card_id FROM credit_card_transactions
+            WHERE org_id             = ${orgId}
+              AND purchase_batch_id  = ${purchaseId}
+              AND type                = 'CHARGE'
+          `;
+          if (ccTx) {
+            await sql`DELETE FROM credit_card_transactions WHERE id = ${ccTx.id} AND org_id = ${orgId}`;
+            if (ccTx.currency === "USD") {
+              await sql`
+                UPDATE credit_cards SET balance_usd = balance_usd - ${ccTx.amount}, updated_at = NOW()
+                WHERE id = ${ccTx.credit_card_id} AND org_id = ${orgId}
+              `;
+            } else {
+              await sql`
+                UPDATE credit_cards SET balance = balance - ${ccTx.amount}, updated_at = NOW()
+                WHERE id = ${ccTx.credit_card_id} AND org_id = ${orgId}
+              `;
+            }
+          } else {
+            ccReversed = false;
+          }
+        } else {
+          ccReversed = false;
+        }
+      }
+
+      // 3. Eliminar la compra y sus items (no hay inventario que revertir: PENDING nunca lo generó)
+      await sql`DELETE FROM purchase_batch_items WHERE purchase_batch_id = ${purchaseId} AND org_id = ${orgId}`;
+      await sql`DELETE FROM purchase_batches     WHERE id = ${purchaseId} AND org_id = ${orgId}`;
+
+      await sql`COMMIT`;
+
+      return Response.json({
+        message: ccReversed
+          ? "Compra cancelada y transacciones revertidas"
+          : "Compra cancelada. No se encontró el cargo de tarjeta para revertir automáticamente; ajústalo manualmente.",
+        data: { id: purchaseId, cc_reversed: ccReversed },
+      });
+
+    } catch (innerError) {
+      await sql`ROLLBACK`;
+      throw innerError;
+    }
+
+  } catch (error) {
+    console.error("DELETE /api/purchases/[id]:", error);
+    return createErrorResponse("Error al cancelar la compra", 500);
+  }
+}

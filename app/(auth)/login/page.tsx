@@ -4,7 +4,8 @@ import { useRedirectIfAuthenticated } from "@/hooks/use-redirect-if-authenticate
 import { LoadingScreen } from "@/hooks/ui/loading-screen";
 import Link from "next/link";
 import { LoginForm } from "@/components/auth/login-form";
-import Image from "next/image";
+import { KontaIcon } from "@/components/shared/konta-icon";
+import { KontaTitle } from "@/components/shared/konta-title";
 import { ArrowLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
@@ -29,9 +30,8 @@ export default function LoginPage() {
         <div className="w-full max-w-md space-y-8">
           {/* Logo */}
           <Link href="/" className="flex items-center gap-2">
-            <Image src="/icon.svg" alt="Konta" width={40} height={40} className="size-10 shadow-lg shadow-primary/50 rounded-lg" />
-            <Image src="/title-black.svg" alt="Konta" width={467} height={159} className="h-6 w-auto dark:hidden" />
-            <Image src="/title-white.svg" alt="Konta" width={467} height={159} className="hidden h-6 w-auto dark:block" />
+            <KontaIcon className="size-10 shadow-lg shadow-primary/50 rounded-lg" />
+            <KontaTitle className="h-6" />
           </Link>
 
           {/* Header */}

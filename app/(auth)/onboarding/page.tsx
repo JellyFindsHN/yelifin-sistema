@@ -9,7 +9,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useSWRConfig } from "swr";
-import Image from "next/image";
+import { KontaIcon } from "@/components/shared/konta-icon";
+import { KontaTitle } from "@/components/shared/konta-title";
 import {
     Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
@@ -155,9 +156,8 @@ export default function OnboardingPage() {
 
                         {/* Logo */}
                         <div className="flex items-center gap-2">
-                            <Image src="/icon.svg" alt="Konta" width={40} height={40} className="size-9 sm:w-10 sm:h-10 shadow-lg shadow-primary/50 rounded-lg" />
-                            <Image src="/title-black.svg" alt="Konta" width={467} height={159} className="h-5 sm:h-6 w-auto dark:hidden" />
-                            <Image src="/title-white.svg" alt="Konta" width={467} height={159} className="hidden h-5 sm:h-6 w-auto dark:block" />
+                            <KontaIcon className="size-9 sm:w-10 sm:h-10 shadow-lg shadow-primary/50 rounded-lg" />
+                            <KontaTitle className="h-5 sm:h-6" />
                         </div>
 
                         {/* Progress */}
