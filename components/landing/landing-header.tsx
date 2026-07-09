@@ -1,9 +1,10 @@
 ﻿// components/landing/landing-header.tsx
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
-import { ArrowRight, LayoutDashboard, Zap } from "lucide-react";
+import { ArrowRight, LayoutDashboard } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
 
 export function LandingHeader() {
@@ -19,10 +20,9 @@ export function LandingHeader() {
     <header className="border-b bg-background/80 backdrop-blur-sm sticky top-0 z-50">
       <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-4 flex justify-between items-center">
         <Link href="/" className="flex items-center gap-2">
-          <div className="size-8 sm:w-10 sm:h-10 bg-primary rounded-lg flex items-center justify-center shadow-lg shadow-primary/50">
-            <Zap className="size-5 sm:w-6 sm:h-6 text-primary-foreground" />
-          </div>
-          <span className="text-xl sm:text-2xl font-bold text-primary"> Konta</span>
+          <Image src="/icon.svg" alt="Konta" width={40} height={40} className="size-8 sm:w-10 sm:h-10 shadow-lg shadow-primary/50 rounded-lg" />
+          <Image src="/title-black.svg" alt="Konta" width={467} height={159} className="h-5 sm:h-6 w-auto dark:hidden" />
+          <Image src="/title-white.svg" alt="Konta" width={467} height={159} className="hidden h-5 sm:h-6 w-auto dark:block" />
         </Link>
 
         {loading ? (

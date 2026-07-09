@@ -1,4 +1,5 @@
 ﻿// app/(legal)/privacy/page.tsx
+import Image from "next/image";
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 
@@ -19,7 +20,8 @@ export default function PrivacyPage() {
             <ArrowLeft className="size-4" />
             Volver al inicio
           </Link>
-          <span className="text-lg font-semibold">Konta</span>
+          <Image src="/title-black.svg" alt="Konta" width={467} height={159} className="h-5 w-auto dark:hidden" />
+          <Image src="/title-white.svg" alt="Konta" width={467} height={159} className="hidden h-5 w-auto dark:block" />
         </div>
       </header>
 

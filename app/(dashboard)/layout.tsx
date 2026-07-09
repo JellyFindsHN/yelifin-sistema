@@ -6,6 +6,7 @@ import { useRequireAuth } from "@/hooks/use-require-auth";
 import { useOnboardingGuard } from "@/hooks/use-onboarding-guard";
 import { usePlanGuard } from "@/hooks/use-plan-guard";
 import { LoadingScreen } from "@/hooks/ui/loading-screen";
+import Image from "next/image";
 import { SWRProvider } from "@/components/providers/swr-provider";
 import { PrivacyModeProvider } from "@/context/privacy-mode-context";
 import {
@@ -36,12 +37,15 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         <SidebarInset className="flex flex-col overflow-hidden">
           {/* Header */}
           <header className="sticky top-0 z-20 flex h-14 shrink-0 items-center gap-2 border-b bg-background px-4 py-4 lg:px-6">
-            <SidebarTrigger className="-ml-1" />
-            <Separator orientation="vertical" className="mr-2 h-4" />
-            <Breadcrumb>
+            <SidebarTrigger className="-ml-1 md:hidden" />
+            <Separator orientation="vertical" className="mr-2 h-4 md:hidden" />
+            <Breadcrumb className="md:hidden">
               <BreadcrumbList>
                 <BreadcrumbItem>
-                  <BreadcrumbPage className="text-sm font-medium">Konta</BreadcrumbPage>
+                  <BreadcrumbPage>
+                    <Image src="/title-black.svg" alt="Konta" width={467} height={159} className="h-4 w-auto dark:hidden" />
+                    <Image src="/title-white.svg" alt="Konta" width={467} height={159} className="hidden h-4 w-auto dark:block" />
+                  </BreadcrumbPage>
                 </BreadcrumbItem>
               </BreadcrumbList>
             </Breadcrumb>

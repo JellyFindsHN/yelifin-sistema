@@ -2,11 +2,12 @@
 "use client"
 
 import {
-  BarChart3, Box, Calendar, ChevronDown, CreditCard,
+  BarChart3, Box, Calendar, ChevronDown, ChevronsLeft, ChevronsRight, CreditCard,
   Home, ShoppingCart, Users, Warehouse, Settings,
-  LogOut, User, Zap, Building2, Crown, Receipt,
+  LogOut, User, Building2, Crown, Receipt,
   Shield, Tags, Wallet, ArrowLeftRight, UserCog,
 } from "lucide-react"
+import Image from "next/image"
 import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
 import { signOut } from "firebase/auth"
@@ -236,7 +237,7 @@ export function AppSidebar() {
   const pathname = usePathname()
   const { push } = useRouter()
   const { user, firebaseUser }  = useAuth()
-  const { isMobile, setOpenMobile, state } = useSidebar()
+  const { isMobile, setOpenMobile, state, toggleSidebar } = useSidebar()
 
   const { isOwner, org, getModulePermissions, isLoading: meIsLoading } = useMe()
   const isAdmin      = user?.subscription?.plan?.slug === "admin"
@@ -296,18 +297,32 @@ export function AppSidebar() {
 
         {/* ── Header ── */}
         <SidebarHeader className="border-b border-sidebar-border px-4 py-3">
-          <Link
-            href="/dashboard"
-            onClick={closeOnMobile}
-            className={`flex items-center gap-2 ${isCollapsed ? "justify-center" : ""}`}
-          >
-            <div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-primary">
-              <Zap className="size-5 text-primary-foreground" />
-            </div>
-            {!isCollapsed && (
-              <span className="text-lg font-semibold text-sidebar-foreground">Konta</span>
-            )}
-          </Link>
+          <div className={`flex items-center ${isCollapsed ? "flex-col gap-2" : "justify-between gap-2"}`}>
+            <Link
+              href="/dashboard"
+              onClick={closeOnMobile}
+              className="flex items-center gap-2"
+            >
+              <Image src="/icon.svg" alt="Konta" width={32} height={32} className="size-8 shrink-0" />
+              {!isCollapsed && (
+                <>
+                  <Image src="/title-black.svg" alt="Konta" width={467} height={159} className="h-5 w-auto dark:hidden" />
+                  <Image src="/title-white.svg" alt="Konta" width={467} height={159} className="hidden h-5 w-auto dark:block" />
+                </>
+              )}
+            </Link>
+
+            <button
+              type="button"
+              onClick={toggleSidebar}
+              aria-label={isCollapsed ? "Expandir menú" : "Contraer menú"}
+              className="hidden size-6 shrink-0 items-center justify-center rounded-md text-sidebar-foreground/70 transition-colors hover:bg-sidebar-accent hover:text-sidebar-foreground md:flex"
+            >
+              {isCollapsed
+                ? <ChevronsRight className="size-4" />
+                : <ChevronsLeft className="size-4" />}
+            </button>
+          </div>
         </SidebarHeader>
 
         {/* ── Content ── */}

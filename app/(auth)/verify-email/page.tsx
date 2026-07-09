@@ -7,7 +7,8 @@ import { sendEmailVerification, signOut } from 'firebase/auth';
 import { useAuth } from '@/hooks/use-auth';
 import { LoadingScreen } from '@/hooks/ui/loading-screen';
 import { Button } from '@/components/ui/button';
-import { Zap, Mail, LogOut, RefreshCw } from 'lucide-react';
+import Image from 'next/image';
+import { Mail, LogOut, RefreshCw } from 'lucide-react';
 import { toast } from 'sonner';
 
 const RESEND_COOLDOWN = 60;
@@ -82,10 +83,9 @@ export default function VerifyEmailPage() {
         <div className="bg-background rounded-2xl border shadow-sm p-8 space-y-6">
 
           <div className="flex items-center gap-2">
-            <div className="size-10 bg-primary rounded-lg flex items-center justify-center shadow-lg shadow-primary/50">
-              <Zap className="size-6 text-primary-foreground" />
-            </div>
-            <span className="text-2xl font-bold text-primary">Konta</span>
+            <Image src="/icon.svg" alt="Konta" width={40} height={40} className="size-10 shadow-lg shadow-primary/50 rounded-lg" />
+            <Image src="/title-black.svg" alt="Konta" width={467} height={159} className="h-6 w-auto dark:hidden" />
+            <Image src="/title-white.svg" alt="Konta" width={467} height={159} className="hidden h-6 w-auto dark:block" />
           </div>
 
           <div className="space-y-3">

@@ -9,11 +9,12 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useSWRConfig } from "swr";
+import Image from "next/image";
 import {
     Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import {
-    Zap, Banknote, Building2, Wallet, HelpCircle,
+    Banknote, Building2, Wallet, HelpCircle,
     Plus, Trash2, CheckCircle2, Loader2, ChevronRight,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -154,10 +155,9 @@ export default function OnboardingPage() {
 
                         {/* Logo */}
                         <div className="flex items-center gap-2">
-                            <div className="size-9 sm:w-10 sm:h-10 bg-primary rounded-lg flex items-center justify-center shadow-lg shadow-primary/50">
-                                <Zap className="size-5 sm:w-6 sm:h-6 text-primary-foreground" />
-                            </div>
-                            <span className="text-xl sm:text-2xl font-bold text-primary">Konta</span>
+                            <Image src="/icon.svg" alt="Konta" width={40} height={40} className="size-9 sm:w-10 sm:h-10 shadow-lg shadow-primary/50 rounded-lg" />
+                            <Image src="/title-black.svg" alt="Konta" width={467} height={159} className="h-5 sm:h-6 w-auto dark:hidden" />
+                            <Image src="/title-white.svg" alt="Konta" width={467} height={159} className="hidden h-5 sm:h-6 w-auto dark:block" />
                         </div>
 
                         {/* Progress */}
