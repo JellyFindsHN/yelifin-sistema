@@ -11,13 +11,14 @@ export function useRedirectIfAuthenticated() {
   useEffect(() => {
     if (loading) return;
 
+    // replace: no dejar /login o /register en el historial
     if (firebaseUser && emailVerified) {
-      router.push('/dashboard');
+      router.replace('/dashboard');
       return;
     }
 
     if (firebaseUser && !emailVerified) {
-      router.push('/verify-email');
+      router.replace('/verify-email');
     }
   }, [firebaseUser, loading, emailVerified, router]);
 

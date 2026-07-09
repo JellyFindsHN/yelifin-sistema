@@ -446,7 +446,7 @@ export async function ensureOrgExists(
       INSERT INTO org_subscriptions (org_id, plan_id, status, trial_start_date, trial_end_date)
       VALUES (
         ${org.id}, ${plan.id}, 'TRIAL',
-        NOW(), NOW() + INTERVAL '14 days'
+        NOW(), NOW() + INTERVAL '30 days'
       )
       ON CONFLICT (org_id) DO NOTHING
     `;

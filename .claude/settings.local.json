@@ -56,7 +56,9 @@
       "Skill(run)",
       "PowerShell(Get-Command *)",
       "PowerShell(Get-Job *)",
-      "PowerShell(Get-Process *)"
+      "PowerShell(Get-Process *)",
+      "PowerShell(npx tsc --noEmit; echo \"EXIT: $LASTEXITCODE\")",
+      "PowerShell(npx eslint \"lib/token-cookie.ts\" \"lib/seed-default-categories.ts\" \"hooks/use-auth.ts\" \"hooks/use-onboarding-guard.ts\" \"hooks/use-redirect-if-authenticated.ts\" \"hooks/swr/use-currency.ts\" \"proxy.ts\" \"app/api/auth/register/route.tsx\" \"app/api/auth/login/route.ts\" \"app/api/onboarding/route.tsx\" \"components/auth/login-form.tsx\" \"components/auth/register-form.tsx\" \"app/\\(auth\\)/verify-email/page.tsx\"; echo \"EXIT: $LASTEXITCODE\")"
     ]
   }
 }

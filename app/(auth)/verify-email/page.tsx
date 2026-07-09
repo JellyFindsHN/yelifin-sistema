@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { auth } from '@/lib/firebase';
 import { sendEmailVerification, signOut } from 'firebase/auth';
+import { setTokenCookie } from '@/lib/token-cookie';
 import { useAuth } from '@/hooks/use-auth';
 import { LoadingScreen } from '@/hooks/ui/loading-screen';
 import { Button } from '@/components/ui/button';
@@ -57,8 +58,11 @@ export default function VerifyEmailPage() {
     try {
       await firebaseUser.reload();
       if (firebaseUser.emailVerified) {
+        // Refrescar el token para que la cookie lleve email_verified=true;
+        // si no, el proxy redirige de vuelta a /verify-email (loop).
+        const freshToken = await firebaseUser.getIdToken(true);
+        setTokenCookie(freshToken);
         toast.success('¡Email verificado! Configurando tu cuenta...');
-        // ✅ Va a onboarding, no a dashboard
         push('/onboarding');
       } else {
         toast.error('Tu email aún no ha sido verificado.');

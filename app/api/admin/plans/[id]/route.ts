@@ -60,17 +60,17 @@ export async function DELETE(request: NextRequest, { params }: Params) {
   if (!id) return createErrorResponse("ID inválido", 400);
 
   try {
-    const [{ user_count }] = await sql`
-      SELECT COUNT(us.id)::int AS user_count
+    const [{ org_count }] = await sql`
+      SELECT COUNT(os.id)::int AS org_count
       FROM subscription_plans sp
-      LEFT JOIN user_subscriptions us ON us.plan_id = sp.id
+      LEFT JOIN org_subscriptions os ON os.plan_id = sp.id
       WHERE sp.id = ${id}
       GROUP BY sp.id
     `;
 
-    if (user_count > 0) {
+    if (org_count > 0) {
       return createErrorResponse(
-        `No se puede eliminar: ${user_count} usuario${user_count !== 1 ? "s" : ""} usa${user_count !== 1 ? "n" : ""} este plan`,
+        `No se puede eliminar: ${org_count} organización${org_count !== 1 ? "es" : ""} usa${org_count !== 1 ? "n" : ""} este plan`,
         409
       );
     }

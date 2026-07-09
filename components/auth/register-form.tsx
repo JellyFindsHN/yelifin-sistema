@@ -78,11 +78,11 @@ export function RegisterForm() {
       }
 
       toast.success(
-        "¡Bienvenido a ! Tu prueba gratuita de 30 días ha comenzado.",
+        "¡Bienvenido a Konta! Revisa tu correo para verificar tu cuenta.",
         { duration: 5000 }
       );
 
-      push("/dashboard");
+      push("/verify-email");
     } catch (error: any) {
       console.error("Error en registro:", error);
 

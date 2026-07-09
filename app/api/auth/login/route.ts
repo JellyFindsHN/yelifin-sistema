@@ -114,27 +114,9 @@ export async function POST(req: NextRequest) {
       },
     });
 
-    // 4. Setear cookie de sesión para que el proxy pueda leerla
-    //    (el proxy está leyendo `token` y opcionalmente `__session`)
-    const isProd = process.env.NODE_ENV === "production";
-
-    response.cookies.set("token", idToken, {
-      httpOnly: true,
-      secure: isProd,
-      sameSite: "lax",
-      path: "/",
-      maxAge: 60 * 60 * 24 * 7, // 7 días, ajusta si quieres
-    });
-
-    // Si quieres compatibilidad extra, puedes duplicar en __session:
-    // response.cookies.set("__session", idToken, {
-    //   httpOnly: true,
-    //   secure: isProd,
-    //   sameSite: "lax",
-    //   path: "/",
-    //   maxAge: 60 * 60 * 24 * 7,
-    // });
-
+    // La cookie `token` la setea el cliente (lib/token-cookie.ts).
+    // No debe setearse httpOnly aquí: el ID token de Firebase expira cada
+    // hora y el cliente necesita poder re-escribir la cookie al refrescarlo.
     return response;
   } catch (error: any) {
     console.error(" Error en login:", error);

@@ -5,6 +5,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { signInWithEmailAndPassword } from "firebase/auth";
 import { auth } from "@/lib/firebase";
+import { setTokenCookie, clearTokenCookie } from "@/lib/token-cookie";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -48,6 +49,8 @@ export function LoginForm() {
       );
 
       const idToken = await userCredential.user.getIdToken();
+      // Setear la cookie antes de navegar para que el proxy vea la sesión
+      setTokenCookie(idToken);
 
       const response = await fetch("/api/auth/login", {
         method: "POST",
@@ -58,6 +61,7 @@ export function LoginForm() {
       const result = await response.json();
 
       if (!response.ok) {
+        clearTokenCookie();
         await auth.signOut();
         throw new Error(result.error || "Error al iniciar sesión");
       }

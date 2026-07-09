@@ -150,6 +150,36 @@ function enforcePlanRules(
   return null;
 }
 
+// ── Session cache en cookie ────────────────────────────────────────────
+// Evita llamar a /api/onboarding (verificación Firebase Admin + JOIN pesado)
+// en cada navegación. Solo se cachean sesiones con onboarding completo,
+// ligadas al uid del token para no arrastrar datos de otro usuario.
+// El POST /api/onboarding también setea esta cookie al completar.
+
+const SESSION_COOKIE = "konta_session";
+const SESSION_TTL = 600; // 10 minutos
+
+type Session = { onboarding_completed: boolean; plan_slug: string | null };
+
+function readSessionCookie(request: NextRequest, uid: string): Session | null {
+  const raw = request.cookies.get(SESSION_COOKIE)?.value;
+  if (!raw) return null;
+  const [flag, planSlug, cookieUid] = raw.split("|");
+  if (flag !== "1" || cookieUid !== uid) return null;
+  return { onboarding_completed: true, plan_slug: planSlug || null };
+}
+
+function attachSessionCookie(res: NextResponse, session: Session, uid: string) {
+  if (!session.onboarding_completed) return;
+  res.cookies.set(SESSION_COOKIE, `1|${session.plan_slug ?? ""}|${uid}`, {
+    httpOnly: true,
+    sameSite: "lax",
+    path: "/",
+    maxAge: SESSION_TTL,
+    secure: process.env.NODE_ENV === "production",
+  });
+}
+
 // ── Session helper (calls /api/onboarding, returns plan info) ──────────
 async function fetchSession(
   token: string,
@@ -207,27 +237,37 @@ export async function proxy(request: NextRequest) {
     return NextResponse.next();
   }
 
+  const uid = typeof result.payload.sub === "string" ? result.payload.sub : "";
+
   // Verificado, rutas públicas o /verify-email → revisar onboarding y redirigir
   if (isPublic || pathname.startsWith("/verify-email")) {
-    const session = await fetchSession(token, request.url);
+    const cached  = readSessionCookie(request, uid);
+    const session = cached ?? (await fetchSession(token, request.url));
+
     if (session && !session.onboarding_completed) {
       return NextResponse.redirect(new URL("/onboarding", request.url));
     }
-    return NextResponse.redirect(new URL(getHome(session?.plan_slug ?? null), request.url));
+    const res = NextResponse.redirect(new URL(getHome(session?.plan_slug ?? null), request.url));
+    if (session && !cached) attachSessionCookie(res, session, uid);
+    return res;
   }
 
   // Rutas privadas (no authOnly) → verificar onboarding + plan rules
   if (!isAuthOnly) {
-    const session = await fetchSession(token, request.url);
+    const cached  = readSessionCookie(request, uid);
+    const session = cached ?? (await fetchSession(token, request.url));
 
     if (session && !session.onboarding_completed) {
       return NextResponse.redirect(new URL("/onboarding", request.url));
     }
 
-    if (session) {
-      const planRedirect = enforcePlanRules(pathname, session.plan_slug, request.url);
-      if (planRedirect) return planRedirect;
-    }
+    const planRedirect = session
+      ? enforcePlanRules(pathname, session.plan_slug, request.url)
+      : null;
+
+    const res = planRedirect ?? NextResponse.next();
+    if (session && !cached) attachSessionCookie(res, session, uid);
+    return res;
   }
 
   return NextResponse.next();

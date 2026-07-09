@@ -1,4 +1,4 @@
-import { NextRequest } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { neon } from "@neondatabase/serverless";
 import { verifyAuth, createErrorResponse, isAuthSuccess } from "@/lib/auth";
 
@@ -63,41 +63,62 @@ export async function POST(request: NextRequest) {
         return createErrorResponse(`Tipo de cuenta inválido: ${acc.type}`, 400);
     }
 
-    await sql`BEGIN`;
-    try {
-      // 1. Actualizar moneda y marcar onboarding completo
+    // Nota: el driver HTTP de Neon ejecuta cada query en una conexión
+    // distinta, así que BEGIN/COMMIT no crean una transacción real.
+    // Las operaciones son idempotentes (ON CONFLICT), reintentar es seguro.
+
+    // 1. Crear cuentas (si ya existía por nombre, actualizar tipo/balance —
+    //    el onboarding solo corre una vez, antes de que haya movimientos)
+    for (const acc of accounts) {
+      const name    = acc.name.trim();
+      const type    = (acc.type ?? "CASH").toUpperCase();
+      const balance = Number(acc.balance ?? 0);
+
       await sql`
-        UPDATE user_profile
-        SET
-          currency             = ${currency},
-          onboarding_completed = TRUE,
-          updated_at           = CURRENT_TIMESTAMP
-        WHERE user_id = ${userId}
+        INSERT INTO accounts (org_id, created_by, name, type, balance, is_active)
+        VALUES (${orgId}, ${userId}, ${name}, ${type}, ${balance}, TRUE)
+        ON CONFLICT (org_id, name) DO UPDATE
+          SET type = EXCLUDED.type, balance = EXCLUDED.balance, is_active = TRUE
       `;
-
-      // 2. Crear cuentas (ignorar duplicados por nombre)
-      for (const acc of accounts) {
-        const name    = acc.name.trim();
-        const type    = (acc.type ?? "CASH").toUpperCase();
-        const balance = Number(acc.balance ?? 0);
-
-        await sql`
-          INSERT INTO accounts (org_id, created_by, name, type, balance, is_active)
-          VALUES (${orgId}, ${userId}, ${name}, ${type}, ${balance}, TRUE)
-          ON CONFLICT (org_id, name) DO NOTHING
-        `;
-      }
-
-      await sql`COMMIT`;
-
-      return Response.json(
-        { message: "Onboarding completado", data: { currency } },
-        { status: 201 }
-      );
-    } catch (inner) {
-      await sql`ROLLBACK`;
-      throw inner;
     }
+
+    // 2. Guardar moneda en la org (es lo que lee /api/auth/me y la app)
+    await sql`
+      UPDATE organizations
+      SET currency = ${currency}, updated_at = CURRENT_TIMESTAMP
+      WHERE id = ${orgId}
+    `;
+
+    // 3. Marcar onboarding completo (al final: si algo falló antes,
+    //    el usuario puede reintentar desde el onboarding)
+    await sql`
+      UPDATE user_profile
+      SET
+        currency             = ${currency},
+        onboarding_completed = TRUE,
+        updated_at           = CURRENT_TIMESTAMP
+      WHERE user_id = ${userId}
+    `;
+
+    // Actualizar la cookie de sesión que cachea el proxy (mismo formato
+    // que konta_session en proxy.ts) para que la navegación al dashboard
+    // no repita el fetch de sesión.
+    const res = NextResponse.json(
+      { message: "Onboarding completado", data: { currency } },
+      { status: 201 }
+    );
+    res.cookies.set(
+      "konta_session",
+      `1|${auth.data.subscription.planSlug ?? ""}|${auth.data.firebaseUid}`,
+      {
+        httpOnly: true,
+        sameSite: "lax",
+        path: "/",
+        maxAge: 600,
+        secure: process.env.NODE_ENV === "production",
+      }
+    );
+    return res;
   } catch (error) {
     console.error(" POST /api/onboarding:", error);
     return createErrorResponse("Error al completar onboarding", 500);
