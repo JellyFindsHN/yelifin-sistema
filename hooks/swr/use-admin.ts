@@ -98,8 +98,19 @@ export type AdminPlan = {
   max_products:         number | null;
   max_sales_per_month:  number | null;
   max_storage_mb:       number | null;
+  max_transactions_per_month: number | null;
+  max_accounts:         number | null;
+  max_supplies:         number | null;
   is_active:            boolean;
   user_count:           number;
+};
+
+export type PlanFeatureRow = {
+  id:           number;
+  feature_key:  string;
+  feature_name: string;
+  category:     string;
+  is_enabled:   boolean;
 };
 
 export type AdminStats = {
@@ -216,8 +227,46 @@ export type PlanInput = {
   max_products?: number | null;
   max_sales_per_month?: number | null;
   max_storage_mb?: number | null;
+  max_transactions_per_month?: number | null;
+  max_accounts?: number | null;
+  max_supplies?: number | null;
   is_active?: boolean;
 };
+
+export function useAdminPlanFeatures(planId: number | null) {
+  const { firebaseUser } = useAuth();
+  const authFetch = useAuthFetch();
+  const { data, isLoading, error, mutate } = useSWR(
+    firebaseUser && planId ? `/api/admin/plans/${planId}/features` : null,
+    (u: string) => authFetch(u),
+    { revalidateOnFocus: false }
+  );
+  return {
+    plan:     (data?.plan ?? null) as { id: number; name: string; slug: string } | null,
+    features: (data?.data ?? []) as PlanFeatureRow[],
+    isLoading,
+    error:    (error as any)?.message ?? null,
+    mutate,
+  };
+}
+
+export function useAdminUpdatePlanFeatures(planId: number | null) {
+  const authFetch = useAuthFetch();
+  const [isSaving, setIsSaving] = useState(false);
+  const updateFeatures = async (features: Record<number, boolean>) => {
+    if (!planId) throw new Error("ID requerido");
+    setIsSaving(true);
+    try {
+      return await authFetch(`/api/admin/plans/${planId}/features`, {
+        method: "PUT",
+        body: JSON.stringify({ features }),
+      });
+    } finally {
+      setIsSaving(false);
+    }
+  };
+  return { updateFeatures, isSaving };
+}
 
 export function useAdminCreatePlan() {
   const authFetch = useAuthFetch();

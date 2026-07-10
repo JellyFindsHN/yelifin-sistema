@@ -25,6 +25,7 @@ import {
 import {
   ArrowLeft, Plus, Pencil, Trash2, Crown, Users,
   Package, ShoppingCart, HardDrive, Loader2, Infinity,
+  ArrowLeftRight, SlidersHorizontal,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -55,6 +56,7 @@ type FormState = {
   billing_interval: string;
   max_products: string;
   max_sales_per_month: string;
+  max_transactions_per_month: string;
   max_storage_mb: string;
   is_active: boolean;
 };
@@ -63,6 +65,7 @@ const emptyForm = (): FormState => ({
   name: "", slug: "", description: "",
   price_usd: "0", billing_interval: "MONTHLY",
   max_products: "", max_sales_per_month: "",
+  max_transactions_per_month: "",
   max_storage_mb: "", is_active: true,
 });
 
@@ -75,6 +78,7 @@ function planToForm(p: AdminPlan): FormState {
     billing_interval:    p.billing_interval ?? "MONTHLY",
     max_products:        p.max_products != null ? String(p.max_products) : "",
     max_sales_per_month: p.max_sales_per_month != null ? String(p.max_sales_per_month) : "",
+    max_transactions_per_month: p.max_transactions_per_month != null ? String(p.max_transactions_per_month) : "",
     max_storage_mb:      p.max_storage_mb != null ? String(p.max_storage_mb) : "",
     is_active:           p.is_active,
   };
@@ -89,6 +93,7 @@ function formToInput(f: FormState): PlanInput {
     billing_interval:    f.billing_interval,
     max_products:        f.max_products !== "" ? Number(f.max_products) : null,
     max_sales_per_month: f.max_sales_per_month !== "" ? Number(f.max_sales_per_month) : null,
+    max_transactions_per_month: f.max_transactions_per_month !== "" ? Number(f.max_transactions_per_month) : null,
     max_storage_mb:      f.max_storage_mb !== "" ? Number(f.max_storage_mb) : null,
     is_active:           f.is_active,
   };
@@ -183,7 +188,7 @@ function PlanFormDialog({
           </div>
 
           <p className="text-xs text-muted-foreground -mb-1">Límites — dejar vacío = sin límite</p>
-          <div className="grid grid-cols-3 gap-3">
+          <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1.5">
               <Label className="text-xs flex items-center gap-1"><Package className="size-3" /> Productos</Label>
               <Input type="number" min="0" value={form.max_products} onChange={(e) => set("max_products")(e.target.value)} placeholder="∞" />
@@ -191,6 +196,10 @@ function PlanFormDialog({
             <div className="space-y-1.5">
               <Label className="text-xs flex items-center gap-1"><ShoppingCart className="size-3" /> Ventas/mes</Label>
               <Input type="number" min="0" value={form.max_sales_per_month} onChange={(e) => set("max_sales_per_month")(e.target.value)} placeholder="∞" />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs flex items-center gap-1"><ArrowLeftRight className="size-3" /> Transacc./mes</Label>
+              <Input type="number" min="0" value={form.max_transactions_per_month} onChange={(e) => set("max_transactions_per_month")(e.target.value)} placeholder="∞" />
             </div>
             <div className="space-y-1.5">
               <Label className="text-xs flex items-center gap-1"><HardDrive className="size-3" /> Almac. (MB)</Label>
@@ -368,6 +377,12 @@ export default function AdminPlansPage() {
                   </div>
                   <div className="flex items-center justify-between">
                     <span className="flex items-center gap-1 text-muted-foreground">
+                      <ArrowLeftRight className="size-3" /> Transacciones/mes
+                    </span>
+                    <span className="font-medium">{limitLabel(plan.max_transactions_per_month)}</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="flex items-center gap-1 text-muted-foreground">
                       <HardDrive className="size-3" /> Almacenamiento
                     </span>
                     <span className="font-medium">
@@ -386,6 +401,12 @@ export default function AdminPlansPage() {
                 <div className="flex gap-2 pt-1">
                   <Button
                     variant="outline" size="sm" className="flex-1 gap-1.5 text-xs"
+                    onClick={() => push(`/admin/plans/${plan.id}`)}
+                  >
+                    <SlidersHorizontal className="size-3" /> Opciones
+                  </Button>
+                  <Button
+                    variant="outline" size="sm" className="gap-1.5 text-xs"
                     onClick={() => setEditPlan(plan)}
                   >
                     <Pencil className="size-3" /> Editar

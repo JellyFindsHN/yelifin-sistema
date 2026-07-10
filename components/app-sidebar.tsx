@@ -48,10 +48,13 @@ const financesOnlyNav = [
 ]
 
 // ── Nav config ──────────────────────────────────────────────────────────
-const mainNav: Array<{
-  title: string; url: string; icon: any; module?: OrgModule;
-  submenu?: Array<{ title: string; url: string }>;
-}> = [
+// `feature` opcional: el ítem/submenú solo se muestra si el plan la incluye.
+type NavItemDef = {
+  title: string; url: string; icon: any; module?: OrgModule; feature?: string;
+  submenu?: Array<{ title: string; url: string; feature?: string }>;
+};
+
+const mainNav: NavItemDef[] = [
   { title: "Dashboard",    url: "/dashboard",  icon: Home, module: "DASHBOARD" as OrgModule },
   {
     title: "Inventario", url: "/inventory", icon: Warehouse, module: "INVENTORY",
@@ -68,7 +71,7 @@ const mainNav: Array<{
       { title: "Nueva Venta (POS)", url: "/sales/new" },
     ],
   },
-  { title: "Clientes",    url: "/customers", icon: Users,     module: "CUSTOMERS" },
+  { title: "Clientes",    url: "/customers", icon: Users,     module: "CUSTOMERS", feature: "customers.manage" },
   {
     title: "Finanzas", url: "/finances", icon: CreditCard, module: "FINANCES",
     submenu: [
@@ -81,17 +84,14 @@ const mainNav: Array<{
   { title: "Suministros", url: "/supplies", icon: Box,        module: "INVENTORY" },
 ]
 
-const secondaryNav: Array<{
-  title: string; url: string; icon: any; module?: OrgModule;
-  submenu?: Array<{ title: string; url: string }>;
-}> = [
+const secondaryNav: NavItemDef[] = [
   {
     title: "Reportes", url: "/reports", icon: BarChart3, module: "REPORTS",
     submenu: [
-      { title: "Ventas",        url: "/reports/sales" },
-      { title: "Inventario",    url: "/reports/inventory" },
-      { title: "Rentabilidad",  url: "/reports/profit" },
-      { title: "Eventos",       url: "/reports/events" },
+      { title: "Ventas",        url: "/reports/sales",     feature: "reports.sales" },
+      { title: "Inventario",    url: "/reports/inventory", feature: "reports.inventory" },
+      { title: "Rentabilidad",  url: "/reports/profit",    feature: "reports.profit" },
+      { title: "Eventos",       url: "/reports/events",    feature: "reports.events" },
     ],
   },
 ]
@@ -282,8 +282,24 @@ export function AppSidebar() {
     return getModulePermissions(module).can_view
   }
 
-  const visibleMainNav = mainNav.filter(item => canViewModule(item.module))
-  const visibleSecondaryNav = secondaryNav.filter(item => canViewModule(item.module))
+  // Feature del plan: mientras el perfil carga se muestra todo (el API
+  // bloquea igual); el plan admin siempre ve todo.
+  const planHasFeature = (feature?: string) => {
+    if (!feature || !user) return true
+    if (planSlug === "admin") return true
+    return Object.values(user.features ?? {}).flat().some((f: any) => f.key === feature)
+  }
+
+  const filterByPlan = (items: NavItemDef[]) =>
+    items
+      .filter(item => canViewModule(item.module) && planHasFeature(item.feature))
+      .map(item => item.submenu
+        ? { ...item, submenu: item.submenu.filter(s => planHasFeature(s.feature)) }
+        : item)
+      .filter(item => !item.submenu || item.submenu.length > 0)
+
+  const visibleMainNav = filterByPlan(mainNav)
+  const visibleSecondaryNav = filterByPlan(secondaryNav)
 
   const renderNav = (items: typeof mainNav) =>
     items.map((item) =>

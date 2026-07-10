@@ -90,6 +90,10 @@ export type FeatureKey =
   | 'events.manage'
   | 'events.inventory'
   // REPORTS
+  | 'reports.sales'
+  | 'reports.inventory'
+  | 'reports.profit'
+  | 'reports.events'
   | 'reports.basic'
   | 'reports.advanced'
   // ADMIN

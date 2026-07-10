@@ -25,6 +25,9 @@ export async function PATCH(request: NextRequest, { params }: Params) {
       max_products,
       max_sales_per_month,
       max_storage_mb,
+      max_transactions_per_month,
+      max_accounts,
+      max_supplies,
       is_active,
     } = body;
 
@@ -37,6 +40,9 @@ export async function PATCH(request: NextRequest, { params }: Params) {
         max_products         = ${max_products !== undefined ? (max_products === null ? null : Number(max_products)) : sql`max_products`},
         max_sales_per_month  = ${max_sales_per_month !== undefined ? (max_sales_per_month === null ? null : Number(max_sales_per_month)) : sql`max_sales_per_month`},
         max_storage_mb       = ${max_storage_mb !== undefined ? (max_storage_mb === null ? null : Number(max_storage_mb)) : sql`max_storage_mb`},
+        max_transactions_per_month = ${max_transactions_per_month !== undefined ? (max_transactions_per_month === null ? null : Number(max_transactions_per_month)) : sql`max_transactions_per_month`},
+        max_accounts         = ${max_accounts !== undefined ? (max_accounts === null ? null : Number(max_accounts)) : sql`max_accounts`},
+        max_supplies         = ${max_supplies !== undefined ? (max_supplies === null ? null : Number(max_supplies)) : sql`max_supplies`},
         is_active            = COALESCE(${is_active ?? null}, is_active),
         updated_at           = CURRENT_TIMESTAMP
       WHERE id = ${id}

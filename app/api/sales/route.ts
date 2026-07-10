@@ -1,7 +1,7 @@
 // app/api/sales/route.ts
 import { NextRequest } from "next/server";
 import { neon } from "@neondatabase/serverless";
-import { verifyAuth, createErrorResponse, isAuthSuccess, getOrgTimezone, requireModule } from "@/lib/auth";
+import { verifyAuth, createErrorResponse, isAuthSuccess, getOrgTimezone, requireModule, verifyResourceLimit } from "@/lib/auth";
 
 const sql = neon(process.env.DATABASE_URL!);
 
@@ -238,6 +238,11 @@ export async function POST(request: NextRequest) {
   if (!isAuthSuccess(auth)) return createErrorResponse(auth.error, auth.status);
   const deny = await requireModule(auth.data, 'SALES', 'canEdit');
   if (deny) return deny;
+
+  const limit = await verifyResourceLimit(auth.data.orgId, "sales");
+  if (!limit.withinLimit) {
+    return createErrorResponse(limit.error ?? "Límite alcanzado", limit.status, "needsUpgrade" in limit ? !!limit.needsUpgrade : false);
+  }
 
   try {
     const { userId, orgId } = auth.data;
