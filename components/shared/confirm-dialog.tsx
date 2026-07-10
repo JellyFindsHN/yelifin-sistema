@@ -1,20 +1,7 @@
-// components/shared/confirm-dialog.tsx
+﻿// components/shared/confirm-dialog.tsx
 "use client";
 
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-  DialogFooter,
-} from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
-import {
-  AlertTriangle,
-  CheckCircle2,
-  Clock,
-} from "lucide-react";
+import { AlertTriangle, CheckCircle2, Clock, X } from "lucide-react";
 
 type ConfirmDialogVariant = "default" | "danger" | "warning";
 
@@ -41,15 +28,12 @@ export function ConfirmDialog({
   onConfirm,
   onOpenChange,
 }: ConfirmDialogProps) {
+  if (!open) return null;
+
   const isDanger = variant === "danger";
   const isWarning = variant === "warning";
 
-  const Icon =
-    variant === "danger"
-      ? AlertTriangle
-      : variant === "warning"
-      ? Clock
-      : CheckCircle2;
+  const Icon = isDanger ? AlertTriangle : isWarning ? Clock : CheckCircle2;
 
   const iconStyles = isDanger
     ? "bg-destructive/10 text-destructive"
@@ -57,58 +41,106 @@ export function ConfirmDialog({
     ? "bg-amber-500/10 text-amber-600"
     : "bg-primary/10 text-primary";
 
-  const confirmVariant = isDanger
-    ? "destructive"
+  const confirmStyles = isDanger
+    ? "bg-destructive text-destructive-foreground hover:bg-destructive/90"
     : isWarning
-    ? "secondary"
-    : "default";
+    ? "bg-amber-500 text-white hover:bg-amber-600"
+    : "bg-primary text-primary-foreground hover:bg-primary/90";
+
+  const closeDialog = () => {
+    if (!isLoading) onOpenChange(false);
+  };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-sm">
-        <DialogHeader className="space-y-2">
-          <div className="flex items-center gap-2.5">
+    <div
+      className="
+        fixed inset-0 z-50
+        flex items-end justify-center
+        bg-black/50
+        p-4
+        sm:items-center
+      "
+      onClick={closeDialog}
+    >
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="confirm-dialog-title"
+        aria-describedby={description ? "confirm-dialog-description" : undefined}
+        className="
+          w-full
+          rounded-2xl
+          bg-background
+          shadow-2xl
+          animate-in
+          slide-in-from-bottom-4
+          duration-200
+
+          sm:max-w-sm
+          sm:zoom-in-95
+        "
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="p-6 pb-4">
+          <div className="mb-3 flex items-center gap-3">
             <div
-              className={`h-9 w-9 rounded-full flex items-center justify-center ${iconStyles}`}
+              className={`
+                flex size-10 shrink-0 items-center justify-center rounded-full
+                ${iconStyles}
+              `}
             >
-              <Icon className="h-4 w-4" />
+              <Icon className="size-5" />
             </div>
-            <DialogTitle className="text-base">
+
+            <h2
+              id="confirm-dialog-title"
+              className="text-base font-semibold"
+            >
               {title}
-            </DialogTitle>
+            </h2>
           </div>
 
           {description && (
-            <DialogDescription className="text-xs text-muted-foreground mt-1 ml-11">
+            <p
+              id="confirm-dialog-description"
+              className="text-sm leading-relaxed text-muted-foreground"
+            >
               {description}
-            </DialogDescription>
+            </p>
           )}
-        </DialogHeader>
+        </div>
 
-        <DialogFooter className="flex flex-col sm:flex-row gap-2 mt-2">
-          <Button
+        <div className="flex flex-col gap-2 px-6 pb-6">
+          <button
             type="button"
-            variant="outline"
-            className="w-full sm:w-auto"
-            onClick={() => onOpenChange(false)}
-            disabled={isLoading}
-          >
-            {cancelLabel}
-          </Button>
-
-          <Button
-            type="button"
-            variant={confirmVariant as any}
-            className={`w-full sm:w-auto ${
-              isWarning ? "bg-amber-500 hover:bg-amber-600 text-white" : ""
-            }`}
             onClick={onConfirm}
             disabled={isLoading}
+            className={`
+              w-full rounded-xl py-2.5 text-sm font-semibold
+              transition-colors cursor-pointer
+              disabled:pointer-events-none disabled:opacity-60
+              ${confirmStyles}
+            `}
           >
-            {confirmLabel}
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+            {isLoading ? "Procesando..." : confirmLabel}
+          </button>
+
+          <button
+            type="button"
+            onClick={closeDialog}
+            disabled={isLoading}
+            className="
+              w-full rounded-xl border border-border py-2.5
+              text-sm font-medium
+              transition-colors cursor-pointer
+              hover:bg-muted
+              disabled:pointer-events-none disabled:opacity-60
+            "
+          >
+            {cancelLabel}
+          </button>
+        </div>
+      </div>
+    </div>
   );
 }

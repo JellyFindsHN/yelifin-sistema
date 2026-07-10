@@ -1,4 +1,4 @@
-// components/events/event-card.tsx
+﻿// components/events/event-card.tsx
 "use client";
 
 import { useRouter } from "next/navigation";
@@ -38,11 +38,13 @@ type Props = {
   onEdit:       (event: Event) => void;
   onDelete:     (event: Event) => void;
   onAddExpense: (event: Event) => void;
+  canEdit?:     boolean;
+  canDelete?:   boolean;
 };
 
 // ── Component ──────────────────────────────────────────────────────────
-export function EventCard({ event, onView, onEdit, onDelete, onAddExpense }: Props) {
-  const router     = useRouter();
+export function EventCard({ event, onView, onEdit, onDelete, onAddExpense, canEdit = true, canDelete = true }: Props) {
+  const { push }   = useRouter();
   const { format } = useCurrency();
 
   const cfg        = STATUS_CONFIG[event.status];
@@ -61,7 +63,7 @@ export function EventCard({ event, onView, onEdit, onDelete, onAddExpense }: Pro
           onClick={() => onView(event)}
         >
           <Badge className={`text-[11px] gap-1 mb-1.5 ${cfg.badge}`} variant="outline">
-            <StatusIcon className="h-3 w-3" />
+            <StatusIcon className="size-3" />
             {cfg.label}
           </Badge>
           <p className="font-semibold text-base truncate hover:text-primary transition-colors">
@@ -70,13 +72,13 @@ export function EventCard({ event, onView, onEdit, onDelete, onAddExpense }: Pro
 
           {event.location && (
             <p className="text-xs text-muted-foreground flex items-center gap-1 mt-0.5 truncate">
-              <MapPin className="h-3 w-3 shrink-0" />
+              <MapPin className="size-3 shrink-0" />
               {event.location}
             </p>
           )}
 
           <p className="text-xs text-muted-foreground flex items-center gap-1 mt-1">
-            <Calendar className="h-3 w-3 shrink-0" />
+            <Calendar className="size-3 shrink-0" />
             {sameDay
               ? formatDate(event.starts_at)
               : <>{formatDate(event.starts_at)} — {formatDate(event.ends_at)}</>
@@ -87,24 +89,30 @@ export function EventCard({ event, onView, onEdit, onDelete, onAddExpense }: Pro
         {/* Actions menu */}
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0">
-              <MoreVertical className="h-4 w-4" />
+            <Button variant="ghost" size="icon" className="size-8 shrink-0">
+              <MoreVertical className="size-4" />
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
             <DropdownMenuItem onClick={() => onView(event)}>
-              <Eye className="h-4 w-4 mr-2" /> Ver detalle
+              <Eye className="size-4 mr-2" /> Ver detalle
             </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => onEdit(event)}>
-              <Pencil className="h-4 w-4 mr-2" /> Editar
-            </DropdownMenuItem>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem
-              className="text-destructive focus:text-destructive"
-              onClick={() => onDelete(event)}
-            >
-              <Trash2 className="h-4 w-4 mr-2" /> Eliminar
-            </DropdownMenuItem>
+            {canEdit && (
+              <DropdownMenuItem onClick={() => onEdit(event)}>
+                <Pencil className="size-4 mr-2" /> Editar
+              </DropdownMenuItem>
+            )}
+            {canDelete && (
+              <>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                  className="text-destructive focus:text-destructive"
+                  onClick={() => onDelete(event)}
+                >
+                  <Trash2 className="size-4 mr-2" /> Eliminar
+                </DropdownMenuItem>
+              </>
+            )}
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
@@ -134,8 +142,8 @@ export function EventCard({ event, onView, onEdit, onDelete, onAddExpense }: Pro
             <p className="text-[11px] text-muted-foreground">ROI</p>
             <p className={`text-sm font-bold flex items-center justify-end gap-0.5 ${event.roi >= 0 ? "text-green-600" : "text-destructive"}`}>
               {event.roi >= 0
-                ? <TrendingUp className="h-3.5 w-3.5" />
-                : <TrendingDown className="h-3.5 w-3.5" />
+                ? <TrendingUp className="size-3.5" />
+                : <TrendingDown className="size-3.5" />
               }
               {event.roi.toFixed(1)}%
             </p>
@@ -157,7 +165,7 @@ export function EventCard({ event, onView, onEdit, onDelete, onAddExpense }: Pro
           className="gap-1.5"
           onClick={() => onView(event)}
         >
-          <Eye className="h-3.5 w-3.5" />
+          <Eye className="size-3.5" />
           Detalle
         </Button>
         <Button
@@ -166,15 +174,15 @@ export function EventCard({ event, onView, onEdit, onDelete, onAddExpense }: Pro
           className="gap-1.5 text-destructive border-destructive/30 hover:bg-destructive/5 hover:text-destructive"
           onClick={() => onAddExpense(event)}
         >
-          <Receipt className="h-3.5 w-3.5" />
+          <Receipt className="size-3.5" />
           Gasto
         </Button>
         <Button
           size="sm"
           className="gap-1.5"
-          onClick={() => router.push(`/sales/new?event_id=${event.id}`)}
+          onClick={() => push(`/sales/new?event_id=${event.id}`)}
         >
-          <ShoppingCart className="h-3.5 w-3.5" />
+          <ShoppingCart className="size-3.5" />
           Venta
         </Button>
       </div>

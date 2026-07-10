@@ -1,16 +1,18 @@
 // app/api/inventory/movements/route.ts
 import { NextRequest } from "next/server";
 import { neon } from "@neondatabase/serverless";
-import { verifyAuth, createErrorResponse, isAuthSuccess } from "@/lib/auth";
+import { verifyAuth, createErrorResponse, isAuthSuccess, requireModule } from "@/lib/auth";
 
 const sql = neon(process.env.DATABASE_URL!);
 
 export async function GET(request: NextRequest) {
   const auth = await verifyAuth(request);
   if (!isAuthSuccess(auth)) return createErrorResponse(auth.error, auth.status);
+  const deny = await requireModule(auth.data, 'INVENTORY', 'canView');
+  if (deny) return deny;
 
   try {
-    const { userId }       = auth.data;
+    const { orgId }        = auth.data;
     const { searchParams } = new URL(request.url);
 
     const date      = searchParams.get("date");
@@ -18,6 +20,11 @@ export async function GET(request: NextRequest) {
     const year      = searchParams.get("year");
     const productId = searchParams.get("product_id");
     const variantId = searchParams.get("variant_id");
+    const search    = searchParams.get("search")?.trim() || null;
+    const typeParam = searchParams.get("type") || null;
+    const page      = Math.max(1, Number(searchParams.get("page"))  || 1);
+    const limit     = Math.min(100, Math.max(1, Number(searchParams.get("limit")) || 25));
+    const offset    = (page - 1) * limit;
 
     const now = new Date();
     let startISO: string;
@@ -38,6 +45,43 @@ export async function GET(request: NextRequest) {
       startISO = new Date(now.getFullYear(), now.getMonth(),     1).toISOString();
       endISO   = new Date(now.getFullYear(), now.getMonth() + 1, 1).toISOString();
     }
+
+    // Mapeo type param → condición SQL
+    const typeMovement  = typeParam === "IN"  ? "IN"  : typeParam === "OUT" ? "OUT" : null;
+    const typeReference =
+      typeParam === "IN"         ? "PURCHASE"       :
+      typeParam === "OUT"        ? "SALE"            :
+      typeParam === "ADJUSTMENT" ? "ADJUSTMENT"      :
+      typeParam === "INITIAL"    ? "INITIAL"         :
+      typeParam === "CANCELLED"  ? "SALE_CANCELLED"  : null;
+
+    const [{ count }] = await sql`
+      SELECT COUNT(*)::int AS count
+      FROM inventory_movements im
+      JOIN products p ON p.id = im.product_id
+      LEFT JOIN product_variants pv ON pv.id = im.variant_id AND pv.org_id = im.org_id
+      LEFT JOIN sales s2
+        ON  im.reference_type = 'SALE'
+        AND s2.id             = im.reference_id
+        AND s2.org_id         = im.org_id
+      LEFT JOIN customers c2 ON c2.id = s2.customer_id
+      WHERE im.org_id     = ${orgId}
+        AND im.created_at >= ${startISO}::timestamptz
+        AND im.created_at <  ${endISO}::timestamptz
+        ${productId ? sql`AND im.product_id = ${Number(productId)}` : sql``}
+        ${variantId ? sql`AND im.variant_id = ${Number(variantId)}` : sql``}
+        ${typeMovement  ? sql`AND im.movement_type  = ${typeMovement}`  : sql``}
+        ${typeReference ? sql`AND im.reference_type = ${typeReference}` : sql``}
+        ${search ? sql`AND (
+          p.name          ILIKE ${"%" + search + "%"} OR
+          p.sku           ILIKE ${"%" + search + "%"} OR
+          pv.variant_name ILIKE ${"%" + search + "%"} OR
+          pv.sku          ILIKE ${"%" + search + "%"} OR
+          c2.name         ILIKE ${"%" + search + "%"} OR
+          s2.sale_number  ILIKE ${"%" + search + "%"} OR
+          im.notes        ILIKE ${"%" + search + "%"}
+        )` : sql``}
+    `;
 
     const movements = await sql`
       SELECT
@@ -110,32 +154,32 @@ export async function GET(request: NextRequest) {
 
       -- Variante (opcional)
       LEFT JOIN product_variants pv
-        ON pv.id      = im.variant_id
-       AND pv.user_id = im.user_id
+        ON pv.id     = im.variant_id
+       AND pv.org_id = im.org_id
 
       -- PURCHASE joins — filtrar por variant_id para evitar duplicados
       LEFT JOIN purchase_batch_items pbi
         ON  im.reference_type     = 'PURCHASE'
         AND pbi.purchase_batch_id = im.reference_id
         AND pbi.product_id        = im.product_id
-        AND pbi.user_id           = im.user_id
+        AND pbi.org_id            = im.org_id
         AND (
           (im.variant_id IS NULL AND pbi.variant_id IS NULL)
           OR pbi.variant_id = im.variant_id
         )
       LEFT JOIN purchase_batches pb
-        ON  pb.id      = pbi.purchase_batch_id
-       AND pb.user_id = im.user_id
+        ON  pb.id     = pbi.purchase_batch_id
+       AND pb.org_id  = im.org_id
       LEFT JOIN inventory_batches ib
         ON  ib.purchase_batch_item_id = pbi.id
-        AND ib.user_id                = im.user_id
+        AND ib.org_id                 = im.org_id
 
       -- SALE joins — filtrar por variant_id para evitar duplicados
       LEFT JOIN sale_items si
         ON  im.reference_type = 'SALE'
         AND si.sale_id        = im.reference_id
         AND si.product_id     = im.product_id
-        AND si.user_id        = im.user_id
+        AND si.org_id         = im.org_id
         AND (
           (im.variant_id IS NULL AND si.variant_id IS NULL)
           OR si.variant_id = im.variant_id
@@ -147,19 +191,39 @@ export async function GET(request: NextRequest) {
       LEFT JOIN sales se
         ON  im.reference_type = 'SALE_EDITED'
         AND se.id             = im.reference_id
-        AND se.user_id        = im.user_id
+        AND se.org_id         = im.org_id
 
-      WHERE im.user_id    = ${userId}
+      WHERE im.org_id     = ${orgId}
         AND im.created_at >= ${startISO}::timestamptz
         AND im.created_at <  ${endISO}::timestamptz
         ${productId ? sql`AND im.product_id = ${Number(productId)}` : sql``}
         ${variantId ? sql`AND im.variant_id = ${Number(variantId)}` : sql``}
+        ${typeMovement  ? sql`AND im.movement_type  = ${typeMovement}`  : sql``}
+        ${typeReference ? sql`AND im.reference_type = ${typeReference}` : sql``}
+        ${search ? sql`AND (
+          p.name          ILIKE ${"%" + search + "%"} OR
+          p.sku           ILIKE ${"%" + search + "%"} OR
+          pv.variant_name ILIKE ${"%" + search + "%"} OR
+          pv.sku          ILIKE ${"%" + search + "%"} OR
+          c.name          ILIKE ${"%" + search + "%"} OR
+          s.sale_number   ILIKE ${"%" + search + "%"} OR
+          im.notes        ILIKE ${"%" + search + "%"}
+        )` : sql``}
 
       ORDER BY im.created_at DESC
-      LIMIT 500
+      LIMIT  ${limit}
+      OFFSET ${offset}
     `;
 
-    return Response.json({ data: movements, total: movements.length });
+    const totalPages = Math.ceil(count / limit);
+
+    return Response.json({
+      data:       movements,
+      total:      count,
+      page,
+      totalPages,
+      limit,
+    });
 
   } catch (error) {
     console.error("GET /api/inventory/movements:", error);

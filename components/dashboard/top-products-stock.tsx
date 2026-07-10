@@ -1,4 +1,4 @@
-// components/dashboard/top-products-stock.tsx
+﻿// components/dashboard/top-products-stock.tsx
 "use client";
 
 import Image from "next/image";
@@ -31,10 +31,10 @@ export function TopProductsStock({ topProducts, lowStock, isLoading }: Props) {
                 <CartesianGrid strokeDasharray="3 3" className="stroke-muted" horizontal={false} />
                 <XAxis type="number" tick={{ fontSize: 11 }} tickLine={false} axisLine={false} />
                 <YAxis dataKey="name" type="category" tick={{ fontSize: 11 }} tickLine={false} axisLine={false} width={110} />
-                <Tooltip contentStyle={{ backgroundColor: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: "8px" }} />
+                <Tooltip contentStyle={{ backgroundColor: "var(--card)", border: "1px solid var(--border)", borderRadius: "8px" }} />
                 <Bar dataKey="units_sold" radius={[0, 4, 4, 0]} name="Unidades">
-                  {topProducts.map((_: any, i: number) => (
-                    <Cell key={i} fill={CHART_COLORS[i % CHART_COLORS.length]} />
+                  {topProducts.map((p: any, i: number) => (
+                    <Cell key={p.name} fill={CHART_COLORS[i % CHART_COLORS.length]} />
                   ))}
                 </Bar>
               </BarChart>
@@ -46,24 +46,24 @@ export function TopProductsStock({ topProducts, lowStock, isLoading }: Props) {
       <Card>
         <CardHeader className="pb-2 pt-4 px-4">
           <CardTitle className="text-base flex items-center gap-2">
-            <AlertTriangle className="h-4 w-4 text-yellow-500" />
+            <AlertTriangle className="size-4 text-yellow-500" />
             Alertas de stock
           </CardTitle>
           <CardDescription>Productos con stock bajo</CardDescription>
         </CardHeader>
         <CardContent className="px-4 pb-4">
           {isLoading ? (
-            <div className="space-y-2">{Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-11 w-full" />)}</div>
+            <div className="space-y-2">{Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-11 w-full" />)}{/* skeleton - index key ok */}</div>
           ) : !lowStock.length ? (
             <p className="text-sm text-muted-foreground text-center py-8">Sin alertas de stock</p>
           ) : (
             <div className="space-y-2">
               {lowStock.map((p: any) => (
                 <div key={p.id} className="flex items-center gap-3 p-2.5 rounded-lg border">
-                  <div className="relative h-8 w-8 rounded-md overflow-hidden bg-muted shrink-0 flex items-center justify-center">
+                  <div className="relative size-8 rounded-md overflow-hidden bg-muted shrink-0 flex items-center justify-center">
                     {p.image_url
                       ? <Image src={p.image_url} alt={p.name} fill className="object-cover" />
-                      : <Package className="h-4 w-4 text-muted-foreground/40" />
+                      : <Package className="size-4 text-muted-foreground/40" />
                     }
                   </div>
                   <div className="flex-1 min-w-0">

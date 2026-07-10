@@ -1,4 +1,4 @@
-// app/(dashboard)/events/[id]/page.tsx
+﻿// app/(dashboard)/events/[id]/page.tsx
 "use client";
 
 import { use, useState } from "react";
@@ -47,7 +47,7 @@ type Props = { params: Promise<{ id: string }> };
 
 export default function EventDetailPage({ params }: Props) {
   const { id }       = use(params);
-  const router       = useRouter();
+  const { back, push } = useRouter();
   const { format }   = useCurrency();
   const { event, isLoading, mutate } = useEvent(Number(id));
   const [editOpen, setEditOpen] = useState(false);
@@ -57,7 +57,7 @@ export default function EventDetailPage({ params }: Props) {
   if (!event)
     return (
       <div className="flex flex-col items-center justify-center py-24 gap-4">
-        <Calendar className="h-12 w-12 text-muted-foreground/40" />
+        <Calendar className="size-12 text-muted-foreground/40" />
         <p className="text-muted-foreground">Evento no encontrado</p>
         <Button variant="outline" asChild>
           <Link href="/events">Volver a eventos</Link>
@@ -75,22 +75,22 @@ export default function EventDetailPage({ params }: Props) {
 
       {/* ── Header ── */}
       <div className="flex items-start gap-3">
-        <Button variant="ghost" size="icon" onClick={() => router.back()} className="shrink-0 mt-0.5">
-          <ArrowLeft className="h-4 w-4" />
+        <Button variant="ghost" size="icon" onClick={() => back()} className="shrink-0 mt-0.5">
+          <ArrowLeft className="size-4" />
         </Button>
         <div className="flex-1 min-w-0">
           <div className="flex flex-wrap items-center gap-2 mb-1">
-            <h1 className="text-2xl font-bold tracking-tight">{event.name}</h1>
+            <h1 className="text-2xl font-semibold tracking-tight">{event.name}</h1>
             <Badge variant="outline" className={statusCfg.className}>{statusCfg.label}</Badge>
           </div>
           <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm text-muted-foreground">
             <span className="flex items-center gap-1.5">
-              <Calendar className="h-3.5 w-3.5" />
+              <Calendar className="size-3.5" />
               {formatDate(event.starts_at)} – {formatDate(event.ends_at)}
             </span>
             {event.location && (
               <span className="flex items-center gap-1.5">
-                <MapPin className="h-3.5 w-3.5" />
+                <MapPin className="size-3.5" />
                 {event.location}
               </span>
             )}
@@ -104,7 +104,7 @@ export default function EventDetailPage({ params }: Props) {
           <CardContent className="pl-3.5 py-3">
             <div className="flex items-center justify-between mb-1">
               <span className="text-xs text-muted-foreground">Ventas totales</span>
-              <DollarSign className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+              <DollarSign className="size-3.5 text-muted-foreground shrink-0" />
             </div>
             <p className="text-base font-bold truncate">{format(summary.total_sales)}</p>
             <p className="text-[10px] text-muted-foreground">{summary.sales_count} transacciones</p>
@@ -115,7 +115,7 @@ export default function EventDetailPage({ params }: Props) {
           <CardContent className="pl-3.5 py-3">
             <div className="flex items-center justify-between mb-1">
               <span className="text-xs text-muted-foreground">Gastos totales</span>
-              <TrendingDown className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+              <TrendingDown className="size-3.5 text-muted-foreground shrink-0" />
             </div>
             <p className="text-base font-bold text-red-500 truncate">{format(summary.total_expenses)}</p>
             {event.fixed_cost > 0 && (
@@ -128,7 +128,7 @@ export default function EventDetailPage({ params }: Props) {
           <CardContent className="pl-3.5 py-3">
             <div className="flex items-center justify-between mb-1">
               <span className="text-xs text-muted-foreground">Ganancia neta</span>
-              <TrendingUp className={`h-3.5 w-3.5 shrink-0 ${isProfit ? "text-green-600" : "text-red-500"}`} />
+              <TrendingUp className={`size-3.5 shrink-0 ${isProfit ? "text-green-600" : "text-red-500"}`} />
             </div>
             <p className={`text-lg font-bold truncate ${isProfit ? "text-green-600" : "text-red-500"}`}>
               {format(summary.net_profit)}
@@ -145,7 +145,7 @@ export default function EventDetailPage({ params }: Props) {
       <Card>
         <CardHeader>
           <CardTitle className="text-base flex items-center gap-2">
-            <Tag className="h-4 w-4" />
+            <Tag className="size-4" />
             Desglose financiero
           </CardTitle>
         </CardHeader>
@@ -154,6 +154,12 @@ export default function EventDetailPage({ params }: Props) {
             <span className="text-muted-foreground">Ventas brutas</span>
             <span className="font-medium">{format(summary.total_sales)}</span>
           </div>
+          {Object.entries(summary.by_account ?? {}).map(([accountName, amount]) => (
+            <div key={accountName} className="flex justify-between text-xs text-muted-foreground pl-4">
+              <span>{accountName}</span>
+              <span>{format(amount as number)}</span>
+            </div>
+          ))}
           {summary.total_tax > 0 && (
             <div className="flex justify-between text-amber-600">
               <span>ISV incluido (pagado al SAR)</span>
@@ -184,7 +190,7 @@ export default function EventDetailPage({ params }: Props) {
 
           <div className={`flex justify-between font-bold text-base ${isProfit ? "text-green-600" : "text-red-500"}`}>
             <span className="flex items-center gap-1.5">
-              <TrendingUp className="h-4 w-4" />
+              <TrendingUp className="size-4" />
               Ganancia neta
             </span>
             <span>{format(summary.net_profit)}</span>
@@ -196,7 +202,7 @@ export default function EventDetailPage({ params }: Props) {
       <Card>
         <CardHeader>
           <CardTitle className="text-base flex items-center gap-2">
-            <ShoppingCart className="h-4 w-4" />
+            <ShoppingCart className="size-4" />
             Ventas del evento
             <Badge variant="secondary" className="ml-auto">{summary.sales_count}</Badge>
           </CardTitle>
@@ -236,7 +242,7 @@ export default function EventDetailPage({ params }: Props) {
                     <p className="text-xs text-green-600">+{format(sale.profit)}</p>
                   </div>
                   <Badge variant="outline" className="shrink-0 gap-1 text-xs">
-                    <PayIcon className="h-3 w-3" />
+                    <PayIcon className="size-3" />
                     {sale.items_count} prod.
                   </Badge>
                 </Link>
@@ -251,7 +257,7 @@ export default function EventDetailPage({ params }: Props) {
         <Card className="border-red-200 dark:border-red-800/40">
           <CardHeader>
             <CardTitle className="text-base flex items-center gap-2 text-red-600 dark:text-red-400">
-              <TrendingDown className="h-4 w-4" />
+              <TrendingDown className="size-4" />
               Gastos adicionales
             </CardTitle>
           </CardHeader>
@@ -290,7 +296,7 @@ export default function EventDetailPage({ params }: Props) {
           ...(event.status !== "COMPLETED" ? [{
             label: "Nueva venta",
             icon: ShoppingCart,
-            onClick: () => router.push(`/sales/new?event_id=${event.id}`),
+            onClick: () => push(`/sales/new?event_id=${event.id}`),
           }] : []),
           {
             label: "Editar evento",
@@ -315,7 +321,7 @@ function EventDetailSkeleton() {
   return (
     <div className="space-y-6 max-w-3xl mx-auto">
       <div className="flex items-center gap-3">
-        <Skeleton className="h-9 w-9 rounded-lg" />
+        <Skeleton className="size-9 rounded-lg" />
         <div className="space-y-2">
           <Skeleton className="h-7 w-48" />
           <Skeleton className="h-4 w-64" />

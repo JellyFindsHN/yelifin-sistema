@@ -1,4 +1,4 @@
-// components/products/product-card.tsx
+﻿// components/products/product-card.tsx
 "use client";
 
 import { Product } from "@/types";
@@ -53,7 +53,7 @@ const ActionBtn = ({
         : "text-muted-foreground border-border hover:bg-muted hover:text-foreground"
       }`}
   >
-    <Icon className="h-3.5 w-3.5" />
+    <Icon className="size-3.5" />
     {label}
   </button>
 );
@@ -68,7 +68,7 @@ export function ProductCard({ product, onEdit, onDelete, onAddInventory }: Props
             {product.image_url ? (
               <Image src={product.image_url} alt={product.name} fill className="object-cover" />
             ) : (
-              <Package className="h-8 w-8 text-muted-foreground/20" />
+              <Package className="size-8 text-muted-foreground/20" />
             )}
           </div>
 

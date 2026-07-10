@@ -1,13 +1,11 @@
-// components/credit-cards/edit-cc-transaction-dialog.tsx
+﻿// components/credit-cards/edit-cc-transaction-dialog.tsx
 "use client";
 
 import { useEffect } from "react";
 import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
-import {
-  Dialog, DialogContent, DialogHeader, DialogTitle,
-} from "@/components/ui/dialog";
+import { ResponsiveModal } from "@/components/shared/responsive-modal";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -16,9 +14,10 @@ import {
 } from "@/components/ui/select";
 import { Loader2, Pencil } from "lucide-react";
 import { toast } from "sonner";
-import { cn } from "@/lib/utils";
 import { CreditCardTransaction, useUpdateCCTransaction } from "@/hooks/swr/use-credit-cards";
+import { localDateToISO, toLocalDateInput } from "@/lib/date-utils";
 import { TransactionCategory } from "@/hooks/swr/use-transaction-categories";
+import { useCurrency } from "@/hooks/swr/use-currency";
 
 const schema = z.object({
   description:   z.string().optional(),
@@ -34,7 +33,6 @@ const schema = z.object({
 
 type FormData = z.infer<typeof schema>;
 
-const toDateInput = (iso: string) => iso.split("T")[0];
 
 type Props = {
   txn:                CreditCardTransaction | null;
@@ -54,6 +52,7 @@ export function EditCCTransactionDialog({
   expenseCategories,
 }: Props) {
   const { updateTransaction, isUpdating } = useUpdateCCTransaction();
+  const { symbol } = useCurrency();
 
   const {
     register,
@@ -65,6 +64,10 @@ export function EditCCTransactionDialog({
   } = useForm<FormData>({ resolver: zodResolver(schema) });
 
   const selectedCurrency = watch("currency");
+  const watchAmount      = watch("amount");
+  const watchRate        = watch("exchange_rate");
+  const isUsd            = selectedCurrency === "USD";
+  const localEquivalent  = isUsd && watchAmount && watchRate ? Number(watchAmount) * Number(watchRate) : null;
   const isSubmittingOrUpdating = isSubmitting || isUpdating;
 
   useEffect(() => {
@@ -72,7 +75,7 @@ export function EditCCTransactionDialog({
       reset({
         description:   txn.description ?? "",
         category:      txn.category ?? "",
-        occurred_at:   toDateInput(txn.occurred_at),
+        occurred_at:   toLocalDateInput(txn.occurred_at),
         amount:        Number(txn.amount),
         currency:      txn.currency,
         exchange_rate: txn.exchange_rate ? Number(txn.exchange_rate) : undefined,
@@ -88,7 +91,7 @@ export function EditCCTransactionDialog({
       await updateTransaction(txn.id, {
         description:   data.description || undefined,
         category:      data.category || null,
-        occurred_at:   new Date(data.occurred_at).toISOString(),
+        occurred_at:   localDateToISO(data.occurred_at),
         amount:        data.amount,
         currency:      data.currency,
         exchange_rate: data.currency === "USD" ? data.exchange_rate : undefined,
@@ -104,47 +107,40 @@ export function EditCCTransactionDialog({
   if (!txn) return null;
 
   return (
-    <Dialog open={open} onOpenChange={(v) => !v && handleClose()}>
-      <DialogContent
-        className={cn(
-          "fixed bottom-0 left-0 right-0 top-auto translate-x-0 translate-y-0",
-          "w-full max-w-full rounded-t-2xl rounded-b-none border-t border-x-0 border-b-0",
-          "max-h-[92dvh] flex flex-col p-0",
-          "sm:bottom-auto sm:left-1/2 sm:right-auto sm:top-1/2",
-          "sm:-translate-x-1/2 sm:-translate-y-1/2",
-          "sm:w-full sm:max-w-md",
-          "lg:max-w-xl",
-          "xl:max-w-xl",
-          "sm:rounded-2xl sm:border",
-          "sm:max-h-[88vh]",
-          "data-[state=open]:animate-in data-[state=closed]:animate-out",
-          "data-[state=open]:slide-in-from-bottom sm:data-[state=open]:slide-in-from-bottom-[48%]",
-          "data-[state=closed]:slide-out-to-bottom sm:data-[state=closed]:slide-out-to-bottom-[48%]",
-          "duration-300",
-        )}
-        onInteractOutside={(e) => e.preventDefault()}
-        onEscapeKeyDown={handleClose}
-      >
-        <div className="sm:hidden flex justify-center pt-3 pb-1 shrink-0">
-          <div className="w-10 h-1 rounded-full bg-muted-foreground/30" />
-        </div>
-
-        <DialogHeader className="shrink-0 px-5 pt-2 pb-3 sm:pt-5 border-b">
-          <DialogTitle className="flex items-center gap-2 text-lg font-bold">
-            <Pencil className="h-4 w-4 text-primary" />
-            Editar cargo
-          </DialogTitle>
-          <p className="text-sm text-muted-foreground truncate">
-            {txn.description || "Compra"}
-          </p>
-        </DialogHeader>
-
-        <form
-          id="edit-cc-txn-form"
-          onSubmit={handleSubmit(onSubmit)}
-          className="flex-1 overflow-y-auto px-5 py-4 space-y-4"
-          style={{ scrollbarWidth: "none" } as React.CSSProperties}
-        >
+    <ResponsiveModal
+      open={open}
+      onOpenChange={(v) => !v && handleClose()}
+      title="Editar cargo"
+      icon={Pencil}
+      subtitle={txn.description || "Compra"}
+      width="wide"
+      as="form"
+      formProps={{ id: "edit-cc-txn-form", onSubmit: handleSubmit(onSubmit) }}
+      footer={
+        <>
+          <Button
+            type="button"
+            variant="outline"
+            onClick={handleClose}
+            disabled={isSubmittingOrUpdating}
+            className="flex-1 h-11"
+          >
+            Cancelar
+          </Button>
+          <Button
+            type="submit"
+            form="edit-cc-txn-form"
+            disabled={isSubmittingOrUpdating}
+            className="flex-1 h-11 gap-2"
+          >
+            {isSubmittingOrUpdating
+              ? <><Loader2 className="size-4 animate-spin" />Guardando…</>
+              : <><Pencil className="size-4" />Guardar cambios</>
+            }
+          </Button>
+        </>
+      }
+    >
           {/* Descripcion */}
           <div className="space-y-1.5">
             <Label className="text-sm font-medium">
@@ -211,7 +207,7 @@ export function EditCCTransactionDialog({
             </Label>
             <div className="relative">
               <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm font-medium">
-                {selectedCurrency === "USD" ? "$" : nativeCurrency}
+                {isUsd ? "$" : symbol}
               </span>
               <Input
                 type="number"
@@ -229,10 +225,10 @@ export function EditCCTransactionDialog({
           </div>
 
           {/* Tasa de cambio (solo USD) */}
-          {selectedCurrency === "USD" && (
+          {isUsd && (
             <div className="space-y-1.5">
               <Label className="text-sm font-medium">
-                Tasa de cambio <span className="text-destructive text-xs">*</span>
+                1 USD = cuántos {symbol} <span className="text-destructive text-xs">*</span>
               </Label>
               <div className="relative">
                 <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm font-medium">
@@ -250,6 +246,14 @@ export function EditCCTransactionDialog({
               </div>
               {errors.exchange_rate && (
                 <p className="text-xs text-destructive">{errors.exchange_rate.message}</p>
+              )}
+              {localEquivalent && localEquivalent > 0 && (
+                <div className="flex items-center gap-1.5 bg-muted/60 rounded-lg px-3 py-2">
+                  <span className="text-xs text-muted-foreground">Equivalente en {symbol}:</span>
+                  <span className="text-xs font-semibold">
+                    {new Intl.NumberFormat("es-HN", { style: "currency", currency: nativeCurrency, minimumFractionDigits: 2 }).format(localEquivalent)}
+                  </span>
+                </div>
               )}
             </div>
           )}
@@ -282,31 +286,6 @@ export function EditCCTransactionDialog({
               )}
             />
           </div>
-        </form>
-
-        <div className="shrink-0 px-5 py-4 border-t bg-transparent xl:bg-transparent md:bg-transparent sm:bg-background flex gap-3">
-          <Button
-            type="button"
-            variant="outline"
-            onClick={handleClose}
-            disabled={isSubmittingOrUpdating}
-            className="flex-1 h-11"
-          >
-            Cancelar
-          </Button>
-          <Button
-            type="submit"
-            form="edit-cc-txn-form"
-            disabled={isSubmittingOrUpdating}
-            className="flex-1 h-11 gap-2"
-          >
-            {isSubmittingOrUpdating
-              ? <><Loader2 className="h-4 w-4 animate-spin" />Guardando...</>
-              : <><Pencil className="h-4 w-4" />Guardar cambios</>
-            }
-          </Button>
-        </div>
-      </DialogContent>
-    </Dialog>
+    </ResponsiveModal>
   );
 }

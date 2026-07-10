@@ -1,13 +1,11 @@
-// components/products/add-inventory-dialog.tsx
+﻿// components/products/add-inventory-dialog.tsx
 "use client";
 
 import { useEffect, useState } from "react";
 import { useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
-import {
-  Dialog, DialogContent, DialogHeader, DialogTitle,
-} from "@/components/ui/dialog";
+import { ResponsiveModal } from "@/components/shared/responsive-modal";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -24,6 +22,7 @@ import { useAccounts } from "@/hooks/swr/use-accounts";
 import { useCreditCards } from "@/hooks/swr/use-credit-cards";
 import { useCurrency } from "@/hooks/swr/use-currency";
 import { Product } from "@/types";
+import { localDateToISO, toLocalDateInput } from "@/lib/date-utils";
 
 const TASA_DEFAULT = 24.89;
 
@@ -131,7 +130,7 @@ export function AddInventoryDialog({ product, open, onOpenChange, onSuccess }: P
         currency: "USD",
         exchange_rate: TASA_DEFAULT,
         shipping: 0,
-        purchased_at: new Date().toISOString().split("T")[0],
+        purchased_at: toLocalDateInput(new Date()),
       });
     }
   }, [open, reset]);
@@ -181,7 +180,7 @@ export function AddInventoryDialog({ product, open, onOpenChange, onSuccess }: P
         notes: data.notes,
         status: isPending ? "PENDING" : "COMPLETED",
         purchased_at: data.purchased_at
-          ? new Date(data.purchased_at + "T00:00:00-06:00").toISOString()
+          ? localDateToISO(data.purchased_at)
           : new Date().toISOString(),
         items: items.map((item) => ({
           product_id: product.id,
@@ -224,47 +223,47 @@ export function AddInventoryDialog({ product, open, onOpenChange, onSuccess }: P
   const canAddMore = !hasVariants ? false : items.length < maxItems;
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent
-        className={cn(
-          "fixed bottom-0 left-0 right-0 top-auto translate-x-0 translate-y-0",
-          "w-full max-w-full rounded-t-2xl rounded-b-none border-t border-x-0 border-b-0",
-          "max-h-[92dvh] flex flex-col p-0",
-          "sm:bottom-auto sm:left-1/2 sm:right-auto sm:top-1/2",
-          "sm:-translate-x-1/2 sm:-translate-y-1/2",
-          "sm:w-full sm:max-w-lg lg:max-w-2xl",
-          "sm:rounded-2xl sm:border sm:max-h-[88vh]",
-          "data-[state=open]:animate-in data-[state=closed]:animate-out",
-          "data-[state=open]:slide-in-from-bottom sm:data-[state=open]:slide-in-from-bottom-[48%]",
-          "data-[state=closed]:slide-out-to-bottom sm:data-[state=closed]:slide-out-to-bottom-[48%]",
-          "duration-300",
-        )}
-        onInteractOutside={(e) => e.preventDefault()}
-        onEscapeKeyDown={() => onOpenChange(false)}
-      >
-        <div className="sm:hidden flex justify-center pt-3 pb-1 shrink-0">
-          <div className="w-10 h-1 rounded-full bg-muted-foreground/30" />
-        </div>
-
-        <DialogHeader className="shrink-0 px-5 pt-2 pb-3 sm:pt-5 border-b">
-          <DialogTitle className="flex items-center gap-2 text-lg font-bold">
-            <PackagePlus className="h-5 w-5 text-primary" />
-            Agregar stock
-          </DialogTitle>
-          <p className="text-sm text-muted-foreground truncate">
-            {product.name}
-            {product.sku && (
-              <span className="font-mono ml-2 text-xs">({product.sku})</span>
-            )}
-          </p>
-        </DialogHeader>
-
-        <form
-          id="add-inventory-form"
-          onSubmit={handleSubmit(onSubmit)}
-          className="flex-1 overflow-y-auto px-5 py-4 space-y-4"
-          style={{ scrollbarWidth: "none" } as React.CSSProperties}
-        >
+    <ResponsiveModal
+      open={open}
+      onOpenChange={onOpenChange}
+      title="Agregar stock"
+      icon={PackagePlus}
+      subtitle={
+        <>
+          {product.name}
+          {product.sku && (
+            <span className="font-mono ml-2 text-xs">({product.sku})</span>
+          )}
+        </>
+      }
+      width="2xl"
+      as="form"
+      formProps={{ id: "add-inventory-form", onSubmit: handleSubmit(onSubmit) }}
+      footer={
+        <>
+          <Button
+            type="button" variant="outline"
+            onClick={() => onOpenChange(false)}
+            disabled={isCreating}
+            className="flex-1 h-11"
+          >
+            Cancelar
+          </Button>
+          <Button
+            type="submit" form="add-inventory-form"
+            disabled={isCreating}
+            className="flex-1 h-11 gap-2"
+          >
+            {isCreating
+              ? <><Loader2 className="size-4 animate-spin" />Registrando…</>
+              : isPending
+                ? <><Clock className="size-4" />Registrar como pendiente</>
+                : <><PackagePlus className="size-4" />Registrar compra</>
+            }
+          </Button>
+        </>
+      }
+    >
           {/* Modo de pago */}
           {creditCards.length > 0 && (
             <div className="grid grid-cols-2 gap-1.5 p-1 bg-muted rounded-lg">
@@ -276,7 +275,7 @@ export function AddInventoryDialog({ product, open, onOpenChange, onSuccess }: P
                   paymentMode === "account" ? "bg-background shadow-sm" : "text-muted-foreground hover:text-foreground"
                 )}
               >
-                <Wallet className="h-3 w-3" /> Cuenta
+                <Wallet className="size-3" /> Cuenta
               </button>
               <button
                 type="button"
@@ -286,65 +285,65 @@ export function AddInventoryDialog({ product, open, onOpenChange, onSuccess }: P
                   paymentMode === "credit_card" ? "bg-background shadow-sm" : "text-muted-foreground hover:text-foreground"
                 )}
               >
-                <CreditCard className="h-3 w-3" /> Tarjeta
+                <CreditCard className="size-3" /> Tarjeta
               </button>
             </div>
           )}
 
           {/* Cuenta */}
           {paymentMode === "account" && (
-            <div className="space-y-1.5">
-              <Label className="text-sm font-medium flex items-center gap-1.5">
-                <Wallet className="h-3.5 w-3.5 text-muted-foreground" />
-                Cuenta <span className="text-destructive text-xs">*</span>
-              </Label>
-              <Select
-                onValueChange={(val) => setValue("account_id", Number(val))}
-                disabled={isCreating}
-              >
-                <SelectTrigger className={cn("h-11 w-full", errors.account_id && "border-destructive")}>
-                  <SelectValue placeholder="Selecciona una cuenta" />
-                </SelectTrigger>
-                <SelectContent>
-                  {accounts.map((a) => (
-                    <SelectItem key={a.id} value={String(a.id)}>
-                      <div className="flex items-center justify-between gap-8 w-full">
-                        <span>{a.name}</span>
-                        <span className="text-xs text-muted-foreground font-mono">
-                          {format(Number(a.balance))}
-                        </span>
-                      </div>
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+          <div className="space-y-1.5">
+            <Label className="text-sm font-medium flex items-center gap-1.5">
+              <Wallet className="size-3.5 text-muted-foreground" />
+              Cuenta <span className="text-destructive text-xs">*</span>
+            </Label>
+            <Select
+              onValueChange={(val) => setValue("account_id", Number(val))}
+              disabled={isCreating}
+            >
+              <SelectTrigger className={cn("h-11 w-full", errors.account_id && "border-destructive")}>
+                <SelectValue placeholder="Selecciona una cuenta" />
+              </SelectTrigger>
+              <SelectContent>
+                {accounts.map((a) => (
+                  <SelectItem key={a.id} value={String(a.id)}>
+                    <div className="flex items-center justify-between gap-8 w-full">
+                      <span>{a.name}</span>
+                      <span className="text-xs text-muted-foreground font-mono">
+                        {format(Number(a.balance))}
+                      </span>
+                    </div>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
           )}
 
           {/* Tarjeta de crédito */}
           {paymentMode === "credit_card" && (
-            <div className="space-y-1.5">
-              <Label className="text-sm font-medium flex items-center gap-1.5">
-                <CreditCard className="h-3.5 w-3.5 text-muted-foreground" />
-                Tarjeta de crédito <span className="text-destructive text-xs">*</span>
-              </Label>
-              <Select
-                value={creditCardId ? String(creditCardId) : ""}
-                onValueChange={(val) => setCreditCardId(Number(val))}
-                disabled={isCreating}
-              >
-                <SelectTrigger className="h-11 w-full">
-                  <SelectValue placeholder="Selecciona una tarjeta" />
-                </SelectTrigger>
-                <SelectContent>
-                  {creditCards.map((c) => (
-                    <SelectItem key={c.id} value={String(c.id)}>
-                      {c.name}{c.last_four ? ` ···· ${c.last_four}` : ""}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+          <div className="space-y-1.5">
+            <Label className="text-sm font-medium flex items-center gap-1.5">
+              <CreditCard className="size-3.5 text-muted-foreground" />
+              Tarjeta de crédito <span className="text-destructive text-xs">*</span>
+            </Label>
+            <Select
+              value={creditCardId ? String(creditCardId) : ""}
+              onValueChange={(val) => setCreditCardId(Number(val))}
+              disabled={isCreating}
+            >
+              <SelectTrigger className="h-11 w-full">
+                <SelectValue placeholder="Selecciona una tarjeta" />
+              </SelectTrigger>
+              <SelectContent>
+                {creditCards.map((c) => (
+                  <SelectItem key={c.id} value={String(c.id)}>
+                    {c.name}{c.last_four ? ` ···· ${c.last_four}` : ""}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
           )}
 
           {/* Moneda + Tasa */}
@@ -401,7 +400,7 @@ export function AddInventoryDialog({ product, open, onOpenChange, onSuccess }: P
                   disabled={isCreating}
                   className="h-7 text-xs gap-1 text-primary hover:text-primary"
                 >
-                  <Plus className="h-3 w-3" />
+                  <Plus className="size-3" />
                   Agregar fila
                 </Button>
               )}
@@ -510,7 +509,7 @@ export function AddInventoryDialog({ product, open, onOpenChange, onSuccess }: P
                         disabled={isCreating || items.length === 1}
                         className="h-10 w-8 text-muted-foreground hover:text-destructive"
                       >
-                        <Trash2 className="h-3.5 w-3.5" />
+                        <Trash2 className="size-3.5" />
                       </Button>
                     )}
                   </div>
@@ -535,8 +534,41 @@ export function AddInventoryDialog({ product, open, onOpenChange, onSuccess }: P
             })}
           </div>
 
-          {/* Envío */}
-          <div className="space-y-1.5">
+          {/* Toggle pendiente */}
+          <div className="flex items-start justify-between gap-3 rounded-xl border p-3.5">
+            <div className="space-y-0.5 min-w-0">
+              <Label className="text-sm font-medium flex items-center gap-2 cursor-pointer">
+                <Clock className="size-3.5 text-amber-500 shrink-0" />
+                Stock pendiente de llegada
+              </Label>
+              <p className="text-xs text-muted-foreground">
+                {isPending
+                  ? "El stock se acredita al confirmar la llegada. El dinero se debita ahora."
+                  : "El stock entra al inventario de inmediato al guardar."}
+              </p>
+            </div>
+            <Switch
+              checked={isPending}
+              onCheckedChange={(checked) => {
+                setIsPending(checked);
+                if (checked) {
+                  setValue("shipping", 0);
+                  setShippingAccountId(null);
+                }
+              }}
+              disabled={isCreating}
+              className="shrink-0 mt-0.5"
+            />
+          </div>
+
+          {isPending && (
+            <div className="rounded-xl border border-amber-200 bg-amber-50/60 dark:bg-amber-950/20 px-3.5 py-3 text-xs text-amber-700 dark:text-amber-400 leading-relaxed">
+              El costo de envío se podrá registrar al confirmar la llegada, una vez sepas cuánto costó.
+            </div>
+          )}
+
+          {/* Envío — oculto en modo pendiente */}
+          {!isPending && <div className="space-y-1.5">
             <Label className="text-sm font-medium">
               Gastos de envío ({symbol})
               {ship > 0 && totalUnits > 0 && (
@@ -556,13 +588,13 @@ export function AddInventoryDialog({ product, open, onOpenChange, onSuccess }: P
                 className="h-11 pl-8 text-base"
               />
             </div>
-          </div>
+          </div>}
 
           {/* Cuenta para el envío (solo si hay envío y hay cuentas disponibles) */}
-          {ship > 0 && accounts.length > 0 && (
+          {!isPending && ship > 0 && accounts.length > 0 && (
             <div className="space-y-1.5">
               <Label className="text-sm font-medium flex items-center gap-1.5">
-                <Truck className="h-3.5 w-3.5 text-muted-foreground" />
+                <Truck className="size-3.5 text-muted-foreground" />
                 Cuenta para el envío
                 <span className="text-xs text-muted-foreground font-normal">
                   {paymentMode === "account" ? "(opcional, si es diferente a la cuenta principal)" : ""}
@@ -604,7 +636,7 @@ export function AddInventoryDialog({ product, open, onOpenChange, onSuccess }: P
           {totalUnits > 0 && totalCost > 0 && (
             <div className="rounded-lg bg-primary/5 border border-primary/10 p-3 space-y-1.5">
               <div className="flex items-center gap-1.5 text-xs font-medium text-primary mb-2">
-                <Calculator className="h-3.5 w-3.5" />
+                <Calculator className="size-3.5" />
                 Resumen de la compra
               </div>
               {items
@@ -664,32 +696,6 @@ export function AddInventoryDialog({ product, open, onOpenChange, onSuccess }: P
               className="h-11 text-base"
             />
           </div>
-        </form>
-
-        {/* Footer */}
-        <div className="shrink-0 px-5 py-4 border-t bg-transparent xl:bg-transparent md:bg-transparent sm:bg-background flex gap-3">
-          <Button
-            type="button" variant="outline"
-            onClick={() => onOpenChange(false)}
-            disabled={isCreating}
-            className="flex-1 h-11"
-          >
-            Cancelar
-          </Button>
-          <Button
-            type="submit" form="add-inventory-form"
-            disabled={isCreating}
-            className="flex-1 h-11 gap-2"
-          >
-            {isCreating
-              ? <><Loader2 className="h-4 w-4 animate-spin" />Registrando...</>
-              : isPending
-                ? <><Clock className="h-4 w-4" />Registrar como pendiente</>
-                : <><PackagePlus className="h-4 w-4" />Registrar compra</>
-            }
-          </Button>
-        </div>
-      </DialogContent>
-    </Dialog>
+    </ResponsiveModal>
   );
 }

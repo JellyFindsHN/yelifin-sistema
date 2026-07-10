@@ -1,7 +1,7 @@
 // app/api/sales/[id]/route.ts
 import { NextRequest } from "next/server";
 import { neon } from "@neondatabase/serverless";
-import { verifyAuth, createErrorResponse, isAuthSuccess } from "@/lib/auth";
+import { verifyAuth, createErrorResponse, isAuthSuccess, requireModule } from "@/lib/auth";
 
 const sql = neon(process.env.DATABASE_URL!);
 
@@ -16,9 +16,11 @@ function itemKey(productId: number, variantId: number | null) {
 export async function GET(request: NextRequest, { params }: Params) {
   const auth = await verifyAuth(request);
   if (!isAuthSuccess(auth)) return createErrorResponse(auth.error, auth.status);
+  const deny = await requireModule(auth.data, 'SALES', 'canView');
+  if (deny) return deny;
 
   try {
-    const { userId } = auth.data;
+    const { userId, orgId } = auth.data;
     const { id }     = await params;
     const saleId     = Number(id);
 
@@ -33,10 +35,22 @@ export async function GET(request: NextRequest, { params }: Params) {
       FROM sales s
       LEFT JOIN customers c ON c.id = s.customer_id
       LEFT JOIN accounts  a ON a.id = s.account_id
-      WHERE s.id = ${saleId} AND s.user_id = ${userId}
+      WHERE s.id = ${saleId} AND s.org_id = ${orgId}
     `;
 
     if (!sale) return createErrorResponse("Venta no encontrada", 404);
+
+    const [neighbors] = await sql`
+      WITH ordered AS (
+        SELECT
+          id,
+          LAG(id)  OVER (ORDER BY sold_at DESC, id DESC) AS newer_id,
+          LEAD(id) OVER (ORDER BY sold_at DESC, id DESC) AS older_id
+        FROM sales
+        WHERE org_id = ${orgId}
+      )
+      SELECT newer_id, older_id FROM ordered WHERE id = ${saleId}
+    `;
 
     const items = await sql`
       SELECT
@@ -48,7 +62,7 @@ export async function GET(request: NextRequest, { params }: Params) {
       FROM sale_items si
       JOIN  products         p  ON p.id  = si.product_id
       LEFT JOIN product_variants pv ON pv.id = si.variant_id
-      WHERE si.sale_id = ${saleId} AND si.user_id = ${userId}
+      WHERE si.sale_id = ${saleId} AND si.org_id = ${orgId}
     `;
 
     const supplies = await sql`
@@ -56,10 +70,18 @@ export async function GET(request: NextRequest, { params }: Params) {
              ss.quantity, ss.unit_cost, ss.line_total
       FROM sale_supplies ss
       JOIN supplies su ON su.id = ss.supply_id
-      WHERE ss.sale_id = ${saleId} AND ss.user_id = ${userId}
+      WHERE ss.sale_id = ${saleId} AND ss.org_id = ${orgId}
     `;
 
-    return Response.json({ data: { ...sale, items, supplies } });
+    return Response.json({
+      data: {
+        ...sale,
+        items,
+        supplies,
+        next_id: neighbors?.newer_id ?? null,
+        prev_id: neighbors?.older_id ?? null,
+      },
+    });
   } catch (error) {
     console.error("GET /api/sales/[id]:", error);
     return createErrorResponse("Error al obtener venta", 500);
@@ -70,9 +92,11 @@ export async function GET(request: NextRequest, { params }: Params) {
 export async function PATCH(request: NextRequest, { params }: Params) {
   const auth = await verifyAuth(request);
   if (!isAuthSuccess(auth)) return createErrorResponse(auth.error, auth.status);
+  const deny = await requireModule(auth.data, 'SALES', 'canEdit');
+  if (deny) return deny;
 
   try {
-    const { userId } = auth.data;
+    const { userId, orgId } = auth.data;
     const { id }     = await params;
     const saleId     = Number(id);
 
@@ -85,7 +109,7 @@ export async function PATCH(request: NextRequest, { params }: Params) {
       return createErrorResponse("Acción inválida. Usar: confirm | cancel | edit", 400);
 
     const [sale] = await sql`
-      SELECT * FROM sales WHERE id = ${saleId} AND user_id = ${userId}
+      SELECT * FROM sales WHERE id = ${saleId} AND org_id = ${orgId}
     `;
     if (!sale)                   return createErrorResponse("Venta no encontrada", 404);
     if (sale.status !== "PENDING")
@@ -93,6 +117,7 @@ export async function PATCH(request: NextRequest, { params }: Params) {
 
     // ── CONFIRM ──────────────────────────────────────────────────────
     if (action === "confirm") {
+      const confirmedAt = body.confirmed_at ?? new Date().toISOString();
       const txParts: string[] = [`Venta ${sale.sale_number}`];
       if (Number(sale.tax_rate)     > 0) txParts.push(`ISV ${sale.tax_rate}% incluido`);
       if (Number(sale.shipping_cost)> 0) txParts.push(`envío L ${Number(sale.shipping_cost).toFixed(2)}`);
@@ -106,29 +131,30 @@ export async function PATCH(request: NextRequest, { params }: Params) {
       await sql`BEGIN`;
       try {
         await sql`
-          UPDATE sales SET status = 'COMPLETED', updated_at = CURRENT_TIMESTAMP
-          WHERE id = ${saleId} AND user_id = ${userId}
+          UPDATE sales SET status = 'COMPLETED', sold_at = ${confirmedAt}, updated_at = CURRENT_TIMESTAMP, updated_by = ${userId}
+          WHERE id = ${saleId} AND org_id = ${orgId}
         `;
         await sql`
           INSERT INTO transactions (
-            user_id, type, account_id, amount,
+            org_id, created_by, type, account_id, amount,
             category, description, reference_type, reference_id, occurred_at
           ) VALUES (
-            ${userId}, 'INCOME', ${sale.account_id}, ${sale.total},
-            'Ventas', ${txDescription}, ${refType}, ${refId}, ${sale.sold_at}
+            ${orgId}, ${userId}, 'INCOME', ${sale.account_id}, ${sale.total},
+            'Ventas', ${txDescription}, ${refType}, ${refId}, ${confirmedAt}
           )
         `;
         await sql`
           UPDATE accounts SET balance = balance + ${sale.total}
-          WHERE id = ${sale.account_id} AND user_id = ${userId}
+          WHERE id = ${sale.account_id} AND org_id = ${orgId}
         `;
         if (sale.customer_id) {
           await sql`
             UPDATE customers
             SET total_orders = total_orders + 1,
                 total_spent  = total_spent  + ${sale.total},
-                updated_at   = CURRENT_TIMESTAMP
-            WHERE id = ${sale.customer_id} AND user_id = ${userId}
+                updated_at   = CURRENT_TIMESTAMP,
+                updated_by   = ${userId}
+            WHERE id = ${sale.customer_id} AND org_id = ${orgId}
           `;
         }
         await sql`COMMIT`;
@@ -148,7 +174,7 @@ export async function PATCH(request: NextRequest, { params }: Params) {
         SELECT si.product_id, si.variant_id, si.quantity, p.is_service
         FROM sale_items si
         JOIN products p ON p.id = si.product_id
-        WHERE si.sale_id = ${saleId} AND si.user_id = ${userId}
+        WHERE si.sale_id = ${saleId} AND si.org_id = ${orgId}
       `;
 
       await sql`BEGIN`;
@@ -158,37 +184,36 @@ export async function PATCH(request: NextRequest, { params }: Params) {
 
           const variantId = item.variant_id ? Number(item.variant_id) : null;
 
-          // Restaurar al último batch de la variante correcta
           const [lastBatch] = variantId !== null
             ? await sql`
                 SELECT id FROM inventory_batches
-                WHERE user_id    = ${userId}
+                WHERE org_id     = ${orgId}
                   AND product_id = ${item.product_id}
                   AND variant_id = ${variantId}
-                ORDER BY received_at DESC LIMIT 1
+                ORDER BY received_at ASC LIMIT 1
               `
             : await sql`
                 SELECT id FROM inventory_batches
-                WHERE user_id    = ${userId}
+                WHERE org_id     = ${orgId}
                   AND product_id = ${item.product_id}
                   AND variant_id IS NULL
-                ORDER BY received_at DESC LIMIT 1
+                ORDER BY received_at ASC LIMIT 1
               `;
 
           if (lastBatch) {
             await sql`
               UPDATE inventory_batches
               SET qty_available = qty_available + ${item.quantity}
-              WHERE id = ${lastBatch.id} AND user_id = ${userId}
+              WHERE id = ${lastBatch.id} AND org_id = ${orgId}
             `;
           }
 
           await sql`
             INSERT INTO inventory_movements (
-              user_id, movement_type, product_id, variant_id,
+              org_id, created_by, movement_type, product_id, variant_id,
               quantity, reference_type, reference_id
             ) VALUES (
-              ${userId}, 'IN', ${item.product_id}, ${variantId},
+              ${orgId}, ${userId}, 'IN', ${item.product_id}, ${variantId},
               ${item.quantity}, 'SALE_CANCELLED', ${saleId}
             )
           `;
@@ -196,27 +221,27 @@ export async function PATCH(request: NextRequest, { params }: Params) {
 
         const supplies = await sql`
           SELECT supply_id, quantity FROM sale_supplies
-          WHERE sale_id = ${saleId} AND user_id = ${userId}
+          WHERE sale_id = ${saleId} AND org_id = ${orgId}
         `;
         for (const s of supplies) {
           await sql`
             UPDATE supplies SET stock = stock + ${s.quantity}
-            WHERE id = ${s.supply_id} AND user_id = ${userId}
+            WHERE id = ${s.supply_id} AND org_id = ${orgId}
           `;
           await sql`
             INSERT INTO supply_movements (
-              user_id, movement_type, supply_id,
+              org_id, created_by, movement_type, supply_id,
               quantity, reference_type, reference_id
             ) VALUES (
-              ${userId}, 'IN', ${s.supply_id},
+              ${orgId}, ${userId}, 'IN', ${s.supply_id},
               ${s.quantity}, 'SALE_CANCELLED', ${saleId}
             )
           `;
         }
 
-        await sql`DELETE FROM sale_supplies WHERE sale_id = ${saleId} AND user_id = ${userId}`;
-        await sql`DELETE FROM sale_items    WHERE sale_id = ${saleId} AND user_id = ${userId}`;
-        await sql`DELETE FROM sales         WHERE id      = ${saleId} AND user_id = ${userId}`;
+        await sql`DELETE FROM sale_supplies WHERE sale_id = ${saleId} AND org_id = ${orgId}`;
+        await sql`DELETE FROM sale_items    WHERE sale_id = ${saleId} AND org_id = ${orgId}`;
+        await sql`DELETE FROM sales         WHERE id      = ${saleId} AND org_id = ${orgId}`;
 
         await sql`COMMIT`;
         return Response.json({ message: "Venta cancelada y stock devuelto", data: { id: saleId, status: "CANCELLED" } });
@@ -250,7 +275,7 @@ export async function PATCH(request: NextRequest, { params }: Params) {
       if (account_id && account_id !== sale.account_id) {
         const [acc] = await sql`
           SELECT id FROM accounts
-          WHERE id = ${account_id} AND user_id = ${userId} AND is_active = TRUE
+          WHERE id = ${account_id} AND org_id = ${orgId} AND is_active = TRUE
         `;
         if (!acc) return createErrorResponse("Cuenta de destino no encontrada", 404);
       }
@@ -260,7 +285,7 @@ export async function PATCH(request: NextRequest, { params }: Params) {
         SELECT si.product_id, si.variant_id, si.quantity, si.unit_cost, p.is_service
         FROM sale_items si
         JOIN products p ON p.id = si.product_id
-        WHERE si.sale_id = ${saleId} AND si.user_id = ${userId}
+        WHERE si.sale_id = ${saleId} AND si.org_id = ${orgId}
       `;
 
       type CurrentItem = {
@@ -311,7 +336,7 @@ export async function PATCH(request: NextRequest, { params }: Params) {
         // Verificar si es servicio (puede ser un producto nuevo en el edit)
         const [product] = await sql`
           SELECT name, is_service FROM products
-          WHERE id = ${newData.product_id} AND user_id = ${userId}
+          WHERE id = ${newData.product_id} AND org_id = ${orgId}
         `;
         if (!product || product.is_service || isService) continue;
 
@@ -321,7 +346,7 @@ export async function PATCH(request: NextRequest, { params }: Params) {
             SELECT id FROM product_variants
             WHERE id         = ${newData.variant_id}
               AND product_id = ${newData.product_id}
-              AND user_id    = ${userId}
+              AND org_id     = ${orgId}
               AND is_active  = TRUE
           `;
           if (!variant)
@@ -334,14 +359,14 @@ export async function PATCH(request: NextRequest, { params }: Params) {
           ? await sql`
               SELECT COALESCE(SUM(qty_available), 0)::numeric AS available
               FROM inventory_batches
-              WHERE user_id    = ${userId}
+              WHERE org_id     = ${orgId}
                 AND product_id = ${newData.product_id}
                 AND variant_id = ${newData.variant_id}
             `
           : await sql`
               SELECT COALESCE(SUM(qty_available), 0)::numeric AS available
               FROM inventory_batches
-              WHERE user_id    = ${userId}
+              WHERE org_id     = ${orgId}
                 AND product_id = ${newData.product_id}
                 AND variant_id IS NULL
             `;
@@ -369,7 +394,7 @@ export async function PATCH(request: NextRequest, { params }: Params) {
 
         const [product] = await sql`
           SELECT is_service FROM products
-          WHERE id = ${data.product_id} AND user_id = ${userId}
+          WHERE id = ${data.product_id} AND org_id = ${orgId}
         `;
         const isService = Boolean(product?.is_service);
 
@@ -385,7 +410,7 @@ export async function PATCH(request: NextRequest, { params }: Params) {
               ? await sql`
                   SELECT id, qty_available, unit_cost
                   FROM inventory_batches
-                  WHERE user_id    = ${userId}
+                  WHERE org_id     = ${orgId}
                     AND product_id = ${data.product_id}
                     AND variant_id = ${data.variant_id}
                     AND qty_available > 0
@@ -394,7 +419,7 @@ export async function PATCH(request: NextRequest, { params }: Params) {
               : await sql`
                   SELECT id, qty_available, unit_cost
                   FROM inventory_batches
-                  WHERE user_id    = ${userId}
+                  WHERE org_id     = ${orgId}
                     AND product_id = ${data.product_id}
                     AND variant_id IS NULL
                     AND qty_available > 0
@@ -449,7 +474,7 @@ export async function PATCH(request: NextRequest, { params }: Params) {
           if (!supply_id || quantity <= 0)
             return createErrorResponse("Datos de suministro inválidos", 400);
           const [supply] = await sql`
-            SELECT id FROM supplies WHERE id = ${supply_id} AND user_id = ${userId}
+            SELECT id FROM supplies WHERE id = ${supply_id} AND org_id = ${orgId}
           `;
           if (!supply)
             return createErrorResponse(`Suministro #${supply_id} no encontrado`, 404);
@@ -461,7 +486,7 @@ export async function PATCH(request: NextRequest, { params }: Params) {
       const currentSupplies = Array.isArray(supplies_used)
         ? await sql`
             SELECT supply_id, quantity FROM sale_supplies
-            WHERE sale_id = ${saleId} AND user_id = ${userId}
+            WHERE sale_id = ${saleId} AND org_id = ${orgId}
           `
         : [];
 
@@ -474,7 +499,7 @@ export async function PATCH(request: NextRequest, { params }: Params) {
             const batches = item.variant_id !== null
               ? await sql`
                   SELECT id, qty_available FROM inventory_batches
-                  WHERE user_id    = ${userId}
+                  WHERE org_id     = ${orgId}
                     AND product_id = ${item.product_id}
                     AND variant_id = ${item.variant_id}
                     AND qty_available > 0
@@ -482,7 +507,7 @@ export async function PATCH(request: NextRequest, { params }: Params) {
                 `
               : await sql`
                   SELECT id, qty_available FROM inventory_batches
-                  WHERE user_id    = ${userId}
+                  WHERE org_id     = ${orgId}
                     AND product_id = ${item.product_id}
                     AND variant_id IS NULL
                     AND qty_available > 0
@@ -496,7 +521,7 @@ export async function PATCH(request: NextRequest, { params }: Params) {
               await sql`
                 UPDATE inventory_batches
                 SET qty_available = qty_available - ${take}
-                WHERE id = ${batch.id} AND user_id = ${userId}
+                WHERE id = ${batch.id} AND org_id = ${orgId}
               `;
               remaining -= take;
             }
@@ -506,14 +531,14 @@ export async function PATCH(request: NextRequest, { params }: Params) {
             const [lastBatch] = item.variant_id !== null
               ? await sql`
                   SELECT id FROM inventory_batches
-                  WHERE user_id    = ${userId}
+                  WHERE org_id     = ${orgId}
                     AND product_id = ${item.product_id}
                     AND variant_id = ${item.variant_id}
                   ORDER BY received_at DESC LIMIT 1
                 `
               : await sql`
                   SELECT id FROM inventory_batches
-                  WHERE user_id    = ${userId}
+                  WHERE org_id     = ${orgId}
                     AND product_id = ${item.product_id}
                     AND variant_id IS NULL
                   ORDER BY received_at DESC LIMIT 1
@@ -522,7 +547,7 @@ export async function PATCH(request: NextRequest, { params }: Params) {
             if (lastBatch) {
               await sql`
                 UPDATE inventory_batches SET qty_available = qty_available + ${Math.abs(item.delta)}
-                WHERE id = ${lastBatch.id} AND user_id = ${userId}
+                WHERE id = ${lastBatch.id} AND org_id = ${orgId}
               `;
             }
           }
@@ -539,14 +564,14 @@ export async function PATCH(request: NextRequest, { params }: Params) {
           const [lastBatch] = variantId !== null
             ? await sql`
                 SELECT id FROM inventory_batches
-                WHERE user_id    = ${userId}
+                WHERE org_id     = ${orgId}
                   AND product_id = ${productId}
                   AND variant_id = ${variantId}
                 ORDER BY received_at DESC LIMIT 1
               `
             : await sql`
                 SELECT id FROM inventory_batches
-                WHERE user_id    = ${userId}
+                WHERE org_id     = ${orgId}
                   AND product_id = ${productId}
                   AND variant_id IS NULL
                 ORDER BY received_at DESC LIMIT 1
@@ -556,7 +581,7 @@ export async function PATCH(request: NextRequest, { params }: Params) {
             await sql`
               UPDATE inventory_batches
               SET qty_available = qty_available + ${current.quantity}
-              WHERE id = ${lastBatch.id} AND user_id = ${userId}
+              WHERE id = ${lastBatch.id} AND org_id = ${orgId}
             `;
           }
 
@@ -564,7 +589,7 @@ export async function PATCH(request: NextRequest, { params }: Params) {
           if (variantId !== null) {
             await sql`
               DELETE FROM inventory_movements
-              WHERE user_id        = ${userId}
+              WHERE org_id         = ${orgId}
                 AND reference_type = 'SALE'
                 AND reference_id   = ${saleId}
                 AND product_id     = ${productId}
@@ -573,7 +598,7 @@ export async function PATCH(request: NextRequest, { params }: Params) {
           } else {
             await sql`
               DELETE FROM inventory_movements
-              WHERE user_id        = ${userId}
+              WHERE org_id         = ${orgId}
                 AND reference_type = 'SALE'
                 AND reference_id   = ${saleId}
                 AND product_id     = ${productId}
@@ -592,7 +617,7 @@ export async function PATCH(request: NextRequest, { params }: Params) {
               await sql`
                 UPDATE inventory_movements
                 SET quantity = ${item.quantity}
-                WHERE user_id        = ${userId}
+                WHERE org_id         = ${orgId}
                   AND reference_type = 'SALE'
                   AND reference_id   = ${saleId}
                   AND product_id     = ${item.product_id}
@@ -602,7 +627,7 @@ export async function PATCH(request: NextRequest, { params }: Params) {
               await sql`
                 UPDATE inventory_movements
                 SET quantity = ${item.quantity}
-                WHERE user_id        = ${userId}
+                WHERE org_id         = ${orgId}
                   AND reference_type = 'SALE'
                   AND reference_id   = ${saleId}
                   AND product_id     = ${item.product_id}
@@ -612,10 +637,10 @@ export async function PATCH(request: NextRequest, { params }: Params) {
           } else {
             await sql`
               INSERT INTO inventory_movements (
-                user_id, movement_type, product_id, variant_id,
+                org_id, created_by, movement_type, product_id, variant_id,
                 quantity, reference_type, reference_id
               ) VALUES (
-                ${userId}, 'OUT', ${item.product_id}, ${item.variant_id},
+                ${orgId}, ${userId}, 'OUT', ${item.product_id}, ${item.variant_id},
                 ${item.quantity}, 'SALE', ${saleId}
               )
             `;
@@ -623,14 +648,14 @@ export async function PATCH(request: NextRequest, { params }: Params) {
         }
 
         // Reemplazar sale_items
-        await sql`DELETE FROM sale_items WHERE sale_id = ${saleId} AND user_id = ${userId}`;
+        await sql`DELETE FROM sale_items WHERE sale_id = ${saleId} AND org_id = ${orgId}`;
         for (const item of processedItems) {
           await sql`
             INSERT INTO sale_items (
-              user_id, sale_id, product_id, variant_id,
+              org_id, created_by, sale_id, product_id, variant_id,
               quantity, unit_price, unit_cost, line_total
             ) VALUES (
-              ${userId}, ${saleId},
+              ${orgId}, ${userId}, ${saleId},
               ${item.product_id}, ${item.variant_id},
               ${item.quantity}, ${item.unit_price},
               ${item.unit_cost}, ${item.line_total}
@@ -650,8 +675,9 @@ export async function PATCH(request: NextRequest, { params }: Params) {
             shipping_cost = ${shippingAmount},
             total         = ${grandTotal},
             notes         = ${notes         ?? sale.notes},
-            updated_at    = CURRENT_TIMESTAMP
-          WHERE id = ${saleId} AND user_id = ${userId}
+            updated_at    = CURRENT_TIMESTAMP,
+            updated_by    = ${userId}
+          WHERE id = ${saleId} AND org_id = ${orgId}
         `;
 
         // Ajustar suministros solo si se enviaron en el body
@@ -672,20 +698,20 @@ export async function PATCH(request: NextRequest, { params }: Params) {
             if (delta > 0) {
               await sql`
                 UPDATE supplies SET stock = GREATEST(0, stock - ${delta})
-                WHERE id = ${supplyId} AND user_id = ${userId}
+                WHERE id = ${supplyId} AND org_id = ${orgId}
               `;
               await sql`
-                INSERT INTO supply_movements (user_id, movement_type, supply_id, quantity, reference_type, reference_id)
-                VALUES (${userId}, 'OUT', ${supplyId}, ${delta}, 'SALE_EDITED', ${saleId})
+                INSERT INTO supply_movements (org_id, created_by, movement_type, supply_id, quantity, reference_type, reference_id)
+                VALUES (${orgId}, ${userId}, 'OUT', ${supplyId}, ${delta}, 'SALE_EDITED', ${saleId})
               `;
             } else if (delta < 0) {
               await sql`
                 UPDATE supplies SET stock = stock + ${Math.abs(delta)}
-                WHERE id = ${supplyId} AND user_id = ${userId}
+                WHERE id = ${supplyId} AND org_id = ${orgId}
               `;
               await sql`
-                INSERT INTO supply_movements (user_id, movement_type, supply_id, quantity, reference_type, reference_id)
-                VALUES (${userId}, 'IN', ${supplyId}, ${Math.abs(delta)}, 'SALE_EDITED', ${saleId})
+                INSERT INTO supply_movements (org_id, created_by, movement_type, supply_id, quantity, reference_type, reference_id)
+                VALUES (${orgId}, ${userId}, 'IN', ${supplyId}, ${Math.abs(delta)}, 'SALE_EDITED', ${saleId})
               `;
             }
           }
@@ -695,21 +721,21 @@ export async function PATCH(request: NextRequest, { params }: Params) {
             if (!newSupplyMap.has(supplyId)) {
               await sql`
                 UPDATE supplies SET stock = stock + ${currentQty}
-                WHERE id = ${supplyId} AND user_id = ${userId}
+                WHERE id = ${supplyId} AND org_id = ${orgId}
               `;
               await sql`
-                INSERT INTO supply_movements (user_id, movement_type, supply_id, quantity, reference_type, reference_id)
-                VALUES (${userId}, 'IN', ${supplyId}, ${currentQty}, 'SALE_EDITED', ${saleId})
+                INSERT INTO supply_movements (org_id, created_by, movement_type, supply_id, quantity, reference_type, reference_id)
+                VALUES (${orgId}, ${userId}, 'IN', ${supplyId}, ${currentQty}, 'SALE_EDITED', ${saleId})
               `;
             }
           }
 
           // Reemplazar sale_supplies
-          await sql`DELETE FROM sale_supplies WHERE sale_id = ${saleId} AND user_id = ${userId}`;
+          await sql`DELETE FROM sale_supplies WHERE sale_id = ${saleId} AND org_id = ${orgId}`;
           for (const s of normalizedNewSupplies) {
             await sql`
-              INSERT INTO sale_supplies (user_id, sale_id, supply_id, quantity, unit_cost, line_total)
-              VALUES (${userId}, ${saleId}, ${s.supply_id}, ${s.quantity}, ${s.unit_cost}, ${s.line_total})
+              INSERT INTO sale_supplies (org_id, created_by, sale_id, supply_id, quantity, unit_cost, line_total)
+              VALUES (${orgId}, ${userId}, ${saleId}, ${s.supply_id}, ${s.quantity}, ${s.unit_cost}, ${s.line_total})
             `;
           }
         }
@@ -745,16 +771,18 @@ export async function PATCH(request: NextRequest, { params }: Params) {
 export async function DELETE(request: NextRequest, { params }: Params) {
   const auth = await verifyAuth(request);
   if (!isAuthSuccess(auth)) return createErrorResponse(auth.error, auth.status);
+  const deny = await requireModule(auth.data, 'SALES', 'canDelete');
+  if (deny) return deny;
 
   try {
-    const { userId } = auth.data;
+    const { userId, orgId } = auth.data;
     const { id }     = await params;
     const saleId     = Number(id);
 
     if (isNaN(saleId)) return createErrorResponse("ID inválido", 400);
 
     const [sale] = await sql`
-      SELECT * FROM sales WHERE id = ${saleId} AND user_id = ${userId}
+      SELECT * FROM sales WHERE id = ${saleId} AND org_id = ${orgId}
     `;
     if (!sale) return createErrorResponse("Venta no encontrada", 404);
     if (sale.status === "CANCELLED")
@@ -764,17 +792,16 @@ export async function DELETE(request: NextRequest, { params }: Params) {
       SELECT si.product_id, si.variant_id, si.quantity, p.is_service
       FROM sale_items si
       JOIN products p ON p.id = si.product_id
-      WHERE si.sale_id = ${saleId} AND si.user_id = ${userId}
+      WHERE si.sale_id = ${saleId} AND si.org_id = ${orgId}
     `;
 
     const supplies = await sql`
       SELECT supply_id, quantity FROM sale_supplies
-      WHERE sale_id = ${saleId} AND user_id = ${userId}
+      WHERE sale_id = ${saleId} AND org_id = ${orgId}
     `;
 
     await sql`BEGIN`;
     try {
-      // 1. Devolver stock por variante (FIFO inverso → último batch)
       for (const item of items) {
         if (item.is_service) continue;
 
@@ -783,33 +810,33 @@ export async function DELETE(request: NextRequest, { params }: Params) {
         const [lastBatch] = variantId !== null
           ? await sql`
               SELECT id FROM inventory_batches
-              WHERE user_id    = ${userId}
+              WHERE org_id     = ${orgId}
                 AND product_id = ${item.product_id}
                 AND variant_id = ${variantId}
-              ORDER BY received_at DESC LIMIT 1
+              ORDER BY received_at ASC LIMIT 1
             `
           : await sql`
               SELECT id FROM inventory_batches
-              WHERE user_id    = ${userId}
+              WHERE org_id     = ${orgId}
                 AND product_id = ${item.product_id}
                 AND variant_id IS NULL
-              ORDER BY received_at DESC LIMIT 1
+              ORDER BY received_at ASC LIMIT 1
             `;
 
         if (lastBatch) {
           await sql`
             UPDATE inventory_batches
             SET qty_available = qty_available + ${item.quantity}
-            WHERE id = ${lastBatch.id} AND user_id = ${userId}
+            WHERE id = ${lastBatch.id} AND org_id = ${orgId}
           `;
         }
 
         await sql`
           INSERT INTO inventory_movements (
-            user_id, movement_type, product_id, variant_id,
+            org_id, created_by, movement_type, product_id, variant_id,
             quantity, reference_type, reference_id
           ) VALUES (
-            ${userId}, 'IN', ${item.product_id}, ${variantId},
+            ${orgId}, ${userId}, 'IN', ${item.product_id}, ${variantId},
             ${item.quantity}, 'SALE_CANCELLED', ${saleId}
           )
         `;
@@ -819,14 +846,14 @@ export async function DELETE(request: NextRequest, { params }: Params) {
       for (const s of supplies) {
         await sql`
           UPDATE supplies SET stock = stock + ${s.quantity}
-          WHERE id = ${s.supply_id} AND user_id = ${userId}
+          WHERE id = ${s.supply_id} AND org_id = ${orgId}
         `;
         await sql`
           INSERT INTO supply_movements (
-            user_id, movement_type, supply_id,
+            org_id, created_by, movement_type, supply_id,
             quantity, reference_type, reference_id
           ) VALUES (
-            ${userId}, 'IN', ${s.supply_id},
+            ${orgId}, ${userId}, 'IN', ${s.supply_id},
             ${s.quantity}, 'SALE_CANCELLED', ${saleId}
           )
         `;
@@ -836,19 +863,19 @@ export async function DELETE(request: NextRequest, { params }: Params) {
       if (sale.status === "COMPLETED") {
         const [linkedTx] = await sql`
           SELECT id, amount FROM transactions
-          WHERE user_id        = ${userId}
+          WHERE org_id         = ${orgId}
             AND reference_type = 'SALE'
             AND reference_id   = ${saleId}
         `;
         if (linkedTx) {
           await sql`
             DELETE FROM transactions
-            WHERE id = ${linkedTx.id} AND user_id = ${userId}
+            WHERE id = ${linkedTx.id} AND org_id = ${orgId}
           `;
           await sql`
             UPDATE accounts
             SET balance = balance - ${linkedTx.amount}
-            WHERE id = ${sale.account_id} AND user_id = ${userId}
+            WHERE id = ${sale.account_id} AND org_id = ${orgId}
           `;
         }
 
@@ -857,16 +884,17 @@ export async function DELETE(request: NextRequest, { params }: Params) {
             UPDATE customers
             SET total_orders = GREATEST(total_orders - 1, 0),
                 total_spent  = GREATEST(total_spent  - ${sale.total}, 0),
-                updated_at   = CURRENT_TIMESTAMP
-            WHERE id = ${sale.customer_id} AND user_id = ${userId}
+                updated_at   = CURRENT_TIMESTAMP,
+                updated_by   = ${userId}
+            WHERE id = ${sale.customer_id} AND org_id = ${orgId}
           `;
         }
       }
 
       // 4. Eliminar
-      await sql`DELETE FROM sale_supplies WHERE sale_id = ${saleId} AND user_id = ${userId}`;
-      await sql`DELETE FROM sale_items    WHERE sale_id = ${saleId} AND user_id = ${userId}`;
-      await sql`DELETE FROM sales         WHERE id      = ${saleId} AND user_id = ${userId}`;
+      await sql`DELETE FROM sale_supplies WHERE sale_id = ${saleId} AND org_id = ${orgId}`;
+      await sql`DELETE FROM sale_items    WHERE sale_id = ${saleId} AND org_id = ${orgId}`;
+      await sql`DELETE FROM sales         WHERE id      = ${saleId} AND org_id = ${orgId}`;
 
       await sql`COMMIT`;
       return Response.json({

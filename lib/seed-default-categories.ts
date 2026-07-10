@@ -26,17 +26,18 @@ const DEFAULT_CATEGORIES = [
 ];
 
 export async function seedDefaultCategories(
+  orgId: number,
   userId: number,
   sql: NeonQueryFunction<false, false>
 ) {
-  // Usar el cliente sql recibido por parámetro (que ya está en transacción)
   await Promise.all(
-    DEFAULT_CATEGORIES.map((cat) =>
-      sql`
-        INSERT INTO transaction_categories (user_id, name, type)
-        VALUES (${userId}, ${cat.name}, ${cat.type})
-        ON CONFLICT (user_id, name, type) DO NOTHING
-      `
+    DEFAULT_CATEGORIES.map(
+      (cat) =>
+        sql`
+          INSERT INTO transaction_categories (org_id, created_by, name, type)
+          VALUES (${orgId}, ${userId}, ${cat.name}, ${cat.type})
+          ON CONFLICT (org_id, name, type) DO NOTHING
+        `
     )
   );
 }

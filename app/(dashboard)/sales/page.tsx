@@ -1,6 +1,6 @@
-"use client";
+﻿"use client";
 
-import { useMemo, useState } from "react";
+import { useState, useEffect } from "react";
 import { useCurrency } from "@/hooks/swr/use-currency";
 import { useRouter } from "next/navigation";
 
@@ -13,6 +13,10 @@ import { Skeleton } from "@/components/ui/skeleton";
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
+import {
+  Pagination, PaginationContent, PaginationItem,
+  PaginationLink, PaginationNext, PaginationPrevious, PaginationEllipsis,
+} from "@/components/ui/pagination";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
@@ -30,7 +34,9 @@ import { SearchBar } from "@/components/shared/search-bar";
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 
 import { useSales, usePatchSale, useDeleteSale, Sale } from "@/hooks/swr/use-sales";
+import { useDebounce } from "@/hooks/use-debounce";
 import { useAccounts } from "@/hooks/swr/use-accounts";
+import { useModulePermissions } from "@/hooks/use-module-permissions";
 
 // ── Utils ──────────────────────────────────────────────────────────────
 const formatDateOnly = (dateString: string) =>
@@ -61,9 +67,10 @@ const PRESET_LABELS: Record<Preset, string> = {
 const getTaxRate = (v: any): number => Number(v) || 0;
 
 // ── Acciones para venta PENDIENTE ─────────────────────────────────────
-function PendingActions({ saleId, onMutate }: { saleId: number; onMutate: () => void }) {
-  const router = useRouter();
+function PendingActions({ saleId, onMutate, canEdit }: { saleId: number; onMutate: () => void; canEdit: boolean }) {
+  const { push } = useRouter();
   const { confirmSale, cancelSale, isPatching } = usePatchSale(saleId);
+  if (!canEdit) return null;
 
   const handleConfirm = async () => {
     try {
@@ -89,29 +96,29 @@ function PendingActions({ saleId, onMutate }: { saleId: number; onMutate: () => 
     <div onClick={(e) => e.stopPropagation()}>
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
-          <Button variant="ghost" size="icon" className="h-8 w-8" disabled={isPatching}>
+          <Button variant="ghost" size="icon" className="size-8" disabled={isPatching}>
             {isPatching
-              ? <Clock className="h-4 w-4 animate-spin text-muted-foreground" />
-              : <MoreVertical className="h-4 w-4" />
+              ? <Clock className="size-4 animate-spin text-muted-foreground" />
+              : <MoreVertical className="size-4" />
             }
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" className="w-44">
-          <DropdownMenuItem onClick={() => router.push(`/sales/${saleId}/edit`)}>
-            <Pencil className="h-4 w-4 mr-2" /> Editar
+          <DropdownMenuItem onClick={() => push(`/sales/${saleId}/edit`)}>
+            <Pencil className="size-4 mr-2" /> Editar
           </DropdownMenuItem>
           <DropdownMenuItem
             className="text-green-600 focus:text-green-700 focus:bg-green-50"
             onClick={handleConfirm}
           >
-            <CheckCircle className="h-4 w-4 mr-2" /> Confirmar pago
+            <CheckCircle className="size-4 mr-2" /> Confirmar pago
           </DropdownMenuItem>
           <DropdownMenuSeparator />
           <DropdownMenuItem
             className="text-destructive focus:text-destructive focus:bg-destructive/10"
             onClick={handleCancel}
           >
-            <XCircle className="h-4 w-4 mr-2" /> Cancelar venta
+            <XCircle className="size-4 mr-2" /> Cancelar venta
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
@@ -123,29 +130,32 @@ function PendingActions({ saleId, onMutate }: { saleId: number; onMutate: () => 
 function CompletedActions({
   sale,
   onDeleteRequest,
+  canDelete,
 }: {
   sale: Sale;
   onDeleteRequest: (sale: Sale) => void;
+  canDelete: boolean;
 }) {
-  const router = useRouter();
+  const { push } = useRouter();
+  if (!canDelete) return null;
   return (
     <div onClick={(e) => e.stopPropagation()}>
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
-          <Button variant="ghost" size="icon" className="h-8 w-8">
-            <MoreVertical className="h-4 w-4" />
+          <Button variant="ghost" size="icon" className="size-8">
+            <MoreVertical className="size-4" />
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" className="w-44">
-          <DropdownMenuItem onClick={() => router.push(`/sales/${sale.id}`)}>
-            <Search className="h-4 w-4 mr-2" /> Ver detalle
+          <DropdownMenuItem onClick={() => push(`/sales/${sale.id}`)}>
+            <Search className="size-4 mr-2" /> Ver detalle
           </DropdownMenuItem>
           <DropdownMenuSeparator />
           <DropdownMenuItem
             className="text-destructive focus:text-destructive focus:bg-destructive/10"
             onClick={() => onDeleteRequest(sale)}
           >
-            <Trash2 className="h-4 w-4 mr-2" /> Anular venta
+            <Trash2 className="size-4 mr-2" /> Anular venta
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
@@ -155,8 +165,9 @@ function CompletedActions({
 
 // ── Page ──────────────────────────────────────────────────────────────
 export default function SalesPage() {
-  const router     = useRouter();
+  const { push }   = useRouter();
   const { format } = useCurrency();
+  const { show_profit: showProfit, can_edit: canEdit, can_delete: canDelete } = useModulePermissions("SALES");
 
   const [preset,         setPreset]         = useState<Preset>("7d");
   const [dateFrom,       setDateFrom]       = useState("");
@@ -165,54 +176,36 @@ export default function SalesPage() {
   const [accountFilter,  setAccountFilter]  = useState<string>("all");
   const [search,         setSearch]         = useState("");
   const [statusFilter,   setStatusFilter]   = useState<StatusFilter>("all");
+  const [page,           setPage]           = useState(1);
+  const pageLimit = 15;
+
+  const debouncedSearch = useDebounce(search, 300);
+
+  useEffect(() => { setPage(1); }, [
+    debouncedSearch, statusFilter, accountFilter,
+    paymentFilter, preset, dateFrom, dateTo,
+  ]);
 
   // Delete
   const [deletingSale,   setDeletingSale]   = useState<Sale | null>(null);
   const { deleteSale,    isDeleting }       = useDeleteSale();
 
-  const { sales, isLoading, mutate } = useSales({
+  const { sales, stats, total, totalPages, isLoading, mutate } = useSales({
     preset,
-    from:    dateFrom || undefined,
-    to:      dateTo   || undefined,
-    payment: paymentFilter,
+    from:       dateFrom    || undefined,
+    to:         dateTo      || undefined,
+    payment:    paymentFilter,
+    search:     debouncedSearch || undefined,
+    status:     statusFilter !== "all" ? statusFilter : undefined,
+    account_id: accountFilter !== "all" ? accountFilter : undefined,
+    page,
+    limit:      pageLimit,
   });
 
   const { accounts } = useAccounts();
 
-  const filteredForStats = useMemo(() => {
-    const q = search.trim().toLowerCase();
-    return sales.filter((s) => {
-      const matchSearch  = !q ||
-        s.sale_number.toLowerCase().includes(q) ||
-        (s.customer_name?.toLowerCase().includes(q) ?? false) ||
-        ((s as any).notes?.toLowerCase().includes(q) ?? false);
-      const matchAccount = accountFilter === "all" || String(s.account_id) === accountFilter;
-      return matchSearch && matchAccount;
-    });
-  }, [sales, search, accountFilter]);
-
-  const filtered = useMemo(() =>
-    statusFilter === "all"
-      ? filteredForStats
-      : filteredForStats.filter((s) => s.status === statusFilter),
-  [filteredForStats, statusFilter]);
-
-  const totalRevenue = useMemo(() =>
-    filteredForStats.filter((s) => s.status === "COMPLETED")
-      .reduce((acc, s) => acc + Number(s.total), 0),
-  [filteredForStats]);
-
-  const totalProfit = useMemo(() =>
-    filteredForStats.filter((s) => s.status === "COMPLETED")
-      .reduce((acc, s) => acc + Number(s.net_profit), 0),
-  [filteredForStats]);
-
-  const pendingCount = useMemo(() =>
-    filteredForStats.filter((s) => s.status === "PENDING").length,
-  [filteredForStats]);
-
   const hasFilters   = dateFrom || dateTo || paymentFilter !== "all" || accountFilter !== "all" || statusFilter !== "all" || search;
-  const clearAll     = () => { setDateFrom(""); setDateTo(""); setSearch(""); setPaymentFilter("all"); setAccountFilter("all"); setStatusFilter("all"); setPreset("this_month"); };
+  const clearAll     = () => { setDateFrom(""); setDateTo(""); setSearch(""); setPaymentFilter("all"); setAccountFilter("all"); setStatusFilter("all"); setPreset("this_month"); setPage(1); };
   const onChangePreset = (v: Preset) => { setPreset(v); setDateFrom(""); setDateTo(""); };
   const onManualFrom   = (v: string)  => { setDateFrom(v); setPreset("all"); };
   const onManualTo     = (v: string)  => { setDateTo(v);   setPreset("all"); };
@@ -238,12 +231,12 @@ export default function SalesPage() {
       {/* Header */}
       <div className="flex items-center justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">Ventas</h1>
+          <h1 className="text-2xl font-semibold tracking-tight">Ventas</h1>
           <p className="text-muted-foreground text-sm">
             {activePeriodLabel}
-            {pendingCount > 0 && (
+            {stats.pending_count > 0 && (
               <span className="ml-1.5 text-amber-600 font-medium">
-                · {pendingCount} pendiente{pendingCount !== 1 ? "s" : ""}
+                · {stats.pending_count} pendiente{stats.pending_count !== 1 ? "s" : ""}
               </span>
             )}
           </p>
@@ -251,7 +244,7 @@ export default function SalesPage() {
         <div className="text-right shrink-0 sm:hidden">
           {isLoading
             ? <Skeleton className="h-8 w-10 ml-auto" />
-            : <p className="text-3xl font-bold">{filtered.length}</p>
+            : <p className="text-3xl font-bold">{total}</p>
           }
           <p className="text-xs text-muted-foreground">registros</p>
         </div>
@@ -263,12 +256,12 @@ export default function SalesPage() {
           <CardContent className="pl-3.5 py-3">
             <div className="flex items-center justify-between mb-1">
               <span className="text-xs font-medium text-muted-foreground">Ventas</span>
-              <ShoppingCart className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+              <ShoppingCart className="size-3.5 text-muted-foreground shrink-0" />
             </div>
             {isLoading ? <Skeleton className="h-6 w-12" /> : (
               <div className="flex items-baseline gap-1.5">
-                <p className="text-lg font-bold">{filtered.filter((s) => s.status === "COMPLETED").length}</p>
-                {pendingCount > 0 && <span className="text-xs text-amber-600">{pendingCount} pend.</span>}
+                <p className="text-lg font-bold">{stats.completed_count}</p>
+                {stats.pending_count > 0 && <span className="text-xs text-amber-600">{stats.pending_count} pend.</span>}
               </div>
             )}
           </CardContent>
@@ -277,32 +270,34 @@ export default function SalesPage() {
           <CardContent className="pl-3.5 py-3">
             <div className="flex items-center justify-between mb-1">
               <span className="text-xs font-medium text-muted-foreground">Ingresos</span>
-              <DollarSign className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+              <DollarSign className="size-3.5 text-muted-foreground shrink-0" />
             </div>
             {isLoading
               ? <Skeleton className="h-6 w-20" />
-              : <p className="text-base font-bold sm:text-lg truncate">{format(totalRevenue)}</p>
+              : <p className="text-base font-bold sm:text-lg truncate">{format(stats.total_revenue)}</p>
             }
           </CardContent>
         </Card>
-        <Card className="pt-2 pb-2">
-          <CardContent className="pl-3.5 py-3">
-            <div className="flex items-center justify-between mb-1">
-              <span className="text-xs font-medium text-muted-foreground">Ganancia</span>
-              <TrendingUp className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
-            </div>
-            {isLoading ? <Skeleton className="h-6 w-20" /> : (
-              <div className="flex items-baseline gap-1.5">
-                <p className="text-base font-bold text-green-600 sm:text-lg truncate">{format(totalProfit)}</p>
-                {totalRevenue > 0 && (
-                  <span className="text-xs text-muted-foreground shrink-0">
-                    {((totalProfit / totalRevenue) * 100).toFixed(0)}%
-                  </span>
-                )}
+        {showProfit && (
+          <Card className="pt-2 pb-2">
+            <CardContent className="pl-3.5 py-3">
+              <div className="flex items-center justify-between mb-1">
+                <span className="text-xs font-medium text-muted-foreground">Ganancia</span>
+                <TrendingUp className="size-3.5 text-muted-foreground shrink-0" />
               </div>
-            )}
-          </CardContent>
-        </Card>
+              {isLoading ? <Skeleton className="h-6 w-20" /> : (
+                <div className="flex items-baseline gap-1.5">
+                  <p className="text-base font-bold text-green-600 sm:text-lg truncate">{format(stats.total_profit)}</p>
+                  {stats.total_revenue > 0 && (
+                    <span className="text-xs text-muted-foreground shrink-0">
+                      {((stats.total_profit / stats.total_revenue) * 100).toFixed(0)}%
+                    </span>
+                  )}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        )}
       </div>
 
       {/* Filtros */}
@@ -357,7 +352,7 @@ export default function SalesPage() {
 
         {hasFilters && (
           <Button variant="ghost" size="sm" className="gap-1.5 text-muted-foreground w-full" onClick={clearAll}>
-            <X className="h-3.5 w-3.5" /> Limpiar filtros
+            <X className="size-3.5" /> Limpiar filtros
           </Button>
         )}
       </div>
@@ -365,16 +360,16 @@ export default function SalesPage() {
       {/* Cards móvil */}
       <div className="space-y-2 lg:hidden">
         {isLoading ? (
-          Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-24 w-full rounded-xl" />)
-        ) : filtered.length === 0 ? (
+          Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-24 w-full rounded-xl" />) /* skeleton - index key ok */
+        ) : sales.length === 0 ? (
           <Card>
             <CardContent className="flex flex-col items-center justify-center py-12">
-              <Receipt className="h-10 w-10 text-muted-foreground/40" />
+              <Receipt className="size-10 text-muted-foreground/40" />
               <p className="mt-3 text-sm text-muted-foreground">No se encontraron ventas</p>
             </CardContent>
           </Card>
         ) : (
-          filtered.map((sale) => {
+          sales.map((sale) => {
             const payment   = paymentConfig[sale.payment_method] ?? paymentConfig.OTHER;
             const PayIcon   = payment.icon;
             const taxRate   = getTaxRate(sale.tax_rate);
@@ -383,7 +378,7 @@ export default function SalesPage() {
               <Card
                 key={sale.id}
                 className={`pt-1 pb-1 cursor-pointer active:scale-[0.99] transition-transform ${isPending ? "border-amber-200 bg-amber-50/30 dark:bg-amber-950/10" : ""}`}
-                onClick={() => router.push(`/sales/${sale.id}`)}
+                onClick={() => push(`/sales/${sale.id}`)}
               >
                 <CardContent className="px-4 py-3">
                   <div className="flex items-start justify-between gap-2 mb-2">
@@ -392,7 +387,7 @@ export default function SalesPage() {
                         <p className="font-mono text-sm font-semibold">{sale.sale_number}</p>
                         {isPending && (
                           <Badge className="text-[10px] px-1.5 py-0 bg-amber-100 text-amber-700 border-amber-200 gap-1" variant="outline">
-                            <Clock className="h-2.5 w-2.5" /> Pendiente
+                            <Clock className="size-2.5" /> Pendiente
                           </Badge>
                         )}
                         {taxRate > 0 && (
@@ -406,18 +401,18 @@ export default function SalesPage() {
                       </p>
                     </div>
                     {isPending
-                      ? <PendingActions saleId={sale.id} onMutate={mutate} />
+                      ? <PendingActions saleId={sale.id} onMutate={mutate} canEdit={canEdit} />
                       : (
                         <div className="flex items-center gap-1 shrink-0">
                           <Badge variant="outline" className="gap-1 text-xs">
-                            <PayIcon className="h-3 w-3" /> {(sale as any).account_name}
+                            <PayIcon className="size-3" /> {(sale as any).account_name}
                           </Badge>
-                          <CompletedActions sale={sale} onDeleteRequest={setDeletingSale} />
+                          <CompletedActions sale={sale} onDeleteRequest={setDeletingSale} canDelete={canDelete} />
                         </div>
                       )
                     }
                   </div>
-                  <div className={`grid gap-1 pt-2 border-t text-center ${isPending ? "grid-cols-2" : "grid-cols-3"}`}>
+                  <div className={`grid gap-1 pt-2 border-t text-center ${(!isPending && showProfit) ? "grid-cols-3" : "grid-cols-2"}`}>
                     <div>
                       <p className="text-[10px] text-muted-foreground mb-0.5">Productos</p>
                       <p className="text-sm font-semibold">{sale.items_count}</p>
@@ -426,7 +421,7 @@ export default function SalesPage() {
                       <p className="text-[10px] text-muted-foreground mb-0.5">Total</p>
                       <p className="text-sm font-bold truncate">{format(Number(sale.total))}</p>
                     </div>
-                    {!isPending && (
+                    {!isPending && showProfit && (
                       <div>
                         <p className="text-[10px] text-muted-foreground mb-0.5">Ganancia</p>
                         <p className="text-sm font-bold text-green-600 truncate">
@@ -457,27 +452,28 @@ export default function SalesPage() {
                 <TableHead>Cuenta</TableHead>
                 <TableHead className="text-right">ISV</TableHead>
                 <TableHead className="text-right">Total</TableHead>
-                <TableHead className="text-right">Ganancia</TableHead>
+                {showProfit && <TableHead className="text-right">Ganancia</TableHead>}
                 <TableHead />
               </TableRow>
             </TableHeader>
             <TableBody>
               {isLoading ? (
+                /* skeleton - index key ok */
                 Array.from({ length: 5 }).map((_, i) => (
                   <TableRow key={i}>
-                    {Array.from({ length: 11 }).map((__, j) => (
+                    {Array.from({ length: showProfit ? 11 : 10 }).map((__, j) => (
                       <TableCell key={j}><Skeleton className="h-4 w-full" /></TableCell>
                     ))}
                   </TableRow>
                 ))
-              ) : filtered.length === 0 ? (
+              ) : sales.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={11} className="text-center py-12 text-muted-foreground">
+                  <TableCell colSpan={showProfit ? 11 : 10} className="text-center py-12 text-muted-foreground">
                     Aún no se han registrado ventas en este período
                   </TableCell>
                 </TableRow>
               ) : (
-                filtered.map((sale) => {
+                sales.map((sale) => {
                   const payment   = paymentConfig[sale.payment_method] ?? paymentConfig.OTHER;
                   const PayIcon   = payment.icon;
                   const taxRate   = getTaxRate(sale.tax_rate);
@@ -486,7 +482,7 @@ export default function SalesPage() {
                     <TableRow
                       key={sale.id}
                       className={`cursor-pointer hover:bg-muted/50 ${isPending ? "bg-amber-50/30 dark:bg-amber-950/10" : ""}`}
-                      onClick={() => router.push(`/sales/${sale.id}`)}
+                      onClick={() => push(`/sales/${sale.id}`)}
                     >
                       <TableCell className="font-medium font-mono">{sale.sale_number}</TableCell>
                       <TableCell className="text-muted-foreground text-sm">{formatDateOnly(sale.sold_at)}</TableCell>
@@ -494,11 +490,11 @@ export default function SalesPage() {
                       <TableCell>
                         {isPending ? (
                           <Badge className="bg-amber-100 text-amber-700 border-amber-200 gap-1" variant="outline">
-                            <Clock className="h-3 w-3" /> Pendiente
+                            <Clock className="size-3" /> Pendiente
                           </Badge>
                         ) : (
                           <Badge className="bg-green-100 text-green-700 border-green-200 gap-1" variant="outline">
-                            <CheckCircle className="h-3 w-3" /> Completada
+                            <CheckCircle className="size-3" /> Completada
                           </Badge>
                         )}
                       </TableCell>
@@ -509,7 +505,7 @@ export default function SalesPage() {
                       </TableCell>
                       <TableCell>
                         <Badge variant="outline" className="gap-1">
-                          <PayIcon className="h-3 w-3" /> {payment.label}
+                          <PayIcon className="size-3" /> {payment.label}
                         </Badge>
                       </TableCell>
                       <TableCell className="text-muted-foreground text-sm">
@@ -522,16 +518,18 @@ export default function SalesPage() {
                         }
                       </TableCell>
                       <TableCell className="text-right font-medium">{format(Number(sale.total))}</TableCell>
-                      <TableCell className="text-right">
-                        {isPending
-                          ? <span className="text-muted-foreground text-xs">—</span>
-                          : <span className="text-green-600 font-medium">{format(Number(sale.net_profit - sale.discount))}</span>
-                        }
-                      </TableCell>
+                      {showProfit && (
+                        <TableCell className="text-right">
+                          {isPending
+                            ? <span className="text-muted-foreground text-xs">—</span>
+                            : <span className="text-green-600 font-medium">{format(Number(sale.net_profit - sale.discount))}</span>
+                          }
+                        </TableCell>
+                      )}
                       <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
                         {isPending
-                          ? <PendingActions saleId={sale.id} onMutate={mutate} />
-                          : <CompletedActions sale={sale} onDeleteRequest={setDeletingSale} />
+                          ? <PendingActions saleId={sale.id} onMutate={mutate} canEdit={canEdit} />
+                          : <CompletedActions sale={sale} onDeleteRequest={setDeletingSale} canDelete={canDelete} />
                         }
                       </TableCell>
                     </TableRow>
@@ -543,7 +541,63 @@ export default function SalesPage() {
         </CardContent>
       </Card>
 
-      <Fab actions={[{ label: "Nueva venta", icon: ShoppingCart, onClick: () => router.push("/sales/new") }]} />
+      {/* Paginación */}
+      {totalPages > 1 && (
+        <div className="flex flex-col items-center gap-2 sm:flex-row sm:justify-between">
+          <p className="text-sm text-muted-foreground order-2 sm:order-1">
+            {total} venta{total !== 1 ? "s" : ""} · página {page} de {totalPages}
+          </p>
+          <Pagination className="order-1 sm:order-2 w-auto mx-0 justify-end">
+            <PaginationContent>
+              <PaginationItem>
+                <PaginationPrevious
+                  onClick={() => setPage((p) => Math.max(1, p - 1))}
+                  aria-disabled={page === 1}
+                  className={page === 1 ? "pointer-events-none opacity-50" : "cursor-pointer"}
+                />
+              </PaginationItem>
+
+              {Array.from({ length: totalPages }, (_, i) => i + 1)
+                .filter((p) =>
+                  p === 1 || p === totalPages ||
+                  (p >= page - 1 && p <= page + 1)
+                )
+                .reduce<(number | "…")[]>((acc, p, i, arr) => {
+                  if (i > 0 && (p as number) - (arr[i - 1] as number) > 1) acc.push("…");
+                  acc.push(p);
+                  return acc;
+                }, [])
+                .map((p, i) =>
+                  p === "…" ? (
+                    <PaginationItem key={`ellipsis-${i}`}>
+                      <PaginationEllipsis />
+                    </PaginationItem>
+                  ) : (
+                    <PaginationItem key={p}>
+                      <PaginationLink
+                        isActive={p === page}
+                        onClick={() => setPage(p as number)}
+                        className="cursor-pointer"
+                      >
+                        {p}
+                      </PaginationLink>
+                    </PaginationItem>
+                  )
+                )}
+
+              <PaginationItem>
+                <PaginationNext
+                  onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                  aria-disabled={page === totalPages}
+                  className={page === totalPages ? "pointer-events-none opacity-50" : "cursor-pointer"}
+                />
+              </PaginationItem>
+            </PaginationContent>
+          </Pagination>
+        </div>
+      )}
+
+      <Fab actions={[{ label: "Nueva venta", icon: ShoppingCart, onClick: () => push("/sales/new") }]} />
 
       {/* Confirm anular venta completada */}
       <ConfirmDialog

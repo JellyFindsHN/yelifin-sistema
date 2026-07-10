@@ -1,7 +1,7 @@
 // app/api/purchases/[id]/route.ts
 import { NextRequest } from "next/server";
 import { neon } from "@neondatabase/serverless";
-import { verifyAuth, createErrorResponse, isAuthSuccess } from "@/lib/auth";
+import { verifyAuth, createErrorResponse, isAuthSuccess, requireModule } from "@/lib/auth";
 
 const sql = neon(process.env.DATABASE_URL!);
 
@@ -11,9 +11,11 @@ type Params = { params: Promise<{ id: string }> };
 export async function PATCH(request: NextRequest, { params }: Params) {
   const auth = await verifyAuth(request);
   if (!isAuthSuccess(auth)) return createErrorResponse(auth.error, auth.status);
+  const deny = await requireModule(auth.data, 'INVENTORY', 'canEdit');
+  if (deny) return deny;
 
   try {
-    const { userId } = auth.data;
+    const { userId, orgId } = auth.data;
     const { id }     = await params;
     const purchaseId = Number(id);
 
@@ -26,7 +28,7 @@ export async function PATCH(request: NextRequest, { params }: Params) {
     const [purchase] = await sql`
       SELECT id, account_id, shipping_account_id, status, shipping, subtotal, total, purchased_at, notes
       FROM purchase_batches
-      WHERE id = ${purchaseId} AND user_id = ${userId}
+      WHERE id = ${purchaseId} AND org_id = ${orgId}
     `;
 
     if (!purchase)
@@ -38,7 +40,7 @@ export async function PATCH(request: NextRequest, { params }: Params) {
     const items = await sql`
       SELECT id, product_id, variant_id, quantity, unit_cost_usd, unit_cost, total_cost
       FROM purchase_batch_items
-      WHERE purchase_batch_id = ${purchaseId} AND user_id = ${userId}
+      WHERE purchase_batch_id = ${purchaseId} AND org_id = ${orgId}
     `;
 
     if (items.length === 0)
@@ -83,7 +85,7 @@ export async function PATCH(request: NextRequest, { params }: Params) {
             UPDATE purchase_batch_items
             SET unit_cost  = ${item.unit_cost},
                 total_cost = ${item.total_cost}
-            WHERE id = ${item.id} AND user_id = ${userId}
+            WHERE id = ${item.id} AND org_id = ${orgId}
           `;
         }
 
@@ -93,7 +95,7 @@ export async function PATCH(request: NextRequest, { params }: Params) {
           SET shipping = ${shippingFinal},
               subtotal = ${newTotal},
               total    = ${newTotal}
-          WHERE id = ${purchaseId} AND user_id = ${userId}
+          WHERE id = ${purchaseId} AND org_id = ${orgId}
         `;
 
         if (shippingAccId) {
@@ -102,7 +104,7 @@ export async function PATCH(request: NextRequest, { params }: Params) {
             SELECT id FROM transactions
             WHERE reference_type = 'PURCHASE_SHIPPING'
               AND reference_id   = ${purchaseId}
-              AND user_id        = ${userId}
+              AND org_id         = ${orgId}
           `;
           if (existingShippingTx) {
             await sql`
@@ -113,23 +115,23 @@ export async function PATCH(request: NextRequest, { params }: Params) {
             await sql`
               UPDATE accounts
               SET balance = balance - ${shippingDelta}
-              WHERE id = ${shippingAccId} AND user_id = ${userId}
+              WHERE id = ${shippingAccId} AND org_id = ${orgId}
             `;
           } else {
             // No existía tx de envío — crearla con el monto final
             await sql`
               INSERT INTO transactions (
-                user_id, account_id, type, amount,
+                org_id, created_by, account_id, type, amount,
                 description, reference_type, reference_id, occurred_at
               ) VALUES (
-                ${userId}, ${shippingAccId}, 'EXPENSE', ${shippingFinal},
+                ${orgId}, ${userId}, ${shippingAccId}, 'EXPENSE', ${shippingFinal},
                 'Pago de envío', 'PURCHASE_SHIPPING', ${purchaseId}, ${occurredAt}
               )
             `;
             await sql`
               UPDATE accounts
               SET balance = balance - ${shippingFinal}
-              WHERE id = ${shippingAccId} AND user_id = ${userId}
+              WHERE id = ${shippingAccId} AND org_id = ${orgId}
             `;
           }
         } else if (purchase.account_id) {
@@ -139,12 +141,12 @@ export async function PATCH(request: NextRequest, { params }: Params) {
             SET amount = ${newTotal}
             WHERE reference_type = 'PURCHASE'
               AND reference_id   = ${purchaseId}
-              AND user_id        = ${userId}
+              AND org_id         = ${orgId}
           `;
           await sql`
             UPDATE accounts
             SET balance = balance - ${shippingDelta}
-            WHERE id = ${purchase.account_id} AND user_id = ${userId}
+            WHERE id = ${purchase.account_id} AND org_id = ${orgId}
           `;
         }
         // Para compras CC sin shipping_account: no ajustamos la CC (edge case)
@@ -154,22 +156,22 @@ export async function PATCH(request: NextRequest, { params }: Params) {
           SELECT id FROM transactions
           WHERE reference_type = 'PURCHASE_SHIPPING'
             AND reference_id   = ${purchaseId}
-            AND user_id        = ${userId}
+            AND org_id         = ${orgId}
         `;
         if (!existingShippingTx) {
           await sql`
             INSERT INTO transactions (
-              user_id, account_id, type, amount,
+              org_id, created_by, account_id, type, amount,
               description, reference_type, reference_id, occurred_at
             ) VALUES (
-              ${userId}, ${shippingAccId}, 'EXPENSE', ${shippingFinal},
+              ${orgId}, ${userId}, ${shippingAccId}, 'EXPENSE', ${shippingFinal},
               'Pago de envío', 'PURCHASE_SHIPPING', ${purchaseId}, ${occurredAt}
             )
           `;
           await sql`
             UPDATE accounts
             SET balance = balance - ${shippingFinal}
-            WHERE id = ${shippingAccId} AND user_id = ${userId}
+            WHERE id = ${shippingAccId} AND org_id = ${orgId}
           `;
         }
       }
@@ -178,20 +180,20 @@ export async function PATCH(request: NextRequest, { params }: Params) {
       for (const item of updatedItems) {
         await sql`
           INSERT INTO inventory_batches (
-            user_id, product_id, variant_id, purchase_batch_item_id,
+            org_id, created_by, product_id, variant_id, purchase_batch_item_id,
             qty_in, qty_available, unit_cost, received_at
           ) VALUES (
-            ${userId}, ${item.product_id}, ${item.variant_id}, ${item.id},
+            ${orgId}, ${userId}, ${item.product_id}, ${item.variant_id}, ${item.id},
             ${item.quantity}, ${item.quantity}, ${item.unit_cost}, ${occurredAt}
           )
         `;
 
         await sql`
           INSERT INTO inventory_movements (
-            user_id, movement_type, product_id, variant_id,
+            org_id, created_by, movement_type, product_id, variant_id,
             quantity, reference_type, reference_id, notes
           ) VALUES (
-            ${userId}, 'IN', ${item.product_id}, ${item.variant_id},
+            ${orgId}, ${userId}, 'IN', ${item.product_id}, ${item.variant_id},
             ${item.quantity}, 'PURCHASE', ${purchaseId}, ${purchase.notes ?? null}
           )
         `;
@@ -201,7 +203,7 @@ export async function PATCH(request: NextRequest, { params }: Params) {
       await sql`
         UPDATE purchase_batches
         SET status = 'COMPLETED'
-        WHERE id = ${purchaseId} AND user_id = ${userId}
+        WHERE id = ${purchaseId} AND org_id = ${orgId}
       `;
 
       await sql`COMMIT`;
@@ -219,5 +221,113 @@ export async function PATCH(request: NextRequest, { params }: Params) {
   } catch (error) {
     console.error("PATCH /api/purchases/[id]:", error);
     return createErrorResponse("Error al confirmar la llegada", 500);
+  }
+}
+
+// ── DELETE /api/purchases/[id] — cancelar compra pendiente ─────────────
+export async function DELETE(request: NextRequest, { params }: Params) {
+  const auth = await verifyAuth(request);
+  if (!isAuthSuccess(auth)) return createErrorResponse(auth.error, auth.status);
+  const deny = await requireModule(auth.data, 'INVENTORY', 'canDelete');
+  if (deny) return deny;
+
+  try {
+    const { orgId }   = auth.data;
+    const { id }       = await params;
+    const purchaseId   = Number(id);
+
+    if (isNaN(purchaseId)) return createErrorResponse("ID inválido", 400);
+
+    const [purchase] = await sql`
+      SELECT id, account_id, status
+      FROM purchase_batches
+      WHERE id = ${purchaseId} AND org_id = ${orgId}
+    `;
+
+    if (!purchase) return createErrorResponse("Compra no encontrada", 404);
+    if (purchase.status !== "PENDING")
+      return createErrorResponse("Solo se pueden cancelar compras pendientes de llegada", 409);
+
+    // Las compras pagadas con tarjeta se guardan con account_id = NULL
+    const isCreditCardFunded = purchase.account_id === null;
+
+    // La reversión de cargos a tarjeta depende de credit_card_transactions.purchase_batch_id
+    // (migración v4.5). Se verifica antes de abrir la transacción para no ejecutar una
+    // columna inexistente dentro de un BEGIN/COMMIT si la migración aún no se aplicó.
+    const [ccLinkColumn] = await sql`
+      SELECT 1 FROM information_schema.columns
+      WHERE table_name = 'credit_card_transactions' AND column_name = 'purchase_batch_id'
+    `;
+    const hasCcLink = !!ccLinkColumn;
+
+    await sql`BEGIN`;
+    try {
+      // 1. Revertir transacciones de cuenta (compra + envío)
+      const txs = await sql`
+        SELECT id, account_id, amount FROM transactions
+        WHERE org_id = ${orgId}
+          AND reference_type IN ('PURCHASE', 'PURCHASE_SHIPPING')
+          AND reference_id   = ${purchaseId}
+      `;
+      for (const tx of txs) {
+        await sql`DELETE FROM transactions WHERE id = ${tx.id} AND org_id = ${orgId}`;
+        await sql`
+          UPDATE accounts SET balance = balance + ${tx.amount}
+          WHERE id = ${tx.account_id} AND org_id = ${orgId}
+        `;
+      }
+
+      // 2. Revertir cargo a tarjeta de crédito, si la compra se pagó así
+      let ccReversed = true;
+      if (isCreditCardFunded) {
+        if (hasCcLink) {
+          const [ccTx] = await sql`
+            SELECT id, amount, currency, credit_card_id FROM credit_card_transactions
+            WHERE org_id             = ${orgId}
+              AND purchase_batch_id  = ${purchaseId}
+              AND type                = 'CHARGE'
+          `;
+          if (ccTx) {
+            await sql`DELETE FROM credit_card_transactions WHERE id = ${ccTx.id} AND org_id = ${orgId}`;
+            if (ccTx.currency === "USD") {
+              await sql`
+                UPDATE credit_cards SET balance_usd = balance_usd - ${ccTx.amount}, updated_at = NOW()
+                WHERE id = ${ccTx.credit_card_id} AND org_id = ${orgId}
+              `;
+            } else {
+              await sql`
+                UPDATE credit_cards SET balance = balance - ${ccTx.amount}, updated_at = NOW()
+                WHERE id = ${ccTx.credit_card_id} AND org_id = ${orgId}
+              `;
+            }
+          } else {
+            ccReversed = false;
+          }
+        } else {
+          ccReversed = false;
+        }
+      }
+
+      // 3. Eliminar la compra y sus items (no hay inventario que revertir: PENDING nunca lo generó)
+      await sql`DELETE FROM purchase_batch_items WHERE purchase_batch_id = ${purchaseId} AND org_id = ${orgId}`;
+      await sql`DELETE FROM purchase_batches     WHERE id = ${purchaseId} AND org_id = ${orgId}`;
+
+      await sql`COMMIT`;
+
+      return Response.json({
+        message: ccReversed
+          ? "Compra cancelada y transacciones revertidas"
+          : "Compra cancelada. No se encontró el cargo de tarjeta para revertir automáticamente; ajústalo manualmente.",
+        data: { id: purchaseId, cc_reversed: ccReversed },
+      });
+
+    } catch (innerError) {
+      await sql`ROLLBACK`;
+      throw innerError;
+    }
+
+  } catch (error) {
+    console.error("DELETE /api/purchases/[id]:", error);
+    return createErrorResponse("Error al cancelar la compra", 500);
   }
 }

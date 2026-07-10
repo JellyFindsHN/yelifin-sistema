@@ -3,11 +3,29 @@ import { NextRequest, NextResponse } from "next/server";
 import { adminAuth } from "@/lib/firebase-admin";
 import { neon } from "@neondatabase/serverless";
 import { seedDefaultCategories } from "@/lib/seed-default-categories";
+import { rateLimit, getClientIP } from "@/lib/rate-limit";
+import { ensureOrgExists } from "@/lib/auth";
 
 const sql = neon(process.env.DATABASE_URL!);
 
 export async function POST(req: NextRequest) {
-  let firebaseUid: string | null = null;
+  // 3 registros por IP cada hora
+  const { allowed, retryAfterSec } = rateLimit(
+    `register:${getClientIP(req)}`,
+    3,
+    60 * 60 * 1000,
+  );
+  if (!allowed) {
+    return NextResponse.json(
+      { error: "Demasiados intentos de registro. Intenta más tarde." },
+      {
+        status: 429,
+        headers: { "Retry-After": String(retryAfterSec) },
+      },
+    );
+  }
+
+  let createdFirebaseUid: string | null = null;
 
   try {
     const { email, password, display_name, business_name } = await req.json();
@@ -27,208 +45,104 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // ── 0. Validar y limpiar registros huérfanos ──────────────────
+    // ── 1. Usuario previo en PostgreSQL con este email ─────────────
+    // Si existe y su firebase_uid sigue vivo en Firebase → 409.
+    // Si existe pero su firebase_uid ya no existe en Firebase (registro
+    // huérfano de un intento fallido), se re-vincula al nuevo uid en el
+    // paso 3 en lugar de borrar datos.
     const [existingUser] = await sql`
-      SELECT id, firebase_uid, email FROM users WHERE email = ${email} LIMIT 1
+      SELECT id, firebase_uid FROM users WHERE email = ${email} LIMIT 1
     `;
 
-    if (existingUser) {
-      // Usuario existe en PostgreSQL, verificar si existe en Firebase
-      let firebaseUserExists = false;
-      
-      // Validar que firebase_uid no sea null o inválido
-      if (!existingUser.firebase_uid || existingUser.firebase_uid.trim() === '') {
-        console.log(`⚠️ Usuario con firebase_uid inválido: ${email}`);
-        // Proceder directamente a limpieza (no intentar verificar en Firebase)
-      } else {
-        try {
-          await adminAuth.getUser(existingUser.firebase_uid);
-          firebaseUserExists = true;
-        } catch (fbError: any) {
-          if (fbError.code !== 'auth/user-not-found') {
-            // Error diferente a "usuario no encontrado"
-            throw fbError;
-          }
-          // Si es 'auth/user-not-found', firebaseUserExists sigue siendo false
-        }
-      }
-
-      if (firebaseUserExists) {
-        // Usuario existe correctamente en ambos sistemas
+    if (existingUser?.firebase_uid) {
+      try {
+        await adminAuth.getUser(existingUser.firebase_uid);
         return NextResponse.json(
           { error: "Este correo ya está registrado" },
           { status: 409 }
         );
+      } catch (fbError: any) {
+        if (fbError.code !== "auth/user-not-found") throw fbError;
       }
-
-      // Usuario existe en PostgreSQL pero NO en Firebase (estado inconsistente)
-      // Proceder a eliminar TODOS los registros relacionados
-      console.log(`🗑️ Limpiando registros huérfanos para: ${email}`);
-      
-      try {
-        await sql`BEGIN`;
-
-        // Eliminar en orden inverso de dependencias (foreign keys)
-        // Solo las tablas que existen en tu schema
-        
-        // 1. Eliminar transacciones (si existen)
-        await sql`
-          DELETE FROM transactions 
-          WHERE account_id IN (
-            SELECT id FROM accounts WHERE user_id = ${existingUser.id}
-          )
-        `;
-
-        // 2. Eliminar categorías
-        await sql`
-          DELETE FROM transaction_categories 
-          WHERE user_id = ${existingUser.id}
-        `;
-
-        // 3. Eliminar cuentas
-        await sql`
-          DELETE FROM accounts 
-          WHERE user_id = ${existingUser.id}
-        `;
-
-        // 4. Eliminar suscripción
-        await sql`
-          DELETE FROM user_subscriptions 
-          WHERE user_id = ${existingUser.id}
-        `;
-
-        // 5. Eliminar perfil
-        await sql`
-          DELETE FROM user_profile 
-          WHERE user_id = ${existingUser.id}
-        `;
-
-        // 6. Finalmente, eliminar usuario
-        await sql`
-          DELETE FROM users 
-          WHERE id = ${existingUser.id}
-        `;
-
-        await sql`COMMIT`;
-        
-        console.log(`✅ Registros huérfanos eliminados para: ${email}`);
-        
-      } catch (cleanupError) {
-        await sql`ROLLBACK`;
-        console.error("❌ Error al limpiar registros huérfanos:", cleanupError);
-        throw new Error("Error al limpiar datos inconsistentes");
-      }
-
-      // Después de la limpieza, continuar con el registro normal
     }
 
-    // ── 1. Crear usuario en Firebase ──────────────────────────────
-    let firebaseUser;
+    // ── 2. Crear usuario en Firebase ──────────────────────────────
     try {
-      firebaseUser = await adminAuth.createUser({
+      const firebaseUser = await adminAuth.createUser({
         email,
         password,
         displayName: display_name,
       });
-      firebaseUid = firebaseUser.uid;
+      createdFirebaseUid = firebaseUser.uid;
     } catch (firebaseError: any) {
       if (firebaseError.code === "auth/email-already-exists") {
         return NextResponse.json(
-          { error: "Este correo ya está registrado en Firebase" },
+          { error: "Este correo ya está registrado" },
           { status: 409 }
         );
       }
       throw firebaseError;
     }
 
-    // ── 2. Obtener el plan trial ───────────────────────────────────
-    const [trialPlan] = await sql`
-      SELECT id FROM subscription_plans
-      WHERE slug = 'trial' AND is_active = TRUE
-      LIMIT 1
-    `;
+    // ── 3. Crear o re-vincular el usuario en PostgreSQL ───────────
+    let userId: number;
 
-    if (!trialPlan) {
-      throw new Error("Plan trial no encontrado");
-    }
-
-    // ── 3. Transacción PostgreSQL ──────────────────────────────────
-    let newUser, subscription;
-
-    try {
-      await sql`BEGIN`;
-
-      [newUser] = await sql`
-        INSERT INTO users (firebase_uid, email, display_name)
-        VALUES (${firebaseUid}, ${email}, ${display_name})
-        RETURNING id, firebase_uid, email, display_name, created_at
+    if (existingUser) {
+      await sql`
+        UPDATE users
+        SET firebase_uid = ${createdFirebaseUid},
+            display_name = ${display_name},
+            is_active    = TRUE,
+            updated_at   = NOW()
+        WHERE id = ${existingUser.id}
       `;
+      userId = existingUser.id;
 
       await sql`
         INSERT INTO user_profile (user_id, business_name)
-        VALUES (${newUser.id}, ${business_name})
+        VALUES (${userId}, ${business_name})
+        ON CONFLICT (user_id) DO UPDATE SET business_name = EXCLUDED.business_name
       `;
-
-      [subscription] = await sql`
-        INSERT INTO user_subscriptions (
-          user_id,
-          plan_id,
-          status,
-          provider
-        )
-        VALUES (
-          ${newUser.id},
-          ${trialPlan.id},
-          'TRIAL',
-          'NONE'
-        )
-        RETURNING id, status, created_at
+    } else {
+      const [newUser] = await sql`
+        INSERT INTO users (firebase_uid, email, display_name)
+        VALUES (${createdFirebaseUid}, ${email}, ${display_name})
+        RETURNING id
       `;
-
-      await seedDefaultCategories(newUser.id, sql);
+      userId = newUser.id;
 
       await sql`
-        INSERT INTO accounts (user_id, name, type, balance)
-        VALUES (${newUser.id}, 'Efectivo', 'CASH', 0)
+        INSERT INTO user_profile (user_id, business_name)
+        VALUES (${userId}, ${business_name})
       `;
-
-      await sql`COMMIT`;
-
-    } catch (txError) {
-      await sql`ROLLBACK`;
-      throw txError;
     }
 
-    // ── 4. Respuesta ───────────────────────────────────────────────
+    // ── 4. Org + rol dueño + membresía + suscripción trial ────────
+    const { orgId } = await ensureOrgExists(userId, business_name);
+
+    // ── 5. Categorías por defecto (las cuentas se crean en onboarding)
+    await seedDefaultCategories(orgId, userId, sql);
+
     return NextResponse.json(
       {
         message: "Cuenta creada exitosamente",
         data: {
-          user: {
-            id: newUser.id,
-            firebase_uid: newUser.firebase_uid,
-            email: newUser.email,
-            display_name: newUser.display_name,
-          },
-          subscription: {
-            id: subscription.id,
-            status: subscription.status,
-          },
+          user: { id: userId, email, display_name },
+          org: { id: orgId },
         },
       },
       { status: 201 }
     );
-
   } catch (error: any) {
-    console.error("❌ Error en registro:", error);
+    console.error("Error en registro:", error);
 
-    // Rollback Firebase si se creó
-    if (firebaseUid) {
+    // Rollback Firebase si se creó (los datos de PG quedan como huérfanos
+    // y se re-vinculan en el próximo intento — paso 1)
+    if (createdFirebaseUid) {
       try {
-        await adminAuth.deleteUser(firebaseUid);
-        console.log("🔄 Rollback Firebase: usuario eliminado");
+        await adminAuth.deleteUser(createdFirebaseUid);
       } catch (rollbackError) {
-        console.error("❌ Error en rollback Firebase:", rollbackError);
+        console.error("Error en rollback Firebase:", rollbackError);
       }
     }
 

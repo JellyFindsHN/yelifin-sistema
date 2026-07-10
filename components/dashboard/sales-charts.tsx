@@ -5,7 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip,
-  ResponsiveContainer, PieChart, Pie, Cell,
+  ResponsiveContainer, PieChart, Pie, Cell, Legend,
 } from "recharts";
 import { useCurrency } from "@/hooks/swr/use-currency";
 
@@ -22,9 +22,10 @@ type Props = {
   paymentMethods: any[];
   periodLabel:    string;
   isLoading:      boolean;
+  showProfit?:    boolean;
 };
 
-export function SalesCharts({ salesChart, paymentMethods, periodLabel, isLoading }: Props) {
+export function SalesCharts({ salesChart, paymentMethods, periodLabel, isLoading, showProfit = true }: Props) {
   const { format: formatCurrency } = useCurrency();
   
   return (
@@ -32,7 +33,7 @@ export function SalesCharts({ salesChart, paymentMethods, periodLabel, isLoading
       {/* Ventas vs Ganancias */}
       <Card className="lg:col-span-4">
         <CardHeader className="pb-3 pt-5 px-5">
-          <CardTitle className="text-lg font-bold tracking-tight">Ventas vs Ganancias</CardTitle>
+          <CardTitle className="text-lg font-bold tracking-tight">{showProfit ? "Ventas vs Ganancias" : "Ventas"}</CardTitle>
           <CardDescription className="text-sm font-medium">{periodLabel}</CardDescription>
         </CardHeader>
         <CardContent className="px-2 pb-1">
@@ -55,8 +56,8 @@ export function SalesCharts({ salesChart, paymentMethods, periodLabel, isLoading
                 <Tooltip
                   formatter={(v: number) => formatCurrency(v)}
                   contentStyle={{ 
-                    backgroundColor: "hsl(var(--card))", 
-                    border: "1px solid hsl(var(--border))", 
+                    backgroundColor: "var(--card)", 
+                    border: "1px solid var(--border)", 
                     borderRadius: "8px",
                     fontWeight: 500
                   }}
@@ -69,14 +70,16 @@ export function SalesCharts({ salesChart, paymentMethods, periodLabel, isLoading
                   dot={false} 
                   name="Ventas" 
                 />
-                <Line 
-                  type="monotone" 
-                  dataKey="profit"  
-                  stroke="#10B981" 
-                  strokeWidth={2.5} 
-                  dot={false} 
-                  name="Ganancia" 
-                />
+                {showProfit && (
+                  <Line
+                    type="monotone"
+                    dataKey="profit"
+                    stroke="#10B981"
+                    strokeWidth={2.5}
+                    dot={false}
+                    name="Ganancia"
+                  />
+                )}
               </LineChart>
             </ResponsiveContainer>
           )}
@@ -95,35 +98,38 @@ export function SalesCharts({ salesChart, paymentMethods, periodLabel, isLoading
               <p className="text-sm text-muted-foreground font-medium">Sin datos disponibles</p>
             </div>
           ) : (
-            <ResponsiveContainer width="100%" height={200}>
+            <ResponsiveContainer width="100%" height={280}>
               <PieChart>
-                <Pie 
-                  data={paymentMethods} 
-                  cx="50%" 
-                  cy="50%" 
-                  innerRadius={55} 
-                  outerRadius={95}
-                  paddingAngle={5} 
+                <Pie
+                  data={paymentMethods}
+                  cx="50%"
+                  cy="42%"
+                  innerRadius={50}
+                  outerRadius={72}
+                  paddingAngle={5}
                   dataKey="value"
-                  label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
-                  style={{ 
-                    fontSize: "13px", 
-                    fontWeight: 600
-                  }}
                 >
-                  {paymentMethods.map((_: any, i: number) => (
-                    <Cell key={i} fill={CHART_COLORS[i % CHART_COLORS.length]} />
+                  {paymentMethods.map((pm: any, i: number) => (
+                    <Cell key={pm.name} fill={CHART_COLORS[i % CHART_COLORS.length]} />
                   ))}
                 </Pie>
                 <Tooltip
                   formatter={(v: number) => formatCurrency(v)}
-                  contentStyle={{ 
-                    backgroundColor: "hsl(var(--card))", 
-                    border: "1px solid hsl(var(--border))", 
+                  contentStyle={{
+                    backgroundColor: "var(--card)",
+                    border: "1px solid var(--border)",
                     borderRadius: "8px",
                     fontWeight: 500,
                     fontSize: "13px"
                   }}
+                />
+                <Legend
+                  iconType="circle"
+                  iconSize={8}
+                  wrapperStyle={{ fontSize: 12, fontWeight: 500, paddingTop: 8 }}
+                  formatter={(value) => (
+                    <span style={{ color: "var(--foreground)", fontSize: 12 }}>{value}</span>
+                  )}
                 />
               </PieChart>
             </ResponsiveContainer>

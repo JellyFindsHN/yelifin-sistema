@@ -8,9 +8,16 @@ import type {
   UserProfileResponse,
   FeatureKey,
   FeatureCategory,
+  OrgModule,
+  ModulePermissions,
 } from "@/types";
 
 const KEY = "/api/auth/me";
+
+const DENY_ALL: ModulePermissions = {
+  can_view: false, can_edit: false, can_delete: false,
+  show_costs: false, show_profit: false,
+};
 
 function useAuthFetch() {
   const { firebaseUser } = useAuth();
@@ -37,12 +44,12 @@ function useAuthFetch() {
 }
 
 export type UpdateProfileInput = {
-  display_name?:     string | null;
-  business_name?:    string | null;
+  display_name?:      string | null;
+  business_name?:     string | null;
   business_logo_url?: string | null;
-  timezone?:         string;
-  currency?:         string;
-  locale?:           string;
+  timezone?:          string;
+  currency?:          string;
+  locale?:            string;
 };
 
 export function useUpdateProfile() {
@@ -103,37 +110,43 @@ export function useMe() {
   const { firebaseUser } = useAuth();
   const authFetch = useAuthFetch();
 
-  const {
-    data,
-    isLoading,
-    error,
-    mutate,
-  } = useSWR<UserProfileResponse>(
+  const { data, isLoading, error, mutate } = useSWR<UserProfileResponse>(
     firebaseUser ? KEY : null,
     (u: string) => authFetch(u),
     {
-      revalidateOnFocus: false,
-      dedupingInterval: 60_000,
-      revalidateOnReconnect: false,
+      revalidateOnFocus:      false,
+      dedupingInterval:       60_000,
+      revalidateOnReconnect:  false,
     }
   );
 
-  const user = data?.user ?? null;
-  const profile = data?.profile ?? null;
+  const user         = data?.user         ?? null;
+  const profile      = data?.profile      ?? null;
+  const org          = data?.org          ?? null;
+  const role         = data?.role         ?? null;
+  const permissions  = data?.permissions  ?? {};
   const subscription = data?.subscription ?? null;
-  const features = data?.features ?? {};
+  const features     = data?.features     ?? {};
+
+  const orgId   = org?.id   ?? null;
+  const roleId  = role?.id  ?? null;
+  const isOwner = role?.is_owner ?? false;
+
   const onboardingCompleted = profile?.onboarding_completed ?? false;
 
-  const hasFeature = (key: FeatureKey): boolean => {
-    if (!features) return false;
-    return Object.values(features).some((list) =>
-      list?.some((f) => f.key === key)
-    );
-  };
+  const hasFeature = (key: FeatureKey): boolean =>
+    Object.values(features).some((list) => list?.some((f) => f.key === key));
 
   const hasFeatureInCategory = (category: FeatureCategory): boolean => {
     const list = features?.[category];
     return !!(list && list.length > 0);
+  };
+
+  const getModulePermissions = (module: OrgModule): ModulePermissions => {
+    if (isOwner) {
+      return { can_view: true, can_edit: true, can_delete: true, show_costs: true, show_profit: true };
+    }
+    return permissions[module] ?? DENY_ALL;
   };
 
   const hasActiveSubscription =
@@ -145,11 +158,18 @@ export function useMe() {
     data,
     user,
     profile,
+    org,
+    role,
+    permissions,
+    orgId,
+    roleId,
+    isOwner,
     subscription,
     features,
     onboardingCompleted,
     hasFeature,
     hasFeatureInCategory,
+    getModulePermissions,
     hasActiveSubscription,
     isTrial,
     isLoading,

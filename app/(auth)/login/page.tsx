@@ -1,10 +1,12 @@
-"use client";
+﻿"use client";
 
 import { useRedirectIfAuthenticated } from "@/hooks/use-redirect-if-authenticated";
 import { LoadingScreen } from "@/hooks/ui/loading-screen";
 import Link from "next/link";
 import { LoginForm } from "@/components/auth/login-form";
-import { Zap, ArrowLeft } from "lucide-react";
+import { KontaIcon } from "@/components/shared/konta-icon";
+import { KontaTitle } from "@/components/shared/konta-title";
+import { ArrowLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 export default function LoginPage() {
@@ -19,7 +21,7 @@ export default function LoginPage() {
       {/* Back Button - Fixed Top Left */}
       <Link href="/" className="fixed top-6 left-6 z-50">
         <Button variant="ghost" size="icon" className="rounded-full">
-          <ArrowLeft className="w-5 h-5" />
+          <ArrowLeft className="size-5" />
         </Button>
       </Link>
 
@@ -28,15 +30,13 @@ export default function LoginPage() {
         <div className="w-full max-w-md space-y-8">
           {/* Logo */}
           <Link href="/" className="flex items-center gap-2">
-            <div className="w-10 h-10 bg-primary rounded-lg flex items-center justify-center shadow-lg shadow-primary/50">
-              <Zap className="w-6 h-6 text-primary-foreground" />
-            </div>
-            <span className="text-2xl font-bold text-primary">Konta</span>
+            <KontaIcon className="size-10 shadow-lg shadow-primary/50 rounded-lg" />
+            <KontaTitle className="h-6" />
           </Link>
 
           {/* Header */}
           <div className="space-y-2">
-            <h1 className="text-3xl font-bold">Bienvenido de vuelta</h1>
+            <h1 className="text-3xl font-semibold">Bienvenido de vuelta</h1>
             <p className="text-muted-foreground">
               Ingresa tus credenciales para acceder a tu cuenta
             </p>

@@ -7,27 +7,29 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Separator } from "@/components/ui/separator";
 import {
-  ArrowLeft, Clock, PackageCheck, Package,
-  Wallet, CalendarDays, StickyNote, Truck,
+  ArrowLeft, Clock, PackageCheck, XCircle,
+  Wallet, CalendarDays, StickyNote, Truck, Package,
 } from "lucide-react";
 
-import { usePurchases, Purchase } from "@/hooks/swr/use-purchases";
-import { useAccounts }            from "@/hooks/swr/use-accounts";
-import { useInventory }           from "@/hooks/swr/use-inventory";
-import { useCurrency }            from "@/hooks/swr/use-currency";
+import { usePendingPurchases, PurchaseWithItems, Purchase } from "@/hooks/swr/use-purchases";
+import { useAccounts }   from "@/hooks/swr/use-accounts";
+import { useInventory }  from "@/hooks/swr/use-inventory";
+import { useCurrency }   from "@/hooks/swr/use-currency";
 import { ConfirmPurchaseArrivalDialog } from "@/components/products/confirm-purchase-arrival-dialog";
+import { CancelPurchaseDialog } from "@/components/products/cancel-purchase-dialog";
+import { StatCard } from "@/components/reports/report-shell";
 
 export default function PendingPurchasesPage() {
-  const router = useRouter();
-  const { purchases, isLoading, mutate: mutatePurchases } = usePurchases();
-  const { mutate: mutateInventory } = useInventory();
+  const { back, push } = useRouter();
+  const { purchases, isLoading, mutate: mutatePurchases } = usePendingPurchases();
+  const { mutate: mutateInventory }  = useInventory();
   const { accounts, mutate: mutateAccounts } = useAccounts();
   const { format } = useCurrency();
 
-  const [selected, setSelected] = useState<Purchase | null>(null);
-
-  const pending = purchases.filter((p) => p.status === "PENDING");
+  const [selected, setSelected] = useState<PurchaseWithItems | null>(null);
+  const [toCancel, setToCancel] = useState<Purchase | null>(null);
 
   const handleSuccess = () => {
     mutatePurchases();
@@ -35,61 +37,78 @@ export default function PendingPurchasesPage() {
     mutateAccounts();
   };
 
+  const stats = purchases.reduce(
+    (acc, p) => {
+      acc.totalMoney += Number(p.total);
+      p.items.forEach((item) => {
+        acc.productKeys.add(`${item.product_id}-${item.variant_name ?? ""}`);
+        acc.totalUnits += Number(item.quantity);
+      });
+      return acc;
+    },
+    { totalMoney: 0, totalUnits: 0, productKeys: new Set<string>() }
+  );
+
   return (
     <div className="space-y-6 max-w-2xl mx-auto">
 
       {/* Header */}
       <div className="flex items-center gap-3">
-        <Button variant="ghost" size="icon" onClick={() => router.back()}>
-          <ArrowLeft className="h-4 w-4" />
+        <Button variant="ghost" size="icon" onClick={() => back()}>
+          <ArrowLeft className="size-4" />
         </Button>
         <div className="flex-1 min-w-0">
-          <h1 className="text-2xl font-bold tracking-tight">Compras pendientes</h1>
+          <h1 className="text-2xl font-semibold tracking-tight">En camino</h1>
           <p className="text-muted-foreground text-sm">
             {isLoading
               ? "Cargando..."
-              : pending.length === 0
-                ? "Sin compras pendientes"
-                : `${pending.length} compra${pending.length !== 1 ? "s" : ""} esperando llegada de mercancía`
+              : purchases.length === 0
+                ? "Sin compras pendientes de llegada"
+                : `${purchases.length} compra${purchases.length !== 1 ? "s" : ""} esperando llegada de mercancía`
             }
           </p>
         </div>
-        {!isLoading && pending.length > 0 && (
+        {!isLoading && purchases.length > 0 && (
           <Badge className="bg-amber-100 text-amber-700 border-amber-200 shrink-0">
-            {pending.length} pendiente{pending.length !== 1 ? "s" : ""}
+            {purchases.length} pendiente{purchases.length !== 1 ? "s" : ""}
           </Badge>
         )}
       </div>
 
-      {/* Loading */}
-      {isLoading && (
-        <div className="space-y-3">
-          {[1, 2, 3].map((i) => (
-            <Skeleton key={i} className="h-36 rounded-xl" />
-          ))}
+      {/* Stats */}
+      {isLoading ? (
+        <div className="grid grid-cols-3 gap-3">
+          {[1, 2, 3].map((i) => <Skeleton key={i} className="h-20 rounded-xl" />)}
+        </div>
+      ) : purchases.length > 0 && (
+        <div className="grid grid-cols-3 gap-3">
+          <StatCard label="Productos pendientes" value={String(stats.productKeys.size)} />
+          <StatCard label="Unidades totales" value={stats.totalUnits.toLocaleString("es-HN")} />
+          <StatCard label="Inversión" value={format(stats.totalMoney)} />
         </div>
       )}
 
       {/* Empty state */}
-      {!isLoading && pending.length === 0 && (
+      {!isLoading && purchases.length === 0 && (
         <div className="flex flex-col items-center justify-center py-20 text-muted-foreground gap-3">
-          <div className="h-14 w-14 rounded-full bg-muted flex items-center justify-center">
-            <PackageCheck className="h-7 w-7 opacity-40" />
+          <div className="size-14 rounded-full bg-muted flex items-center justify-center">
+            <PackageCheck className="size-7 opacity-40" />
           </div>
           <p className="text-sm">No hay compras pendientes de llegada</p>
-          <Button variant="outline" size="sm" onClick={() => router.push("/inventory")}>
+          <Button variant="outline" size="sm" onClick={() => push("/inventory")}>
             Ir a inventario
           </Button>
         </div>
       )}
 
       {/* Lista */}
-      {!isLoading && pending.map((p) => (
+      {!isLoading && purchases.map((p) => (
         <PurchaseCard
           key={p.id}
           purchase={p}
           format={format}
           onConfirm={() => setSelected(p)}
+          onCancel={() => setToCancel(p)}
         />
       ))}
 
@@ -99,6 +118,14 @@ export default function PendingPurchasesPage() {
         accounts={accounts}
         open={!!selected}
         onOpenChange={(open) => !open && setSelected(null)}
+        onSuccess={handleSuccess}
+      />
+
+      {/* Dialog de cancelación */}
+      <CancelPurchaseDialog
+        purchase={toCancel}
+        open={!!toCancel}
+        onOpenChange={(open) => !open && setToCancel(null)}
         onSuccess={handleSuccess}
       />
     </div>
@@ -111,10 +138,12 @@ function PurchaseCard({
   purchase: p,
   format,
   onConfirm,
+  onCancel,
 }: {
-  purchase: Purchase;
+  purchase: PurchaseWithItems;
   format: (v: number) => string;
   onConfirm: () => void;
+  onCancel: () => void;
 }) {
   const date = new Date(p.purchased_at).toLocaleDateString("es-HN", {
     day: "numeric", month: "long", year: "numeric",
@@ -127,8 +156,8 @@ function PurchaseCard({
         {/* Fila superior */}
         <div className="flex items-start justify-between gap-3">
           <div className="flex items-center gap-2.5 min-w-0">
-            <div className="h-9 w-9 rounded-lg bg-amber-100 dark:bg-amber-900/40 flex items-center justify-center shrink-0">
-              <Clock className="h-4 w-4 text-amber-600" />
+            <div className="size-9 rounded-lg bg-amber-100 dark:bg-amber-900/40 flex items-center justify-center shrink-0">
+              <Clock className="size-4 text-amber-600" />
             </div>
             <div className="min-w-0">
               <p className="text-sm font-semibold leading-tight">
@@ -146,42 +175,76 @@ function PurchaseCard({
         {/* Detalles */}
         <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 text-xs text-muted-foreground">
           <div className="flex items-center gap-1.5">
-            <CalendarDays className="h-3 w-3 shrink-0" />
+            <CalendarDays className="size-3 shrink-0" />
             <span>{date}</span>
           </div>
           {p.account_name && (
             <div className="flex items-center gap-1.5">
-              <Wallet className="h-3 w-3 shrink-0" />
+              <Wallet className="size-3 shrink-0" />
               <span className="truncate">{p.account_name}</span>
             </div>
           )}
           {Number(p.shipping) > 0 && (
             <div className="flex items-center gap-1.5">
-              <Truck className="h-3 w-3 shrink-0" />
+              <Truck className="size-3 shrink-0" />
               <span>Envío: {format(Number(p.shipping))}</span>
             </div>
           )}
           {p.notes && (
             <div className="flex items-center gap-1.5 col-span-2">
-              <StickyNote className="h-3 w-3 shrink-0" />
+              <StickyNote className="size-3 shrink-0" />
               <span className="truncate">{p.notes}</span>
             </div>
           )}
         </div>
+
+        {/* Lista de productos */}
+        {p.items.length > 0 && (
+          <>
+            <Separator />
+            <div className="space-y-1.5">
+              {p.items.map((item, i) => (
+                <div key={i} className="flex items-center justify-between gap-2 text-xs">
+                  <div className="flex items-center gap-1.5 min-w-0">
+                    <Package className="size-3 text-muted-foreground shrink-0" />
+                    <span className="truncate font-medium">
+                      {item.product_name}
+                      {item.variant_name && (
+                        <span className="text-muted-foreground font-normal"> · {item.variant_name}</span>
+                      )}
+                    </span>
+                  </div>
+                  <div className="shrink-0 text-right text-muted-foreground">
+                    <span className="font-mono">{item.quantity}</span>
+                    <span className="mx-1 opacity-50">×</span>
+                    <span>{format(Number(item.unit_cost))}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </>
+        )}
 
         {/* Aviso */}
         <div className="rounded-lg bg-amber-100/60 dark:bg-amber-900/20 px-3 py-2 text-xs text-amber-700 dark:text-amber-400">
           El dinero ya fue debitado de la cuenta. Al confirmar la llegada, el stock se acreditará al inventario.
         </div>
 
-        {/* Acción */}
-        <Button
-          className="w-full gap-2"
-          onClick={onConfirm}
-        >
-          <PackageCheck className="h-4 w-4" />
-          Confirmar llegada
-        </Button>
+        {/* Acciones */}
+        <div className="flex gap-2">
+          <Button
+            variant="outline"
+            className="gap-2 text-destructive border-destructive/30 hover:bg-destructive/10 hover:text-destructive"
+            onClick={onCancel}
+          >
+            <XCircle className="size-4" />
+            Cancelar
+          </Button>
+          <Button className="flex-1 gap-2" onClick={onConfirm}>
+            <PackageCheck className="size-4" />
+            Confirmar llegada
+          </Button>
+        </div>
       </CardContent>
     </Card>
   );

@@ -90,6 +90,10 @@ export type FeatureKey =
   | 'events.manage'
   | 'events.inventory'
   // REPORTS
+  | 'reports.sales'
+  | 'reports.inventory'
+  | 'reports.profit'
+  | 'reports.events'
   | 'reports.basic'
   | 'reports.advanced'
   // ADMIN
@@ -105,14 +109,71 @@ export interface Feature {
 export type FeaturesByCategory = Partial<Record<FeatureCategory, Feature[]>>;
 
 // ============================================
+// ORGANIZACIÓN Y ROLES
+// ============================================
+
+export type OrgModule =
+  | 'DASHBOARD'
+  | 'PRODUCTS'
+  | 'INVENTORY'
+  | 'SALES'
+  | 'CUSTOMERS'
+  | 'FINANCES'
+  | 'EVENTS'
+  | 'REPORTS'
+  | 'ADMIN';
+
+export interface ModulePermissions {
+  can_view:    boolean;
+  can_edit:    boolean;
+  can_delete:  boolean;
+  show_costs:  boolean;
+  show_profit: boolean;
+}
+
+export interface OrgInfo {
+  id:       number;
+  name:     string;
+  slug:     string | null;
+  logo_url: string | null;
+  timezone: string;
+  currency: string;
+  locale:   string;
+}
+
+export interface OrgRole {
+  id:       number;
+  name:     string;
+  is_owner: boolean;
+}
+
+export interface OrgMember {
+  id:            number;
+  user_id:       number;
+  role_id:       number;
+  is_active:     boolean;
+  joined_at:     string | null;
+  created_at:    string;
+  email:         string;
+  display_name:  string | null;
+  role_name:     string;
+  is_owner_role: boolean;
+}
+
+export type OrgPermissions = Partial<Record<OrgModule, ModulePermissions>>;
+
+// ============================================
 // PERFIL COMPLETO (respuesta de /api/auth/me)
 // ============================================
 
 export interface UserProfileResponse {
-  user: User;
-  profile: UserProfile;
+  user:         User;
+  profile:      UserProfile;
+  org:          OrgInfo;
+  role:         OrgRole;
+  permissions:  OrgPermissions;
   subscription: UserSubscription;
-  features: FeaturesByCategory;
+  features:     FeaturesByCategory;
 }
 
 // ============================================

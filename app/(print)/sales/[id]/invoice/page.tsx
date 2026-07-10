@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { use } from "react";
 import Link from "next/link";
@@ -32,7 +32,7 @@ export default function InvoicePage({ params }: Props) {
   if (saleLoading || profileLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-100">
-        <p className="text-sm text-gray-500">Cargando factura...</p>
+        <p className="text-sm text-gray-500">Cargando factura…</p>
       </div>
     );
   }
@@ -107,10 +107,10 @@ export default function InvoicePage({ params }: Props) {
                   <img
                     src={businessLogo}
                     alt={businessName}
-                    className="h-14 w-14 object-contain rounded-lg"
+                    className="size-14 object-contain rounded-lg"
                   />
                 ) : (
-                  <div className="h-14 w-14 rounded-lg bg-black flex items-center justify-center shrink-0">
+                  <div className="size-14 rounded-lg bg-black flex items-center justify-center shrink-0">
                     <span className="text-2xl font-bold text-white">
                       {businessName.charAt(0).toUpperCase()}
                     </span>

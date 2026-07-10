@@ -1,4 +1,4 @@
-// components/sales/pos/supplies-used-modal.tsx
+﻿// components/sales/pos/supplies-used-modal.tsx
 "use client";
 
 import { useState, useEffect } from "react";
@@ -88,7 +88,7 @@ export function SuppliesUsedModal({ open, onOpenChange, onConfirm, initialSuppli
       <DialogContent className="sm:max-w-md max-h-[90vh] flex flex-col">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <FlaskConical className="h-5 w-5 text-primary" />
+            <FlaskConical className="size-5 text-primary" />
             Suministros usados
           </DialogTitle>
           <p className="text-xs text-muted-foreground">
@@ -100,7 +100,7 @@ export function SuppliesUsedModal({ open, onOpenChange, onConfirm, initialSuppli
 
           {/* Búsqueda */}
           <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-3.5 text-muted-foreground" />
             <Input
               placeholder="Buscar suministro..."
               value={search}
@@ -129,10 +129,10 @@ export function SuppliesUsedModal({ open, onOpenChange, onConfirm, initialSuppli
                           : "hover:bg-muted/50"
                       }`}
                     >
-                      <div className={`h-5 w-5 rounded-full border-2 flex items-center justify-center shrink-0 transition-colors ${
+                      <div className={`size-5 rounded-full border-2 flex items-center justify-center shrink-0 transition-colors ${
                         sel ? "border-primary bg-primary" : "border-muted-foreground/30"
                       }`}>
-                        {sel && <div className="h-2 w-2 rounded-full bg-white" />}
+                        {sel && <div className="size-2 rounded-full bg-white" />}
                       </div>
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-medium truncate">{supply.name}</p>
@@ -160,10 +160,10 @@ export function SuppliesUsedModal({ open, onOpenChange, onConfirm, initialSuppli
                       <p className="text-xs font-medium flex-1 truncate">{s.name}</p>
                       <div className="flex items-center gap-1 shrink-0">
                         <Button
-                          variant="ghost" size="icon" className="h-5 w-5"
+                          variant="ghost" size="icon" className="size-5"
                           onClick={(e) => { e.stopPropagation(); updateQty(s.supply_id, -0.5); }}
                         >
-                          <Minus className="h-3 w-3" />
+                          <Minus className="size-3" />
                         </Button>
                         <Input
                           type="number"
@@ -178,16 +178,16 @@ export function SuppliesUsedModal({ open, onOpenChange, onConfirm, initialSuppli
                           {s.unit ?? "ud"}
                         </span>
                         <Button
-                          variant="ghost" size="icon" className="h-5 w-5"
+                          variant="ghost" size="icon" className="size-5"
                           onClick={(e) => { e.stopPropagation(); updateQty(s.supply_id, 0.5); }}
                         >
-                          <Plus className="h-3 w-3" />
+                          <Plus className="size-3" />
                         </Button>
                         <Button
-                          variant="ghost" size="icon" className="h-5 w-5 text-destructive"
+                          variant="ghost" size="icon" className="size-5 text-destructive"
                           onClick={(e) => { e.stopPropagation(); toggle({ id: s.supply_id }); }}
                         >
-                          <X className="h-3 w-3" />
+                          <X className="size-3" />
                         </Button>
                       </div>
                     </div>

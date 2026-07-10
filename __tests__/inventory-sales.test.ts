@@ -70,6 +70,10 @@ import type { AuthUser } from "@/lib/auth";
 function makeAuthUser(overrides: Partial<AuthUser> = {}): AuthUser {
   return {
     userId: 42,
+    orgId: 1,
+    roleId: 1,
+    roleName: "Dueño",
+    isOwner: true,
     firebaseUid: "uid-test",
     email: "test@konta.app",
     displayName: "Test User",

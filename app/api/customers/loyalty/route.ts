@@ -1,19 +1,23 @@
 // app/api/customers/loyalty/route.ts
 import { NextRequest } from "next/server";
 import { neon } from "@neondatabase/serverless";
-import { verifyAuth, createErrorResponse, isAuthSuccess } from "@/lib/auth";
+import { verifyAuth, createErrorResponse, isAuthSuccess, requireModule, requireFeature } from "@/lib/auth";
 
 const sql = neon(process.env.DATABASE_URL!);
 
 export async function GET(request: NextRequest) {
   const auth = await verifyAuth(request);
   if (!isAuthSuccess(auth)) return createErrorResponse(auth.error, auth.status);
+  const deny = await requireModule(auth.data, 'CUSTOMERS', 'canView');
+  if (deny) return deny;
+  const denyFeature = await requireFeature(auth.data.orgId, 'customers.loyalty');
+  if (denyFeature) return denyFeature;
 
-  const { userId } = auth.data;
+  const { userId, orgId } = auth.data;
   try {
     const policies = await sql`
       SELECT * FROM loyalty_policies
-      WHERE user_id = ${userId}
+      WHERE org_id = ${orgId}
       ORDER BY sort_order ASC, created_at ASC
     `;
     return Response.json({ data: policies });
@@ -26,8 +30,12 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   const auth = await verifyAuth(request);
   if (!isAuthSuccess(auth)) return createErrorResponse(auth.error, auth.status);
+  const deny = await requireModule(auth.data, 'CUSTOMERS', 'canEdit');
+  if (deny) return deny;
+  const denyFeature = await requireFeature(auth.data.orgId, 'customers.loyalty');
+  if (denyFeature) return denyFeature;
 
-  const { userId } = auth.data;
+  const { userId, orgId } = auth.data;
   try {
     const { tier_name, color, min_orders, min_spent, discount_pct, sort_order } = await request.json();
 
@@ -38,8 +46,9 @@ export async function POST(request: NextRequest) {
       return createErrorResponse("Debe definir al menos una condición (órdenes o monto)", 400);
 
     const [policy] = await sql`
-      INSERT INTO loyalty_policies (user_id, tier_name, color, min_orders, min_spent, discount_pct, sort_order)
+      INSERT INTO loyalty_policies (org_id, created_by, tier_name, color, min_orders, min_spent, discount_pct, sort_order)
       VALUES (
+        ${orgId},
         ${userId},
         ${tier_name.trim()},
         ${color ?? "amber"},

@@ -52,6 +52,10 @@ export type MovementFilters = {
   year?:       number;
   product_id?: number;
   variant_id?: number;
+  search?:     string;
+  type?:       string;
+  page?:       number;
+  limit?:      number;
 };
 
 // ── Auth fetch ─────────────────────────────────────────────────────────
@@ -84,6 +88,10 @@ export function useMovements(filters?: MovementFilters) {
   if (filters?.year)       params.set('year',       String(filters.year));
   if (filters?.product_id) params.set('product_id', String(filters.product_id));
   if (filters?.variant_id) params.set('variant_id', String(filters.variant_id));
+  if (filters?.search)     params.set('search',     filters.search);
+  if (filters?.type && filters.type !== 'all') params.set('type', filters.type);
+  if (filters?.page)       params.set('page',       String(filters.page));
+  if (filters?.limit)      params.set('limit',      String(filters.limit));
 
   const url = `${KEY}?${params.toString()}`;
 
@@ -97,10 +105,13 @@ export function useMovements(filters?: MovementFilters) {
   );
 
   return {
-    movements: (data?.data ?? []) as Movement[],
-    total:     data?.total ?? 0,
+    movements:  (data?.data ?? []) as Movement[],
+    total:      (data?.total      ?? 0)  as number,
+    page:       (data?.page       ?? 1)  as number,
+    totalPages: (data?.totalPages ?? 1)  as number,
+    limit:      (data?.limit      ?? 25) as number,
     isLoading,
-    error:     error?.message ?? null,
+    error:      error?.message ?? null,
     mutate,
   };
 }

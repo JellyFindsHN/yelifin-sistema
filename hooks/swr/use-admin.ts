@@ -67,6 +67,27 @@ export type AdminUserActivity = {
   total_transactions: number;
 };
 
+export type AdminUserStorage = {
+  products:            number;
+  sales:               number;
+  transactions:        number;
+  customers:           number;
+  accounts:            number;
+  credit_cards:        number;
+  cc_transactions:     number;
+  inventory_batches:   number;
+  inventory_movements: number;
+  events:              number;
+  image_count:         number;
+};
+
+export type AdminStorageStats = {
+  db_size_bytes: number;
+  table_sizes: { tablename: string; size_bytes: number }[];
+  top_users: { id: number; email: string; display_name: string; total_rows: number }[];
+  image_counts: { user_photos: number; logos: number; product_images: number };
+};
+
 export type AdminPlan = {
   id:                   number;
   name:                 string;
@@ -77,8 +98,19 @@ export type AdminPlan = {
   max_products:         number | null;
   max_sales_per_month:  number | null;
   max_storage_mb:       number | null;
+  max_transactions_per_month: number | null;
+  max_accounts:         number | null;
+  max_supplies:         number | null;
   is_active:            boolean;
   user_count:           number;
+};
+
+export type PlanFeatureRow = {
+  id:           number;
+  feature_key:  string;
+  feature_name: string;
+  category:     string;
+  is_enabled:   boolean;
 };
 
 export type AdminStats = {
@@ -147,6 +179,23 @@ export function useAdminUser(id: number | null) {
   return {
     user:     (data?.user     ?? null) as AdminUserDetail | null,
     activity: (data?.activity ?? null) as AdminUserActivity | null,
+    storage:  (data?.storage  ?? null) as AdminUserStorage | null,
+    isLoading,
+    error:    (error as any)?.message ?? null,
+    mutate,
+  };
+}
+
+export function useAdminStorage() {
+  const { firebaseUser } = useAuth();
+  const authFetch = useAuthFetch();
+  const { data, isLoading, error, mutate } = useSWR(
+    firebaseUser ? "/api/admin/storage" : null,
+    (u: string) => authFetch(u),
+    { revalidateOnFocus: false, dedupingInterval: 60_000 }
+  );
+  return {
+    storage:  (data ?? null) as AdminStorageStats | null,
     isLoading,
     error:    (error as any)?.message ?? null,
     mutate,
@@ -169,6 +218,89 @@ export function useAdminPlans() {
   };
 }
 
+export type PlanInput = {
+  name?: string;
+  slug?: string;
+  description?: string | null;
+  price_usd?: number;
+  billing_interval?: string;
+  max_products?: number | null;
+  max_sales_per_month?: number | null;
+  max_storage_mb?: number | null;
+  max_transactions_per_month?: number | null;
+  max_accounts?: number | null;
+  max_supplies?: number | null;
+  is_active?: boolean;
+};
+
+export function useAdminPlanFeatures(planId: number | null) {
+  const { firebaseUser } = useAuth();
+  const authFetch = useAuthFetch();
+  const { data, isLoading, error, mutate } = useSWR(
+    firebaseUser && planId ? `/api/admin/plans/${planId}/features` : null,
+    (u: string) => authFetch(u),
+    { revalidateOnFocus: false }
+  );
+  return {
+    plan:     (data?.plan ?? null) as { id: number; name: string; slug: string } | null,
+    features: (data?.data ?? []) as PlanFeatureRow[],
+    isLoading,
+    error:    (error as any)?.message ?? null,
+    mutate,
+  };
+}
+
+export function useAdminUpdatePlanFeatures(planId: number | null) {
+  const authFetch = useAuthFetch();
+  const [isSaving, setIsSaving] = useState(false);
+  const updateFeatures = async (features: Record<number, boolean>) => {
+    if (!planId) throw new Error("ID requerido");
+    setIsSaving(true);
+    try {
+      return await authFetch(`/api/admin/plans/${planId}/features`, {
+        method: "PUT",
+        body: JSON.stringify({ features }),
+      });
+    } finally {
+      setIsSaving(false);
+    }
+  };
+  return { updateFeatures, isSaving };
+}
+
+export function useAdminCreatePlan() {
+  const authFetch = useAuthFetch();
+  const [isCreating, setIsCreating] = useState(false);
+  const createPlan = async (input: PlanInput) => {
+    setIsCreating(true);
+    try { return await authFetch("/api/admin/plans", { method: "POST", body: JSON.stringify(input) }); }
+    finally { setIsCreating(false); }
+  };
+  return { createPlan, isCreating };
+}
+
+export function useAdminUpdatePlan() {
+  const authFetch = useAuthFetch();
+  const [isSaving, setIsSaving] = useState(false);
+  const updatePlan = async (id: number, input: PlanInput) => {
+    setIsSaving(true);
+    try { return await authFetch(`/api/admin/plans/${id}`, { method: "PATCH", body: JSON.stringify(input) }); }
+    finally { setIsSaving(false); }
+  };
+  return { updatePlan, isSaving };
+}
+
+export function useAdminDeletePlan() {
+  const authFetch = useAuthFetch();
+  const [isDeleting, setIsDeleting] = useState(false);
+  const deletePlan = async (id: number) => {
+    setIsDeleting(true);
+    try { return await authFetch(`/api/admin/plans/${id}`, { method: "DELETE" }); }
+    finally { setIsDeleting(false); }
+  };
+  return { deletePlan, isDeleting };
+}
+
 export function useAdminUpdateUser(id: number | null) {
   const authFetch = useAuthFetch();
   const [isSaving, setIsSaving] = useState(false);
@@ -185,4 +317,33 @@ export function useAdminUpdateUser(id: number | null) {
     }
   };
   return { updateUser, isSaving };
+}
+
+export type CreateUserInput = {
+  email:          string;
+  password:       string;
+  display_name?:  string;
+  business_name?: string;
+  timezone?:      string;
+  currency?:      string;
+  locale?:        string;
+  plan_id?:       number;
+  email_verified?: boolean;
+};
+
+export function useAdminCreateUser() {
+  const authFetch = useAuthFetch();
+  const [isCreating, setIsCreating] = useState(false);
+  const createUser = async (input: CreateUserInput) => {
+    setIsCreating(true);
+    try {
+      return await authFetch("/api/admin/users", {
+        method: "POST",
+        body: JSON.stringify(input),
+      });
+    } finally {
+      setIsCreating(false);
+    }
+  };
+  return { createUser, isCreating };
 }

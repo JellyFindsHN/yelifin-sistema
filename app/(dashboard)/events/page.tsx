@@ -1,4 +1,4 @@
-// app/(dashboard)/events/page.tsx
+﻿// app/(dashboard)/events/page.tsx
 "use client";
 
 import { useState } from "react";
@@ -9,6 +9,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Calendar, TrendingUp, DollarSign, BarChart3, CalendarPlus } from "lucide-react";
 import { useEvents, Event } from "@/hooks/swr/use-events";
 import { useCurrency }      from "@/hooks/swr/use-currency";
+import { useModulePermissions } from "@/hooks/use-module-permissions";
 
 import { EventCard }           from "@/components/events/event-card";
 import { CreateEventDialog }   from "@/components/events/create-event-dialog";
@@ -18,9 +19,10 @@ import { AddExpenseDialog }    from "@/components/events/add-expense-dialog";
 import { Fab }                 from "@/components/ui/fab";
 
 export default function EventsPage() {
-  const router                        = useRouter();
+  const { push }                      = useRouter();
   const { events, isLoading, mutate } = useEvents();
   const { format }                    = useCurrency();
+  const { show_profit: showProfit, can_edit: canEdit, can_delete: canDelete } = useModulePermissions("EVENTS");
 
   const [createOpen,   setCreateOpen]   = useState(false);
   const [editEvent,    setEditEvent]    = useState<Event | null>(null);
@@ -40,7 +42,7 @@ export default function EventsPage() {
 
       {/* Header */}
       <div>
-        <h1 className="text-2xl font-bold tracking-tight">Eventos y Ferias</h1>
+        <h1 className="text-2xl font-semibold tracking-tight">Eventos y Ferias</h1>
         <p className="text-muted-foreground text-sm">
           {isLoading
             ? "Cargando..."
@@ -54,14 +56,14 @@ export default function EventsPage() {
         {[
           { title: "Eventos",       value: String(events.length),    sub: `${activeCount} activos`,    icon: Calendar,   cls: "" },
           { title: "Ventas",        value: format(totalSales),       sub: "total acumulado",           icon: DollarSign, cls: "" },
-          { title: "Ganancia neta", value: format(totalProfit),      sub: "ingresos − gastos",         icon: TrendingUp, cls: totalProfit >= 0 ? "text-green-600" : "text-destructive" },
-          { title: "ROI promedio",  value: `${avgRoi.toFixed(1)}%`,  sub: "retorno sobre inversión",   icon: BarChart3,  cls: avgRoi >= 0 ? "text-green-600" : "text-destructive" },
-        ].map((s) => (
-          <Card key={s.title}>
-            <CardContent className="pl-3 py-3">
+          { title: "Ganancia neta", value: format(totalProfit),      sub: "ingresos − gastos",         icon: TrendingUp, cls: totalProfit >= 0 ? "text-green-600" : "text-destructive", hidden: !showProfit },
+          { title: "ROI promedio",  value: `${avgRoi.toFixed(1)}%`,  sub: "retorno sobre inversión",   icon: BarChart3,  cls: avgRoi >= 0 ? "text-green-600" : "text-destructive",        hidden: !showProfit },
+        ].filter((s) => !(s as any).hidden).map((s) => (
+          <Card key={s.title} >
+            <CardContent>
               <div className="flex items-center justify-between mb-1.5">
                 <span className="text-xs font-medium text-muted-foreground">{s.title}</span>
-                <s.icon className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                <s.icon className="size-3.5 text-muted-foreground shrink-0" />
               </div>
               <div className={`text-lg font-bold ${s.cls}`}>
                 {isLoading ? <Skeleton className="h-6 w-20" /> : s.value}
@@ -82,15 +84,15 @@ export default function EventsPage() {
       ) : events.length === 0 ? (
         <Card>
           <CardContent className="flex flex-col items-center justify-center py-16">
-            <div className="h-14 w-14 rounded-2xl bg-primary/10 flex items-center justify-center mb-4">
-              <Calendar className="h-7 w-7 text-primary" />
+            <div className="size-14 rounded-2xl bg-primary/10 flex items-center justify-center mb-4">
+              <Calendar className="size-7 text-primary" />
             </div>
             <p className="text-base font-semibold">Sin eventos registrados</p>
             <p className="text-sm text-muted-foreground mt-1 text-center max-w-xs">
               Crea tu primer evento para rastrear ventas, gastos y rentabilidad de ferias.
             </p>
             <Button className="mt-5 gap-2" onClick={() => setCreateOpen(true)}>
-              <CalendarPlus className="h-4 w-4" />
+              <CalendarPlus className="size-4" />
               Crear evento
             </Button>
           </CardContent>
@@ -99,9 +101,11 @@ export default function EventsPage() {
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
           {events.map((event) => (
             <EventCard
+              canEdit={canEdit}
+              canDelete={canDelete}
               key={event.id}
               event={event}
-              onView={(e) => router.push(`/events/${e.id}`)}
+              onView={(e) => push(`/events/${e.id}`)}
               onEdit={setEditEvent}
               onDelete={setDeleteEvent}
               onAddExpense={setExpenseEvent}
@@ -111,11 +115,13 @@ export default function EventsPage() {
       )}
 
       {/* FAB */}
-      <Fab
-        actions={[
-          { label: "Nuevo evento", icon: CalendarPlus, onClick: () => setCreateOpen(true) },
-        ]}
-      />
+      {canEdit && (
+        <Fab
+          actions={[
+            { label: "Nuevo evento", icon: CalendarPlus, onClick: () => setCreateOpen(true) },
+          ]}
+        />
+      )}
 
       {/* Dialogs */}
       <CreateEventDialog

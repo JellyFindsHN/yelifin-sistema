@@ -48,6 +48,19 @@ export type Purchase = {
   items_count: number;
 };
 
+export type PurchaseItemDetail = {
+  product_id: number;
+  product_name: string;
+  variant_name: string | null;
+  quantity: number;
+  unit_cost: number;
+  unit_cost_usd: number;
+};
+
+export type PurchaseWithItems = Purchase & {
+  items: PurchaseItemDetail[];
+};
+
 function useAuthFetch() {
   const { firebaseUser } = useAuth();
   return async (url: string, options: RequestInit = {}) => {
@@ -97,6 +110,40 @@ export function useCreatePurchase() {
     }
   };
   return { createPurchase, isCreating };
+}
+
+export function usePendingPurchases() {
+  const { firebaseUser } = useAuth();
+  const authFetch = useAuthFetch();
+  const { data, error, isLoading, mutate } = useSWR(
+    firebaseUser ? `${KEY}?status=PENDING&with_items=true` : null,
+    (url: string) => authFetch(url),
+    {
+      revalidateOnFocus: false,
+      dedupingInterval:  5 * 60_000,
+    }
+  );
+  return {
+    purchases: (data?.data ?? []) as PurchaseWithItems[],
+    total:     data?.total ?? 0,
+    isLoading,
+    error:     error?.message ?? null,
+    mutate,
+  };
+}
+
+export function useCancelPurchase() {
+  const authFetch = useAuthFetch();
+  const [isCancelling, setIsCancelling] = useState(false);
+  const cancelPurchase = async (id: number) => {
+    setIsCancelling(true);
+    try {
+      return await authFetch(`${KEY}/${id}`, { method: 'DELETE' });
+    } finally {
+      setIsCancelling(false);
+    }
+  };
+  return { cancelPurchase, isCancelling };
 }
 
 export function useConfirmPurchaseArrival(id: number | null) {

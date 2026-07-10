@@ -1,7 +1,7 @@
 // app/api/reports/sales/route.ts
 import { NextRequest } from "next/server";
 import { neon } from "@neondatabase/serverless";
-import { verifyAuth, createErrorResponse, isAuthSuccess } from "@/lib/auth";
+import { verifyAuth, createErrorResponse, isAuthSuccess, requireModule, requireFeature } from "@/lib/auth";
 
 const sql = neon(process.env.DATABASE_URL!);
 
@@ -15,9 +15,13 @@ function defaultRange() {
 export async function GET(request: NextRequest) {
   const auth = await verifyAuth(request);
   if (!isAuthSuccess(auth)) return createErrorResponse(auth.error, auth.status);
+  const deny = await requireModule(auth.data, 'REPORTS', 'canView');
+  if (deny) return deny;
+  const denyFeature = await requireFeature(auth.data.orgId, 'reports.sales');
+  if (denyFeature) return denyFeature;
 
   try {
-    const { userId } = auth.data;
+    const { userId, orgId } = auth.data;
     const { searchParams } = new URL(request.url);
     const def  = defaultRange();
     const from = searchParams.get("from") ?? def.from;
@@ -25,15 +29,21 @@ export async function GET(request: NextRequest) {
 
     // ── Resumen ────────────────────────────────────────────────────
     const [summary] = await sql`
+      WITH item_costs AS (
+        SELECT sale_id, SUM(unit_cost * quantity) AS cogs
+        FROM sale_items
+        WHERE org_id = ${orgId}
+        GROUP BY sale_id
+      )
       SELECT
-        COUNT(DISTINCT s.id)::int                                              AS total_sales,
-        COALESCE(SUM(s.total),    0)::float                                    AS total_revenue,
-        COALESCE(SUM(s.discount), 0)::float                                    AS total_discount,
-        COALESCE(SUM(si.unit_cost * si.quantity), 0)::float                   AS total_cogs,
-        COALESCE(SUM(s.total) - SUM(si.unit_cost * si.quantity), 0)::float    AS gross_profit
+        COUNT(DISTINCT s.id)::int                                    AS total_sales,
+        COALESCE(SUM(s.total),    0)::float                          AS total_revenue,
+        COALESCE(SUM(s.discount), 0)::float                          AS total_discount,
+        COALESCE(SUM(ic.cogs), 0)::float                             AS total_cogs,
+        COALESCE(SUM(s.total) - SUM(ic.cogs), 0)::float              AS gross_profit
       FROM sales s
-      LEFT JOIN sale_items si ON si.sale_id = s.id AND si.user_id = ${userId}
-      WHERE s.user_id = ${userId}
+      LEFT JOIN item_costs ic ON ic.sale_id = s.id
+      WHERE s.org_id = ${orgId}
         AND s.status  = 'COMPLETED'
         AND s.sold_at >= ${from}::date
         AND s.sold_at <  (${to}::date + INTERVAL '1 day')
@@ -41,14 +51,20 @@ export async function GET(request: NextRequest) {
 
     // ── Por día ────────────────────────────────────────────────────
     const byDay = await sql`
+      WITH item_costs AS (
+        SELECT sale_id, SUM(unit_cost * quantity) AS cogs
+        FROM sale_items
+        WHERE org_id = ${orgId}
+        GROUP BY sale_id
+      )
       SELECT
         DATE(s.sold_at)::text                     AS date,
         COUNT(*)::int                             AS sales_count,
         COALESCE(SUM(s.total), 0)::float          AS revenue,
-        COALESCE(SUM(s.total) - SUM(si.unit_cost * si.quantity), 0)::float AS profit
+        COALESCE(SUM(s.total) - SUM(ic.cogs), 0)::float AS profit
       FROM sales s
-      LEFT JOIN sale_items si ON si.sale_id = s.id AND si.user_id = ${userId}
-      WHERE s.user_id = ${userId}
+      LEFT JOIN item_costs ic ON ic.sale_id = s.id
+      WHERE s.org_id = ${orgId}
         AND s.status  = 'COMPLETED'
         AND s.sold_at >= ${from}::date
         AND s.sold_at <  (${to}::date + INTERVAL '1 day')
@@ -73,7 +89,7 @@ export async function GET(request: NextRequest) {
       FROM sale_items si
       JOIN products p ON p.id = si.product_id
       JOIN sales    s ON s.id = si.sale_id
-      WHERE si.user_id = ${userId}
+      WHERE si.org_id = ${orgId}
         AND s.status   = 'COMPLETED'
         AND s.sold_at  >= ${from}::date
         AND s.sold_at  <  (${to}::date + INTERVAL '1 day')
@@ -98,8 +114,8 @@ export async function GET(request: NextRequest) {
       FROM sales s
       LEFT JOIN customers  c  ON c.id  = s.customer_id
       LEFT JOIN accounts   a  ON a.id  = s.account_id
-      LEFT JOIN sale_items si ON si.sale_id = s.id AND si.user_id = ${userId}
-      WHERE s.user_id = ${userId}
+      LEFT JOIN sale_items si ON si.sale_id = s.id AND si.org_id = ${orgId}
+      WHERE s.org_id = ${orgId}
         AND s.status  = 'COMPLETED'
         AND s.sold_at >= ${from}::date
         AND s.sold_at <  (${to}::date + INTERVAL '1 day')

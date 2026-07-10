@@ -19,6 +19,10 @@ export type CreditCard = {
   is_active: boolean;
   created_at: string;
   updated_at: string;
+  // only present on detail endpoint
+  statement_balance_local?: number;
+  statement_balance_usd?: number;
+  cycle_start?: string;
 };
 
 export type CreditCardTransaction = {
@@ -61,6 +65,7 @@ export type PayCreditCardInput = {
   exchange_rate?: number;
   occurred_at?: string;
   description?: string;
+  category?: string;
 };
 
 function useAuthFetch() {
@@ -123,14 +128,15 @@ export function useCreditCard(id: number | null) {
 
 export function useCreditCardTransactions(
   id: number | null,
-  params?: { month?: number; year?: number }
+  params?: { month?: number; year?: number; tz_offset?: number }
 ) {
   const { firebaseUser } = useAuth();
   const authFetch = useAuthFetch();
 
   const query = new URLSearchParams();
-  if (params?.month) query.set('month', String(params.month));
-  if (params?.year)  query.set('year',  String(params.year));
+  if (params?.month)      query.set('month',     String(params.month));
+  if (params?.year)       query.set('year',      String(params.year));
+  if (params?.tz_offset !== undefined) query.set('tz_offset', String(params.tz_offset));
   const qs = query.toString();
 
   const { data, isLoading, error, mutate } = useSWR(
@@ -148,20 +154,52 @@ export function useCreditCardTransactions(
   };
 }
 
+export function useCreditCardPeriods(id: number | null) {
+  const { firebaseUser } = useAuth();
+  const authFetch = useAuthFetch();
+  const { data, isLoading } = useSWR(
+    firebaseUser && id ? `/api/credit-cards/${id}/periods` : null,
+    (url: string) => authFetch(url),
+    { revalidateOnFocus: false, dedupingInterval: 5 * 60_000 }
+  );
+  return {
+    periods: (data?.data ?? []) as { year: number; month: number }[],
+    isLoading,
+  };
+}
+
+export function useCCTransactionPeriods() {
+  const { firebaseUser } = useAuth();
+  const authFetch = useAuthFetch();
+  const { data, isLoading } = useSWR(
+    firebaseUser ? "/api/credit-card-transactions/periods" : null,
+    (url: string) => authFetch(url),
+    { revalidateOnFocus: false, dedupingInterval: 5 * 60_000 }
+  );
+  return {
+    periods: (data?.data ?? []) as { year: number; month: number }[],
+    isLoading,
+  };
+}
+
 export function useAllCreditCardTransactions(params?: {
   month?: number;
   year?: number;
   date?: string;
   card_id?: number;
+  search?: string;
+  tz_offset?: number;
 }) {
   const { firebaseUser } = useAuth();
   const authFetch = useAuthFetch();
 
   const query = new URLSearchParams();
-  if (params?.month)   query.set('month',   String(params.month));
-  if (params?.year)    query.set('year',    String(params.year));
-  if (params?.date)    query.set('date',    params.date);
-  if (params?.card_id) query.set('card_id', String(params.card_id));
+  if (params?.month)    query.set('month',     String(params.month));
+  if (params?.year)     query.set('year',      String(params.year));
+  if (params?.date)     query.set('date',      params.date);
+  if (params?.card_id)  query.set('card_id',   String(params.card_id));
+  if (params?.search)   query.set('search',    params.search);
+  if (params?.tz_offset !== undefined) query.set('tz_offset', String(params.tz_offset));
   const qs = query.toString();
 
   const { data, isLoading, error, mutate } = useSWR(

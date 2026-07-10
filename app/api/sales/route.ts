@@ -1,7 +1,7 @@
 // app/api/sales/route.ts
 import { NextRequest } from "next/server";
 import { neon } from "@neondatabase/serverless";
-import { verifyAuth, createErrorResponse, isAuthSuccess } from "@/lib/auth";
+import { verifyAuth, createErrorResponse, isAuthSuccess, getOrgTimezone, requireModule, verifyResourceLimit } from "@/lib/auth";
 
 const sql = neon(process.env.DATABASE_URL!);
 
@@ -109,18 +109,69 @@ function resolveRange(params: URLSearchParams, tz: string) {
 export async function GET(request: NextRequest) {
   const auth = await verifyAuth(request);
   if (!isAuthSuccess(auth)) return createErrorResponse(auth.error, auth.status);
+  const deny = await requireModule(auth.data, 'SALES', 'canView');
+  if (deny) return deny;
 
   try {
-    const { userId } = auth.data;
+    const { userId, orgId } = auth.data;
     const { searchParams } = new URL(request.url);
 
-    const [profile] = await sql`
-      SELECT timezone FROM user_profile WHERE user_id = ${userId}
-    `;
-    const tz = profile?.timezone ?? "America/Tegucigalpa";
+    const tz = await getOrgTimezone(orgId);
 
     const { fromDateISO, toDateISO, payment } = resolveRange(searchParams, tz);
 
+    const search    = searchParams.get("search")?.trim()   || null;
+    const status    = searchParams.get("status")           || null;
+    const accountId = searchParams.get("account_id")       || null;
+    const page      = Math.max(1, Number(searchParams.get("page"))  || 1);
+    const limit     = Math.min(100, Math.max(1, Number(searchParams.get("limit")) || 25));
+    const offset    = (page - 1) * limit;
+
+    // ── Stats (sin filtro de status, para los summary cards) ─────────
+    const [statsRow] = await sql`
+      SELECT
+        COALESCE(SUM(s.total) FILTER (WHERE s.status = 'COMPLETED'), 0)   AS total_revenue,
+        COALESCE(
+          SUM(
+            CASE WHEN s.status = 'COMPLETED'
+              THEN COALESCE(prof.profit, 0) - COALESCE(s.tax, 0)
+              ELSE 0
+            END
+          ), 0
+        )                                                                   AS total_profit,
+        COUNT(*) FILTER (WHERE s.status = 'PENDING')::int                  AS pending_count,
+        COUNT(*) FILTER (WHERE s.status = 'COMPLETED')::int                AS completed_count
+      FROM sales s
+      LEFT JOIN customers c ON c.id = s.customer_id
+      LEFT JOIN (
+        SELECT sale_id, SUM(line_total - unit_cost * quantity) AS profit
+        FROM sale_items GROUP BY sale_id
+      ) prof ON prof.sale_id = s.id
+      WHERE s.org_id = ${orgId}
+        AND (${fromDateISO}::timestamptz IS NULL OR s.sold_at >= ${fromDateISO})
+        AND (${toDateISO}::timestamptz   IS NULL OR s.sold_at <= ${toDateISO})
+        AND (${payment}::text            IS NULL OR s.payment_method = ${payment})
+        AND (${search}::text             IS NULL OR s.sale_number ILIKE ${'%' + (search ?? '') + '%'} OR c.name ILIKE ${'%' + (search ?? '') + '%'} OR s.notes ILIKE ${'%' + (search ?? '') + '%'})
+        AND (${accountId}::text          IS NULL OR s.account_id::text = ${accountId})
+    `;
+
+    // ── Count para paginación (incluye filtro de status) ─────────────
+    const [{ count }] = await sql`
+      SELECT COUNT(s.id)::int AS count
+      FROM sales s
+      LEFT JOIN customers c ON c.id = s.customer_id
+      WHERE s.org_id = ${orgId}
+        AND (${fromDateISO}::timestamptz IS NULL OR s.sold_at >= ${fromDateISO})
+        AND (${toDateISO}::timestamptz   IS NULL OR s.sold_at <= ${toDateISO})
+        AND (${payment}::text            IS NULL OR s.payment_method = ${payment})
+        AND (${search}::text             IS NULL OR s.sale_number ILIKE ${'%' + (search ?? '') + '%'} OR c.name ILIKE ${'%' + (search ?? '') + '%'} OR s.notes ILIKE ${'%' + (search ?? '') + '%'})
+        AND (${accountId}::text          IS NULL OR s.account_id::text = ${accountId})
+        AND (${status}::text             IS NULL OR s.status = ${status})
+    `;
+
+    const totalPages = Math.max(1, Math.ceil(count / limit));
+
+    // ── Data paginada ─────────────────────────────────────────────────
     const sales = await sql`
       SELECT
         s.id,
@@ -150,15 +201,31 @@ export async function GET(request: NextRequest) {
       LEFT JOIN customers  c  ON c.id      = s.customer_id
       LEFT JOIN accounts   a  ON a.id      = s.account_id
       LEFT JOIN sale_items si ON si.sale_id = s.id
-      WHERE s.user_id = ${userId}
+      WHERE s.org_id = ${orgId}
         AND (${fromDateISO}::timestamptz IS NULL OR s.sold_at >= ${fromDateISO})
         AND (${toDateISO}::timestamptz   IS NULL OR s.sold_at <= ${toDateISO})
         AND (${payment}::text            IS NULL OR s.payment_method = ${payment})
+        AND (${search}::text             IS NULL OR s.sale_number ILIKE ${'%' + (search ?? '') + '%'} OR c.name ILIKE ${'%' + (search ?? '') + '%'} OR s.notes ILIKE ${'%' + (search ?? '') + '%'})
+        AND (${accountId}::text          IS NULL OR s.account_id::text = ${accountId})
+        AND (${status}::text             IS NULL OR s.status = ${status})
       GROUP BY s.id, c.name, a.name
       ORDER BY s.sold_at DESC
+      LIMIT ${limit} OFFSET ${offset}
     `;
 
-    return Response.json({ data: sales, total: sales.length });
+    return Response.json({
+      data:       sales,
+      total:      count,
+      page,
+      totalPages,
+      limit,
+      stats: {
+        total_revenue:   Number(statsRow.total_revenue),
+        total_profit:    Number(statsRow.total_profit),
+        pending_count:   statsRow.pending_count,
+        completed_count: statsRow.completed_count,
+      },
+    });
   } catch (error) {
     console.error("GET /api/sales:", error);
     return createErrorResponse("Error al obtener ventas", 500);
@@ -169,9 +236,16 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   const auth = await verifyAuth(request);
   if (!isAuthSuccess(auth)) return createErrorResponse(auth.error, auth.status);
+  const deny = await requireModule(auth.data, 'SALES', 'canEdit');
+  if (deny) return deny;
+
+  const limit = await verifyResourceLimit(auth.data.orgId, "sales");
+  if (!limit.withinLimit) {
+    return createErrorResponse(limit.error ?? "Límite alcanzado", limit.status, "needsUpgrade" in limit ? !!limit.needsUpgrade : false);
+  }
 
   try {
-    const { userId } = auth.data;
+    const { userId, orgId } = auth.data;
     const body = await request.json();
 
     const {
@@ -227,7 +301,7 @@ export async function POST(request: NextRequest) {
     if (!isCreditCard) {
       const [account] = await sql`
         SELECT id FROM accounts
-        WHERE id = ${account_id} AND user_id = ${userId} AND is_active = TRUE
+        WHERE id = ${account_id} AND org_id = ${orgId} AND is_active = TRUE
       `;
       if (!account) return createErrorResponse("Cuenta no encontrada", 404);
     }
@@ -236,7 +310,7 @@ export async function POST(request: NextRequest) {
     if (isCreditCard) {
       const [card] = await sql`
         SELECT id FROM credit_cards
-        WHERE id = ${Number(credit_card_id)} AND user_id = ${userId} AND is_active = TRUE
+        WHERE id = ${Number(credit_card_id)} AND org_id = ${orgId} AND is_active = TRUE
       `;
       if (!card) return createErrorResponse("Tarjeta de crédito no encontrada", 404);
     }
@@ -245,7 +319,7 @@ export async function POST(request: NextRequest) {
     const eventIdNum = event_id ? Number(event_id) : null;
     if (eventIdNum) {
       const [ev] = await sql`
-        SELECT id FROM events WHERE id = ${eventIdNum} AND user_id = ${userId}
+        SELECT id FROM events WHERE id = ${eventIdNum} AND org_id = ${orgId}
       `;
       if (!ev) return createErrorResponse("Evento no encontrado", 404);
     }
@@ -259,7 +333,7 @@ export async function POST(request: NextRequest) {
       // Verificar producto
       const [product] = await sql`
         SELECT id, name, is_service FROM products
-        WHERE id = ${item.product_id} AND user_id = ${userId} AND is_active = TRUE
+        WHERE id = ${item.product_id} AND org_id = ${orgId} AND is_active = TRUE
       `;
       if (!product)
         return createErrorResponse(
@@ -291,7 +365,7 @@ export async function POST(request: NextRequest) {
           FROM product_variants
           WHERE id         = ${variantId}
             AND product_id = ${item.product_id}
-            AND user_id    = ${userId}
+            AND org_id     = ${orgId}
             AND is_active  = TRUE
         `;
         if (!variant)
@@ -309,7 +383,7 @@ export async function POST(request: NextRequest) {
           ? await sql`
             SELECT id, qty_available, unit_cost
             FROM inventory_batches
-            WHERE user_id    = ${userId}
+            WHERE org_id     = ${orgId}
               AND product_id = ${item.product_id}
               AND variant_id = ${variantId}
               AND qty_available > 0
@@ -318,7 +392,7 @@ export async function POST(request: NextRequest) {
           : await sql`
             SELECT id, qty_available, unit_cost
             FROM inventory_batches
-            WHERE user_id    = ${userId}
+            WHERE org_id     = ${orgId}
               AND product_id = ${item.product_id}
               AND variant_id IS NULL
               AND qty_available > 0
@@ -378,7 +452,7 @@ export async function POST(request: NextRequest) {
         if (!supply_id || quantity <= 0)
           return createErrorResponse("Datos de suministro inválidos", 400);
         const [supply] = await sql`
-          SELECT id FROM supplies WHERE id = ${supply_id} AND user_id = ${userId}
+          SELECT id FROM supplies WHERE id = ${supply_id} AND org_id = ${orgId}
         `;
         if (!supply)
           return createErrorResponse(
@@ -420,11 +494,11 @@ export async function POST(request: NextRequest) {
     await sql`BEGIN`;
     try {
       // ── Número de venta (advisory lock evita duplicados bajo concurrencia) ──
-      await sql`SELECT pg_advisory_xact_lock(${userId})`;
+      await sql`SELECT pg_advisory_xact_lock(${orgId})`;
       const [lastSale] = await sql`
         SELECT MAX(CAST(REGEXP_REPLACE(sale_number, '[^0-9]', '', 'g') AS INTEGER)) AS last_num
         FROM sales
-        WHERE user_id = ${userId}
+        WHERE org_id = ${orgId}
       `;
       const lastNum = lastSale?.last_num ? Number(lastSale.last_num) : 0;
       const saleNumber = `VTA-${String(lastNum + 1).padStart(5, "0")}`;
@@ -440,12 +514,12 @@ export async function POST(request: NextRequest) {
       // 1. Crear venta
       const [sale] = await sql`
         INSERT INTO sales (
-          user_id, sale_number, customer_id,
+          org_id, created_by, sale_number, customer_id,
           subtotal, discount, tax_rate, tax, shipping_cost, total,
           payment_method, account_id, credit_card_id, event_id,
           status, sold_at, notes
         ) VALUES (
-          ${userId}, ${saleNumber}, ${customer_id ?? null},
+          ${orgId}, ${userId}, ${saleNumber}, ${customer_id ?? null},
           ${subtotal}, ${totalDiscount}, ${taxRateNum}, ${taxAmount},
           ${shippingAmount}, ${grandTotal},
           ${payment_method},
@@ -462,10 +536,10 @@ export async function POST(request: NextRequest) {
       for (const item of processedItems) {
         await sql`
           INSERT INTO sale_items (
-            user_id, sale_id, product_id, variant_id,
+            org_id, created_by, sale_id, product_id, variant_id,
             quantity, unit_price, unit_cost, line_total
           ) VALUES (
-            ${userId}, ${saleId},
+            ${orgId}, ${userId}, ${saleId},
             ${item.product_id}, ${item.variant_id},
             ${item.quantity}, ${item.unit_price},
             ${item.unit_cost}, ${item.line_total}
@@ -480,17 +554,17 @@ export async function POST(request: NextRequest) {
             await sql`
                       UPDATE inventory_batches
                       SET qty_available = qty_available - ${take}
-                      WHERE id = ${batch.id} AND user_id = ${userId}
+                      WHERE id = ${batch.id} AND org_id = ${orgId}
                     `;
             remaining -= take;
           }
 
           await sql`
             INSERT INTO inventory_movements (
-              user_id, movement_type, product_id, variant_id,
+              org_id, created_by, movement_type, product_id, variant_id,
               quantity, reference_type, reference_id
             ) VALUES (
-              ${userId}, 'OUT',
+              ${orgId}, ${userId}, 'OUT',
               ${item.product_id}, ${item.variant_id},
               ${item.quantity}, 'SALE', ${saleId}
             )
@@ -502,26 +576,26 @@ export async function POST(request: NextRequest) {
       for (const s of normalizedSupplies) {
         await sql`
           INSERT INTO sale_supplies (
-            user_id, sale_id, supply_id,
+            org_id, created_by, sale_id, supply_id,
             quantity, unit_cost, line_total
           )
           VALUES (
-            ${userId}, ${saleId}, ${s.supply_id},
+            ${orgId}, ${userId}, ${saleId}, ${s.supply_id},
             ${s.quantity}, ${s.unit_cost}, ${s.line_total}
           )
         `;
         await sql`
           UPDATE supplies
           SET stock = GREATEST(0, stock - ${s.quantity})
-          WHERE id = ${s.supply_id} AND user_id = ${userId}
+          WHERE id = ${s.supply_id} AND org_id = ${orgId}
         `;
         await sql`
           INSERT INTO supply_movements (
-            user_id, movement_type, supply_id,
+            org_id, created_by, movement_type, supply_id,
             quantity, reference_type, reference_id
           )
           VALUES (
-            ${userId}, 'OUT', ${s.supply_id},
+            ${orgId}, ${userId}, 'OUT', ${s.supply_id},
             ${s.quantity}, 'SALE', ${saleId}
           )
         `;
@@ -538,11 +612,11 @@ export async function POST(request: NextRequest) {
 
           await sql`
             INSERT INTO credit_card_transactions (
-              user_id, credit_card_id, type, description,
+              org_id, created_by, credit_card_id, type, description,
               amount, currency, exchange_rate, amount_local,
               sale_id, occurred_at
             ) VALUES (
-              ${userId}, ${Number(credit_card_id)}, 'CHARGE', ${txDescription},
+              ${orgId}, ${userId}, ${Number(credit_card_id)}, 'CHARGE', ${txDescription},
               ${chargeAmount}, ${chargeCurrency}, ${rateNum},
               ${localEquivalent}, ${saleId}, ${occurredAt}::timestamptz
             )
@@ -552,13 +626,13 @@ export async function POST(request: NextRequest) {
             await sql`
               UPDATE credit_cards
               SET balance_usd = balance_usd + ${chargeAmount}, updated_at = NOW()
-              WHERE id = ${Number(credit_card_id)} AND user_id = ${userId}
+              WHERE id = ${Number(credit_card_id)} AND org_id = ${orgId}
             `;
           } else {
             await sql`
               UPDATE credit_cards
               SET balance = balance + ${chargeAmount}, updated_at = NOW()
-              WHERE id = ${Number(credit_card_id)} AND user_id = ${userId}
+              WHERE id = ${Number(credit_card_id)} AND org_id = ${orgId}
             `;
           }
         } else {
@@ -567,11 +641,11 @@ export async function POST(request: NextRequest) {
 
           await sql`
             INSERT INTO transactions (
-              user_id, type, account_id, amount,
+              org_id, created_by, type, account_id, amount,
               category, description,
               reference_type, reference_id, occurred_at
             ) VALUES (
-              ${userId}, 'INCOME', ${account_id}, ${grandTotal},
+              ${orgId}, ${userId}, 'INCOME', ${account_id}, ${grandTotal},
               'Ventas', ${txDescription},
               ${txRefType}, ${txRefId}, ${occurredAt}::timestamptz
             )
@@ -580,7 +654,7 @@ export async function POST(request: NextRequest) {
           await sql`
             UPDATE accounts
             SET balance = balance + ${grandTotal}
-            WHERE id = ${account_id} AND user_id = ${userId}
+            WHERE id = ${account_id} AND org_id = ${orgId}
           `;
         }
 
@@ -589,8 +663,9 @@ export async function POST(request: NextRequest) {
             UPDATE customers
             SET total_orders = total_orders + 1,
                 total_spent  = total_spent  + ${grandTotal},
-                updated_at   = CURRENT_TIMESTAMP
-            WHERE id = ${customer_id} AND user_id = ${userId}
+                updated_at   = CURRENT_TIMESTAMP,
+                updated_by   = ${userId}
+            WHERE id = ${customer_id} AND org_id = ${orgId}
           `;
         }
       }

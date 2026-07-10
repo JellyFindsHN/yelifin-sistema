@@ -1,7 +1,8 @@
 // app/api/credit-cards/[id]/transactions/route.ts
 import { NextRequest } from "next/server";
 import { neon } from "@neondatabase/serverless";
-import { verifyAuth, createErrorResponse, isAuthSuccess } from "@/lib/auth";
+import { verifyAuth, createErrorResponse, isAuthSuccess, requireModule } from "@/lib/auth";
+import { getUtcBounds } from "@/lib/date-bounds";
 
 const sql = neon(process.env.DATABASE_URL!);
 
@@ -11,34 +12,18 @@ export async function GET(
 ) {
   const auth = await verifyAuth(request);
   if (!isAuthSuccess(auth)) return createErrorResponse(auth.error, auth.status);
+  const deny = await requireModule(auth.data, 'FINANCES', 'canView');
+  if (deny) return deny;
 
   try {
-    const { userId } = auth.data;
+    const { userId, orgId } = auth.data;
     const { id } = await params;
     const { searchParams } = new URL(request.url);
 
-    const month = searchParams.get("month");
-    const year = searchParams.get("year");
-    const now = new Date();
-
-    let startISO: string;
-    let endISO: string;
-
-    if (year && month) {
-      const y = Number(year), m = Number(month);
-      startISO = new Date(y, m - 1, 1).toISOString();
-      endISO = new Date(y, m, 1).toISOString();
-    } else if (year) {
-      const y = Number(year);
-      startISO = new Date(y, 0, 1).toISOString();
-      endISO = new Date(y + 1, 0, 1).toISOString();
-    } else {
-      startISO = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
-      endISO = new Date(now.getFullYear(), now.getMonth() + 1, 1).toISOString();
-    }
+    const { startISO, endISO } = getUtcBounds(searchParams);
 
     const [card] = await sql`
-      SELECT id FROM credit_cards WHERE id = ${Number(id)} AND user_id = ${userId}
+      SELECT id FROM credit_cards WHERE id = ${Number(id)} AND org_id = ${orgId}
     `;
     if (!card) return createErrorResponse("Tarjeta no encontrada", 404);
 
@@ -63,7 +48,7 @@ export async function GET(
       LEFT JOIN transactions t ON t.id = cct.account_transaction_id
       LEFT JOIN accounts a ON a.id = t.account_id
       WHERE cct.credit_card_id = ${Number(id)}
-        AND cct.user_id = ${userId}
+        AND cct.org_id = ${orgId}
         AND cct.occurred_at >= ${startISO}::timestamptz
         AND cct.occurred_at <  ${endISO}::timestamptz
       ORDER BY cct.occurred_at DESC
@@ -79,7 +64,7 @@ export async function GET(
         COUNT(*)::int AS total_count
       FROM credit_card_transactions
       WHERE credit_card_id = ${Number(id)}
-        AND user_id = ${userId}
+        AND org_id = ${orgId}
         AND occurred_at >= ${startISO}::timestamptz
         AND occurred_at <  ${endISO}::timestamptz
     `;

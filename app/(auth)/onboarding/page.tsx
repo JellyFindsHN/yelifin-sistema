@@ -1,4 +1,4 @@
-// app/(auth)/onboarding/page.tsx
+﻿// app/(auth)/onboarding/page.tsx
 "use client";
 
 import { useState, useEffect } from "react";
@@ -9,11 +9,13 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useSWRConfig } from "swr";
+import { KontaIcon } from "@/components/shared/konta-icon";
+import { KontaTitle } from "@/components/shared/konta-title";
 import {
     Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import {
-    Zap, Banknote, Building2, Wallet, HelpCircle,
+    Banknote, Building2, Wallet, HelpCircle,
     Plus, Trash2, CheckCircle2, Loader2, ChevronRight,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -37,10 +39,10 @@ const ACCOUNT_TYPE_LABELS: Record<AccountType, string> = {
 };
 
 const ACCOUNT_TYPE_ICONS: Record<AccountType, React.ReactNode> = {
-    CASH: <Banknote className="h-3.5 w-3.5" />,
-    BANK: <Building2 className="h-3.5 w-3.5" />,
-    WALLET: <Wallet className="h-3.5 w-3.5" />,
-    OTHER: <HelpCircle className="h-3.5 w-3.5" />,
+    CASH: <Banknote className="size-3.5" />,
+    BANK: <Building2 className="size-3.5" />,
+    WALLET: <Wallet className="size-3.5" />,
+    OTHER: <HelpCircle className="size-3.5" />,
 };
 
 const CURRENCIES = [
@@ -59,7 +61,7 @@ function uid() {
 export default function OnboardingPage() {
     const { mutate } = useSWRConfig();
     const { firebaseUser, loading } = useAuth();
-    const router = useRouter();
+    const { replace, push } = useRouter();
 
     const [checking, setChecking] = useState(true);
     const [step, setStep] = useState<1 | 2>(1);
@@ -72,7 +74,7 @@ export default function OnboardingPage() {
 
     useEffect(() => {
         if (loading) return;
-        if (!firebaseUser) { router.replace("/login"); return; }
+        if (!firebaseUser) { replace("/login"); return; }
 
         const check = async () => {
             try {
@@ -83,7 +85,7 @@ export default function OnboardingPage() {
                 if (res.ok) {
                     const data = await res.json();
                     if (data?.data?.onboarding_completed) {
-                        router.replace("/dashboard");
+                        replace("/dashboard");
                         return;
                     }
                 }
@@ -133,7 +135,7 @@ export default function OnboardingPage() {
 
             toast.success("¡Todo listo! Bienvenido a Konta 🎉");
             await mutate(() => true, undefined, { revalidate: true });
-            router.push("/dashboard");
+            push("/dashboard");
         } catch (err: any) {
             toast.error(err.message || "Error inesperado");
         } finally {
@@ -154,10 +156,8 @@ export default function OnboardingPage() {
 
                         {/* Logo */}
                         <div className="flex items-center gap-2">
-                            <div className="w-9 h-9 sm:w-10 sm:h-10 bg-primary rounded-lg flex items-center justify-center shadow-lg shadow-primary/50">
-                                <Zap className="w-5 h-5 sm:w-6 sm:h-6 text-primary-foreground" />
-                            </div>
-                            <span className="text-xl sm:text-2xl font-bold text-primary">Konta</span>
+                            <KontaIcon className="size-9 sm:w-10 sm:h-10 shadow-lg shadow-primary/50 rounded-lg" />
+                            <KontaTitle className="h-5 sm:h-6" />
                         </div>
 
                         {/* Progress */}
@@ -196,7 +196,7 @@ export default function OnboardingPage() {
 
                                 <Button className="w-full gap-2 h-11" onClick={() => setStep(2)}>
                                     Continuar
-                                    <ChevronRight className="h-4 w-4" />
+                                    <ChevronRight className="size-4" />
                                 </Button>
                             </div>
                         )}
@@ -233,9 +233,9 @@ export default function OnboardingPage() {
                                                 {!acc.locked && (
                                                     <button
                                                         onClick={() => removeAccount(acc.id)}
-                                                        className="h-7 w-7 rounded flex items-center justify-center text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors cursor-pointer"
+                                                        className="size-7 rounded flex items-center justify-center text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors cursor-pointer"
                                                     >
-                                                        <Trash2 className="h-3.5 w-3.5" />
+                                                        <Trash2 className="size-3.5" />
                                                     </button>
                                                 )}
                                             </div>
@@ -297,7 +297,7 @@ export default function OnboardingPage() {
                                         onClick={addAccount}
                                         className="w-full h-11 rounded-xl border-2 border-dashed border-border flex items-center justify-center gap-2 text-sm text-muted-foreground hover:border-primary hover:text-primary transition-colors cursor-pointer"
                                     >
-                                        <Plus className="h-4 w-4" />
+                                        <Plus className="size-4" />
                                         Agregar otra cuenta
                                     </button>
                                 </div>
@@ -317,9 +317,9 @@ export default function OnboardingPage() {
                                         disabled={saving}
                                     >
                                         {saving ? (
-                                            <><Loader2 className="h-4 w-4 animate-spin" />Guardando...</>
+                                            <><Loader2 className="size-4 animate-spin" />Guardando…</>
                                         ) : (
-                                            <><CheckCircle2 className="h-4 w-4" />Comenzar</>
+                                            <><CheckCircle2 className="size-4" />Comenzar</>
                                         )}
                                     </Button>
                                 </div>
@@ -341,10 +341,10 @@ function StepIndicator({
     return (
         <div className="flex items-center gap-1.5">
             <div className={cn(
-                "h-6 w-6 sm:h-7 sm:w-7 rounded-full flex items-center justify-center text-xs font-bold transition-colors shrink-0",
+                "size-6 sm:h-7 sm:w-7 rounded-full flex items-center justify-center text-xs font-bold transition-colors shrink-0",
                 (done || active) ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground",
             )}>
-                {done ? <CheckCircle2 className="h-3.5 w-3.5" /> : n}
+                {done ? <CheckCircle2 className="size-3.5" /> : n}
             </div>
             <span className={cn(
                 "text-xs sm:text-sm font-medium",

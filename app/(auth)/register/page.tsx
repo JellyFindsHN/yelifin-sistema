@@ -1,11 +1,13 @@
-// app/(auth)/register/page.tsx
+﻿// app/(auth)/register/page.tsx
 "use client";
 
 import { useRedirectIfAuthenticated } from "@/hooks/use-redirect-if-authenticated";
 import { LoadingScreen } from "@/hooks/ui/loading-screen";
 import Link from "next/link";
 import { RegisterForm } from "@/components/auth/register-form";
-import { Zap, ArrowLeft } from "lucide-react";
+import { KontaIcon } from "@/components/shared/konta-icon";
+import { KontaTitle } from "@/components/shared/konta-title";
+import { ArrowLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 export default function RegisterPage() {
@@ -20,7 +22,7 @@ export default function RegisterPage() {
       {/* Botón volver */}
       <Link href="/" className="fixed top-4 left-4 md:top-6 md:left-6 z-50">
         <Button variant="ghost" size="icon" className="rounded-full">
-          <ArrowLeft className="w-5 h-5" />
+          <ArrowLeft className="size-5" />
         </Button>
       </Link>
 
@@ -29,14 +31,12 @@ export default function RegisterPage() {
         <div className="flex items-center justify-center px-6 py-10 lg:py-0">
           <div className="w-full max-w-md space-y-8">
             <Link href="/" className="flex items-center gap-2">
-              <div className="w-10 h-10 bg-primary rounded-lg flex items-center justify-center shadow-lg shadow-primary/50">
-                <Zap className="w-6 h-6 text-primary-foreground" />
-              </div>
-              <span className="text-2xl font-bold text-primary">Konta</span>
+              <KontaIcon className="size-10 shadow-lg shadow-primary/50 rounded-lg" />
+              <KontaTitle className="h-6" />
             </Link>
 
             <div className="space-y-2">
-              <h1 className="text-3xl font-bold">Crea tu cuenta</h1>
+              <h1 className="text-3xl font-semibold">Crea tu cuenta</h1>
               <p className="text-muted-foreground">
                 Comienza a gestionar tu emprendimiento hoy
               </p>
@@ -61,7 +61,7 @@ export default function RegisterPage() {
           <div className="absolute inset-0 bg-linear-to-br from-primary to-primary/80" />
           <div className="relative h-full flex flex-col items-center justify-center p-12 text-primary-foreground">
             <div className="max-w-md space-y-8 text-center">
-              <h2 className="text-4xl font-bold">
+              <h2 className="text-4xl font-semibold">
                 Bienvenido a <span className="underline decoration-primary-foreground/50">Konta</span>
               </h2>
               <p className="text-lg text-primary-foreground/90">
@@ -77,9 +77,9 @@ export default function RegisterPage() {
                   </div>
                 </div>
                 <div className="bg-primary-foreground/10 backdrop-blur-sm rounded-xl p-4">
-                  <div className="text-3xl font-bold">$9.99</div>
+                  <div className="text-3xl font-bold">$11.99</div>
                   <div className="text-sm text-primary-foreground/80">
-                    luego al mes, plan Pro
+                    USD/mes plan Pro · ISV inc.
                   </div>
                 </div>
               </div>

@@ -1,14 +1,9 @@
-// components/transactions/create-transaction-modal.tsx
+﻿// components/transactions/create-transaction-modal.tsx
 "use client";
 
 import { useState } from "react";
 import { useSWRConfig } from "swr";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+import { ResponsiveModal } from "@/components/shared/responsive-modal";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -31,6 +26,7 @@ import {
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { useCreateTransaction } from "@/hooks/swr/use-transactions";
+import { localDateToISO, toLocalDateInput } from "@/lib/date-utils";
 import { useCurrency } from "@/hooks/swr/use-currency";
 import { useTransactionCategories } from "@/hooks/swr/use-transaction-categories";
 import { CreditCard as CreditCardType } from "@/hooks/swr/use-credit-cards";
@@ -75,7 +71,7 @@ export function CreateTransactionModal({
   const [category, setCategory] = useState("");
   const [description, setDescription] = useState("");
   const [occurredAt, setOccurredAt] = useState(
-    new Date().toISOString().split("T")[0],
+    toLocalDateInput(new Date()),
   );
 
   const showCreditCardOption = type === "EXPENSE" && creditCards.length > 0;
@@ -97,7 +93,7 @@ export function CreateTransactionModal({
     setAmount("");
     setCategory("");
     setDescription("");
-    setOccurredAt(new Date().toISOString().split("T")[0]);
+    setOccurredAt(toLocalDateInput(new Date()));
   };
 
   const handleClose = () => {
@@ -143,7 +139,7 @@ export function CreateTransactionModal({
         amount: Number(amount),
         category: category || undefined,
         description: description || undefined,
-        occurred_at: new Date(occurredAt).toISOString(),
+        occurred_at: localDateToISO(occurredAt),
       } as any);
 
       toast.success("Transacción registrada exitosamente");
@@ -156,45 +152,44 @@ export function CreateTransactionModal({
   };
 
   return (
-    <Dialog open={open} onOpenChange={(v) => !v && handleClose()}>
-      <DialogContent
-        className={cn(
-          "fixed bottom-0 left-0 right-0 top-auto translate-x-0 translate-y-0",
-          "w-full max-w-full rounded-t-2xl rounded-b-none border-t border-x-0 border-b-0",
-          "max-h-[92dvh] flex flex-col p-0",
-          "sm:bottom-auto sm:left-1/2 sm:right-auto sm:top-1/2",
-          "sm:-translate-x-1/2 sm:-translate-y-1/2",
-          "sm:w-full sm:max-w-md",
-          "lg:max-w-xl",
-          "xl:max-w-xl",
-          "sm:rounded-2xl sm:border",
-          "sm:max-h-[88vh]",
-          "data-[state=open]:animate-in data-[state=closed]:animate-out",
-          "data-[state=open]:slide-in-from-bottom sm:data-[state=open]:slide-in-from-bottom-[48%]",
-          "data-[state=closed]:slide-out-to-bottom sm:data-[state=closed]:slide-out-to-bottom-[48%]",
-          "duration-300",
-        )}
-        onInteractOutside={(e) => e.preventDefault()}
-        onEscapeKeyDown={handleClose}
-      >
-        <div className="sm:hidden flex justify-center pt-3 pb-1 shrink-0">
-          <div className="w-10 h-1 rounded-full bg-muted-foreground/30" />
-        </div>
-
-        <DialogHeader className="shrink-0 px-5 pt-2 pb-3 sm:pt-5 border-b">
-          <DialogTitle className="text-lg font-bold">
-            Nueva transacción
-          </DialogTitle>
-        </DialogHeader>
-
-        <div
-          className="flex-1 overflow-y-auto px-5 py-4 space-y-4"
-          style={{ scrollbarWidth: "none" } as React.CSSProperties}
-        >
+    <ResponsiveModal
+      open={open}
+      onOpenChange={(v) => !v && handleClose()}
+      title="Nueva transacción"
+      width="wide"
+      footer={
+        <>
+          <Button
+            type="button"
+            variant="outline"
+            onClick={handleClose}
+            disabled={isCreating}
+            className="flex-1 h-11"
+          >
+            Cancelar
+          </Button>
+          <Button
+            type="button"
+            onClick={onSubmit}
+            disabled={isCreating}
+            className="flex-1 h-11 gap-2"
+          >
+            {isCreating ? (
+              <>
+                <Loader2 className="size-4 animate-spin" />
+                Guardando…
+              </>
+            ) : (
+              "Registrar"
+            )}
+          </Button>
+        </>
+      }
+    >
           <div className="space-y-2">
             <Label className="text-sm font-medium">Tipo</Label>
-            <div className="grid grid-cols-3 rounded-xl border overflow-hidden">
-              {(["INCOME", "EXPENSE", "TRANSFER"] as const).map((t, i) => {
+            <div className="grid grid-cols-3 gap-1.5 rounded-xl border">
+              {(["INCOME", "EXPENSE", "TRANSFER"] as const).map((t) => {
                 const { label, icon: Icon } = TYPE_CONFIG[t];
                 return (
                   <button
@@ -202,14 +197,13 @@ export function CreateTransactionModal({
                     type="button"
                     onClick={() => setType(t)}
                     className={cn(
-                      "py-2.5 flex flex-col items-center gap-1 text-xs font-medium transition-colors",
-                      i > 0 && "border-l",
+                      "flex items-center justify-center gap-1.5 rounded-lg py-2.5 text-sm font-medium transition-all duration-200",
                       type === t
-                        ? "bg-primary text-primary-foreground"
-                        : "text-muted-foreground hover:bg-muted",
+                        ? "rounded-xl bg-primary/15 text-primary"
+                        : "text-muted-foreground hover:rounded-xl hover:bg-primary/15 hover:text-primary",
                     )}
                   >
-                    <Icon className="h-3.5 w-3.5" />
+                    <Icon className="size-3.5" />
                     {label}
                   </button>
                 );
@@ -220,26 +214,30 @@ export function CreateTransactionModal({
           <div className="grid-gap-4 flex flex-col ">
             {/* Toggle cuenta / tarjeta (solo para EXPENSE) */}
             {showCreditCardOption && (
-              <div className="grid grid-cols-2 gap-1.5 p-1 bg-muted rounded-lg">
+              <div className="grid grid-cols-2 gap-1.5 rounded-xl border mb-4">
                 <button
                   type="button"
                   onClick={() => setSourceMode("account")}
                   className={cn(
-                    "flex items-center justify-center gap-1.5 py-1.5 rounded-md text-xs font-medium transition-colors cursor-pointer",
-                    sourceMode === "account" ? "bg-background shadow-sm" : "text-muted-foreground hover:text-foreground"
+                    "flex items-center justify-center gap-1.5 rounded-lg py-1.5 text-xs font-medium transition-all duration-200 cursor-pointer",
+                    sourceMode === "account"
+                      ? "rounded-xl bg-primary/15 text-primary"
+                      : "text-muted-foreground hover:rounded-xl hover:bg-primary/15 hover:text-primary"
                   )}
                 >
-                  <Wallet className="h-3 w-3" /> Cuenta
+                  <Wallet className="size-3" /> Cuenta
                 </button>
                 <button
                   type="button"
                   onClick={() => setSourceMode("credit_card")}
                   className={cn(
-                    "flex items-center justify-center gap-1.5 py-1.5 rounded-md text-xs font-medium transition-colors cursor-pointer",
-                    sourceMode === "credit_card" ? "bg-background shadow-sm" : "text-muted-foreground hover:text-foreground"
+                    "flex items-center justify-center gap-1.5 rounded-lg py-1.5 text-xs font-medium transition-all duration-200 cursor-pointer",
+                    sourceMode === "credit_card"
+                      ? "rounded-xl bg-primary/15 text-primary"
+                      : "text-muted-foreground hover:rounded-xl hover:bg-primary/15 hover:text-primary"
                   )}
                 >
-                  <CreditCard className="h-3 w-3" /> Tarjeta
+                  <CreditCard className="size-3" /> Tarjeta
                 </button>
               </div>
             )}
@@ -274,7 +272,7 @@ export function CreateTransactionModal({
             {/* Selector de tarjeta de crédito */}
             {isCreditCardMode && (
               <div className="space-y-3">
-                <div className="space-y-1.5">
+                <div className="space-y-1.5 mb-4">
                   <Label className="text-sm font-medium">
                     Tarjeta de crédito <span className="text-destructive text-xs">*</span>
                   </Label>
@@ -306,7 +304,7 @@ export function CreateTransactionModal({
                 {isCcUsd && (
                   <div className="space-y-1.5">
                     <Label className="text-sm font-medium">
-                      Tasa de cambio (1 USD = ? {nativeCurrency}) <span className="text-destructive text-xs">*</span>
+                      1 USD = cuántos {symbol} <span className="text-destructive text-xs">*</span>
                     </Label>
                     <Input
                       type="number" step="0.0001" min="0" placeholder="Ej: 24.89"
@@ -314,13 +312,21 @@ export function CreateTransactionModal({
                       onChange={(e) => setCcExchangeRate(e.target.value)}
                       className="h-11 text-base"
                     />
+                    {Number(amount) > 0 && Number(ccExchangeRate) > 0 && (
+                      <div className="flex items-center gap-1.5 bg-muted/60 rounded-lg px-3 py-2">
+                        <span className="text-xs text-muted-foreground">Equivalente en {symbol}:</span>
+                        <span className="text-xs font-semibold">
+                          {format(Number(amount) * Number(ccExchangeRate))}
+                        </span>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
             )}
 
             {type === "TRANSFER" && (
-              <div className="space-y-1.5 sm:mt-3">
+              <div className="space-y-1.5 sm:mt-3 mt-4">
                 <Label className="text-sm font-medium">
                   Cuenta destino{" "}
                   <span className="text-destructive text-xs">*</span>
@@ -345,12 +351,12 @@ export function CreateTransactionModal({
 
           <div className="space-y-1.5">
             <Label className="text-sm font-medium">
-              Monto ({symbol}){" "}
+              Monto ({isCcUsd ? "USD" : symbol}){" "}
               <span className="text-destructive text-xs">*</span>
             </Label>
             <div className="relative">
               <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm font-medium">
-                {symbol}
+                {isCcUsd ? "$" : symbol}
               </span>
               <Input
                 type="number"
@@ -412,35 +418,6 @@ export function CreateTransactionModal({
               className="resize-none text-base"
             />
           </div>
-        </div>
-
-        <div className="shrink-0 px-5 py-4 border-t bg-transparent xl:bg-transparent md:bg-transparent sm:bg-background flex gap-3">
-          <Button
-            type="button"
-            variant="outline"
-            onClick={handleClose}
-            disabled={isCreating}
-            className="flex-1 h-11"
-          >
-            Cancelar
-          </Button>
-          <Button
-            type="button"
-            onClick={onSubmit}
-            disabled={isCreating}
-            className="flex-1 h-11 gap-2"
-          >
-            {isCreating ? (
-              <>
-                <Loader2 className="h-4 w-4 animate-spin" />
-                Guardando...
-              </>
-            ) : (
-              "Registrar"
-            )}
-          </Button>
-        </div>
-      </DialogContent>
-    </Dialog>
+    </ResponsiveModal>
   );
 }

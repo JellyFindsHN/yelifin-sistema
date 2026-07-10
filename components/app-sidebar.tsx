@@ -1,19 +1,24 @@
-// components/app-sidebar.tsx
+﻿// components/app-sidebar.tsx
 "use client"
 
 import {
-  BarChart3, Box, Calendar, ChevronDown, CreditCard,
+  BarChart3, Box, Calendar, ChevronDown, ChevronsLeft, ChevronsRight, CreditCard,
   Home, ShoppingCart, Users, Warehouse, Settings,
-  LogOut, User, Zap, Building2, Crown, Receipt,
-  Shield, Tags
+  LogOut, User, Building2, Crown, Receipt,
+  Shield, Tags, Wallet, ArrowLeftRight, UserCog,
 } from "lucide-react"
 import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
 import { signOut } from "firebase/auth"
 import { auth } from "@/lib/firebase"
 import { useAuth } from "@/hooks/use-auth"
+import { useMe }   from "@/hooks/swr/use-me"
+import type { OrgModule } from "@/types"
 import { toast } from "sonner"
 import { useSidebar } from "@/components/ui/sidebar"
+import { cn } from "@/lib/utils"
+import { KontaIcon } from "@/components/shared/konta-icon"
+import { KontaTitle } from "@/components/shared/konta-title"
 
 import {
   Sidebar, SidebarContent, SidebarFooter, SidebarGroup,
@@ -31,47 +36,62 @@ import {
 import {
   Tooltip, TooltipContent, TooltipProvider, TooltipTrigger,
 } from "@/components/ui/tooltip"
-import { Avatar, AvatarFallback } from "@/components/ui/avatar"
-import { ThemeToggle } from "@/components/theme-toggle"
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { ThemeToggle }   from "@/components/theme-toggle"
+import { PrivacyToggle } from "@/components/privacy-toggle"
+
+// ── Plan-specific nav (finanzas plan: flat finance items) ────────────────
+const financesOnlyNav = [
+  { title: "Cuentas",          url: "/finances",                icon: Wallet },
+  { title: "Transacciones",    url: "/finances/transactions",   icon: ArrowLeftRight },
+  { title: "Tarjetas crédito", url: "/finances/credit-cards",   icon: CreditCard },
+]
 
 // ── Nav config ──────────────────────────────────────────────────────────
-const mainNav = [
-  { title: "Dashboard",    url: "/dashboard",  icon: Home },
+// `feature` opcional: el ítem/submenú solo se muestra si el plan la incluye.
+type NavItemDef = {
+  title: string; url: string; icon: any; module?: OrgModule; feature?: string;
+  submenu?: Array<{ title: string; url: string; feature?: string }>;
+};
+
+const mainNav: NavItemDef[] = [
+  { title: "Dashboard",    url: "/dashboard",  icon: Home, module: "DASHBOARD" as OrgModule },
   {
-    title: "Inventario", url: "/inventory", icon: Warehouse,
+    title: "Inventario", url: "/inventory", icon: Warehouse, module: "INVENTORY",
     submenu: [
       { title: "Productos",    url: "/inventory" },
       { title: "Movimientos",  url: "/inventory/movements" },
+      { title: "En camino",    url: "/purchases/pending" },
     ],
   },
   {
-    title: "Ventas", url: "/sales", icon: ShoppingCart,
+    title: "Ventas", url: "/sales", icon: ShoppingCart, module: "SALES",
     submenu: [
       { title: "Lista de Ventas",    url: "/sales" },
       { title: "Nueva Venta (POS)", url: "/sales/new" },
     ],
   },
-  { title: "Clientes",    url: "/customers", icon: Users },
+  { title: "Clientes",    url: "/customers", icon: Users,     module: "CUSTOMERS", feature: "customers.manage" },
   {
-    title: "Finanzas", url: "/finances", icon: CreditCard,
+    title: "Finanzas", url: "/finances", icon: CreditCard, module: "FINANCES",
     submenu: [
       { title: "Cuentas",          url: "/finances" },
       { title: "Transacciones",    url: "/finances/transactions" },
       { title: "Tarjetas crédito", url: "/finances/credit-cards" },
     ],
   },
-  { title: "Eventos",     url: "/events",   icon: Calendar },
-  { title: "Suministros", url: "/supplies", icon: Box },
+  { title: "Eventos",     url: "/events",   icon: Calendar,  module: "EVENTS" },
+  { title: "Suministros", url: "/supplies", icon: Box,        module: "INVENTORY" },
 ]
 
-const secondaryNav = [
+const secondaryNav: NavItemDef[] = [
   {
-    title: "Reportes", url: "/reports", icon: BarChart3,
+    title: "Reportes", url: "/reports", icon: BarChart3, module: "REPORTS",
     submenu: [
-      { title: "Ventas",        url: "/reports/sales" },
-      { title: "Inventario",    url: "/reports/inventory" },
-      { title: "Rentabilidad",  url: "/reports/profit" },
-      { title: "Eventos",       url: "/reports/events" },
+      { title: "Ventas",        url: "/reports/sales",     feature: "reports.sales" },
+      { title: "Inventario",    url: "/reports/inventory", feature: "reports.inventory" },
+      { title: "Rentabilidad",  url: "/reports/profit",    feature: "reports.profit" },
+      { title: "Eventos",       url: "/reports/events",    feature: "reports.events" },
     ],
   },
 ]
@@ -82,65 +102,36 @@ const adminNav = [
     submenu: [
       { title: "Resumen",   url: "/admin" },
       { title: "Usuarios",  url: "/admin/users" },
+      { title: "Planes",    url: "/admin/plans" },
     ],
   },
 ]
 
-const settingsNav = [
-  {
-    title: "Configuración", url: "/settings", icon: Settings,
-    submenu: [
-      { title: "Mi Perfil",           url: "/settings/profile",       icon: User },
-      { title: "Mi Negocio",          url: "/settings/organization",  icon: Building2 },
-      { title: "Categorías",          url: "/settings/categories",    icon: Tags },
-      { title: "Suscripción",         url: "/settings/billing",       icon: Receipt },
-
-      //debe de ser para el panel Admin, no para todos los usuarios
-  //  { title: "Usuarios",            url: "/settings/users",         icon: UserPlus },
-    ],
-  },
+const settingsNavBase = [
+  { title: "Mi Perfil",   url: "/settings/profile",       icon: User },
+  { title: "Mi Negocio",  url: "/settings/organization",  icon: Building2 },
+  { title: "Categorías",  url: "/settings/categories",    icon: Tags },
+  { title: "Suscripción", url: "/settings/billing",       icon: Receipt },
 ]
 
-// ── Component ───────────────────────────────────────────────────────────
-export function AppSidebar() {
-  const pathname = usePathname()
-  const router   = useRouter()
-  const { user, firebaseUser }  = useAuth()
-  const { isMobile, setOpenMobile, state } = useSidebar()
+const settingsNavOwner = [
+  { title: "Equipo",      url: "/settings/members",       icon: Users },
+  { title: "Roles",       url: "/settings/roles",         icon: UserCog },
+]
 
-  const isCollapsed  = !isMobile && state === "collapsed"
-  const closeOnMobile = () => { if (isMobile) setOpenMobile(false) }
-
-  const isActive = (url: string) => {
-    if (url === "/dashboard") return pathname === url || pathname === "/"
-    return pathname.startsWith(url)
-  }
-
-  const handleLogout = async () => {
-    try {
-      await signOut(auth)
-      document.cookie = "token=; Max-Age=0; path=/"
-      toast.success("Sesión cerrada exitosamente")
-      closeOnMobile()
-      router.push("/")
-    } catch {
-      toast.error("Error al cerrar sesión")
-    }
-  }
-
-  const displayName =
-    user?.profile?.business_name ||
-    firebaseUser?.displayName    ||
-    firebaseUser?.email?.split("@")[0] ||
-    "Usuario"
-
-  const getUserInitials = () =>
-    displayName.split(" ").map((n: string) => n[0]).join("").toUpperCase().slice(0, 2)
-
-  const isAdmin = user?.subscription?.plan?.name === "Admin"
-
-  // ── Icon-only item (collapsed) ─────────────────────────────────────
-  const CollapsedItem = ({ item }: { item: any }) => (
+// ── Icon-only item (collapsed) ─────────────────────────────────────────
+function CollapsedItem({
+  item,
+  isActive,
+  closeOnMobile,
+  pathname,
+}: {
+  item: any;
+  isActive: (url: string) => boolean;
+  closeOnMobile: () => void;
+  pathname: string;
+}) {
+  return (
     <SidebarMenuItem>
       <Tooltip>
         <TooltipTrigger asChild>
@@ -150,12 +141,12 @@ export function AppSidebar() {
             className="justify-center"
           >
             <Link href={item.submenu ? item.submenu[0].url : item.url} onClick={closeOnMobile}>
-              <item.icon className="h-4 w-4" />
+              <item.icon className="size-4" />
             </Link>
           </SidebarMenuButton>
         </TooltipTrigger>
         <TooltipContent side="right" className="flex flex-col gap-0.5 py-2 px-3 bg-foreground text-background">
-          <span className="font-medium text-sm text-white">{item.title}</span>
+          <span className="font-medium text-sm text-background">{item.title}</span>
           {item.submenu && (
             <div className="flex flex-col gap-0.5 mt-1">
               {item.submenu.map((s: any) => (
@@ -163,7 +154,7 @@ export function AppSidebar() {
                   key={s.url}
                   href={s.url}
                   onClick={closeOnMobile}
-                  className={`text-xs transition-opacity text-white ${
+                  className={`text-xs transition-opacity text-background ${
                     pathname === s.url
                       ? "font-medium opacity-100"
                       : "opacity-70 hover:opacity-100"
@@ -178,17 +169,38 @@ export function AppSidebar() {
       </Tooltip>
     </SidebarMenuItem>
   )
+}
 
-  // ── Full item (expanded) ───────────────────────────────────────────
-  const ExpandedItem = ({ item }: { item: any }) => (
+// ── Full item (expanded) ───────────────────────────────────────────────
+const navIconCls = "flex items-center justify-center size-7 rounded-full group-hover/navbtn:bg-sidebar-accent-foreground/10 group-data-[active=true]/navbtn:bg-sidebar-accent-foreground/10 transition-colors shrink-0"
+
+function ExpandedItem({
+  item,
+  isActive,
+  closeOnMobile,
+  pathname,
+}: {
+  item: any;
+  isActive: (url: string) => boolean;
+  closeOnMobile: () => void;
+  pathname: string;
+}) {
+  return (
     <SidebarMenuItem>
       {item.submenu ? (
         <Collapsible defaultOpen={isActive(item.url)} className="group/collapsible">
           <CollapsibleTrigger asChild>
-            <SidebarMenuButton isActive={isActive(item.url)}>
-              <item.icon className="h-4 w-4" />
+            <SidebarMenuButton
+              isActive={isActive(item.url)}
+              className="group/navbtn h-11 hover:rounded-xl data-[active=true]:rounded-xl"
+            >
+              <span className={navIconCls}>
+                <item.icon className="size-4 shrink-0" />
+              </span>
               <span>{item.title}</span>
-              <ChevronDown className="ml-auto h-4 w-4 transition-transform group-data-[state=open]/collapsible:rotate-180" />
+              <span className={cn(navIconCls, "ml-auto")}>
+                <ChevronDown className="size-4 shrink-0 transition-transform group-data-[state=open]/collapsible:rotate-180" />
+              </span>
             </SidebarMenuButton>
           </CollapsibleTrigger>
           <CollapsibleContent>
@@ -204,86 +216,196 @@ export function AppSidebar() {
           </CollapsibleContent>
         </Collapsible>
       ) : (
-        <SidebarMenuButton asChild isActive={isActive(item.url)}>
+        <SidebarMenuButton
+          asChild
+          isActive={isActive(item.url)}
+          className="group/navbtn h-11 hover:rounded-xl data-[active=true]:rounded-xl"
+        >
           <Link href={item.url} onClick={closeOnMobile}>
-            <item.icon className="h-4 w-4" />
+            <span className={navIconCls}>
+              <item.icon className="size-4 shrink-0" />
+            </span>
             <span>{item.title}</span>
           </Link>
         </SidebarMenuButton>
       )}
     </SidebarMenuItem>
   )
+}
 
-  const renderNav = (items: any[]) =>
+// ── Component ───────────────────────────────────────────────────────────
+export function AppSidebar() {
+  const pathname = usePathname()
+  const { push } = useRouter()
+  const { user, firebaseUser }  = useAuth()
+  const { isMobile, setOpenMobile, state, toggleSidebar } = useSidebar()
+
+  const { isOwner, org, getModulePermissions, isLoading: meIsLoading } = useMe()
+  const isAdmin      = user?.subscription?.plan?.slug === "admin"
+  const planSlug     = user?.subscription?.plan?.slug ?? null
+  const isFinanzas   = planSlug === "finanzas"
+
+  const isCollapsed  = !isMobile && state === "collapsed"
+  const closeOnMobile = () => { if (isMobile) setOpenMobile(false) }
+
+  const isActive = (url: string) => {
+    if (url === "/dashboard") return pathname === url || pathname === "/"
+    return pathname.startsWith(url)
+  }
+
+  const handleLogout = async () => {
+    try {
+      await signOut(auth)
+      document.cookie = "token=; Max-Age=0; path=/"
+      toast.success("Sesión cerrada exitosamente")
+      closeOnMobile()
+      push("/")
+    } catch {
+      toast.error("Error al cerrar sesión")
+    }
+  }
+
+  const displayName =
+    user?.profile?.business_name      ||
+    org?.name                         ||
+    firebaseUser?.displayName         ||
+    firebaseUser?.email?.split("@")[0] ||
+    "Usuario"
+
+  const getUserInitials = () =>
+    displayName.split(" ").map((n: string) => n[0]).join("").toUpperCase().slice(0, 2)
+
+
+
+  const canViewModule = (module?: OrgModule) => {
+    if (!module || meIsLoading) return true
+    return getModulePermissions(module).can_view
+  }
+
+  // Feature del plan: mientras el perfil carga se muestra todo (el API
+  // bloquea igual); el plan admin siempre ve todo.
+  const planHasFeature = (feature?: string) => {
+    if (!feature || !user) return true
+    if (planSlug === "admin") return true
+    return Object.values(user.features ?? {}).flat().some((f: any) => f.key === feature)
+  }
+
+  const filterByPlan = (items: NavItemDef[]) =>
+    items
+      .filter(item => canViewModule(item.module) && planHasFeature(item.feature))
+      .map(item => item.submenu
+        ? { ...item, submenu: item.submenu.filter(s => planHasFeature(s.feature)) }
+        : item)
+      .filter(item => !item.submenu || item.submenu.length > 0)
+
+  const visibleMainNav = filterByPlan(mainNav)
+  const visibleSecondaryNav = filterByPlan(secondaryNav)
+
+  const renderNav = (items: typeof mainNav) =>
     items.map((item) =>
       isCollapsed
-        ? <CollapsedItem key={item.title} item={item} />
-        : <ExpandedItem  key={item.title} item={item} />
+        ? <CollapsedItem key={item.title} item={item} isActive={isActive} closeOnMobile={closeOnMobile} pathname={pathname} />
+        : <ExpandedItem  key={item.title} item={item} isActive={isActive} closeOnMobile={closeOnMobile} pathname={pathname} />
     )
 
   return (
     <TooltipProvider delayDuration={200}>
-      <Sidebar collapsible="icon" className="sticky top-0 h-svh">
+      <Sidebar collapsible="icon" variant="floating" className="sticky top-0 h-svh">
 
         {/* ── Header ── */}
-        <SidebarHeader className="border-b border-sidebar-border px-4 py-3">
-          <Link
-            href="/dashboard"
-            onClick={closeOnMobile}
-            className={`flex items-center gap-2 ${isCollapsed ? "justify-center" : ""}`}
-          >
-            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary">
-              <Zap className="h-5 w-5 text-primary-foreground" />
-            </div>
-            {!isCollapsed && (
-              <span className="text-lg font-semibold text-sidebar-foreground">Konta</span>
-            )}
-          </Link>
+        <SidebarHeader className="px-4 py-3">
+          <div className={`flex items-center ${isCollapsed ? "flex-col gap-2" : "justify-between gap-2"}`}>
+            <Link
+              href="/dashboard"
+              onClick={closeOnMobile}
+              className="flex items-center gap-2"
+            >
+              <KontaIcon className="size-8" />
+              {!isCollapsed && <KontaTitle className="h-5" />}
+            </Link>
+
+            <button
+              type="button"
+              onClick={toggleSidebar}
+              aria-label={isCollapsed ? "Expandir menú" : "Contraer menú"}
+              className="hidden size-6 shrink-0 items-center justify-center rounded-md text-sidebar-foreground/70 transition-colors hover:bg-sidebar-accent hover:text-sidebar-foreground md:flex"
+            >
+              {isCollapsed
+                ? <ChevronsRight className="size-4" />
+                : <ChevronsLeft className="size-4" />}
+            </button>
+          </div>
         </SidebarHeader>
 
         {/* ── Content ── */}
         <SidebarContent>
+          {isFinanzas ? (
+            // Finanzas plan: flat finance nav, no dashboard, no other sections
+            <SidebarGroup>
+              {!isCollapsed && <SidebarGroupLabel>Finanzas</SidebarGroupLabel>}
+              <SidebarGroupContent>
+                <SidebarMenu>{renderNav(financesOnlyNav)}</SidebarMenu>
+              </SidebarGroupContent>
+            </SidebarGroup>
+          ) : (
+            <>
+              <SidebarGroup>
+                {!isCollapsed && <SidebarGroupLabel>Menú Principal</SidebarGroupLabel>}
+                <SidebarGroupContent>
+                  <SidebarMenu>{renderNav(visibleMainNav)}</SidebarMenu>
+                </SidebarGroupContent>
+              </SidebarGroup>
+
+              {visibleSecondaryNav.length > 0 && (
+                <SidebarGroup>
+                  {!isCollapsed && <SidebarGroupLabel>Análisis</SidebarGroupLabel>}
+                  <SidebarGroupContent>
+                    <SidebarMenu>{renderNav(visibleSecondaryNav)}</SidebarMenu>
+                  </SidebarGroupContent>
+                </SidebarGroup>
+              )}
+
+              {isAdmin && (
+                <SidebarGroup>
+                  {!isCollapsed && <SidebarGroupLabel>Admin</SidebarGroupLabel>}
+                  <SidebarGroupContent>
+                    <SidebarMenu>{renderNav(adminNav)}</SidebarMenu>
+                  </SidebarGroupContent>
+                </SidebarGroup>
+              )}
+            </>
+          )}
+
           <SidebarGroup>
-            {!isCollapsed && <SidebarGroupLabel>Menú Principal</SidebarGroupLabel>}
+            {!isCollapsed && <SidebarGroupLabel>Sistema</SidebarGroupLabel>}
             <SidebarGroupContent>
-              <SidebarMenu>{renderNav(mainNav)}</SidebarMenu>
+              <SidebarMenu>
+                {renderNav([{
+                  title: "Configuración", url: "/settings", icon: Settings,
+                  submenu: [
+                    ...settingsNavBase,
+                    ...(isOwner ? settingsNavOwner : []),
+                  ],
+                }])}
+              </SidebarMenu>
             </SidebarGroupContent>
           </SidebarGroup>
-
-          {isAdmin && (
-            <SidebarGroup>
-              {!isCollapsed && <SidebarGroupLabel>Análisis</SidebarGroupLabel>}
-              <SidebarGroupContent>
-                <SidebarMenu>{renderNav(secondaryNav)}</SidebarMenu>
-              </SidebarGroupContent>
-            </SidebarGroup>
-          )}
-
-          {isAdmin && (
-            <SidebarGroup>
-              {!isCollapsed && <SidebarGroupLabel>Admin</SidebarGroupLabel>}
-              <SidebarGroupContent>
-                <SidebarMenu>{renderNav(adminNav)}</SidebarMenu>
-              </SidebarGroupContent>
-            </SidebarGroup>
-          )}
-
-            <SidebarGroup>
-              {!isCollapsed && <SidebarGroupLabel>Sistema</SidebarGroupLabel>}
-              <SidebarGroupContent>
-                <SidebarMenu>{renderNav(settingsNav)}</SidebarMenu>
-              </SidebarGroupContent>
-            </SidebarGroup>
 
         </SidebarContent>
 
         {/* ── Footer ── */}
         <SidebarFooter className="border-t border-sidebar-border p-3 gap-1">
+          <PrivacyToggle isCollapsed={isCollapsed} />
           <ThemeToggle isCollapsed={isCollapsed} />
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <button className={`flex w-full items-center rounded-lg p-2 hover:bg-sidebar-accent transition-colors ${isCollapsed ? "justify-center" : "gap-3"}`}>
-                <Avatar className="h-8 w-8 shrink-0">
+                <Avatar className="size-8 shrink-0">
+                  <AvatarImage
+                    src={org?.logo_url ?? user?.profile?.business_logo_url ?? undefined}
+                    alt={displayName}
+                    className="object-cover"
+                  />
                   <AvatarFallback className="bg-primary text-primary-foreground text-sm">
                     {getUserInitials()}
                   </AvatarFallback>
@@ -294,7 +416,7 @@ export function AppSidebar() {
                       <span className="font-medium text-sidebar-foreground truncate w-full">{displayName}</span>
                       <span className="text-xs text-muted-foreground truncate w-full">{firebaseUser?.email}</span>
                     </div>
-                    <ChevronDown className="h-4 w-4 text-muted-foreground shrink-0" />
+                    <ChevronDown className="size-4 text-muted-foreground shrink-0" />
                   </>
                 )}
               </button>
@@ -310,12 +432,12 @@ export function AppSidebar() {
                 <p className="text-xs text-muted-foreground truncate">{firebaseUser?.email}</p>
                 {isAdmin ? (
                   <span className="inline-flex items-center gap-1 mt-1.5 text-xs font-medium text-emerald-600">
-                    <Shield className="h-3 w-3" /> Admin
+                    <Shield className="size-3" /> Admin
                   </span>
                 ) : (
                   user?.subscription?.plan?.name && (
                     <span className="inline-flex items-center gap-1 mt-1.5 text-xs text-primary font-medium">
-                      <Crown className="h-3 w-3" /> Plan {user.subscription.plan.name}
+                      <Crown className="size-3" /> Plan {user.subscription.plan.name}
                     </span>
                   )
                 )}
@@ -323,22 +445,22 @@ export function AppSidebar() {
 
               <DropdownMenuItem asChild>
                 <Link href="/settings/profile" onClick={closeOnMobile} className="flex items-center cursor-pointer">
-                  <User className="mr-2 h-4 w-4" /> Mi Perfil
+                  <User className="mr-2 size-4" /> Mi Perfil
                 </Link>
               </DropdownMenuItem>
               <DropdownMenuItem asChild>
                 <Link href="/settings/organization" onClick={closeOnMobile} className="flex items-center cursor-pointer">
-                  <Building2 className="mr-2 h-4 w-4" /> Mi Negocio
+                  <Building2 className="mr-2 size-4" /> Mi Negocio
                 </Link>
               </DropdownMenuItem>
               <DropdownMenuItem asChild>
                 <Link href="/settings/billing" onClick={closeOnMobile} className="flex items-center cursor-pointer">
-                  <Receipt className="mr-2 h-4 w-4" /> Suscripción
+                  <Receipt className="mr-2 size-4" /> Suscripción
                 </Link>
               </DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem onClick={handleLogout} className="text-destructive cursor-pointer">
-                <LogOut className="mr-2 h-4 w-4" /> Cerrar Sesión
+                <LogOut className="mr-2 size-4" /> Cerrar Sesión
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>

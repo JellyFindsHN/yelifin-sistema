@@ -1,13 +1,9 @@
-import { useState } from "react";
-import { Search } from "lucide-react";
+﻿"use client";
+
+import { useState, useRef, useEffect } from "react";
+import { Search, X, ChevronDown, Check } from "lucide-react";
 import { Input } from "@/components/ui/input";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
 
 export interface SearchableSelectItem {
@@ -21,10 +17,9 @@ interface SearchableSelectProps {
   items: SearchableSelectItem[];
   placeholder?: string;
   searchPlaceholder?: string;
-  searchThreshold?: number;
   className?: string;
   disabled?: boolean;
-  defaultOption?: SearchableSelectItem; // Nueva prop para "Todos", "Ninguno", etc.
+  defaultOption?: SearchableSelectItem;
 }
 
 export function SearchableSelect({
@@ -33,85 +28,123 @@ export function SearchableSelect({
   items,
   placeholder = "Seleccionar...",
   searchPlaceholder = "Buscar...",
-  searchThreshold = 9,
   className,
   disabled = false,
   defaultOption,
 }: SearchableSelectProps) {
+  const [open, setOpen]     = useState(false);
   const [search, setSearch] = useState("");
-  const [open, setOpen] = useState(false);
-  const [isSearchFocused, setIsSearchFocused] = useState(false);
+  const inputRef            = useRef<HTMLInputElement>(null);
 
-  const showSearch = items.length > searchThreshold;
+  const allItems = defaultOption ? [defaultOption, ...items] : items;
+  const filtered = search
+    ? items.filter((i) => i.label.toLowerCase().includes(search.toLowerCase()))
+    : items;
 
-  const filtered = items.filter((item) =>
-    item.label.toLowerCase().includes(search.toLowerCase())
-  );
+  const selectedLabel = allItems.find((i) => i.value === value)?.label ?? placeholder;
 
-  const handleOpenChange = (isOpen: boolean) => {
-    // Si el input de búsqueda tiene el foco, no cerrar
-    if (!isOpen && isSearchFocused) {
-      return;
-    }
-    setOpen(isOpen);
-    if (!isOpen) {
+  useEffect(() => {
+    if (open) {
+      const id = setTimeout(() => inputRef.current?.focus(), 0);
+      return () => clearTimeout(id);
+    } else {
       setSearch("");
-      setIsSearchFocused(false);
     }
-  };
+  }, [open]);
 
   return (
-    <Select
-      value={value}
-      onValueChange={onValueChange}
-      open={open}
-      onOpenChange={handleOpenChange}
-      disabled={disabled}
-    >
-      <SelectTrigger className={className}>
-        <SelectValue placeholder={placeholder} />
-      </SelectTrigger>
-      <SelectContent>
-        {showSearch && (
-          <div 
-            className="sticky top-0 z-10 bg-popover px-1 pb-2"
-            onPointerDown={(e) => e.stopPropagation()}
-          >
-            <div className="relative">
-              <Search className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground pointer-events-none" />
-              <Input
-                placeholder={searchPlaceholder}
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                onFocus={() => setIsSearchFocused(true)}
-                onBlur={() => {
-                  // Pequeño delay para permitir que el click en un item se procese
-                  setTimeout(() => setIsSearchFocused(false), 100);
-                }}
-                className="h-8 pl-8 text-sm"
-              />
-            </div>
+    <Popover open={open} onOpenChange={disabled ? undefined : setOpen}>
+      <PopoverTrigger asChild>
+        <button
+          type="button"
+          role="combobox"
+          aria-expanded={open}
+          disabled={disabled}
+          className={cn(
+            "flex h-9 items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm",
+            "hover:bg-accent hover:text-accent-foreground transition-colors",
+            "focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2",
+            "disabled:cursor-not-allowed disabled:opacity-50",
+            className,
+          )}
+        >
+          <span className="truncate text-left">{selectedLabel}</span>
+          <ChevronDown
+            className={cn(
+              "ml-2 size-4 shrink-0 text-muted-foreground transition-transform duration-200",
+              open && "rotate-180",
+            )}
+          />
+        </button>
+      </PopoverTrigger>
+
+      <PopoverContent
+        align="start"
+        sideOffset={4}
+        onOpenAutoFocus={(e) => e.preventDefault()}
+        className="p-0 w-[var(--radix-popover-trigger-width)]"
+      >
+        {/* Buscador — mismo estilo que SearchBar */}
+        <div className="p-2 border-b">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground pointer-events-none" />
+            <Input
+              ref={inputRef}
+              placeholder={searchPlaceholder}
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className={cn("pl-9", search && "pr-9")}
+            />
+            {search && (
+              <button
+                type="button"
+                onClick={() => { setSearch(""); inputRef.current?.focus(); }}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
+              >
+                <X className="size-4" />
+              </button>
+            )}
           </div>
-        )}
-        
-        {defaultOption && (
-          <SelectItem value={defaultOption.value}>
-            {defaultOption.label}
-          </SelectItem>
-        )}
-        
-        {filtered.length === 0 ? (
-          <div className="py-6 text-center text-sm text-muted-foreground">
-            No se encontraron resultados
-          </div>
-        ) : (
-          filtered.map((item) => (
-            <SelectItem key={item.value} value={item.value}>
-              {item.label}
-            </SelectItem>
-          ))
-        )}
-      </SelectContent>
-    </Select>
+        </div>
+
+        {/* Lista */}
+        <div className="max-h-60 overflow-y-auto py-1">
+          {defaultOption && !search && (
+            <button
+              type="button"
+              onClick={() => { onValueChange(defaultOption.value); setOpen(false); }}
+              className={cn(
+                "flex w-full items-center gap-2 px-3 py-2 text-sm hover:bg-accent hover:text-accent-foreground",
+                value === defaultOption.value && "bg-accent/50",
+              )}
+            >
+              <Check className={cn("size-4 shrink-0", value !== defaultOption.value && "invisible")} />
+              {defaultOption.label}
+            </button>
+          )}
+
+          {filtered.length === 0 ? (
+            <p className="py-6 text-center text-sm text-muted-foreground">
+              No se encontraron resultados
+            </p>
+          ) : (
+            filtered.map((item) => (
+              <button
+                key={item.value}
+                type="button"
+                onClick={() => { onValueChange(item.value); setOpen(false); }}
+                className={cn(
+                  "flex w-full items-center gap-2 px-3 py-2 text-sm hover:bg-accent hover:text-accent-foreground",
+                  value === item.value && "bg-accent/50",
+                )}
+              >
+                <Check className={cn("size-4 shrink-0", value !== item.value && "invisible")} />
+                {item.label}
+              </button>
+            ))
+          )}
+        </div>
+      </PopoverContent>
+    </Popover>
   );
 }

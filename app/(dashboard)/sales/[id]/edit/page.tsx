@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import {
   useState,
@@ -64,7 +64,7 @@ type SearchBarProps = {
 function SearchBar({ search, onChange }: SearchBarProps) {
   return (
     <div className="relative">
-      <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+      <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
       <Input
         placeholder="Buscar producto..."
         value={search}
@@ -77,7 +77,7 @@ function SearchBar({ search, onChange }: SearchBarProps) {
           onClick={() => onChange("")}
           className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
         >
-          <X className="h-4 w-4" />
+          <X className="size-4" />
         </button>
       )}
     </div>
@@ -86,7 +86,7 @@ function SearchBar({ search, onChange }: SearchBarProps) {
 
 function EditSaleContent() {
   const params = useParams();
-  const router = useRouter();
+  const { push } = useRouter();
   const { format } = useCurrency();
 
   const saleId = Number(params.id);
@@ -95,9 +95,9 @@ function EditSaleContent() {
   const { sale, isLoading } = useSale(saleId);
   const { products } = useProducts();
   const { accounts } = useAccounts();
-  const { customers } = useCustomers();
+  const { customers } = useCustomers({ limit: 500 });
   const { supplies } = useSupplies();
-  const { inventory, mutate: mutateInventory } = useInventory();
+  const { inventory, mutate: mutateInventory } = useInventory({ limit: 500 });
   const { editSale, confirmSale, cancelSale, isPatching } = usePatchSale(saleId);
 
   const [cart, setCart] = useState<CartItem[]>([]);
@@ -160,18 +160,18 @@ function EditSaleContent() {
   const safeNavigate = useCallback(
     (href: string) => {
       if (!hasCart) {
-        router.push(href);
+        push(href);
         return;
       }
       setPendingHref(href);
       setExitDialog(true);
     },
-    [hasCart, router]
+    [hasCart, push]
   );
 
   const confirmExit = () => {
     setExitDialog(false);
-    if (pendingHref) router.push(pendingHref);
+    if (pendingHref) push(pendingHref);
   };
   const cancelExit = () => {
     setExitDialog(false);
@@ -184,7 +184,7 @@ function EditSaleContent() {
 
     if (sale.status !== "PENDING") {
       toast.error("Solo se pueden editar ventas pendientes");
-      router.push("/sales");
+      push("/sales");
       return;
     }
 
@@ -243,7 +243,7 @@ function EditSaleContent() {
     }
 
     setInitialized(true);
-  }, [sale, initialized, router]);
+  }, [sale, initialized, push]);
 
   // productos disponibles
   const availableProducts = useMemo(
@@ -463,7 +463,7 @@ function EditSaleContent() {
       await editSale(payload);
       mutateInventory();
       toast.success("Venta actualizada");
-      router.push("/sales");
+      push("/sales");
     } catch (err: any) {
       toast.error(
         err.message || "Error al actualizar la venta"
@@ -508,7 +508,7 @@ function EditSaleContent() {
 
       mutateInventory();
       toast.success("Venta completada");
-      router.push("/sales");
+      push("/sales");
     } catch (err: any) {
       console.error("Error:", err);
       toast.error(err.message || "Error al completar la venta");
@@ -524,7 +524,7 @@ function EditSaleContent() {
       await cancelSale();
       mutateInventory();
       toast.success("Venta cancelada");
-      router.push("/sales");
+      push("/sales");
     } catch (err: any) {
       toast.error(
         err.message || "Error al cancelar la venta"
@@ -536,7 +536,7 @@ function EditSaleContent() {
     return (
       <div className="space-y-4">
         <div className="flex items-center gap-2">
-          <Skeleton className="h-9 w-9 rounded-full" />
+          <Skeleton className="size-9 rounded-full" />
           <Skeleton className="h-6 w-48" />
         </div>
         <Skeleton className="h-10 w-full" />
@@ -610,10 +610,10 @@ function EditSaleContent() {
               className="shrink-0"
               onClick={() => safeNavigate(backHref)}
             >
-              <ArrowLeft className="h-4 w-4" />
+              <ArrowLeft className="size-4" />
             </Button>
             <div className="flex-1">
-              <h1 className="text-xl font-bold tracking-tight">
+              <h1 className="text-xl font-semibold tracking-tight">
                 Editar Venta
               </h1>
               {sale?.sale_number && (
@@ -673,10 +673,10 @@ function EditSaleContent() {
             size="icon"
             onClick={() => safeNavigate(backHref)}
           >
-            <ArrowLeft className="h-4 w-4" />
+            <ArrowLeft className="size-4" />
           </Button>
           <div className="flex-1">
-            <h1 className="text-2xl font-bold tracking-tight">
+            <h1 className="text-2xl font-semibold tracking-tight">
               Editar venta {sale?.sale_number}
             </h1>
             <p className="text-muted-foreground text-sm">
@@ -702,10 +702,10 @@ function EditSaleContent() {
                   : "text-muted-foreground hover:bg-muted"
                 }`}
             >
-              <ShoppingCart className="h-3.5 w-3.5" />
+              <ShoppingCart className="size-3.5" />
               Productos
             </button>
-            <ChevronRight className="h-4 w-4 text-muted-foreground" />
+            <ChevronRight className="size-4 text-muted-foreground" />
             <button
               onClick={() =>
                 cart.length > 0 && setDesktopStep(2)
@@ -757,7 +757,7 @@ function EditSaleContent() {
                   onClick={() => setDesktopStep(2)}
                 >
                   Continuar al detalle{" "}
-                  <ArrowRight className="h-4 w-4" />
+                  <ArrowRight className="size-4" />
                 </Button>
               )}
             </div>
@@ -827,8 +827,8 @@ function EditSaleContent() {
           >
             <div className="p-6 pb-4">
               <div className="flex items-center gap-3 mb-3">
-                <div className="h-10 w-10 rounded-full bg-yellow-100 flex items-center justify-center shrink-0">
-                  <AlertTriangle className="h-5 w-5 text-yellow-600" />
+                <div className="size-10 rounded-full bg-yellow-100 flex items-center justify-center shrink-0">
+                  <AlertTriangle className="size-5 text-yellow-600" />
                 </div>
                 <h2 className="text-base font-semibold">
                   ¿Salir sin guardar cambios?
@@ -874,8 +874,8 @@ function EditSaleContent() {
           >
             <div className="p-6 pb-4">
               <div className="flex items-center gap-3 mb-3">
-                <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
-                  <AlertTriangle className="h-5 w-5 text-primary" />
+                <div className="size-10 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+                  <AlertTriangle className="size-5 text-primary" />
                 </div>
                 <h2 className="text-base font-semibold">
                   ¿Completar esta venta?
@@ -923,8 +923,8 @@ function EditSaleContent() {
           >
             <div className="p-6 pb-4">
               <div className="flex items-center gap-3 mb-3">
-                <div className="h-10 w-10 rounded-full bg-destructive/10 flex items-center justify-center shrink-0">
-                  <AlertTriangle className="h-5 w-5 text-destructive" />
+                <div className="size-10 rounded-full bg-destructive/10 flex items-center justify-center shrink-0">
+                  <AlertTriangle className="size-5 text-destructive" />
                 </div>
                 <h2 className="text-base font-semibold">
                   ¿Cancelar esta venta pendiente?

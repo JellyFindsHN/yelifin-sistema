@@ -1,10 +1,8 @@
-// components/products/confirm-purchase-arrival-dialog.tsx
+﻿// components/products/confirm-purchase-arrival-dialog.tsx
 "use client";
 
 import { useState, useEffect } from "react";
-import {
-  Dialog, DialogContent, DialogHeader, DialogTitle,
-} from "@/components/ui/dialog";
+import { ResponsiveModal } from "@/components/shared/responsive-modal";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -37,18 +35,23 @@ export function ConfirmPurchaseArrivalDialog({
 
   const [newShipping,       setNewShipping]       = useState("");
   const [shippingAccountId, setShippingAccountId] = useState<string>("stored");
+  const [wantsShipping,     setWantsShipping]     = useState(false);
 
   useEffect(() => {
     if (open && purchase) {
-      setNewShipping(Number(purchase.shipping) > 0 ? String(purchase.shipping) : "");
+      const hadShipping = Number(purchase.shipping) > 0;
+      setNewShipping(hadShipping ? String(purchase.shipping) : "");
       setShippingAccountId("stored");
+      setWantsShipping(hadShipping);
     }
   }, [open, purchase]);
 
   if (!purchase) return null;
 
   const originalShipping = Number(purchase.shipping);
-  const parsedShipping   = newShipping === "" ? 0 : Math.max(0, Number(newShipping));
+  const parsedShipping   = (!wantsShipping && originalShipping === 0)
+    ? 0
+    : newShipping === "" ? 0 : Math.max(0, Number(newShipping));
   const shippingDelta    = parsedShipping - originalShipping;
   const newTotal         = Number(purchase.total) + shippingDelta;
   const hasAdjustment    = shippingDelta !== 0;
@@ -80,42 +83,40 @@ export function ConfirmPurchaseArrivalDialog({
   });
 
   return (
-    <Dialog open={open} onOpenChange={(v) => !v && onOpenChange(false)}>
-      <DialogContent
-        className={cn(
-          "fixed bottom-0 left-0 right-0 top-auto translate-x-0 translate-y-0",
-          "w-full max-w-full rounded-t-2xl rounded-b-none border-t border-x-0 border-b-0",
-          "max-h-[92dvh] flex flex-col p-0",
-          "sm:bottom-auto sm:left-1/2 sm:right-auto sm:top-1/2",
-          "sm:-translate-x-1/2 sm:-translate-y-1/2",
-          "sm:w-full sm:max-w-md",
-          "sm:rounded-2xl sm:border sm:max-h-[88vh]",
-          "data-[state=open]:animate-in data-[state=closed]:animate-out",
-          "data-[state=open]:slide-in-from-bottom sm:data-[state=open]:slide-in-from-bottom-[48%]",
-          "data-[state=closed]:slide-out-to-bottom sm:data-[state=closed]:slide-out-to-bottom-[48%]",
-          "duration-300",
-        )}
-        onInteractOutside={(e) => e.preventDefault()}
-        onEscapeKeyDown={() => onOpenChange(false)}
-      >
-        <div className="sm:hidden flex justify-center pt-3 pb-1 shrink-0">
-          <div className="w-10 h-1 rounded-full bg-muted-foreground/30" />
-        </div>
-
-        <DialogHeader className="shrink-0 px-5 pt-2 pb-3 sm:pt-5 border-b">
-          <DialogTitle className="flex items-center gap-2 text-lg font-bold">
-            <PackageCheck className="h-5 w-5 text-primary" />
-            Confirmar llegada
-          </DialogTitle>
-          <p className="text-xs text-muted-foreground">
-            Compra del {purchasedDate} · {purchase.items_count} producto{purchase.items_count !== 1 ? "s" : ""}
-          </p>
-        </DialogHeader>
-
-        <div
-          className="flex-1 overflow-y-auto px-5 py-4 space-y-4"
-          style={{ scrollbarWidth: "none" } as React.CSSProperties}
-        >
+    <ResponsiveModal
+      open={open}
+      onOpenChange={(v) => !v && onOpenChange(false)}
+      title="Confirmar llegada"
+      icon={PackageCheck}
+      subtitle={
+        <>
+          Compra del <span suppressHydrationWarning>{purchasedDate}</span> · {purchase.items_count} producto{purchase.items_count !== 1 ? "s" : ""}
+        </>
+      }
+      footer={
+        <>
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => onOpenChange(false)}
+            disabled={isConfirming}
+            className="flex-1 h-11"
+          >
+            Cancelar
+          </Button>
+          <Button
+            onClick={handleConfirm}
+            disabled={isConfirming}
+            className="flex-1 h-11 gap-2"
+          >
+            {isConfirming
+              ? <><Loader2 className="size-4 animate-spin" />Registrando…</>
+              : <><PackageCheck className="size-4" />Confirmar llegada</>
+            }
+          </Button>
+        </>
+      }
+    >
           {/* Resumen original */}
           <div className="rounded-xl border bg-muted/20 p-3.5 space-y-2 text-sm">
             <div className="flex justify-between text-muted-foreground">
@@ -140,40 +141,101 @@ export function ConfirmPurchaseArrivalDialog({
             </div>
           </div>
 
-          {/* Input de nuevo envío */}
-          <div className="space-y-1.5">
-            <Label className="text-sm font-medium flex items-center gap-1.5">
-              <Truck className="h-3.5 w-3.5 text-muted-foreground" />
-              Costo de envío real
-              <span className="text-xs text-muted-foreground font-normal">
-                {originalShipping > 0 ? `· original: ${format(originalShipping)}` : "· sin envío registrado"}
-              </span>
-            </Label>
-            <div className="relative">
-              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm font-medium">
-                {symbol}
-              </span>
-              <Input
-                type="number"
-                step="0.01"
-                min="0"
-                placeholder="0.00"
-                value={newShipping}
-                onChange={(e) => setNewShipping(e.target.value)}
-                disabled={isConfirming}
-                className="h-11 pl-8 text-base"
-              />
-            </div>
-            <p className="text-xs text-muted-foreground">
-              Dejá en 0 si no hubo envío. Se distribuye entre todas las unidades.
-            </p>
-          </div>
+          {/* Pregunta de envío */}
+          {originalShipping === 0 ? (
+            <div className="space-y-3">
+              <Label className="text-sm font-medium flex items-center gap-1.5">
+                <Truck className="size-3.5 text-muted-foreground" />
+                ¿Llegó con costo de envío?
+              </Label>
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  onClick={() => { setWantsShipping(false); setNewShipping(""); }}
+                  disabled={isConfirming}
+                  className={cn(
+                    "h-10 rounded-lg border text-sm font-medium transition-colors",
+                    !wantsShipping
+                      ? "bg-primary text-primary-foreground border-primary"
+                      : "bg-background text-muted-foreground hover:bg-muted"
+                  )}
+                >
+                  No, sin envío
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setWantsShipping(true)}
+                  disabled={isConfirming}
+                  className={cn(
+                    "h-10 rounded-lg border text-sm font-medium transition-colors",
+                    wantsShipping
+                      ? "bg-primary text-primary-foreground border-primary"
+                      : "bg-background text-muted-foreground hover:bg-muted"
+                  )}
+                >
+                  Sí, agregar envío
+                </button>
+              </div>
 
-          {/* Cuenta para el envío — solo si hay ajuste y hay cuentas */}
+              {wantsShipping && (
+                <div className="space-y-1.5">
+                  <div className="relative">
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm font-medium">
+                      {symbol}
+                    </span>
+                    <Input
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      placeholder="0.00"
+                      value={newShipping}
+                      onChange={(e) => setNewShipping(e.target.value)}
+                      disabled={isConfirming}
+                      className="h-11 pl-8 text-base"
+                      autoFocus
+                    />
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Se distribuye entre las {purchase.items_count} línea{purchase.items_count !== 1 ? "s" : ""} de productos.
+                  </p>
+                </div>
+              )}
+            </div>
+          ) : (
+            <div className="space-y-1.5">
+              <Label className="text-sm font-medium flex items-center gap-1.5">
+                <Truck className="size-3.5 text-muted-foreground" />
+                Costo de envío real
+                <span className="text-xs text-muted-foreground font-normal">
+                  · original: {format(originalShipping)}
+                </span>
+              </Label>
+              <div className="relative">
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm font-medium">
+                  {symbol}
+                </span>
+                <Input
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  placeholder="0.00"
+                  value={newShipping}
+                  onChange={(e) => setNewShipping(e.target.value)}
+                  disabled={isConfirming}
+                  className="h-11 pl-8 text-base"
+                />
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Se distribuye entre todas las unidades.
+              </p>
+            </div>
+          )}
+
+          {/* Cuenta para el envío — solo si hay envío y hay cuentas */}
           {parsedShipping > 0 && accounts.length > 0 && (
             <div className="space-y-1.5">
               <Label className="text-sm font-medium flex items-center gap-1.5">
-                <Wallet className="h-3.5 w-3.5 text-muted-foreground" />
+                <Wallet className="size-3.5 text-muted-foreground" />
                 Cuenta para el envío
               </Label>
               <Select
@@ -212,7 +274,7 @@ export function ConfirmPurchaseArrivalDialog({
                 : "border-green-200 bg-green-50/60 dark:bg-green-950/20"
             )}>
               <div className="flex items-center gap-1.5 font-medium text-xs mb-1">
-                <AlertTriangle className="h-3.5 w-3.5" />
+                <AlertTriangle className="size-3.5" />
                 Ajuste financiero automático
               </div>
               <div className="flex justify-between text-muted-foreground">
@@ -259,30 +321,6 @@ export function ConfirmPurchaseArrivalDialog({
               </>
             )}
           </div>
-        </div>
-
-         <div className="shrink-0 px-5 py-4 border-t bg-transparent xl:bg-transparent md:bg-transparent sm:bg-background flex gap-3">
-          <Button
-            type="button"
-            variant="outline"
-            onClick={() => onOpenChange(false)}
-            disabled={isConfirming}
-            className="flex-1 h-11"
-          >
-            Cancelar
-          </Button>
-          <Button
-            onClick={handleConfirm}
-            disabled={isConfirming}
-            className="flex-1 h-11 gap-2"
-          >
-            {isConfirming
-              ? <><Loader2 className="h-4 w-4 animate-spin" />Registrando...</>
-              : <><PackageCheck className="h-4 w-4" />Confirmar llegada</>
-            }
-          </Button>
-        </div>
-      </DialogContent>
-    </Dialog>
+    </ResponsiveModal>
   );
 }

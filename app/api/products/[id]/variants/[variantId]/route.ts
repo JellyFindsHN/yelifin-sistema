@@ -1,7 +1,7 @@
 // app/api/products/[id]/variants/[variantId]/route.ts
 import { NextRequest } from "next/server";
 import { neon } from "@neondatabase/serverless";
-import { verifyAuth, createErrorResponse, isAuthSuccess } from "@/lib/auth";
+import { verifyAuth, createErrorResponse, isAuthSuccess, requireModule } from "@/lib/auth";
 
 const sql = neon(process.env.DATABASE_URL!);
 
@@ -10,9 +10,11 @@ type Params = { params: Promise<{ id: string; variantId: string }> };
 export async function PATCH(request: NextRequest, { params }: Params) {
   const auth = await verifyAuth(request);
   if (!isAuthSuccess(auth)) return createErrorResponse(auth.error, auth.status);
+  const deny = await requireModule(auth.data, 'PRODUCTS', 'canEdit');
+  if (deny) return deny;
 
   try {
-    const { userId } = auth.data;
+    const { userId, orgId } = auth.data;
     const { id, variantId } = await params;
     const productId  = Number(id);
     const variantIdN = Number(variantId);
@@ -21,12 +23,12 @@ export async function PATCH(request: NextRequest, { params }: Params) {
       return createErrorResponse("ID inválido", 400);
     }
 
-    // Verificar que la variante existe, pertenece al usuario y al producto correcto
+    // Verificar que la variante existe, pertenece a la org y al producto correcto
     const [existing] = await sql`
       SELECT id FROM product_variants
       WHERE id         = ${variantIdN}
         AND product_id = ${productId}
-        AND user_id    = ${userId}
+        AND org_id     = ${orgId}
       LIMIT 1
     `;
     if (!existing) return createErrorResponse("Variante no encontrada", 404);
@@ -44,9 +46,9 @@ export async function PATCH(request: NextRequest, { params }: Params) {
     if (sku) {
       const [skuConflict] = await sql`
         SELECT id FROM product_variants
-        WHERE user_id = ${userId}
-          AND sku     = ${sku}
-          AND id     != ${variantIdN}
+        WHERE org_id = ${orgId}
+          AND sku    = ${sku}
+          AND id    != ${variantIdN}
         LIMIT 1
       `;
       if (skuConflict) {
@@ -64,10 +66,11 @@ export async function PATCH(request: NextRequest, { params }: Params) {
                               : null},
         image_url      = COALESCE(${image_url     ?? null}, image_url),
         is_active      = COALESCE(${is_active     !== undefined ? is_active : null}, is_active),
-        updated_at     = CURRENT_TIMESTAMP
+        updated_at     = CURRENT_TIMESTAMP,
+        updated_by     = ${userId}
       WHERE id         = ${variantIdN}
         AND product_id = ${productId}
-        AND user_id    = ${userId}
+        AND org_id     = ${orgId}
       RETURNING *
     `;
 
@@ -81,9 +84,11 @@ export async function PATCH(request: NextRequest, { params }: Params) {
 export async function DELETE(request: NextRequest, { params }: Params) {
   const auth = await verifyAuth(request);
   if (!isAuthSuccess(auth)) return createErrorResponse(auth.error, auth.status);
+  const deny = await requireModule(auth.data, 'PRODUCTS', 'canDelete');
+  if (deny) return deny;
 
   try {
-    const { userId } = auth.data;
+    const { userId, orgId } = auth.data;
     const { id, variantId } = await params;
     const productId  = Number(id);
     const variantIdN = Number(variantId);
@@ -96,7 +101,7 @@ export async function DELETE(request: NextRequest, { params }: Params) {
       SELECT id FROM product_variants
       WHERE id         = ${variantIdN}
         AND product_id = ${productId}
-        AND user_id    = ${userId}
+        AND org_id     = ${orgId}
       LIMIT 1
     `;
     if (!existing) return createErrorResponse("Variante no encontrada", 404);
@@ -114,7 +119,7 @@ export async function DELETE(request: NextRequest, { params }: Params) {
         DELETE FROM product_variants
         WHERE id         = ${variantIdN}
           AND product_id = ${productId}
-          AND user_id    = ${userId}
+          AND org_id     = ${orgId}
       `;
       return Response.json({ message: "Variante eliminada permanentemente" });
     }
@@ -123,10 +128,11 @@ export async function DELETE(request: NextRequest, { params }: Params) {
     await sql`
       UPDATE product_variants SET
         is_active  = FALSE,
-        updated_at = CURRENT_TIMESTAMP
+        updated_at = CURRENT_TIMESTAMP,
+        updated_by = ${userId}
       WHERE id         = ${variantIdN}
         AND product_id = ${productId}
-        AND user_id    = ${userId}
+        AND org_id     = ${orgId}
     `;
 
     return Response.json({ message: "Variante desactivada correctamente" });

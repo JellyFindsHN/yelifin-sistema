@@ -1,12 +1,14 @@
-// app/page.tsx
+﻿// app/page.tsx
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import {
   Package, ShoppingCart, TrendingUp, Users,
-  DollarSign, Calendar, CheckCircle2, ArrowRight, Zap,
+  DollarSign, Calendar, CheckCircle2, ArrowRight,
 } from "lucide-react";
 import { LandingHeader } from "@/components/landing/landing-header";
 import { LandingCta }    from "@/components/landing/landing-cta";
+import { KontaIcon } from "@/components/shared/konta-icon";
+import { KontaTitle } from "@/components/shared/konta-title";
 
 export default function Home() {
   return (
@@ -35,7 +37,7 @@ export default function Home() {
           </div>
           <div className="grid grid-cols-3 gap-4 sm:gap-8 pt-8 sm:pt-12 max-w-2xl mx-auto">
             {[
-              { value: "$9.99", label: "Por mes" },
+              { value: "$11.99", label: "Por mes" },
               { value: "24/7",  label: "Disponible" },
               { value: "Cloud", label: "En la nube" },
             ].map((s) => (
@@ -61,23 +63,23 @@ export default function Home() {
             <div className="text-center mb-6 sm:mb-8">
               <h3 className="text-xl sm:text-2xl font-bold mb-2">Plan Profesional</h3>
               <div className="flex items-baseline justify-center gap-2">
-                <span className="text-4xl sm:text-5xl font-bold text-primary">$9.99</span>
+                <span className="text-4xl sm:text-5xl font-bold text-primary">$11.99</span>
                 <span className="text-muted-foreground">USD/mes</span>
               </div>
-              <p className="text-sm text-muted-foreground mt-2">Facturación mensual</p>
+              <p className="text-sm text-muted-foreground mt-2">ISV incluido · Facturación mensual</p>
             </div>
             <ul className="space-y-3 sm:space-y-4 mb-6 sm:mb-8">
               {[
-                "Inventario ilimitado con método FIFO",
-                "Punto de venta completo",
-                "Gestión de clientes y lealtad",
-                "Control financiero multi-cuenta",
-                "Gestión de eventos y ferias",
-                "Reportes y análisis detallados",
-                "Soporte prioritario en español",
+                "Inventario sin límite, siempre organizado",
+                "Registra ventas en segundos",
+                "Fideliza a tus mejores clientes",
+                "Controla tus cuentas y gastos",
+                "Organiza tus ferias y eventos",
+                "Ve cómo crece tu negocio",
+                "Soporte en español cuando lo necesitas",
               ].map((item) => (
                 <li key={item} className="flex items-start gap-3">
-                  <CheckCircle2 className="w-5 h-5 text-primary shrink-0 mt-0.5" />
+                  <CheckCircle2 className="size-5 text-primary shrink-0 mt-0.5" />
                   <span className="text-sm sm:text-base">{item}</span>
                 </li>
               ))}
@@ -85,7 +87,7 @@ export default function Home() {
             <Link href="/register" className="block">
               <Button size="lg" className="w-full text-base sm:text-lg h-12 sm:h-14 gap-2 shadow-lg shadow-primary/30">
                 Comenzar prueba gratuita
-                <ArrowRight className="w-4 h-4 sm:w-5 sm:h-5" />
+                <ArrowRight className="size-4 sm:w-5 sm:h-5" />
               </Button>
             </Link>
             <p className="text-xs sm:text-sm text-center text-muted-foreground mt-3 sm:mt-4">
@@ -105,16 +107,16 @@ export default function Home() {
         </div>
         <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-8">
           {[
-            { icon: Package,      bg: "bg-primary/10",     color: "text-primary",      title: "Gestión de Inventario",    desc: "Control preciso con método FIFO, variantes de productos, alertas de stock bajo y seguimiento por lotes." },
-            { icon: ShoppingCart, bg: "bg-emerald-500/10", color: "text-emerald-600",  title: "Punto de Venta",           desc: "Interfaz rápida e intuitiva para registrar ventas, aplicar descuentos y gestionar clientes leales." },
-            { icon: TrendingUp,   bg: "bg-primary/10",     color: "text-primary",      title: "Análisis de Rentabilidad", desc: "Conoce tus ganancias reales por producto, cliente y período. Toma decisiones basadas en datos." },
-            { icon: Users,        bg: "bg-orange-500/10",  color: "text-orange-600",   title: "Base de Clientes",         desc: "Programa de lealtad automático con descuentos progresivos y historial completo de compras." },
-            { icon: DollarSign,   bg: "bg-amber-500/10",   color: "text-amber-600",    title: "Control Financiero",       desc: "Gestiona múltiples cuentas bancarias, efectivo y registra todos tus gastos operativos." },
-            { icon: Calendar,     bg: "bg-rose-500/10",    color: "text-rose-600",     title: "Gestión de Eventos",       desc: "Planifica y analiza ferias y eventos con seguimiento de inventario, gastos y ROI específico." },
+            { icon: Package,      bg: "bg-primary/10",     color: "text-primary",      title: "Tu inventario bajo control",  desc: "Sabe exactamente cuánto tienes de cada producto, cuándo se está acabando y cuánto pagaste por ello. Sin hojas de Excel, sin sorpresas." },
+            { icon: ShoppingCart, bg: "bg-emerald-500/10", color: "text-emerald-600",  title: "Vende más rápido",            desc: "Registra una venta en segundos, aplica descuentos y agrega el cliente al momento. Así de simple." },
+            { icon: TrendingUp,   bg: "bg-primary/10",     color: "text-primary",      title: "¿Estás ganando dinero?",      desc: "Ve cuánto ganas realmente, qué productos te dejan más y en qué época del año vendes mejor. La respuesta siempre a la mano." },
+            { icon: Users,        bg: "bg-orange-500/10",  color: "text-orange-600",   title: "Clientes que regresan",       desc: "Premia a quienes más te compran con descuentos automáticos. Conoce a tus mejores clientes y cuida esa relación." },
+            { icon: DollarSign,   bg: "bg-amber-500/10",   color: "text-amber-600",    title: "El dinero del negocio, claro", desc: "¿Cuánto hay en caja, en el banco, cuánto salió esta semana? Todo en un solo lugar, siempre actualizado." },
+            { icon: Calendar,     bg: "bg-rose-500/10",    color: "text-rose-600",     title: "Ferias y eventos sin estrés", desc: "Prepara lo que llevas, controla las ventas del evento y ve cuánto ganaste cuando termina. Sin perder nada." },
           ].map((f) => (
             <div key={f.title} className="bg-card p-6 sm:p-8 rounded-2xl border hover:shadow-xl hover:border-primary/50 transition-all">
-              <div className={`w-12 h-12 ${f.bg} rounded-xl flex items-center justify-center mb-4`}>
-                <f.icon className={`w-6 h-6 ${f.color}`} />
+              <div className={`size-12 ${f.bg} rounded-xl flex items-center justify-center mb-4`}>
+                <f.icon className={`size-6 ${f.color}`} />
               </div>
               <h3 className="text-lg sm:text-xl font-bold mb-2">{f.title}</h3>
               <p className="text-sm sm:text-base text-muted-foreground">{f.desc}</p>
@@ -129,7 +131,7 @@ export default function Home() {
           <h2 className="text-3xl sm:text-4xl font-bold mb-8 sm:mb-12 text-center">¿Por qué elegir Konta?</h2>
           <div className="grid sm:grid-cols-2 gap-4 sm:gap-6">
             {[
-              { title: "Precio Justo",               desc: "Solo $9.99/mes con todo incluido" },
+              { title: "Precio Justo",               desc: "Solo $11.99 USD/mes, ISV incluido, con todo incluido" },
               { title: "Fácil de Usar",              desc: "Interfaz intuitiva diseñada para emprendedores" },
               { title: "Acceso desde Cualquier Lugar", desc: "Web y móvil, siempre disponible" },
               { title: "Seguro y Confiable",         desc: "Tus datos protegidos en la nube" },
@@ -137,7 +139,7 @@ export default function Home() {
               { title: "Soporte en Español",         desc: "Todo el sistema en tu idioma" },
             ].map((b) => (
               <div key={b.title} className="flex gap-3 sm:gap-4">
-                <CheckCircle2 className="w-5 h-5 sm:w-6 sm:h-6 shrink-0 mt-1" />
+                <CheckCircle2 className="size-5 sm:w-6 sm:h-6 shrink-0 mt-1" />
                 <div>
                   <h3 className="font-bold text-base sm:text-lg mb-1">{b.title}</h3>
                   <p className="text-sm sm:text-base text-primary-foreground/80">{b.desc}</p>
@@ -168,19 +170,19 @@ export default function Home() {
         <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-12">
           <div className="flex flex-col md:flex-row justify-between items-center gap-4 sm:gap-6">
             <div className="flex items-center gap-2">
-              <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center shadow-lg shadow-primary/30">
-                <Zap className="w-5 h-5 text-primary-foreground" />
-              </div>
-              <span className="text-lg sm:text-xl font-bold">Konta</span>
+              <KontaIcon className="size-8 shadow-lg shadow-primary/30 rounded-lg" />
+              <KontaTitle className="h-5 sm:h-6" />
             </div>
             <p className="text-muted-foreground text-xs sm:text-sm text-center">
-              © 2026 hiKonta. Sistema de gestión para emprendedores.
+              © 2026 Konta. Sistema de gestión para emprendedores.
             </p>
             <div className="flex flex-wrap justify-center gap-4 sm:gap-6 text-xs sm:text-sm text-muted-foreground">
-              <Link href="/login"    className="hover:text-primary transition-colors">Iniciar Sesión</Link>
-              <Link href="/register" className="hover:text-primary transition-colors">Registrarse</Link>
-              <Link href="#pricing"  className="hover:text-primary transition-colors">Precios</Link>
-              <Link href="#features" className="hover:text-primary transition-colors">Características</Link>
+              <Link href="/login"      className="hover:text-primary transition-colors">Iniciar Sesión</Link>
+              <Link href="/register"   className="hover:text-primary transition-colors">Registrarse</Link>
+              <Link href="#pricing"    className="hover:text-primary transition-colors">Precios</Link>
+              <Link href="#features"   className="hover:text-primary transition-colors">Características</Link>
+              <Link href="/terms"   className="hover:text-primary transition-colors">Términos de Uso</Link>
+              <Link href="/privacy" className="hover:text-primary transition-colors">Privacidad</Link>
             </div>
           </div>
         </div>

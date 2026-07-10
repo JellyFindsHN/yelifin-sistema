@@ -1,7 +1,7 @@
 // app/api/products/[id]/variants/route.ts
 import { NextRequest } from "next/server";
 import { neon } from "@neondatabase/serverless";
-import { verifyAuth, createErrorResponse, isAuthSuccess } from "@/lib/auth";
+import { verifyAuth, createErrorResponse, isAuthSuccess, requireModule } from "@/lib/auth";
 
 const sql = neon(process.env.DATABASE_URL!);
 
@@ -10,19 +10,21 @@ type Params = { params: Promise<{ id: string }> };
 export async function POST(request: NextRequest, { params }: Params) {
   const auth = await verifyAuth(request);
   if (!isAuthSuccess(auth)) return createErrorResponse(auth.error, auth.status);
+  const deny = await requireModule(auth.data, 'PRODUCTS', 'canEdit');
+  if (deny) return deny;
 
   try {
-    const { userId } = auth.data;
+    const { userId, orgId } = auth.data;
     const { id } = await params;
     const productId = Number(id);
 
     if (isNaN(productId)) return createErrorResponse("ID inválido", 400);
 
-    // Verificar que el producto padre existe y pertenece al usuario
+    // Verificar que el producto padre existe y pertenece a la org
     const [product] = await sql`
       SELECT id FROM products
-      WHERE id      = ${productId}
-        AND user_id = ${userId}
+      WHERE id        = ${productId}
+        AND org_id    = ${orgId}
         AND is_active = TRUE
       LIMIT 1
     `;
@@ -41,22 +43,23 @@ export async function POST(request: NextRequest, { params }: Params) {
       }
     }
 
-    // Verificar SKU duplicado en variantes del mismo usuario
-    if (sku) {
-      const [skuConflict] = await sql`
-        SELECT id FROM product_variants
-        WHERE user_id = ${userId}
-          AND sku     = ${sku}
-        LIMIT 1
-      `;
-      if (skuConflict) {
-        return createErrorResponse("Ya existe una variante con este SKU", 409);
-      }
+    const finalSku = sku?.trim()
+      || `VAR-${Date.now().toString(36).toUpperCase()}${Math.random().toString(36).slice(2, 5).toUpperCase()}`;
+
+    const [skuConflict] = await sql`
+      SELECT id FROM product_variants
+      WHERE org_id = ${orgId}
+        AND sku    = ${finalSku}
+      LIMIT 1
+    `;
+    if (skuConflict) {
+      return createErrorResponse("Ya existe una variante con este SKU", 409);
     }
 
     const [variant] = await sql`
       INSERT INTO product_variants (
-        user_id,
+        org_id,
+        created_by,
         product_id,
         variant_name,
         sku,
@@ -65,10 +68,11 @@ export async function POST(request: NextRequest, { params }: Params) {
         image_url
       )
       VALUES (
+        ${orgId},
         ${userId},
         ${productId},
         ${variant_name.trim()},
-        ${sku            ?? null},
+        ${finalSku},
         ${attributes     ? JSON.stringify(attributes) : null},
         ${price_override !== undefined && price_override !== null && Number(price_override) > 0
             ? Number(price_override)

@@ -33,16 +33,17 @@ export async function GET(request: NextRequest, { params }: Params) {
         up.currency,
         up.locale,
         up.onboarding_completed,
-        us.id                        AS subscription_id,
-        us.status                    AS subscription_status,
-        us.trial_start_date,
-        us.trial_end_date,
-        us.current_period_start,
-        us.current_period_end,
-        us.cancel_at_period_end,
-        us.cancelled_at,
-        us.provider,
-        us.created_at                AS subscription_created_at,
+        o.id                         AS org_id,
+        os.id                        AS subscription_id,
+        os.status                    AS subscription_status,
+        os.trial_start_date,
+        os.trial_end_date,
+        os.current_period_start,
+        os.current_period_end,
+        os.cancel_at_period_end,
+        os.cancelled_at,
+        os.provider,
+        os.created_at                AS subscription_created_at,
         sp.id                        AS plan_id,
         sp.name                      AS plan_name,
         sp.slug                      AS plan_slug,
@@ -51,21 +52,17 @@ export async function GET(request: NextRequest, { params }: Params) {
         sp.max_products,
         sp.max_sales_per_month
       FROM users u
-      LEFT JOIN user_profile       up ON up.user_id = u.id
-      LEFT JOIN user_subscriptions us ON us.user_id = u.id
-      LEFT JOIN subscription_plans sp ON sp.id      = us.plan_id
+      LEFT JOIN user_profile       up ON up.user_id      = u.id
+      LEFT JOIN organizations       o ON o.owner_user_id = u.id
+      LEFT JOIN org_subscriptions  os ON os.org_id       = o.id
+      LEFT JOIN subscription_plans sp ON sp.id           = os.plan_id
       WHERE u.id = ${userId}
-      ORDER BY us.created_at DESC
       LIMIT 1
     `;
 
     if (!user) return createErrorResponse("Usuario no encontrado", 404);
 
-    // Firebase metadata (last sign in / last token refresh)
-    let firebaseMeta: { last_sign_in_time: string | null; last_refresh_time: string | null } = {
-      last_sign_in_time: null,
-      last_refresh_time: null,
-    };
+    let firebaseMeta = { last_sign_in_time: null as string | null, last_refresh_time: null as string | null };
     try {
       const fbUser = await adminAuth.getUser(user.firebase_uid);
       firebaseMeta = {
@@ -74,15 +71,36 @@ export async function GET(request: NextRequest, { params }: Params) {
       };
     } catch { /* usuario puede no existir en Firebase */ }
 
-    // Totales de actividad
-    const [activity] = await sql`
+    // Actividad — usando org_id
+    const orgId = user.org_id;
+    const [activity] = orgId ? await sql`
       SELECT
-        (SELECT COUNT(*) FROM sales       WHERE user_id = ${userId})::int AS total_sales,
-        (SELECT COUNT(*) FROM products    WHERE user_id = ${userId} AND is_active = TRUE)::int AS total_products,
-        (SELECT COUNT(*) FROM transactions WHERE user_id = ${userId})::int AS total_transactions
-    `;
+        (SELECT COUNT(*) FROM sales        WHERE org_id = ${orgId})::int AS total_sales,
+        (SELECT COUNT(*) FROM products     WHERE org_id = ${orgId} AND is_active = TRUE)::int AS total_products,
+        (SELECT COUNT(*) FROM transactions WHERE org_id = ${orgId})::int AS total_transactions
+    ` : [{ total_sales: 0, total_products: 0, total_transactions: 0 }];
 
-    return Response.json({ user: { ...user, ...firebaseMeta }, activity });
+    // Almacenamiento — usando org_id
+    const [storage] = orgId ? await sql`
+      SELECT
+        (SELECT COUNT(*) FROM products                 WHERE org_id = ${orgId})::int AS products,
+        (SELECT COUNT(*) FROM sales                    WHERE org_id = ${orgId})::int AS sales,
+        (SELECT COUNT(*) FROM transactions             WHERE org_id = ${orgId})::int AS transactions,
+        (SELECT COUNT(*) FROM customers                WHERE org_id = ${orgId})::int AS customers,
+        (SELECT COUNT(*) FROM accounts                 WHERE org_id = ${orgId})::int AS accounts,
+        (SELECT COUNT(*) FROM credit_cards             WHERE org_id = ${orgId})::int AS credit_cards,
+        (SELECT COUNT(*) FROM credit_card_transactions WHERE org_id = ${orgId})::int AS cc_transactions,
+        (SELECT COUNT(*) FROM inventory_batches        WHERE org_id = ${orgId})::int AS inventory_batches,
+        (SELECT COUNT(*) FROM inventory_movements      WHERE org_id = ${orgId})::int AS inventory_movements,
+        (SELECT COUNT(*) FROM events                   WHERE org_id = ${orgId})::int AS events,
+        (
+          CASE WHEN (SELECT photo_url FROM users WHERE id = ${userId}) IS NOT NULL THEN 1 ELSE 0 END +
+          CASE WHEN (SELECT business_logo_url FROM user_profile WHERE user_id = ${userId}) IS NOT NULL THEN 1 ELSE 0 END +
+          (SELECT COUNT(*) FROM products WHERE org_id = ${orgId} AND image_url IS NOT NULL)::int
+        )::int AS image_count
+    ` : [{ products: 0, sales: 0, transactions: 0, customers: 0, accounts: 0, credit_cards: 0, cc_transactions: 0, inventory_batches: 0, inventory_movements: 0, events: 0, image_count: 0 }];
+
+    return Response.json({ user: { ...user, ...firebaseMeta }, activity, storage });
   } catch (error) {
     console.error("GET /api/admin/users/[id]:", error);
     return createErrorResponse("Error al obtener usuario", 500);
@@ -100,50 +118,68 @@ export async function PATCH(request: NextRequest, { params }: Params) {
     if (isNaN(userId)) return createErrorResponse("ID inválido", 400);
 
     const body = await request.json();
-    const { is_active, plan_id, subscription_status, trial_end_date, current_period_end } = body;
+    const { is_active, plan_id, subscription_status, trial_end_date, current_period_end, new_password } = body;
 
-    // Prevenir que el admin se desactive a sí mismo
     if (is_active === false && userId === auth.data.userId) {
       return createErrorResponse("No podés desactivar tu propia cuenta", 400);
     }
 
-    await sql`BEGIN`;
-    try {
-      if (is_active !== undefined) {
-        await sql`UPDATE users SET is_active = ${is_active}, updated_at = NOW() WHERE id = ${userId}`;
+    // Obtener firebase_uid y org_id del usuario
+    const [userData] = await sql`
+      SELECT u.firebase_uid, o.id AS org_id
+      FROM users u
+      LEFT JOIN organizations o ON o.owner_user_id = u.id
+      WHERE u.id = ${userId}
+    `;
+    if (!userData) return createErrorResponse("Usuario no encontrado", 404);
+
+    // Actualizar estado activo — sincroniza con Firebase
+    if (is_active !== undefined) {
+      await sql`UPDATE users SET is_active = ${is_active}, updated_at = NOW() WHERE id = ${userId}`;
+      try {
+        await adminAuth.updateUser(userData.firebase_uid, { disabled: !is_active });
+      } catch (fbErr) {
+        console.error("Error sincronizando estado en Firebase:", fbErr);
       }
-
-      const hasSubUpdate = plan_id !== undefined || subscription_status !== undefined ||
-                           trial_end_date !== undefined || current_period_end !== undefined;
-
-      if (hasSubUpdate) {
-        const [current] = await sql`SELECT id FROM user_subscriptions WHERE user_id = ${userId} ORDER BY created_at DESC LIMIT 1`;
-
-        if (current) {
-          await sql`
-            UPDATE user_subscriptions
-            SET
-              plan_id              = COALESCE(${plan_id              ?? null}::bigint,  plan_id),
-              status               = COALESCE(${subscription_status  ?? null}::text,   status),
-              trial_end_date       = COALESCE(${trial_end_date       ?? null}::timestamp, trial_end_date),
-              current_period_end   = COALESCE(${current_period_end   ?? null}::timestamp, current_period_end),
-              updated_at           = NOW()
-            WHERE id = ${current.id}
-          `;
-        } else if (plan_id) {
-          await sql`
-            INSERT INTO user_subscriptions (user_id, plan_id, status, provider, created_at, updated_at)
-            VALUES (${userId}, ${plan_id}, ${subscription_status ?? 'TRIAL'}, 'MANUAL', NOW(), NOW())
-          `;
-        }
-      }
-
-      await sql`COMMIT`;
-      return Response.json({ message: "Usuario actualizado exitosamente" });
-    } catch (innerError) {
-      await sql`ROLLBACK`;
-      throw innerError;
     }
+
+    // Restablecer contraseña
+    if (new_password) {
+      if (new_password.length < 6) return createErrorResponse("La contraseña debe tener al menos 6 caracteres", 400);
+      try {
+        await adminAuth.updateUser(userData.firebase_uid, { password: new_password });
+      } catch (fbErr: any) {
+        return createErrorResponse(fbErr.message ?? "Error al cambiar contraseña", 500);
+      }
+    }
+
+    // Actualizar suscripción de la org
+    const hasSubUpdate = plan_id !== undefined || subscription_status !== undefined ||
+                         trial_end_date !== undefined || current_period_end !== undefined;
+
+    if (hasSubUpdate && userData.org_id) {
+      const [currentSub] = await sql`SELECT id FROM org_subscriptions WHERE org_id = ${userData.org_id}`;
+
+      if (currentSub) {
+        await sql`
+          UPDATE org_subscriptions
+          SET
+            plan_id            = COALESCE(${plan_id             ?? null}::bigint,    plan_id),
+            status             = COALESCE(${subscription_status ?? null}::text,      status),
+            trial_end_date     = COALESCE(${trial_end_date      ?? null}::timestamp, trial_end_date),
+            current_period_end = COALESCE(${current_period_end  ?? null}::timestamp, current_period_end),
+            updated_at         = NOW()
+          WHERE id = ${currentSub.id}
+        `;
+      } else if (plan_id) {
+        await sql`
+          INSERT INTO org_subscriptions (org_id, plan_id, status, provider, created_at, updated_at)
+          VALUES (${userData.org_id}, ${plan_id}, ${subscription_status ?? 'TRIAL'}, 'MANUAL', NOW(), NOW())
+        `;
+      }
+    }
+
+    return Response.json({ message: "Usuario actualizado exitosamente" });
   } catch (error) {
     console.error("PATCH /api/admin/users/[id]:", error);
     return createErrorResponse("Error al actualizar usuario", 500);

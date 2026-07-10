@@ -1,7 +1,7 @@
 // app/api/accounts/[id]/route.ts
 import { NextRequest } from "next/server";
 import { neon } from "@neondatabase/serverless";
-import { verifyAuth, createErrorResponse, isAuthSuccess } from "@/lib/auth";
+import { verifyAuth, createErrorResponse, isAuthSuccess, requireModule } from "@/lib/auth";
 
 const sql = neon(process.env.DATABASE_URL!);
 
@@ -10,9 +10,11 @@ type Params = { params: Promise<{ id: string }> };
 export async function PATCH(request: NextRequest, { params }: Params) {
   const auth = await verifyAuth(request);
   if (!isAuthSuccess(auth)) return createErrorResponse(auth.error, auth.status);
+  const deny = await requireModule(auth.data, 'FINANCES', 'canEdit');
+  if (deny) return deny;
 
   try {
-    const { userId } = auth.data;
+    const { userId, orgId } = auth.data;
     const { id } = await params;
     const accountId = Number(id);
 
@@ -22,10 +24,11 @@ export async function PATCH(request: NextRequest, { params }: Params) {
 
     const [updated] = await sql`
       UPDATE accounts SET
-        name      = COALESCE(${name ?? null}, name),
-        type      = COALESCE(${type ?? null}, type),
-        is_active = COALESCE(${is_active !== undefined ? is_active : null}, is_active)
-      WHERE id = ${accountId} AND user_id = ${userId}
+        name       = COALESCE(${name ?? null}, name),
+        type       = COALESCE(${type ?? null}, type),
+        is_active  = COALESCE(${is_active !== undefined ? is_active : null}, is_active),
+        updated_by = ${userId}
+      WHERE id = ${accountId} AND org_id = ${orgId}
       RETURNING *
     `;
 
@@ -42,17 +45,19 @@ export async function PATCH(request: NextRequest, { params }: Params) {
 export async function DELETE(request: NextRequest, { params }: Params) {
   const auth = await verifyAuth(request);
   if (!isAuthSuccess(auth)) return createErrorResponse(auth.error, auth.status);
+  const deny = await requireModule(auth.data, 'FINANCES', 'canDelete');
+  if (deny) return deny;
 
   try {
-    const { userId } = auth.data;
+    const { userId, orgId } = auth.data;
     const { id } = await params;
     const accountId = Number(id);
 
     if (isNaN(accountId)) return createErrorResponse("ID inválido", 400);
 
     await sql`
-      UPDATE accounts SET is_active = FALSE
-      WHERE id = ${accountId} AND user_id = ${userId}
+      UPDATE accounts SET is_active = FALSE, updated_by = ${userId}
+      WHERE id = ${accountId} AND org_id = ${orgId}
     `;
 
     return Response.json({ message: "Cuenta eliminada correctamente" });

@@ -1,16 +1,18 @@
 // app/api/credit-cards/route.ts
 import { NextRequest } from "next/server";
 import { neon } from "@neondatabase/serverless";
-import { verifyAuth, createErrorResponse, isAuthSuccess } from "@/lib/auth";
+import { verifyAuth, createErrorResponse, isAuthSuccess, requireModule } from "@/lib/auth";
 
 const sql = neon(process.env.DATABASE_URL!);
 
 export async function GET(request: NextRequest) {
   const auth = await verifyAuth(request);
   if (!isAuthSuccess(auth)) return createErrorResponse(auth.error, auth.status);
+  const deny = await requireModule(auth.data, 'FINANCES', 'canView');
+  if (deny) return deny;
 
   try {
-    const { userId } = auth.data;
+    const { userId, orgId } = auth.data;
 
     const cards = await sql`
       SELECT
@@ -18,7 +20,7 @@ export async function GET(request: NextRequest) {
         statement_closing_day, payment_due_day,
         balance, balance_usd, is_active, created_at, updated_at
       FROM credit_cards
-      WHERE user_id = ${userId} AND is_active = TRUE
+      WHERE org_id = ${orgId} AND is_active = TRUE
       ORDER BY name ASC
     `;
 
@@ -32,9 +34,11 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   const auth = await verifyAuth(request);
   if (!isAuthSuccess(auth)) return createErrorResponse(auth.error, auth.status);
+  const deny = await requireModule(auth.data, 'FINANCES', 'canEdit');
+  if (deny) return deny;
 
   try {
-    const { userId } = auth.data;
+    const { userId, orgId } = auth.data;
     const {
       name,
       last_four,
@@ -55,10 +59,11 @@ export async function POST(request: NextRequest) {
 
     const [card] = await sql`
       INSERT INTO credit_cards (
-        user_id, name, last_four, credit_limit,
+        org_id, created_by, name, last_four, credit_limit,
         statement_closing_day, payment_due_day,
         balance, balance_usd
       ) VALUES (
+        ${orgId},
         ${userId},
         ${name.trim()},
         ${last_four ?? null},

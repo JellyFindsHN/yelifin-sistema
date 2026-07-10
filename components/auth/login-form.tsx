@@ -1,10 +1,11 @@
-// components/auth/login-form.tsx
+﻿// components/auth/login-form.tsx
 "use client";
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { signInWithEmailAndPassword } from "firebase/auth";
 import { auth } from "@/lib/firebase";
+import { setTokenCookie, clearTokenCookie } from "@/lib/token-cookie";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -22,7 +23,7 @@ const loginSchema = z.object({
 type LoginFormData = z.infer<typeof loginSchema>;
 
 export function LoginForm() {
-  const router = useRouter();
+  const { push } = useRouter();
   const [isLoading, setIsLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
@@ -48,6 +49,8 @@ export function LoginForm() {
       );
 
       const idToken = await userCredential.user.getIdToken();
+      // Setear la cookie antes de navegar para que el proxy vea la sesión
+      setTokenCookie(idToken);
 
       const response = await fetch("/api/auth/login", {
         method: "POST",
@@ -58,12 +61,13 @@ export function LoginForm() {
       const result = await response.json();
 
       if (!response.ok) {
+        clearTokenCookie();
         await auth.signOut();
         throw new Error(result.error || "Error al iniciar sesión");
       }
 
       toast.success("¡Bienvenido de vuelta!");
-      router.push("/dashboard");
+      push("/dashboard");
     } catch (error: any) {
       console.error("Error en login:", error);
 
@@ -103,7 +107,7 @@ export function LoginForm() {
       {/* Error general del form */}
       {formError && (
         <div className="flex items-start gap-3 rounded-lg border border-destructive/50 bg-destructive/10 px-4 py-3 text-sm text-destructive">
-          <AlertCircle className="h-4 w-4 mt-0.5 shrink-0" />
+          <AlertCircle className="size-4 mt-0.5 shrink-0" />
           <span>{formError}</span>
         </div>
       )}
@@ -191,9 +195,9 @@ export function LoginForm() {
             tabIndex={-1}
           >
             {showPassword ? (
-              <EyeOff className="w-4 h-4" />
+              <EyeOff className="size-4" />
             ) : (
-              <Eye className="w-4 h-4" />
+              <Eye className="size-4" />
             )}
           </button>
         </div>
@@ -205,8 +209,8 @@ export function LoginForm() {
       <Button type="submit" className="w-full" disabled={isLoading}>
         {isLoading ? (
           <>
-            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-            Iniciando sesión...
+            <Loader2 className="mr-2 size-4 animate-spin" />
+            Iniciando sesión…
           </>
         ) : (
           "Iniciar sesión"

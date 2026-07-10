@@ -1,6 +1,6 @@
-"use client";
+﻿"use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -27,6 +27,10 @@ import {
   Banknote, Building2, Wallet,
 } from "lucide-react";
 import {
+  Pagination, PaginationContent, PaginationItem,
+  PaginationLink, PaginationNext, PaginationPrevious, PaginationEllipsis,
+} from "@/components/ui/pagination";
+import {
   PieChart, Pie, Cell, Tooltip, Legend, ResponsiveContainer,
 } from "recharts";
 import {
@@ -35,12 +39,16 @@ import {
 } from "@/hooks/swr/use-transactions";
 import { useSWRConfig } from "swr";
 import { Fab } from "@/components/ui/fab";
+import { useModulePermissions } from "@/hooks/use-module-permissions";
 import { useAccounts } from "@/hooks/swr/use-accounts";
 import { useCurrency } from "@/hooks/swr/use-currency";
 import { useCreditCards, useAllCreditCardTransactions, AllCardTransaction } from "@/hooks/swr/use-credit-cards";
 import { CreateTransactionModal } from "@/components/transactions/create-transaction-modal";
 import { EditTransactionModal } from "@/components/transactions/edit-transaction-modal";
 import { toast } from "sonner";
+import { SearchBar } from "@/components/shared/search-bar";
+import { useDebounce } from "@/hooks/use-debounce";
+import { cn } from "@/lib/utils";
 
 // ── Helpers ────────────────────────────────────────────────────────────
 const formatDate = (d: string) =>
@@ -108,79 +116,158 @@ type Row =
   | { _src: "account"; data: Transaction }
   | { _src: "cc"; data: AllCardTransaction };
 
+// ── Module-level Actions menu (solo transacciones de cuenta) ──────────
+function ActionsMenu({
+  t,
+  isEditable,
+  onEdit,
+  onDelete,
+  canEdit,
+  canDelete,
+}: {
+  t: Transaction;
+  isEditable: (t: Transaction) => boolean;
+  onEdit: (t: Transaction) => void;
+  onDelete: (t: Transaction) => void;
+  canEdit: boolean;
+  canDelete: boolean;
+}) {
+  if (!isEditable(t) || (!canEdit && !canDelete)) return <div className="w-8" />;
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button
+          variant="ghost"
+          size="icon"
+          className="size-8 shrink-0"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <MoreVertical className="size-4" />
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end">
+        {canEdit && (
+          <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onEdit(t); }}>
+            <Pencil className="size-4 mr-2" />
+            Editar
+          </DropdownMenuItem>
+        )}
+        {canDelete && (
+          <>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem
+              className="text-destructive focus:text-destructive"
+              onClick={(e) => { e.stopPropagation(); onDelete(t); }}
+            >
+              <Trash2 className="size-4 mr-2" />
+              Eliminar
+            </DropdownMenuItem>
+          </>
+        )}
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
+
 // ── Page ───────────────────────────────────────────────────────────────
 export default function TransactionsPage() {
-  const router = useRouter();
+  const { push } = useRouter();
   const searchParams = useSearchParams();
   const { mutate: globalMutate } = useSWRConfig();
   const now = new Date();
 
-  const [filterMode,    setFilterMode]    = useState<"month" | "date">("month");
-  const [selectedYear,  setSelectedYear]  = useState(now.getFullYear());
+  const [filterMode, setFilterMode] = useState<"month" | "date">("month");
+  const [selectedYear, setSelectedYear] = useState(now.getFullYear());
   const [selectedMonth, setSelectedMonth] = useState(now.getMonth() + 1);
-  const [specificDate,  setSpecificDate]  = useState("");
-  const [sourceFilter,  setSourceFilter]  = useState<string>(() => {
+  const [specificDate, setSpecificDate] = useState("");
+  const [sourceFilter, setSourceFilter] = useState<string>(() => {
     const accountId = searchParams.get("account_id");
     return accountId ? accountId : "all";
   }); // "all" | "cc-{id}" | account_id
-  const [typeFilter,    setTypeFilter]    = useState("all");
-  const [modalOpen,     setModalOpen]     = useState(false);
+  const [typeFilter, setTypeFilter] = useState("all");
+  const [search, setSearch] = useState("");
+  const [modalOpen, setModalOpen] = useState(false);
+  const [page, setPage] = useState(1);
+  const pageLimit = 15;
 
-  const [editingTx,     setEditingTx]     = useState<Transaction | null>(null);
-  const [deletingTx,    setDeletingTx]    = useState<Transaction | null>(null);
-  const [analyticsTab,  setAnalyticsTab]  = useState<"expense" | "income">("expense");
+  const debouncedSearch = useDebounce(search, 300);
+  const isSearching = debouncedSearch.trim().length > 0;
+
+  const [editingTx, setEditingTx] = useState<Transaction | null>(null);
+  const [deletingTx, setDeletingTx] = useState<Transaction | null>(null);
+  const [analyticsTab, setAnalyticsTab] = useState<"expense" | "income">("expense");
 
   const { deleteTransaction, isDeleting } = useDeleteTransaction();
 
   const periodParams = {
     month: filterMode === "month" ? selectedMonth : undefined,
-    year:  filterMode === "month" ? selectedYear  : undefined,
-    date:  filterMode === "date" && specificDate ? specificDate : undefined,
+    year: filterMode === "month" ? selectedYear : undefined,
+    date: filterMode === "date" && specificDate ? specificDate : undefined,
   };
 
-  const isCardFilter    = sourceFilter.startsWith("cc-");
-  const selectedCardId  = isCardFilter ? Number(sourceFilter.replace("cc-", "")) : undefined;
+  const isCardFilter = sourceFilter.startsWith("cc-");
+  const selectedCardId = isCardFilter ? Number(sourceFilter.replace("cc-", "")) : undefined;
   const isAccountFilter = !isCardFilter && sourceFilter !== "all";
+
+  // Para account transactions: type se envía al server solo cuando aplica
+  // (TRANSFER no existe en CC, INCOME/EXPENSE se mapean en client para CC)
+  const accountTypeFilter =
+    typeFilter === "INCOME" || typeFilter === "EXPENSE" || typeFilter === "TRANSFER"
+      ? typeFilter
+      : undefined;
 
   const { transactions, totals, isLoading: loadingAcc, mutate } = useTransactions({
     account_id: isAccountFilter ? Number(sourceFilter) : undefined,
-    ...periodParams,
+    type: accountTypeFilter,
+    search: isSearching ? debouncedSearch.trim() : undefined,
+    ...(isSearching ? {} : periodParams),
   });
 
   const { transactions: ccTxs, isLoading: loadingCC } = useAllCreditCardTransactions({
     card_id: selectedCardId,
-    ...periodParams,
+    search: isSearching ? debouncedSearch.trim() : undefined,
+    ...(isSearching ? {} : periodParams),
   });
 
-  const { periods }     = useTransactionPeriods();
-  const { accounts }    = useAccounts();
+  const { periods } = useTransactionPeriods();
+  const { accounts } = useAccounts();
   const { creditCards } = useCreditCards();
   const { format } = useCurrency();
+  const { can_edit: canEdit, can_delete: canDelete } = useModulePermissions("FINANCES");
 
   const isLoading = loadingAcc || loadingCC;
 
   const availableYears = [...new Set(periods.map((p) => p.year))].sort((a, b) => b - a);
-  const monthsForYear  = (y: number) =>
+  const monthsForYear = (y: number) =>
     periods.filter((p) => p.year === y).map((p) => p.month).sort((a, b) => b - a);
 
   const neto = totals.income - totals.expense;
 
-  const periodLabel = filterMode === "date" && specificDate
-    ? formatDate(specificDate)
-    : `${MONTH_NAMES[selectedMonth]} ${selectedYear}`;
+  const periodLabel = isSearching
+    ? `Resultados para "${debouncedSearch.trim()}"`
+    : filterMode === "date" && specificDate
+      ? formatDate(specificDate)
+      : `${MONTH_NAMES[selectedMonth]} ${selectedYear}`;
+
+  // Reset page on filter changes
+  useEffect(() => { setPage(1); }, [
+    typeFilter, sourceFilter, filterMode,
+    selectedMonth, selectedYear, specificDate, debouncedSearch,
+  ]);
 
   // ── Merge & filter ─────────────────────────────────────────────────
   const rows = useMemo<Row[]>(() => {
+    // account transactions ya vienen filtradas por type desde el server
     const accRows: Row[] = (isCardFilter ? [] : transactions)
-      .filter((t) => typeFilter === "all" || t.type === typeFilter)
       .map((t) => ({ _src: "account" as const, data: t }));
 
+    // CC transactions se filtran client-side
     const ccRows: Row[] = (isAccountFilter ? [] : ccTxs)
       .filter((t) => {
-        if (typeFilter === "all") return true;
+        if (typeFilter === "all" || typeFilter === "TRANSFER") return typeFilter !== "TRANSFER";
         if (typeFilter === "EXPENSE") return t.type === "CHARGE";
-        if (typeFilter === "INCOME")  return t.type === "PAYMENT";
-        return false;
+        if (typeFilter === "INCOME") return t.type === "PAYMENT";
+        return true;
       })
       .map((t) => ({ _src: "cc" as const, data: t }));
 
@@ -191,11 +278,16 @@ export default function TransactionsPage() {
     );
   }, [transactions, ccTxs, typeFilter, isCardFilter, isAccountFilter]);
 
-  const PIE_COLORS = ["#6366f1","#f59e0b","#10b981","#3b82f6","#ec4899","#8b5cf6","#f97316","#14b8a6"];
+  // ── Paginación client-side de rows ─────────────────────────────────
+  const totalRows = rows.length;
+  const totalPages = Math.max(1, Math.ceil(totalRows / pageLimit));
+  const pagedRows = rows.slice((page - 1) * pageLimit, page * pageLimit);
+
+  const PIE_COLORS = ["#6366f1", "#f59e0b", "#10b981", "#3b82f6", "#ec4899", "#8b5cf6", "#f97316", "#14b8a6"];
 
   const categoryData = useMemo(() => {
     const expenseMap = new Map<string, number>();
-    const incomeMap  = new Map<string, number>();
+    const incomeMap = new Map<string, number>();
 
     for (const row of rows) {
       if (row._src === "account") {
@@ -209,10 +301,13 @@ export default function TransactionsPage() {
       } else {
         const t = row.data;
         const label = t.category?.trim() || "Sin categoría";
+        const amt = t.currency === "USD" && t.amount_local != null
+          ? Number(t.amount_local)
+          : Number(t.amount);
         if (t.type === "CHARGE") {
-          expenseMap.set(label, (expenseMap.get(label) ?? 0) + Number(t.amount));
+          expenseMap.set(label, (expenseMap.get(label) ?? 0) + amt);
         } else {
-          incomeMap.set(label, (incomeMap.get(label) ?? 0) + Number(t.amount));
+          incomeMap.set(label, (incomeMap.get(label) ?? 0) + amt);
         }
       }
     }
@@ -228,7 +323,7 @@ export default function TransactionsPage() {
 
   const handleTransactionClick = (t: Transaction) => {
     if (t.reference_type === "SALE" && t.reference_id) {
-      router.push(`/sales/${t.reference_id}`);
+      push(`/sales/${t.reference_id}`);
     }
   };
 
@@ -257,39 +352,6 @@ export default function TransactionsPage() {
 
   const isEditable = (t: Transaction) => t.reference_type === "OTHER" || !t.reference_type;
 
-  // ── Actions menu (solo transacciones de cuenta) ────────────────────
-  const ActionsMenu = ({ t }: { t: Transaction }) => {
-    if (!isEditable(t)) return <div className="w-8" />;
-    return (
-      <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-8 w-8 shrink-0"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <MoreVertical className="h-4 w-4" />
-          </Button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="end">
-          <DropdownMenuItem onClick={(e) => { e.stopPropagation(); setEditingTx(t); }}>
-            <Pencil className="h-4 w-4 mr-2" />
-            Editar
-          </DropdownMenuItem>
-          <DropdownMenuSeparator />
-          <DropdownMenuItem
-            className="text-destructive focus:text-destructive"
-            onClick={(e) => { e.stopPropagation(); setDeletingTx(t); }}
-          >
-            <Trash2 className="h-4 w-4 mr-2" />
-            Eliminar
-          </DropdownMenuItem>
-        </DropdownMenuContent>
-      </DropdownMenu>
-    );
-  };
-
   // ── Row renderers ──────────────────────────────────────────────────
   const renderMobileCard = (row: Row, i: number) => {
     if (row._src === "account") {
@@ -305,8 +367,8 @@ export default function TransactionsPage() {
         >
           <CardContent className="pl-3.5">
             <div className="flex items-start gap-3">
-              <div className="h-8 w-8 rounded-full bg-muted flex items-center justify-center shrink-0">
-                <Icon className={`h-4 w-4 ${cfg.color}`} />
+              <div className="size-8 rounded-full bg-muted flex items-center justify-center shrink-0">
+                <Icon className={`size-4 ${cfg.color}`} />
               </div>
               <div className="flex-1 min-w-0">
                 <div className="flex items-start justify-between gap-2">
@@ -320,7 +382,8 @@ export default function TransactionsPage() {
                     </p>
                     <p className="text-xs text-muted-foreground">{formatDate(t.occurred_at)}</p>
                   </div>
-                  <div className="flex items-start gap-1 shrink-0">
+                  <div className="flex flex-col items-end gap-1 shrink-0">
+                    <ActionsMenu t={t} isEditable={isEditable} onEdit={setEditingTx} onDelete={setDeletingTx} canEdit={canEdit} canDelete={canDelete} />
                     <div className="text-right">
                       <p className={`text-sm font-bold ${cfg.color}`}>
                         {cfg.sign}{format(Number(t.amount))}
@@ -329,7 +392,6 @@ export default function TransactionsPage() {
                         {cfg.label}
                       </Badge>
                     </div>
-                    <ActionsMenu t={t} />
                   </div>
                 </div>
               </div>
@@ -348,8 +410,8 @@ export default function TransactionsPage() {
       <Card key={`cc-${t.id}`} className="pt-3 pb-2.5">
         <CardContent className="pl-3.5">
           <div className="flex items-start gap-3">
-            <div className="h-8 w-8 rounded-full bg-muted flex items-center justify-center shrink-0">
-              <Icon className={`h-4 w-4 ${cfg.color}`} />
+            <div className="size-8 rounded-full bg-muted flex items-center justify-center shrink-0">
+              <Icon className={`size-4 ${cfg.color}`} />
             </div>
             <div className="flex-1 min-w-0">
               <div className="flex items-start justify-between gap-2">
@@ -401,7 +463,7 @@ export default function TransactionsPage() {
         >
           <TableCell>
             <Badge className={`gap-1 ${cfg.badge}`} variant="outline">
-              <Icon className="h-3 w-3" />
+              <Icon className="size-3" />
               {cfg.label}
             </Badge>
           </TableCell>
@@ -426,7 +488,7 @@ export default function TransactionsPage() {
             {cfg.sign}{format(Number(t.amount))}
           </TableCell>
           <TableCell>
-            <ActionsMenu t={t} />
+            <ActionsMenu t={t} isEditable={isEditable} onEdit={setEditingTx} onDelete={setDeletingTx} canEdit={canEdit} canDelete={canDelete} />
           </TableCell>
         </TableRow>
       );
@@ -441,7 +503,7 @@ export default function TransactionsPage() {
       <TableRow key={`cc-${t.id}`}>
         <TableCell>
           <Badge className={`gap-1 ${cfg.badge}`} variant="outline">
-            <Icon className="h-3 w-3" />
+            <Icon className="size-3" />
             {cfg.label}
           </Badge>
         </TableCell>
@@ -450,7 +512,7 @@ export default function TransactionsPage() {
         </TableCell>
         <TableCell className="text-sm">
           <span className="flex items-center gap-1">
-            <CreditCard className="h-3 w-3 text-muted-foreground shrink-0" />
+            <CreditCard className="size-3 text-muted-foreground shrink-0" />
             {t.card_name}{t.last_four ? ` ···· ${t.last_four}` : ""}
           </span>
         </TableCell>
@@ -488,31 +550,215 @@ export default function TransactionsPage() {
       {/* Header */}
       <div className="flex items-center justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">Transacciones</h1>
+          <h1 className="text-2xl font-semibold tracking-tight">Transacciones</h1>
           <p className="text-muted-foreground text-sm">{periodLabel}</p>
         </div>
       </div>
 
-      {/* Stats */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-        {[
-          { label: "Ingresos",  value: totals.income,  color: "text-green-600",   icon: TrendingUp },
-          { label: "Egresos",   value: totals.expense, color: "text-destructive", icon: TrendingDown },
-          { label: "Neto",      value: neto, color: neto >= 0 ? "text-green-600" : "text-destructive", icon: ArrowLeftRight },
-        ].map((s, index) => (
-          <Card key={s.label} className={index === 2 ? "col-span-2 sm:col-span-1" : ""}>
-            <CardContent className="pl-3">
-              <div className="flex items-center justify-between mb-1.5">
-                <span className="text-[11px] font-medium text-muted-foreground">{s.label}</span>
-                <s.icon className="h-3 w-3 text-muted-foreground shrink-0" />
+      <div className="grid grid-cols-1 md:grid-cols-[3fr_2fr] gap-4 w-full items-stretch">
+        <div className="flex flex-col gap-3">
+          {/* Stats */}
+          <div className="grid grid-cols-2 gap-2">
+            {[
+              { label: "Ingresos", value: totals.income, color: "text-green-600", icon: TrendingUp },
+              { label: "Egresos", value: totals.expense, color: "text-destructive", icon: TrendingDown },
+              { label: "Neto", value: neto, color: neto >= 0 ? "text-green-600" : "text-destructive", icon: ArrowLeftRight },
+            ].map((s, index) => (
+              <Card key={s.label} className={index === 2 ? "col-span-2" : ""}>
+                <CardContent className="pl-3">
+                  <div className="flex items-center justify-between mb-1.5">
+                    <span className="text-[11px] font-medium text-muted-foreground">{s.label}</span>
+                    <s.icon className="size-3 text-muted-foreground shrink-0" />
+                  </div>
+                  <div className={`text-sm font-bold ${s.color}`}>
+                    {isLoading ? <Skeleton className="h-4 w-16" /> : format(s.value)}
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+          {/* Filtros */}
+          <div className="flex-1 space-y-2.5">
+            <div>
+              <SearchBar
+                value={search}
+                onChange={setSearch}
+                size="full"
+                placeholder="Buscar por detalle de la transacción..."
+              />
+              {isSearching && (
+                <p className="text-[11px] text-muted-foreground mt-1">
+                  Búsqueda global: se ignora el filtro de periodo
+                </p>
+              )}
+            </div>
+
+            <div className={isSearching ? "opacity-50 pointer-events-none" : ""}>
+              <div className="grid grid-cols-2 gap-1.5 rounded-xl border">
+                {(["month", "date"] as const).map((mode) => (
+                  <button
+                    key={mode}
+                    onClick={() => setFilterMode(mode)}
+                    className={cn(
+                      "rounded-lg py-2 text-sm font-medium transition-all duration-200",
+                      filterMode === mode
+                        ? "rounded-xl bg-primary/15 text-primary"
+                        : "text-muted-foreground hover:rounded-xl hover:bg-primary/15 hover:text-primary",
+                    )}
+                  >
+                    {mode === "month" ? "Por mes" : "Fecha exacta"}
+                  </button>
+                ))}
               </div>
-              <div className={`text-sm font-bold ${s.color}`}>
-                {isLoading ? <Skeleton className="h-4 w-16" /> : format(s.value)}
-              </div>
-            </CardContent>
-          </Card>
-        ))}
+
+              {filterMode === "month" ? (
+                <div className="grid grid-cols-2 gap-2 mt-2.5">
+                  <Select value={String(selectedMonth)} onValueChange={(v) => setSelectedMonth(Number(v))}>
+                    <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {monthsForYear(selectedYear).map((m) => (
+                        <SelectItem key={m} value={String(m)}>{MONTH_NAMES[m]}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <Select
+                    value={String(selectedYear)}
+                    onValueChange={(v) => {
+                      const y = Number(v);
+                      setSelectedYear(y);
+                      const months = periods.filter((p) => p.year === y).map((p) => p.month);
+                      if (months.length && !months.includes(selectedMonth)) setSelectedMonth(months[0]);
+                    }}
+                  >
+                    <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {availableYears.map((y) => (
+                        <SelectItem key={y} value={String(y)}>{y}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              ) : (
+                <Input
+                  type="date"
+                  value={specificDate}
+                  onChange={(e) => setSpecificDate(e.target.value)}
+                  className="w-full mt-2.5"
+                />
+              )}
+            </div>
+
+            <div className="grid grid-cols-2 gap-2">
+              {/* Fuente: cuentas + tarjetas */}
+              <Select value={sourceFilter} onValueChange={setSourceFilter}>
+                <SelectTrigger className="w-full"><SelectValue placeholder="Fuente" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todas las fuentes</SelectItem>
+                  {accounts.length > 0 && (
+                    <>
+                      <div className="px-2 py-1 text-[10px] font-semibold text-muted-foreground uppercase tracking-wide">
+                        Cuentas
+                      </div>
+                      {accounts.map((a) => (
+                        <SelectItem key={a.id} value={String(a.id)}>{a.name}</SelectItem>
+                      ))}
+                    </>
+                  )}
+                  {creditCards.length > 0 && (
+                    <>
+                      <div className="px-2 py-1 text-[10px] font-semibold text-muted-foreground uppercase tracking-wide">
+                        Tarjetas de crédito
+                      </div>
+                      {creditCards.map((c) => (
+                        <SelectItem key={c.id} value={`cc-${c.id}`}>
+                          {c.name}{c.last_four ? ` ···· ${c.last_four}` : ""}
+                        </SelectItem>
+                      ))}
+                    </>
+                  )}
+                </SelectContent>
+              </Select>
+
+              <Select value={typeFilter} onValueChange={setTypeFilter}>
+                <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todos</SelectItem>
+                  <SelectItem value="INCOME">Ingresos / Pagos CC</SelectItem>
+                  <SelectItem value="EXPENSE">Egresos / Cargos CC</SelectItem>
+                  <SelectItem value="TRANSFER">Transferencias</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+        </div>
+        <div className="h-full">
+          {!isLoading && rows.length > 0 && (
+            <Card className="pt-1 pb-1 h-full">
+              <CardContent className="p-3">
+                <div className="flex items-center justify-between mb-3">
+                  <p className="text-sm font-semibold">Por categoría</p>
+                  <div className="grid grid-cols-2 gap-1.5 rounded-xl border text-xs">
+                    {(["expense", "income"] as const).map((tab) => (
+                      <button
+                        key={tab}
+                        onClick={() => setAnalyticsTab(tab)}
+                        className={cn(
+                          "rounded-lg px-3 py-1.5 font-medium transition-all duration-200",
+                          analyticsTab === tab
+                            ? "rounded-xl bg-primary/15 text-primary"
+                            : "text-muted-foreground hover:rounded-xl hover:bg-primary/15 hover:text-primary",
+                        )}
+                      >
+                        {tab === "expense" ? "Egresos" : "Ingresos"}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                {(analyticsTab === "expense" ? categoryData.expenses : categoryData.income).length === 0 ? (
+                  <p className="text-sm text-muted-foreground text-center py-6">Sin datos</p>
+                ) : (
+                  <ResponsiveContainer width="100%" height={300}>
+                    <PieChart>
+                      <Pie
+                        data={analyticsTab === "expense" ? categoryData.expenses : categoryData.income}
+                        dataKey="value"
+                        nameKey="name"
+                        cx="50%"
+                        cy="42%"
+                        innerRadius={46}
+                        outerRadius={72}
+                        paddingAngle={2}
+                      >
+                        {(analyticsTab === "expense" ? categoryData.expenses : categoryData.income).map((cat, i) => (
+                          <Cell key={cat.name} fill={PIE_COLORS[i % PIE_COLORS.length]} />
+                        ))}
+                      </Pie>
+                      <Tooltip
+                        formatter={(v: number) => format(v)}
+                        contentStyle={{ fontSize: 12, borderRadius: 8, border: "1px solid var(--border)", backgroundColor: "var(--card)", color: "var(--foreground)" }}
+                      />
+                      <Legend
+                        iconType="circle"
+                        iconSize={8}
+                        wrapperStyle={{ fontSize: 11, paddingTop: 8 }}
+                        formatter={(value) => (
+                          <span style={{ color: "var(--foreground)", fontSize: 11 }}>
+                            {value.length > 18 ? value.slice(0, 18) + "…" : value}
+                          </span>
+                        )}
+                      />
+                    </PieChart>
+                  </ResponsiveContainer>
+                )}
+              </CardContent>
+            </Card>
+          )}
+        </div>
+
+
       </div>
+
 
       {/* Banner de cuenta/tarjeta seleccionada */}
       {sourceFilter !== "all" && (() => {
@@ -529,8 +775,8 @@ export default function TransactionsPage() {
           return (
             <Card className="bg-muted/40">
               <CardContent className="p-3 flex items-center gap-3">
-                <div className="h-9 w-9 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
-                  <Icon className="h-4 w-4 text-primary" />
+                <div className="size-9 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
+                  <Icon className="size-4 text-primary" />
                 </div>
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-semibold">{selectedAccount.name}</p>
@@ -547,8 +793,8 @@ export default function TransactionsPage() {
           return (
             <Card className="bg-muted/40">
               <CardContent className="p-3 flex items-center gap-3">
-                <div className="h-9 w-9 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
-                  <CreditCard className="h-4 w-4 text-primary" />
+                <div className="size-9 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
+                  <CreditCard className="size-4 text-primary" />
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-1.5">
@@ -575,157 +821,6 @@ export default function TransactionsPage() {
         return null;
       })()}
 
-      {/* Filtros */}
-      <div className="space-y-2.5">
-        <div className="grid grid-cols-2 rounded-lg border overflow-hidden">
-          {(["month", "date"] as const).map((mode, i) => (
-            <button
-              key={mode}
-              onClick={() => setFilterMode(mode)}
-              className={`py-2 text-xs font-medium transition-colors ${i > 0 ? "border-l" : ""} ${
-                filterMode === mode ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-muted"
-              }`}
-            >
-              {mode === "month" ? "Por mes" : "Fecha exacta"}
-            </button>
-          ))}
-        </div>
-
-        {filterMode === "month" ? (
-          <div className="grid grid-cols-2 gap-2">
-            <Select value={String(selectedMonth)} onValueChange={(v) => setSelectedMonth(Number(v))}>
-              <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
-              <SelectContent>
-                {monthsForYear(selectedYear).map((m) => (
-                  <SelectItem key={m} value={String(m)}>{MONTH_NAMES[m]}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <Select
-              value={String(selectedYear)}
-              onValueChange={(v) => {
-                const y = Number(v);
-                setSelectedYear(y);
-                const months = periods.filter((p) => p.year === y).map((p) => p.month);
-                if (months.length && !months.includes(selectedMonth)) setSelectedMonth(months[0]);
-              }}
-            >
-              <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
-              <SelectContent>
-                {availableYears.map((y) => (
-                  <SelectItem key={y} value={String(y)}>{y}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-        ) : (
-          <Input
-            type="date"
-            value={specificDate}
-            onChange={(e) => setSpecificDate(e.target.value)}
-            className="w-full"
-          />
-        )}
-
-        <div className="grid grid-cols-2 gap-2">
-          {/* Fuente: cuentas + tarjetas */}
-          <Select value={sourceFilter} onValueChange={setSourceFilter}>
-            <SelectTrigger className="w-full"><SelectValue placeholder="Fuente" /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Todas las fuentes</SelectItem>
-              {accounts.length > 0 && (
-                <>
-                  <div className="px-2 py-1 text-[10px] font-semibold text-muted-foreground uppercase tracking-wide">
-                    Cuentas
-                  </div>
-                  {accounts.map((a) => (
-                    <SelectItem key={a.id} value={String(a.id)}>{a.name}</SelectItem>
-                  ))}
-                </>
-              )}
-              {creditCards.length > 0 && (
-                <>
-                  <div className="px-2 py-1 text-[10px] font-semibold text-muted-foreground uppercase tracking-wide">
-                    Tarjetas de crédito
-                  </div>
-                  {creditCards.map((c) => (
-                    <SelectItem key={c.id} value={`cc-${c.id}`}>
-                      {c.name}{c.last_four ? ` ···· ${c.last_four}` : ""}
-                    </SelectItem>
-                  ))}
-                </>
-              )}
-            </SelectContent>
-          </Select>
-
-          <Select value={typeFilter} onValueChange={setTypeFilter}>
-            <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Todos</SelectItem>
-              <SelectItem value="INCOME">Ingresos / Pagos CC</SelectItem>
-              <SelectItem value="EXPENSE">Egresos / Cargos CC</SelectItem>
-              <SelectItem value="TRANSFER">Transferencias</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-      </div>
-
-      {/* Analíticas por categoría */}
-      {!isLoading && rows.length > 0 && (
-        <Card className="pt-1 pb-1">
-          <CardContent className="p-3">
-            <div className="flex items-center justify-between mb-3">
-              <p className="text-sm font-semibold">Por categoría</p>
-              <div className="grid grid-cols-2 rounded-lg border overflow-hidden text-xs">
-                {(["expense", "income"] as const).map((tab, i) => (
-                  <button
-                    key={tab}
-                    onClick={() => setAnalyticsTab(tab)}
-                    className={`px-3 py-1.5 font-medium transition-colors ${i > 0 ? "border-l" : ""} ${
-                      analyticsTab === tab ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-muted"
-                    }`}
-                  >
-                    {tab === "expense" ? "Egresos" : "Ingresos"}
-                  </button>
-                ))}
-              </div>
-            </div>
-            {(analyticsTab === "expense" ? categoryData.expenses : categoryData.income).length === 0 ? (
-              <p className="text-sm text-muted-foreground text-center py-6">Sin datos</p>
-            ) : (
-              <ResponsiveContainer width="100%" height={220}>
-                <PieChart>
-                  <Pie
-                    data={analyticsTab === "expense" ? categoryData.expenses : categoryData.income}
-                    dataKey="value"
-                    nameKey="name"
-                    cx="50%"
-                    cy="45%"
-                    innerRadius={52}
-                    outerRadius={80}
-                    paddingAngle={2}
-                  >
-                    {(analyticsTab === "expense" ? categoryData.expenses : categoryData.income).map((_, i) => (
-                      <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />
-                    ))}
-                  </Pie>
-                  <Tooltip
-                    formatter={(v: number) => format(v)}
-                    contentStyle={{ fontSize: 12, borderRadius: 8, border: "1px solid hsl(var(--border))", backgroundColor: "hsl(var(--card))" }}
-                  />
-                  <Legend
-                    iconType="circle"
-                    iconSize={8}
-                    wrapperStyle={{ fontSize: 11, paddingTop: 8 }}
-                    formatter={(value) => value.length > 18 ? value.slice(0, 18) + "…" : value}
-                  />
-                </PieChart>
-              </ResponsiveContainer>
-            )}
-          </CardContent>
-        </Card>
-      )}
-
       {/* Cards — móvil */}
       <div className="space-y-2.5 lg:hidden">
         {isLoading ? (
@@ -735,14 +830,14 @@ export default function TransactionsPage() {
         ) : rows.length === 0 ? (
           <Card>
             <CardContent className="flex flex-col items-center justify-center py-12">
-              <SlidersHorizontal className="h-10 w-10 text-muted-foreground/40" />
+              <SlidersHorizontal className="size-10 text-muted-foreground/40" />
               <p className="mt-3 text-sm text-muted-foreground">
                 No hay transacciones en este período
               </p>
             </CardContent>
           </Card>
         ) : (
-          rows.map((row, i) => renderMobileCard(row, i))
+          pagedRows.map((row, i) => renderMobileCard(row, i))
         )}
       </div>
 
@@ -777,21 +872,68 @@ export default function TransactionsPage() {
                   </TableCell>
                 </TableRow>
               ) : (
-                rows.map((row) => renderDesktopRow(row))
+                pagedRows.map((row) => renderDesktopRow(row))
               )}
             </TableBody>
           </Table>
         </CardContent>
       </Card>
 
+      {/* Paginación */}
+      {totalPages > 1 && (
+        <div className="flex flex-col items-center gap-2 sm:flex-row sm:justify-between">
+          <p className="text-sm text-muted-foreground order-2 sm:order-1">
+            {totalRows} transacción{totalRows !== 1 ? "es" : ""} · página {page} de {totalPages}
+          </p>
+          <Pagination className="order-1 sm:order-2 w-auto mx-0 justify-end">
+            <PaginationContent>
+              <PaginationItem>
+                <PaginationPrevious
+                  onClick={() => setPage((p) => Math.max(1, p - 1))}
+                  aria-disabled={page === 1}
+                  className={page === 1 ? "pointer-events-none opacity-50" : "cursor-pointer"}
+                />
+              </PaginationItem>
+              {Array.from({ length: totalPages }, (_, i) => i + 1)
+                .filter((p) => p === 1 || p === totalPages || (p >= page - 1 && p <= page + 1))
+                .reduce<(number | "…")[]>((acc, p, i, arr) => {
+                  if (i > 0 && (p as number) - (arr[i - 1] as number) > 1) acc.push("…");
+                  acc.push(p);
+                  return acc;
+                }, [])
+                .map((p, i) =>
+                  p === "…" ? (
+                    <PaginationItem key={`ellipsis-${i}`}><PaginationEllipsis /></PaginationItem>
+                  ) : (
+                    <PaginationItem key={p}>
+                      <PaginationLink isActive={p === page} onClick={() => setPage(p as number)} className="cursor-pointer">
+                        {p}
+                      </PaginationLink>
+                    </PaginationItem>
+                  )
+                )}
+              <PaginationItem>
+                <PaginationNext
+                  onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                  aria-disabled={page === totalPages}
+                  className={page === totalPages ? "pointer-events-none opacity-50" : "cursor-pointer"}
+                />
+              </PaginationItem>
+            </PaginationContent>
+          </Pagination>
+        </div>
+      )}
+
       {/* FAB */}
-      <Fab
-        actions={[{
-          label: "Nueva transacción",
-          icon: ArrowLeftRight,
-          onClick: () => setModalOpen(true),
-        }]}
-      />
+      {canEdit && (
+        <Fab
+          actions={[{
+            label: "Nueva transacción",
+            icon: ArrowLeftRight,
+            onClick: () => setModalOpen(true),
+          }]}
+        />
+      )}
 
       {/* Modal crear */}
       <CreateTransactionModal

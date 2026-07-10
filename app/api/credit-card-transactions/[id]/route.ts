@@ -1,6 +1,6 @@
 import { NextRequest } from "next/server";
 import { neon } from "@neondatabase/serverless";
-import { verifyAuth, createErrorResponse, isAuthSuccess } from "@/lib/auth";
+import { verifyAuth, createErrorResponse, isAuthSuccess, requireModule } from "@/lib/auth";
 
 const sql = neon(process.env.DATABASE_URL!);
 
@@ -10,9 +10,11 @@ export async function PATCH(
 ) {
   const auth = await verifyAuth(request);
   if (!isAuthSuccess(auth)) return createErrorResponse(auth.error, auth.status);
+  const deny = await requireModule(auth.data, 'FINANCES', 'canEdit');
+  if (deny) return deny;
 
   try {
-    const { userId } = auth.data;
+    const { userId, orgId } = auth.data;
     const { id } = await params;
     const txId = Number(id);
     const body = await request.json();
@@ -22,7 +24,7 @@ export async function PATCH(
     const [existing] = await sql`
       SELECT id, type, amount, currency, exchange_rate, amount_local, sale_id, credit_card_id
       FROM credit_card_transactions
-      WHERE id = ${txId} AND user_id = ${userId}
+      WHERE id = ${txId} AND org_id = ${orgId}
     `;
     if (!existing) return createErrorResponse("Transacción no encontrada", 404);
     if (existing.type !== "CHARGE" || existing.sale_id !== null) {
@@ -44,13 +46,13 @@ export async function PATCH(
       await sql`
         UPDATE credit_cards
         SET balance_usd = balance_usd - ${oldAmount}
-        WHERE id = ${existing.credit_card_id} AND user_id = ${userId}
+        WHERE id = ${existing.credit_card_id} AND org_id = ${orgId}
       `;
     } else {
       await sql`
         UPDATE credit_cards
         SET balance = balance - ${oldAmount}
-        WHERE id = ${existing.credit_card_id} AND user_id = ${userId}
+        WHERE id = ${existing.credit_card_id} AND org_id = ${orgId}
       `;
     }
 
@@ -59,13 +61,13 @@ export async function PATCH(
       await sql`
         UPDATE credit_cards
         SET balance_usd = balance_usd + ${newAmount}
-        WHERE id = ${existing.credit_card_id} AND user_id = ${userId}
+        WHERE id = ${existing.credit_card_id} AND org_id = ${orgId}
       `;
     } else {
       await sql`
         UPDATE credit_cards
         SET balance = balance + ${newAmount}
-        WHERE id = ${existing.credit_card_id} AND user_id = ${userId}
+        WHERE id = ${existing.credit_card_id} AND org_id = ${orgId}
       `;
     }
 
@@ -81,8 +83,9 @@ export async function PATCH(
         amount        = ${newAmount},
         currency      = ${newCurrency},
         exchange_rate = ${newCurrency === "USD" ? newExchangeRate : null},
-        amount_local  = ${newAmountLocal}
-      WHERE id = ${txId} AND user_id = ${userId}
+        amount_local  = ${newAmountLocal},
+        updated_by    = ${userId}
+      WHERE id = ${txId} AND org_id = ${orgId}
       RETURNING *
     `;
 
@@ -99,16 +102,18 @@ export async function DELETE(
 ) {
   const auth = await verifyAuth(request);
   if (!isAuthSuccess(auth)) return createErrorResponse(auth.error, auth.status);
+  const deny = await requireModule(auth.data, 'FINANCES', 'canDelete');
+  if (deny) return deny;
 
   try {
-    const { userId } = auth.data;
+    const { userId, orgId } = auth.data;
     const { id } = await params;
     const txId = Number(id);
 
     const [existing] = await sql`
       SELECT id, type, amount, currency, credit_card_id, sale_id
       FROM credit_card_transactions
-      WHERE id = ${txId} AND user_id = ${userId}
+      WHERE id = ${txId} AND org_id = ${orgId}
     `;
     if (!existing) return createErrorResponse("Transacción no encontrada", 404);
     if (existing.type !== "CHARGE" || existing.sale_id !== null) {
@@ -120,19 +125,19 @@ export async function DELETE(
       await sql`
         UPDATE credit_cards
         SET balance_usd = balance_usd - ${Number(existing.amount)}
-        WHERE id = ${existing.credit_card_id} AND user_id = ${userId}
+        WHERE id = ${existing.credit_card_id} AND org_id = ${orgId}
       `;
     } else {
       await sql`
         UPDATE credit_cards
         SET balance = balance - ${Number(existing.amount)}
-        WHERE id = ${existing.credit_card_id} AND user_id = ${userId}
+        WHERE id = ${existing.credit_card_id} AND org_id = ${orgId}
       `;
     }
 
     await sql`
       DELETE FROM credit_card_transactions
-      WHERE id = ${txId} AND user_id = ${userId}
+      WHERE id = ${txId} AND org_id = ${orgId}
     `;
 
     return Response.json({ success: true });

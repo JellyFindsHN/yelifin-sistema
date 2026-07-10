@@ -1,7 +1,7 @@
 // app/api/transaction-categories/route.ts
 import { NextRequest } from "next/server";
 import { neon } from "@neondatabase/serverless";
-import { verifyAuth, createErrorResponse, isAuthSuccess } from "@/lib/auth";
+import { verifyAuth, createErrorResponse, isAuthSuccess, requireModule } from "@/lib/auth";
 
 const sql = neon(process.env.DATABASE_URL!);
 
@@ -11,9 +11,11 @@ type TransactionType = (typeof VALID_TYPES)[number];
 export async function GET(request: NextRequest) {
   const auth = await verifyAuth(request);
   if (!isAuthSuccess(auth)) return createErrorResponse(auth.error, auth.status);
+  const deny = await requireModule(auth.data, 'FINANCES', 'canView');
+  if (deny) return deny;
 
   try {
-    const { userId } = auth.data;
+    const { orgId } = auth.data;
     const { searchParams } = new URL(request.url);
     const type = searchParams.get("type");
 
@@ -27,7 +29,7 @@ export async function GET(request: NextRequest) {
     const categories = await sql`
       SELECT id, name, type, is_active, created_at
       FROM transaction_categories
-      WHERE user_id  = ${userId}
+      WHERE org_id   = ${orgId}
         AND (${type}::text IS NULL OR type = ${type})
         AND is_active = TRUE
       ORDER BY type, name
@@ -43,9 +45,11 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   const auth = await verifyAuth(request);
   if (!isAuthSuccess(auth)) return createErrorResponse(auth.error, auth.status);
+  const deny = await requireModule(auth.data, 'FINANCES', 'canEdit');
+  if (deny) return deny;
 
   try {
-    const { userId } = auth.data;
+    const { userId, orgId } = auth.data;
     const body = await request.json();
     const { name, type } = body;
 
@@ -65,8 +69,8 @@ export async function POST(request: NextRequest) {
     }
 
     const [category] = await sql`
-      INSERT INTO transaction_categories (user_id, name, type)
-      VALUES (${userId}, ${name.trim()}, ${type})
+      INSERT INTO transaction_categories (org_id, created_by, name, type)
+      VALUES (${orgId}, ${userId}, ${name.trim()}, ${type})
       RETURNING *
     `;
 

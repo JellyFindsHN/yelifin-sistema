@@ -10,7 +10,7 @@ export async function GET(request: NextRequest) {
   if (!isAuthSuccess(auth)) return createErrorResponse(auth.error, auth.status);
 
   try {
-    const { userId } = auth.data;
+    const { userId, orgId } = auth.data;
     const { searchParams } = new URL(request.url);
 
     const now = new Date();
@@ -46,17 +46,17 @@ export async function GET(request: NextRequest) {
     // ── Revenue (solo COMPLETED) ───────────────────────────────────────
     const [revenueThis] = await sql`
       SELECT COALESCE(SUM(total), 0) AS revenue FROM sales
-      WHERE user_id = ${userId} AND status = 'COMPLETED'
+      WHERE org_id = ${orgId} AND status = 'COMPLETED'
         AND sold_at >= ${startISO} AND sold_at < ${endISO}
     `;
     const [revenueLast] = await sql`
       SELECT COALESCE(SUM(total), 0) AS revenue FROM sales
-      WHERE user_id = ${userId} AND status = 'COMPLETED'
+      WHERE org_id = ${orgId} AND status = 'COMPLETED'
         AND sold_at >= ${prevStartISO} AND sold_at < ${prevEndISO}
     `;
     const [countThis] = await sql`
       SELECT COUNT(*)::int AS count FROM sales
-      WHERE user_id = ${userId} AND status = 'COMPLETED'
+      WHERE org_id = ${orgId} AND status = 'COMPLETED'
         AND sold_at >= ${startISO} AND sold_at < ${endISO}
     `;
 
@@ -76,17 +76,17 @@ export async function GET(request: NextRequest) {
       ), 0) AS profit
       FROM sale_items si
       JOIN sales s ON s.id = si.sale_id
-      WHERE si.user_id = ${userId} AND s.status = 'COMPLETED'
+      WHERE si.org_id = ${orgId} AND s.status = 'COMPLETED'
         AND s.sold_at >= ${startISO} AND s.sold_at < ${endISO}
     `;
 
     const [profitLast] = await sql`
       SELECT COALESCE(SUM(
-        si.line_total 
+        si.line_total
         - (si.unit_cost * si.quantity)
         - COALESCE(
-            CASE 
-              WHEN (s.subtotal - s.discount) > 0 
+            CASE
+              WHEN (s.subtotal - s.discount) > 0
               THEN (s.tax * si.line_total / (s.subtotal - s.discount))
               ELSE 0
             END,
@@ -95,17 +95,17 @@ export async function GET(request: NextRequest) {
       ), 0) AS profit
       FROM sale_items si
       JOIN sales s ON s.id = si.sale_id
-      WHERE si.user_id = ${userId} AND s.status = 'COMPLETED'
+      WHERE si.org_id = ${orgId} AND s.status = 'COMPLETED'
         AND s.sold_at >= ${prevStartISO} AND s.sold_at < ${prevEndISO}
     `;
 
     // ── Customers ──────────────────────────────────────────────────────
     const [customersTotal] = await sql`
-      SELECT COUNT(*)::int AS count FROM customers WHERE user_id = ${userId}
+      SELECT COUNT(*)::int AS count FROM customers WHERE org_id = ${orgId}
     `;
     const [customersNew] = await sql`
       SELECT COUNT(*)::int AS count FROM customers
-      WHERE user_id = ${userId} AND created_at >= ${startISO} AND created_at < ${endISO}
+      WHERE org_id = ${orgId} AND created_at >= ${startISO} AND created_at < ${endISO}
     `;
 
     // ── Inventory ──────────────────────────────────────────────────────
@@ -117,18 +117,18 @@ export async function GET(request: NextRequest) {
         COUNT(DISTINCT CASE WHEN COALESCE(stock.s, 0) = 0 THEN p.id END)::int AS out_of_stock,
         COUNT(DISTINCT CASE WHEN COALESCE(stock.s, 0) > 0 AND COALESCE(stock.s, 0) < 10 THEN p.id END)::int AS low_stock
       FROM products p
-      LEFT JOIN inventory_batches ib ON ib.product_id = p.id AND ib.user_id = p.user_id
+      LEFT JOIN inventory_batches ib ON ib.product_id = p.id AND ib.org_id = p.org_id
       LEFT JOIN (
         SELECT product_id, SUM(qty_available) AS s
-        FROM inventory_batches WHERE user_id = ${userId} GROUP BY product_id
+        FROM inventory_batches WHERE org_id = ${orgId} GROUP BY product_id
       ) stock ON stock.product_id = p.id
-      WHERE p.user_id = ${userId} AND p.is_active = TRUE
+      WHERE p.org_id = ${orgId} AND p.is_active = TRUE
     `;
 
     // ── Balance ────────────────────────────────────────────────────────
     const [accountsBalance] = await sql`
       SELECT COALESCE(SUM(balance), 0) AS total
-      FROM accounts WHERE user_id = ${userId} AND is_active = TRUE
+      FROM accounts WHERE org_id = ${orgId} AND is_active = TRUE
     `;
 
     // ── Deuda de tarjetas de crédito ───────────────────────────────────
@@ -137,7 +137,7 @@ export async function GET(request: NextRequest) {
         COALESCE(SUM(balance),     0) AS total_local,
         COALESCE(SUM(balance_usd), 0) AS total_usd
       FROM credit_cards
-      WHERE user_id = ${userId} AND is_active = TRUE
+      WHERE org_id = ${orgId} AND is_active = TRUE
     `;
 
     // ── Sales chart (con cálculo correcto de profit) ───────────────────────
@@ -147,7 +147,7 @@ export async function GET(request: NextRequest) {
       DATE(sold_at)::text AS date,
       COALESCE(SUM(total), 0) AS revenue
     FROM sales
-    WHERE user_id = ${userId} AND status = 'COMPLETED'
+    WHERE org_id = ${orgId} AND status = 'COMPLETED'
       AND sold_at >= ${startISO} AND sold_at < ${endISO}
     GROUP BY DATE(sold_at)
   ),
@@ -155,11 +155,11 @@ export async function GET(request: NextRequest) {
     SELECT
       DATE(s.sold_at)::text AS date,
       COALESCE(SUM(
-        si.line_total 
+        si.line_total
         - (si.unit_cost * si.quantity)
         - COALESCE(
-            CASE 
-              WHEN (s.subtotal - s.discount) > 0 
+            CASE
+              WHEN (s.subtotal - s.discount) > 0
               THEN (s.tax * si.line_total / (s.subtotal - s.discount))
               ELSE 0
             END,
@@ -167,8 +167,8 @@ export async function GET(request: NextRequest) {
           )
       ), 0) AS profit
     FROM sales s
-    LEFT JOIN sale_items si ON si.sale_id = s.id AND si.user_id = s.user_id
-    WHERE s.user_id = ${userId} AND s.status = 'COMPLETED'
+    LEFT JOIN sale_items si ON si.sale_id = s.id AND si.org_id = s.org_id
+    WHERE s.org_id = ${orgId} AND s.status = 'COMPLETED'
       AND s.sold_at >= ${startISO} AND s.sold_at < ${endISO}
     GROUP BY DATE(s.sold_at)
   )
@@ -187,7 +187,7 @@ export async function GET(request: NextRequest) {
         COALESCE(payment_method, 'OTHER') AS method,
         COALESCE(SUM(total), 0)           AS amount
       FROM sales
-      WHERE user_id = ${userId} AND status = 'COMPLETED'
+      WHERE org_id = ${orgId} AND status = 'COMPLETED'
         AND sold_at >= ${startISO} AND sold_at < ${endISO}
       GROUP BY COALESCE(payment_method, 'OTHER')
       ORDER BY amount DESC
@@ -212,9 +212,9 @@ export async function GET(request: NextRequest) {
             )
         ), 0) AS profit
       FROM sale_items si
-      JOIN sales s ON s.id = si.sale_id AND s.user_id = si.user_id
+      JOIN sales s ON s.id = si.sale_id AND s.org_id = si.org_id
       JOIN products p ON p.id = si.product_id
-      WHERE si.user_id = ${userId} AND s.status = 'COMPLETED'
+      WHERE si.org_id = ${orgId} AND s.status = 'COMPLETED'
         AND s.sold_at >= ${startISO} AND s.sold_at < ${endISO}
       GROUP BY p.id
       ORDER BY units_sold DESC
@@ -241,8 +241,8 @@ export async function GET(request: NextRequest) {
         ), 0) AS profit
       FROM sales s
       LEFT JOIN customers c ON c.id = s.customer_id
-      LEFT JOIN sale_items si ON si.sale_id = s.id AND si.user_id = s.user_id
-      WHERE s.user_id = ${userId} AND s.status = 'COMPLETED'
+      LEFT JOIN sale_items si ON si.sale_id = s.id AND si.org_id = s.org_id
+      WHERE s.org_id = ${orgId} AND s.status = 'COMPLETED'
         AND s.sold_at >= ${startISO} AND s.sold_at < ${endISO}
       GROUP BY s.id, c.name
       ORDER BY s.sold_at DESC
@@ -255,8 +255,8 @@ export async function GET(request: NextRequest) {
         p.id, p.name, p.sku, p.image_url,
         COALESCE(SUM(ib.qty_available), 0)::int AS stock
       FROM products p
-      LEFT JOIN inventory_batches ib ON ib.product_id = p.id AND ib.user_id = p.user_id
-      WHERE p.user_id = ${userId} AND p.is_active = TRUE
+      LEFT JOIN inventory_batches ib ON ib.product_id = p.id AND ib.org_id = p.org_id
+      WHERE p.org_id = ${orgId} AND p.is_active = TRUE AND p.is_service = FALSE
       GROUP BY p.id
       HAVING COALESCE(SUM(ib.qty_available), 0) < 10
       ORDER BY stock ASC

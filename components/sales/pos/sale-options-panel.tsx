@@ -1,4 +1,4 @@
-// components/sales/pos/sale-options-panel.tsx
+﻿// components/sales/pos/sale-options-panel.tsx
 "use client";
 
 import type React from "react";
@@ -104,7 +104,7 @@ export function SaleOptionsPanel({
           {/* Cliente */}
           <div className="space-y-1.5">
             <Label className="text-xs flex items-center gap-1.5">
-              <User className="h-3.5 w-3.5" />
+              <User className="size-3.5" />
               Cliente
               <span className="text-muted-foreground ml-1">(opcional)</span>
             </Label>
@@ -127,7 +127,7 @@ export function SaleOptionsPanel({
             const colors = TIER_COLOR_CLASSES[loyaltyTier.color] ?? TIER_COLOR_CLASSES.amber;
             return (
               <div className={cn("rounded-xl border px-3 py-2.5 flex items-center gap-2.5", colors.border, colors.bg)}>
-                <Star className={cn("h-3.5 w-3.5 shrink-0", colors.text)} />
+                <Star className={cn("size-3.5 shrink-0", colors.text)} />
                 <div className="flex-1 min-w-0">
                   <p className={cn("text-[11px] font-semibold leading-tight", colors.text)}>
                     Cliente {loyaltyTier.tier_name}
@@ -154,7 +154,7 @@ export function SaleOptionsPanel({
           {/* Cuenta destino */}
           <div className="space-y-1.5">
             <Label className="text-xs flex items-center gap-1.5">
-              <Wallet className="h-3.5 w-3.5" />
+              <Wallet className="size-3.5" />
               Cuenta de destino *
             </Label>
             <Select
@@ -177,7 +177,7 @@ export function SaleOptionsPanel({
           {/* Envío */}
           <div className="space-y-1.5">
             <Label className="text-xs flex items-center gap-1.5">
-              <Truck className="h-3.5 w-3.5" />
+              <Truck className="size-3.5" />
               Costo de envío
               <span className="text-muted-foreground ml-1">(opcional)</span>
             </Label>
@@ -224,7 +224,7 @@ export function SaleOptionsPanel({
               onClick={onOpenSupplies}
               type="button"
             >
-              <FlaskConical className="h-3.5 w-3.5 text-primary" />
+              <FlaskConical className="size-3.5 text-primary" />
               Agregar suministros usados
             </Button>
           )}
@@ -242,7 +242,7 @@ export function SaleOptionsPanel({
             {/* Texto + icono */}
             <div className="flex-1 min-w-0 flex items-center gap-2">
               <Clock
-                className={`h-3.5 w-3.5 shrink-0 ${isPending ? "text-amber-600" : "text-muted-foreground"
+                className={`size-3.5 shrink-0 ${isPending ? "text-amber-600" : "text-muted-foreground"
                   }`}
               />
               <div className="min-w-0">
@@ -266,7 +266,7 @@ export function SaleOptionsPanel({
                 }`}
             >
               <span
-                className={`h-4 w-4 rounded-full bg-white shadow transition-transform ${isPending ? "translate-x-4.5" : "translate-x-0.5"
+                className={`size-4 rounded-full bg-white shadow transition-transform ${isPending ? "translate-x-4.5" : "translate-x-0.5"
                   }`}
               />
             </div>
@@ -283,7 +283,7 @@ export function SaleOptionsPanel({
                 className="gap-1.5 shrink-0"
                 type="button"
               >
-                <ArrowLeft className="h-3.5 w-3.5" />
+                <ArrowLeft className="size-3.5" />
                 Carrito
               </Button>
             )}
@@ -296,12 +296,12 @@ export function SaleOptionsPanel({
             >
               {isCreating ? (
                 <>
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                  Procesando...
+                  <Loader2 className="size-4 animate-spin" />
+                  Procesando…
                 </>
               ) : isPending ? (
                 <>
-                  <Clock className="h-3.5 w-3.5" />
+                  <Clock className="size-3.5" />
                   Guardar pendiente · {format(grandTotal)}
                 </>
               ) : (

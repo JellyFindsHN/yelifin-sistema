@@ -1,4 +1,4 @@
-// components/products/inventory-section/purchase-form.tsx
+﻿// components/products/inventory-section/purchase-form.tsx
 "use client";
 
 import { useState } from "react";
@@ -10,6 +10,7 @@ import {
 } from "@/components/ui/select";
 import { Calculator, Wallet } from "lucide-react";
 import { useAccounts } from "@/hooks/swr/use-accounts";
+import { toLocalDateInput } from "@/lib/date-utils";
 import { useCurrency } from "@/hooks/swr/use-currency";
 
 const TASA_DEFAULT = 24.89;
@@ -41,7 +42,7 @@ export const defaultPurchaseForm = (): PurchaseFormValue => ({
   quantity:      "1",
   unit_cost:     0,
   shipping:      0,
-  purchased_at:  new Date().toISOString().split("T")[0],
+  purchased_at:  toLocalDateInput(new Date()),
   notes:         "",
 });
 
@@ -94,7 +95,7 @@ export function PurchaseForm({ value, onChange, disabled }: Props) {
       {/* Cuenta — ancho completo */}
       <div className="space-y-1.5">
         <Label className="text-sm font-medium flex items-center gap-1.5">
-          <Wallet className="h-3.5 w-3.5 text-muted-foreground" />
+          <Wallet className="size-3.5 text-muted-foreground" />
           Cuenta <span className="text-destructive text-xs">*</span>
         </Label>
         <Select
@@ -273,7 +274,7 @@ export function PurchaseForm({ value, onChange, disabled }: Props) {
       {showSummary && (
         <div className="rounded-lg bg-primary/5 border border-primary/10 p-3 space-y-1.5">
           <div className="flex items-center gap-1.5 text-xs font-medium text-primary mb-2">
-            <Calculator className="h-3.5 w-3.5" />
+            <Calculator className="size-3.5" />
             Resumen
           </div>
           {isUSD && (

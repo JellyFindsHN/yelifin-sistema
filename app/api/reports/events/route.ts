@@ -1,7 +1,7 @@
 // app/api/reports/events/route.ts
 import { NextRequest } from "next/server";
 import { neon } from "@neondatabase/serverless";
-import { verifyAuth, createErrorResponse, isAuthSuccess } from "@/lib/auth";
+import { verifyAuth, createErrorResponse, isAuthSuccess, requireModule, requireFeature } from "@/lib/auth";
 
 const sql = neon(process.env.DATABASE_URL!);
 
@@ -15,9 +15,13 @@ function defaultRange() {
 export async function GET(request: NextRequest) {
   const auth = await verifyAuth(request);
   if (!isAuthSuccess(auth)) return createErrorResponse(auth.error, auth.status);
+  const deny = await requireModule(auth.data, 'REPORTS', 'canView');
+  if (deny) return deny;
+  const denyFeature = await requireFeature(auth.data.orgId, 'reports.events');
+  if (denyFeature) return denyFeature;
 
   try {
-    const { userId } = auth.data;
+    const { userId, orgId } = auth.data;
     const { searchParams } = new URL(request.url);
     const def  = defaultRange();
     const from = searchParams.get("from") ?? def.from;
@@ -46,7 +50,7 @@ export async function GET(request: NextRequest) {
           WHERE t.reference_type = 'EVENT'
             AND t.reference_id   = e.id
             AND t.type           = 'EXPENSE'
-            AND t.user_id        = e.user_id
+            AND t.org_id         = e.org_id
         ), 0)::float AS extra_expenses,
 
         -- Utilidad neta
@@ -59,7 +63,7 @@ export async function GET(request: NextRequest) {
               WHERE t.reference_type = 'EVENT'
                 AND t.reference_id   = e.id
                 AND t.type           = 'EXPENSE'
-                AND t.user_id        = e.user_id
+                AND t.org_id         = e.org_id
             ), 0) AS net_profit,
 
         CASE
@@ -69,12 +73,12 @@ export async function GET(request: NextRequest) {
         END AS status
 
       FROM events e
-      LEFT JOIN sales      s  ON s.event_id  = e.id AND s.status = 'COMPLETED' AND s.user_id = e.user_id
-      LEFT JOIN sale_items si ON si.sale_id  = s.id AND si.user_id = e.user_id
-      WHERE e.user_id     = ${userId}
+      LEFT JOIN sales      s  ON s.event_id  = e.id AND s.status = 'COMPLETED' AND s.org_id = e.org_id
+      LEFT JOIN sale_items si ON si.sale_id  = s.id AND si.org_id = e.org_id
+      WHERE e.org_id      = ${orgId}
         AND e.starts_at  >= ${from}::date
         AND e.starts_at  <  (${to}::date + INTERVAL '1 day')
-      GROUP BY e.id, e.name, e.location, e.starts_at, e.ends_at, e.fixed_cost, e.notes, e.user_id
+      GROUP BY e.id, e.name, e.location, e.starts_at, e.ends_at, e.fixed_cost, e.notes, e.org_id
       ORDER BY e.starts_at DESC
     `;
 

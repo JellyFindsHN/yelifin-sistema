@@ -1,13 +1,11 @@
-// components/credit-cards/pay-credit-card-dialog.tsx
+﻿// components/credit-cards/pay-credit-card-dialog.tsx
 "use client";
 
 import { useState } from "react";
-import { useForm } from "react-hook-form";
+import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
-import {
-  Dialog, DialogContent, DialogHeader, DialogTitle,
-} from "@/components/ui/dialog";
+import { ResponsiveModal } from "@/components/shared/responsive-modal";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -16,16 +14,18 @@ import {
 } from "@/components/ui/select";
 import { Loader2, Banknote } from "lucide-react";
 import { toast } from "sonner";
-import { cn } from "@/lib/utils";
 import { usePayCreditCard, CreditCard } from "@/hooks/swr/use-credit-cards";
 import { useCurrency } from "@/hooks/swr/use-currency";
 import { Account } from "@/hooks/swr/use-accounts";
+import { useTransactionCategories } from "@/hooks/swr/use-transaction-categories";
 
 const schema = z.object({
   account_id:    z.coerce.number().min(1, "Selecciona una cuenta"),
   currency:      z.string().min(1, "Selecciona la moneda"),
   amount:        z.coerce.number().positive("El monto debe ser mayor a 0"),
   exchange_rate: z.coerce.number().positive().optional(),
+  occurred_at:   z.string().min(1, "La fecha es requerida"),
+  category:      z.string().optional(),
   description:   z.string().optional(),
 });
 
@@ -42,11 +42,14 @@ type Props = {
 export function PayCreditCardDialog({ open, onOpenChange, card, accounts, onSuccess }: Props) {
   const { payCreditCard, isPaying } = usePayCreditCard();
   const { currency: nativeCurrency, symbol, format } = useCurrency();
+  const { categories } = useTransactionCategories("EXPENSE");
   const [selectedCurrency, setSelectedCurrency] = useState<string>(nativeCurrency);
 
-  const { register, handleSubmit, reset, setValue, watch, formState: { errors } } = useForm<FormData>({
+  const todayLocal = new Date().toLocaleDateString("en-CA"); // YYYY-MM-DD
+
+  const { register, handleSubmit, reset, setValue, watch, control, formState: { errors } } = useForm<FormData>({
     resolver: zodResolver(schema),
-    defaultValues: { currency: nativeCurrency },
+    defaultValues: { currency: nativeCurrency, occurred_at: todayLocal },
   });
 
   const watchCurrency = watch("currency", nativeCurrency);
@@ -56,7 +59,7 @@ export function PayCreditCardDialog({ open, onOpenChange, card, accounts, onSucc
   const localEquivalent = isUsd && watchAmount && watchRate ? watchAmount * watchRate : null;
 
   const handleClose = () => {
-    reset({ currency: nativeCurrency });
+    reset({ currency: nativeCurrency, occurred_at: todayLocal });
     setSelectedCurrency(nativeCurrency);
     onOpenChange(false);
   };
@@ -73,6 +76,8 @@ export function PayCreditCardDialog({ open, onOpenChange, card, accounts, onSucc
         amount:        data.amount,
         currency:      data.currency,
         exchange_rate: isUsd ? data.exchange_rate : undefined,
+        occurred_at:   new Date(`${data.occurred_at}T12:00:00`).toISOString(),
+        category:      data.category?.trim() || undefined,
         description:   data.description?.trim() || undefined,
       });
       toast.success("Pago registrado exitosamente");
@@ -84,64 +89,46 @@ export function PayCreditCardDialog({ open, onOpenChange, card, accounts, onSucc
   };
 
   return (
-    <Dialog open={open} onOpenChange={(v) => !v && handleClose()}>
-      <DialogContent
-        className={cn(
-          "fixed bottom-0 left-0 right-0 top-auto translate-x-0 translate-y-0",
-          "w-full max-w-full rounded-t-2xl rounded-b-none border-t border-x-0 border-b-0",
-          "max-h-[92dvh] flex flex-col p-0",
-          "sm:bottom-auto sm:left-1/2 sm:right-auto sm:top-1/2",
-          "sm:-translate-x-1/2 sm:-translate-y-1/2",
-          "sm:w-full sm:max-w-md sm:rounded-2xl sm:border sm:max-h-[88vh]",
-          "data-[state=open]:animate-in data-[state=closed]:animate-out",
-          "data-[state=open]:slide-in-from-bottom sm:data-[state=open]:slide-in-from-bottom-[48%]",
-          "data-[state=closed]:slide-out-to-bottom sm:data-[state=closed]:slide-out-to-bottom-[48%]",
-          "duration-300",
-        )}
-        onInteractOutside={(e) => e.preventDefault()}
-        onEscapeKeyDown={handleClose}
-      >
-        <div className="sm:hidden flex justify-center pt-3 pb-1 shrink-0">
-          <div className="w-10 h-1 rounded-full bg-muted-foreground/30" />
-        </div>
-
-        <DialogHeader className="shrink-0 px-5 pt-2 pb-3 sm:pt-5 border-b">
-          <DialogTitle className="flex items-center gap-2 text-lg font-bold">
-            <Banknote className="h-4 w-4 text-primary" />
-            Pagar tarjeta
-          </DialogTitle>
-          {card && (
-            <p className="text-sm text-muted-foreground">
-              {card.name}{card.last_four ? ` ···· ${card.last_four}` : ""}
-            </p>
-          )}
-        </DialogHeader>
-
-        {card && (
-          <div className="shrink-0 px-5 pt-4 pb-0">
-            <div className="bg-muted/50 rounded-xl p-3 grid grid-cols-2 gap-2 text-sm">
-              <div>
-                <p className="text-xs text-muted-foreground">Deuda {nativeCurrency}</p>
-                <p className="font-bold text-destructive">{format(Number(card.balance))}</p>
-              </div>
-              {Number(card.balance_usd) > 0 && (
-                <div>
-                  <p className="text-xs text-muted-foreground">Deuda USD</p>
-                  <p className="font-bold text-destructive">
-                    {new Intl.NumberFormat("es-HN", { style: "currency", currency: "USD", minimumFractionDigits: 2 }).format(Number(card.balance_usd))}
-                  </p>
-                </div>
-              )}
+    <ResponsiveModal
+      open={open}
+      onOpenChange={(v) => !v && handleClose()}
+      title="Pagar tarjeta"
+      icon={Banknote}
+      subtitle={card && `${card.name}${card.last_four ? ` ···· ${card.last_four}` : ""}`}
+      as="form"
+      formProps={{ id: "pay-cc-form", onSubmit: handleSubmit(onSubmit) }}
+      topContent={card && (
+        <div className="shrink-0 px-5 pt-4 pb-0">
+          <div className="bg-muted/50 rounded-xl p-3 grid grid-cols-2 gap-2 text-sm">
+            <div>
+              <p className="text-xs text-muted-foreground">Deuda {nativeCurrency}</p>
+              <p className="font-bold text-destructive">{format(Number(card.balance))}</p>
             </div>
+            {Number(card.balance_usd) > 0 && (
+              <div>
+                <p className="text-xs text-muted-foreground">Deuda USD</p>
+                <p className="font-bold text-destructive">
+                  {new Intl.NumberFormat("es-HN", { style: "currency", currency: "USD", minimumFractionDigits: 2 }).format(Number(card.balance_usd))}
+                </p>
+              </div>
+            )}
           </div>
-        )}
-
-        <form
-          id="pay-cc-form"
-          onSubmit={handleSubmit(onSubmit)}
-          className="flex-1 overflow-y-auto px-5 py-4 space-y-4"
-          style={{ scrollbarWidth: "none" } as React.CSSProperties}
-        >
+        </div>
+      )}
+      footer={
+        <>
+          <Button type="button" variant="outline" onClick={handleClose} disabled={isPaying} className="flex-1 h-11">
+            Cancelar
+          </Button>
+          <Button type="submit" form="pay-cc-form" disabled={isPaying} className="flex-1 h-11 gap-2">
+            {isPaying
+              ? <><Loader2 className="size-4 animate-spin" />Registrando…</>
+              : <><Banknote className="size-4" />Registrar pago</>
+            }
+          </Button>
+        </>
+      }
+    >
           {/* Cuenta */}
           <div className="space-y-1.5">
             <Label className="text-sm font-medium">
@@ -160,6 +147,21 @@ export function PayCreditCardDialog({ open, onOpenChange, card, accounts, onSucc
               </SelectContent>
             </Select>
             {errors.account_id && <p className="text-xs text-destructive">{errors.account_id.message}</p>}
+          </div>
+
+          {/* Fecha del pago */}
+          <div className="space-y-1.5">
+            <Label className="text-sm font-medium">
+              Fecha del pago <span className="text-destructive text-xs">*</span>
+            </Label>
+            <Input
+              type="date"
+              max={todayLocal}
+              {...register("occurred_at")}
+              disabled={isPaying}
+              className="h-11 text-base"
+            />
+            {errors.occurred_at && <p className="text-xs text-destructive">{errors.occurred_at.message}</p>}
           </div>
 
           {/* Moneda del pago */}
@@ -187,7 +189,7 @@ export function PayCreditCardDialog({ open, onOpenChange, card, accounts, onSucc
           {/* Monto */}
           <div className="space-y-1.5">
             <Label className="text-sm font-medium">
-              Monto a pagar ({isUsd ? "USD" : nativeCurrency}) <span className="text-destructive text-xs">*</span>
+              Monto a pagar ({isUsd ? "USD" : symbol}) <span className="text-destructive text-xs">*</span>
             </Label>
             <div className="relative">
               <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm font-medium">
@@ -207,7 +209,7 @@ export function PayCreditCardDialog({ open, onOpenChange, card, accounts, onSucc
           {isUsd && (
             <div className="space-y-1.5">
               <Label className="text-sm font-medium">
-                Tasa de cambio (1 USD = ? {nativeCurrency}) <span className="text-destructive text-xs">*</span>
+                1 USD = cuántos {symbol} <span className="text-destructive text-xs">*</span>
               </Label>
               <Input
                 type="number" step="0.0001" min="0.0001" placeholder="Ej: 24.89"
@@ -217,12 +219,42 @@ export function PayCreditCardDialog({ open, onOpenChange, card, accounts, onSucc
               />
               {errors.exchange_rate && <p className="text-xs text-destructive">{errors.exchange_rate.message}</p>}
               {localEquivalent && localEquivalent > 0 && (
-                <p className="text-xs text-muted-foreground">
-                  Se deducirán {format(localEquivalent)} de la cuenta seleccionada
-                </p>
+                <div className="flex items-center gap-1.5 bg-muted/60 rounded-lg px-3 py-2">
+                  <span className="text-xs text-muted-foreground">Se deducirán de la cuenta:</span>
+                  <span className="text-xs font-semibold">{format(localEquivalent)}</span>
+                </div>
               )}
             </div>
           )}
+
+          {/* Categoría */}
+          <div className="space-y-1.5">
+            <Label className="text-sm font-medium">
+              Categoría
+              <span className="text-xs text-muted-foreground font-normal ml-1">opcional</span>
+            </Label>
+            <Controller
+              control={control}
+              name="category"
+              render={({ field }) => (
+                <Select
+                  value={field.value ?? "__none__"}
+                  onValueChange={(v) => field.onChange(v === "__none__" ? "" : v)}
+                  disabled={isPaying}
+                >
+                  <SelectTrigger className="w-full h-11">
+                    <SelectValue placeholder="Sin categoría" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__none__">Sin categoría</SelectItem>
+                    {categories.filter((c) => c.is_active).map((c) => (
+                      <SelectItem key={c.id} value={c.name}>{c.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
+            />
+          </div>
 
           {/* Descripción opcional */}
           <div className="space-y-1.5">
@@ -237,20 +269,6 @@ export function PayCreditCardDialog({ open, onOpenChange, card, accounts, onSucc
               className="h-11 text-base"
             />
           </div>
-        </form>
-
-        <div className="shrink-0 px-5 py-4 border-t bg-transparent sm:bg-background flex gap-3">
-          <Button type="button" variant="outline" onClick={handleClose} disabled={isPaying} className="flex-1 h-11">
-            Cancelar
-          </Button>
-          <Button type="submit" form="pay-cc-form" disabled={isPaying} className="flex-1 h-11 gap-2">
-            {isPaying
-              ? <><Loader2 className="h-4 w-4 animate-spin" />Registrando...</>
-              : <><Banknote className="h-4 w-4" />Registrar pago</>
-            }
-          </Button>
-        </div>
-      </DialogContent>
-    </Dialog>
+    </ResponsiveModal>
   );
 }

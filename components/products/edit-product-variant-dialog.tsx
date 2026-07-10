@@ -1,13 +1,11 @@
-// components/products/edit-product-variant-dialog.tsx
+﻿// components/products/edit-product-variant-dialog.tsx
 "use client";
 
 import { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
-import {
-  Dialog, DialogContent, DialogHeader, DialogTitle,
-} from "@/components/ui/dialog";
+import { ResponsiveModal } from "@/components/shared/responsive-modal";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -16,7 +14,6 @@ import {
   Hash, ImageIcon, Tag, Layers,
 } from "lucide-react";
 import { toast } from "sonner";
-import { cn } from "@/lib/utils";
 import { useUpdateVariant } from "@/hooks/swr/use-products";
 import { useAuth } from "@/hooks/use-auth";
 import { useCurrency } from "@/hooks/swr/use-currency";
@@ -40,7 +37,11 @@ type FormData = z.infer<typeof schema>;
 
 // ── Tipos ──────────────────────────────────────────────────────────────
 
-type AttributePair = { key: string; value: string };
+function uid() {
+  return Math.random().toString(36).slice(2, 9);
+}
+
+type AttributePair = { id: string; key: string; value: string };
 
 type Props = {
   open:          boolean;
@@ -80,7 +81,7 @@ export function EditProductVariantDialog({
   const [imagePreview,     setImagePreview]      = useState<string | null>(null);
   const [isUploadingImage, setIsUploadingImage]  = useState(false);
   const [attributes,       setAttributes]        = useState<AttributePair[]>([
-    { key: "", value: "" },
+    { id: uid(), key: "", value: "" },
   ]);
 
   const {
@@ -108,10 +109,10 @@ export function EditProductVariantDialog({
 
       if (variant.attributes && Object.keys(variant.attributes).length > 0) {
         setAttributes(
-          Object.entries(variant.attributes).map(([key, value]) => ({ key, value }))
+          Object.entries(variant.attributes).map(([key, value]) => ({ id: uid(), key, value }))
         );
       } else {
-        setAttributes([{ key: "", value: "" }]);
+        setAttributes([{ id: uid(), key: "", value: "" }]);
       }
     }
   }, [variant, open, reset, baseSku, variantIndex]);
@@ -119,20 +120,20 @@ export function EditProductVariantDialog({
   // ── Atributos dinámicos ────────────────────────────────────────────
 
   const addAttribute = () => {
-    setAttributes((prev) => [...prev, { key: "", value: "" }]);
+    setAttributes((prev) => [...prev, { id: uid(), key: "", value: "" }]);
   };
 
-  const removeAttribute = (index: number) => {
-    setAttributes((prev) => prev.filter((_, i) => i !== index));
+  const removeAttribute = (id: string) => {
+    setAttributes((prev) => prev.filter((attr) => attr.id !== id));
   };
 
   const updateAttribute = (
-    index: number,
+    id: string,
     field: "key" | "value",
     value: string
   ) => {
     setAttributes((prev) =>
-      prev.map((attr, i) => (i === index ? { ...attr, [field]: value } : attr))
+      prev.map((attr) => (attr.id === id ? { ...attr, [field]: value } : attr))
     );
   };
 
@@ -205,48 +206,50 @@ export function EditProductVariantDialog({
   if (!variant) return null;
 
   return (
-    <Dialog open={open} onOpenChange={(v) => !v && handleClose()}>
-      <DialogContent
-        className={cn(
-          "fixed bottom-0 left-0 right-0 top-auto translate-x-0 translate-y-0",
-          "w-full max-w-full rounded-t-2xl rounded-b-none border-t border-x-0 border-b-0",
-          "max-h-[92dvh] flex flex-col p-0",
-          "sm:bottom-auto sm:left-1/2 sm:right-auto sm:top-1/2",
-          "sm:-translate-x-1/2 sm:-translate-y-1/2",
-          "sm:w-full sm:max-w-md lg:max-w-xl xl:max-w-xl",
-          "sm:rounded-2xl sm:border sm:max-h-[88vh]",
-          "data-[state=open]:animate-in data-[state=closed]:animate-out",
-          "data-[state=open]:slide-in-from-bottom sm:data-[state=open]:slide-in-from-bottom-[48%]",
-          "data-[state=closed]:slide-out-to-bottom sm:data-[state=closed]:slide-out-to-bottom-[48%]",
-          "duration-300",
-        )}
-        onInteractOutside={(e) => e.preventDefault()}
-        onEscapeKeyDown={handleClose}
-      >
-        {/* Handle móvil */}
-        <div className="sm:hidden flex justify-center pt-3 pb-1 shrink-0">
-          <div className="w-10 h-1 rounded-full bg-muted-foreground/30" />
-        </div>
-
-        {/* Header */}
-        <DialogHeader className="shrink-0 px-5 pt-2 pb-3 sm:pt-5 border-b">
-          <DialogTitle className="flex items-center gap-2 text-lg font-bold">
-            <Layers className="h-4 w-4 text-primary" />
-            Editar variante
-          </DialogTitle>
-          <p className="text-xs text-muted-foreground mt-0.5 truncate">
-            {productName} · precio base {format(basePrice)}
-          </p>
-        </DialogHeader>
-
-        <div
-          className="flex-1 overflow-y-auto px-5 py-4"
-          style={{ scrollbarWidth: "none" } as React.CSSProperties}
-        >
-          <form id="edit-variant-form" onSubmit={handleSubmit(onSubmit)} className="space-y-5">
-
+    <ResponsiveModal
+      open={open}
+      onOpenChange={(v) => !v && handleClose()}
+      title="Editar variante"
+      icon={Layers}
+      subtitle={`${productName} · precio base ${format(basePrice)}`}
+      width="wide"
+      as="form"
+      formProps={{ id: "edit-variant-form", onSubmit: handleSubmit(onSubmit) }}
+      bodyClassName="space-y-5"
+      footer={
+        <>
+          <Button
+            type="button"
+            variant="outline"
+            onClick={handleClose}
+            disabled={isLoading}
+            className="flex-1 h-11"
+          >
+            Cancelar
+          </Button>
+          <Button
+            type="submit"
+            form="edit-variant-form"
+            disabled={isLoading}
+            className="flex-1 h-11 gap-2"
+          >
+            {isLoading ? (
+              <>
+                <Loader2 className="size-4 animate-spin" />
+                {submitLabel}
+              </>
+            ) : (
+              <>
+                <Pencil className="size-4" />
+                {submitLabel}
+              </>
+            )}
+          </Button>
+        </>
+      }
+    >
             <div className="space-y-2">
-              <FieldLabel icon={<ImageIcon className="h-3.5 w-3.5" />} label="Imagen" optional />
+              <FieldLabel icon={<ImageIcon className="size-3.5" />} label="Imagen" optional />
               <ProductImageUpload
                 disabled={isLoading}
                 onChange={setImageFile}
@@ -256,7 +259,7 @@ export function EditProductVariantDialog({
             </div>
 
             <div className="space-y-2">
-              <FieldLabel icon={<Tag className="h-3.5 w-3.5" />} label="Nombre" required />
+              <FieldLabel icon={<Tag className="size-3.5" />} label="Nombre" required />
               <Input
                 {...register("variant_name")}
                 placeholder="Ej: Talla M / Color Rojo / 500g"
@@ -269,7 +272,7 @@ export function EditProductVariantDialog({
             </div>
 
             <div className="space-y-2">
-              <FieldLabel icon={<Hash className="h-3.5 w-3.5" />} label="SKU" required />
+              <FieldLabel icon={<Hash className="size-3.5" />} label="SKU" required />
               <Input
                 {...register("sku")}
                 placeholder="Ej: CAM-NEG-M"
@@ -283,7 +286,7 @@ export function EditProductVariantDialog({
 
             <div className="space-y-2">
               <FieldLabel
-                icon={<DollarSign className="h-3.5 w-3.5" />}
+                icon={<DollarSign className="size-3.5" />}
                 label="Precio especial"
                 optional
               />
@@ -318,7 +321,7 @@ export function EditProductVariantDialog({
             <div className="space-y-3">
               <div className="flex items-center justify-between">
                 <FieldLabel
-                  icon={<Tag className="h-3.5 w-3.5" />}
+                  icon={<Tag className="size-3.5" />}
                   label="Atributos"
                   optional
                 />
@@ -330,24 +333,24 @@ export function EditProductVariantDialog({
                   disabled={isLoading || attributes.length >= 8}
                   className="h-7 text-xs gap-1 text-primary hover:text-primary"
                 >
-                  <Plus className="h-3 w-3" />
+                  <Plus className="size-3" />
                   Agregar
                 </Button>
               </div>
 
               <div className="space-y-2">
-                {attributes.map((attr, index) => (
-                  <div key={index} className="flex items-center gap-2">
+                {attributes.map((attr) => (
+                  <div key={attr.id} className="flex items-center gap-2">
                     <Input
                       value={attr.key}
-                      onChange={(e) => updateAttribute(index, "key", e.target.value)}
+                      onChange={(e) => updateAttribute(attr.id, "key", e.target.value)}
                       placeholder="Ej: Color"
                       disabled={isLoading}
                       className="h-10 text-sm flex-1"
                     />
                     <Input
                       value={attr.value}
-                      onChange={(e) => updateAttribute(index, "value", e.target.value)}
+                      onChange={(e) => updateAttribute(attr.id, "value", e.target.value)}
                       placeholder="Ej: Rojo"
                       disabled={isLoading}
                       className="h-10 text-sm flex-1"
@@ -356,11 +359,11 @@ export function EditProductVariantDialog({
                       type="button"
                       variant="ghost"
                       size="icon"
-                      onClick={() => removeAttribute(index)}
+                      onClick={() => removeAttribute(attr.id)}
                       disabled={isLoading || attributes.length === 1}
-                      className="h-10 w-10 shrink-0 text-muted-foreground hover:text-destructive"
+                      className="size-10 shrink-0 text-muted-foreground hover:text-destructive"
                     >
-                      <Trash2 className="h-3.5 w-3.5" />
+                      <Trash2 className="size-3.5" />
                     </Button>
                   </div>
                 ))}
@@ -371,41 +374,7 @@ export function EditProductVariantDialog({
               </p>
             </div>
 
-          </form>
-        </div>
-
-        {/* Footer */}
-        <div className="shrink-0 px-5 py-4 border-t bg-transparent xl:bg-transparent md:bg-transparent sm:bg-background flex gap-3">
-          <Button
-            type="button"
-            variant="outline"
-            onClick={handleClose}
-            disabled={isLoading}
-            className="flex-1 h-11"
-          >
-            Cancelar
-          </Button>
-          <Button
-            type="submit"
-            form="edit-variant-form"
-            disabled={isLoading}
-            className="flex-1 h-11 gap-2"
-          >
-            {isLoading ? (
-              <>
-                <Loader2 className="h-4 w-4 animate-spin" />
-                {submitLabel}
-              </>
-            ) : (
-              <>
-                <Pencil className="h-4 w-4" />
-                {submitLabel}
-              </>
-            )}
-          </Button>
-        </div>
-      </DialogContent>
-    </Dialog>
+    </ResponsiveModal>
   );
 }
 

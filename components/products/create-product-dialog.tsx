@@ -1,12 +1,10 @@
-"use client";
+﻿"use client";
 
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
-import {
-  Dialog, DialogContent, DialogHeader, DialogTitle,
-} from "@/components/ui/dialog";
+import { ResponsiveModal } from "@/components/shared/responsive-modal";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -25,6 +23,7 @@ import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 
 import { ProductImageUpload } from "./product-image-upload";
 import { InventorySection, InventorySectionValue } from "./inventory-section";
+import { localDateToISO } from "@/lib/date-utils";
 
 const schema = z.object({
   name:        z.string().min(1, "El nombre es requerido"),
@@ -113,7 +112,7 @@ export function CreateProductDialog({ open, onOpenChange, onSuccess }: Props) {
           exchange_rate: d.exchange_rate,
           shipping:      d.shipping,
           notes:         d.notes || undefined,
-          purchased_at:  new Date(d.purchased_at).toISOString(),
+          purchased_at:  localDateToISO(d.purchased_at),
           items: [{
             product_id:    productId,
             quantity:      Number(d.quantity),
@@ -132,7 +131,7 @@ export function CreateProductDialog({ open, onOpenChange, onSuccess }: Props) {
             product_id:   productId,
             quantity:     Number(d.quantity),
             unit_cost:    d.unit_cost || undefined,
-            purchased_at: d.purchased_at || undefined,
+            purchased_at: d.purchased_at ? localDateToISO(d.purchased_at) : undefined,
             notes:        d.notes || undefined,
           }),
         });
@@ -179,43 +178,39 @@ export function CreateProductDialog({ open, onOpenChange, onSuccess }: Props) {
                     : "Crear producto";
 
   return (
-    <Dialog open={open} onOpenChange={(v) => !v && handleClose()}>
-      <DialogContent
-        className={cn(
-          "fixed bottom-0 left-0 right-0 top-auto translate-x-0 translate-y-0",
-          "w-full max-w-full rounded-t-2xl rounded-b-none border-t border-x-0 border-b-0",
-          "max-h-[92dvh] flex flex-col p-0",
-          "sm:bottom-auto sm:left-1/2 sm:right-auto sm:top-1/2",
-          "sm:-translate-x-1/2 sm:-translate-y-1/2",
-          "sm:w-full sm:max-w-md lg:max-w-xl xl:max-w-xl",
-          "sm:rounded-2xl sm:border sm:max-h-[88vh]",
-          "data-[state=open]:animate-in data-[state=closed]:animate-out",
-          "data-[state=open]:slide-in-from-bottom sm:data-[state=open]:slide-in-from-bottom-[48%]",
-          "data-[state=closed]:slide-out-to-bottom sm:data-[state=closed]:slide-out-to-bottom-[48%]",
-          "duration-300",
-        )}
-        onInteractOutside={(e) => e.preventDefault()}
-        onEscapeKeyDown={() => handleClose()}
-      >
-        {/* Handle móvil */}
-        <div className="sm:hidden flex justify-center pt-3 pb-1 shrink-0">
-          <div className="w-10 h-1 rounded-full bg-muted-foreground/30" />
-        </div>
-
-        {/* Header */}
-        <DialogHeader className="shrink-0 px-5 pt-2 pb-3 sm:pt-5 border-b">
-          <DialogTitle className="text-lg font-bold">
-            {isService ? "Nuevo servicio" : "Nuevo producto"}
-          </DialogTitle>
-        </DialogHeader>
-
-        {/* Scroll */}
-        <div
-          className="flex-1 overflow-y-auto px-5 py-4"
-          style={{ scrollbarWidth: "none" } as React.CSSProperties}
-        >
-          <form id="create-product-form" onSubmit={handleSubmit(onSubmit)} className="space-y-5">
-
+    <ResponsiveModal
+      open={open}
+      onOpenChange={(v) => !v && handleClose()}
+      title={isService ? "Nuevo servicio" : "Nuevo producto"}
+      width="wide"
+      as="form"
+      formProps={{ id: "create-product-form", onSubmit: handleSubmit(onSubmit) }}
+      bodyClassName="space-y-5"
+      footer={
+        <>
+          <Button
+            type="button"
+            variant="outline"
+            onClick={handleClose}
+            disabled={isLoading}
+            className="flex-1 h-11"
+          >
+            Cancelar
+          </Button>
+          <Button
+            type="submit"
+            form="create-product-form"
+            disabled={isLoading}
+            className="flex-1 h-11 gap-2"
+          >
+            {isLoading
+              ? <><Loader2 className="size-4 animate-spin" />{submitLabel}</>
+              : <><PackagePlus className="size-4" />{submitLabel}</>
+            }
+          </Button>
+        </>
+      }
+    >
             {/* Toggle de servicio — va primero para que cambie el contexto del form */}
             <div className={cn(
               "flex items-start justify-between gap-4 rounded-xl border p-4 transition-colors",
@@ -226,7 +221,7 @@ export function CreateProductDialog({ open, onOpenChange, onSuccess }: Props) {
                   "mt-0.5 rounded-lg p-1.5 transition-colors",
                   isService ? "bg-primary/10 text-primary" : "bg-muted text-muted-foreground"
                 )}>
-                  <Wrench className="h-4 w-4" />
+                  <Wrench className="size-4" />
                 </div>
                 <div className="space-y-0.5">
                   <p className="text-sm font-medium leading-none">Es un servicio</p>
@@ -246,13 +241,13 @@ export function CreateProductDialog({ open, onOpenChange, onSuccess }: Props) {
 
             {/* Imagen */}
             <div className="space-y-2">
-              <FieldLabel icon={<ImageIcon className="h-3.5 w-3.5" />} label="Imagen" optional />
+              <FieldLabel icon={<ImageIcon className="size-3.5" />} label="Imagen" optional />
               <ProductImageUpload disabled={isLoading} onChange={setImageFile} />
             </div>
 
             {/* Nombre */}
             <div className="space-y-2">
-              <FieldLabel icon={<FileText className="h-3.5 w-3.5" />} label="Nombre" required />
+              <FieldLabel icon={<FileText className="size-3.5" />} label="Nombre" required />
               <Input
                 {...register("name")}
                 placeholder={isService ? "Ej: Mantenimiento de equipo" : "Ej: Camiseta negra talla M"}
@@ -265,7 +260,7 @@ export function CreateProductDialog({ open, onOpenChange, onSuccess }: Props) {
             {/* SKU — opcional para servicios */}
             <div className="space-y-2">
               <FieldLabel
-                icon={<Hash className="h-3.5 w-3.5" />}
+                icon={<Hash className="size-3.5" />}
                 label="SKU"
                 required={!isService}
                 optional={isService}
@@ -293,7 +288,7 @@ export function CreateProductDialog({ open, onOpenChange, onSuccess }: Props) {
 
             {/* Precio */}
             <div className="space-y-2">
-              <FieldLabel icon={<DollarSign className="h-3.5 w-3.5" />} label="Precio de venta" required />
+              <FieldLabel icon={<DollarSign className="size-3.5" />} label="Precio de venta" required />
               <div className="relative">
                 <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground font-medium text-sm">
                   {symbol}
@@ -310,7 +305,7 @@ export function CreateProductDialog({ open, onOpenChange, onSuccess }: Props) {
 
             {/* Descripción */}
             <div className="space-y-2">
-              <FieldLabel icon={<FileText className="h-3.5 w-3.5" />} label="Descripción" optional />
+              <FieldLabel icon={<FileText className="size-3.5" />} label="Descripción" optional />
               <Textarea
                 placeholder={
                   isService
@@ -333,34 +328,7 @@ export function CreateProductDialog({ open, onOpenChange, onSuccess }: Props) {
               />
             )}
 
-          </form>
-        </div>
-
-        {/* Footer */}
-        <div className="shrink-0 px-5 py-4 border-t bg-transparent sm:bg-background flex gap-3">
-          <Button
-            type="button"
-            variant="outline"
-            onClick={handleClose}
-            disabled={isLoading}
-            className="flex-1 h-11"
-          >
-            Cancelar
-          </Button>
-          <Button
-            type="submit"
-            form="create-product-form"
-            disabled={isLoading}
-            className="flex-1 h-11 gap-2"
-          >
-            {isLoading
-              ? <><Loader2 className="h-4 w-4 animate-spin" />{submitLabel}</>
-              : <><PackagePlus className="h-4 w-4" />{submitLabel}</>
-            }
-          </Button>
-        </div>
-      </DialogContent>
-    </Dialog>
+    </ResponsiveModal>
   );
 }
 

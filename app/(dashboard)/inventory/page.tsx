@@ -1,7 +1,7 @@
-// app/(dashboard)/inventory/page.tsx
+﻿// app/(dashboard)/inventory/page.tsx
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -26,80 +26,524 @@ import {
   Package, Warehouse, AlertTriangle, DollarSign,
   Plus, MoreVertical, Pencil, Trash2, PackagePlus,
   ShoppingCart, SlidersHorizontal, ArrowLeftRight,
-  ChevronDown, Layers, Box, Clock, Download, Upload,
+  ChevronDown, Layers, Box, Clock, Download, Upload, X, Eye,
 } from "lucide-react";
+import {
+  Pagination, PaginationContent, PaginationItem,
+  PaginationLink, PaginationNext, PaginationPrevious, PaginationEllipsis,
+} from "@/components/ui/pagination";
 import Image from "next/image";
 import { toast } from "sonner";
 import { SearchBar } from "@/components/shared/search-bar"
 import { cn } from "@/lib/utils";
 
 import { useInventory, VariantStock } from "@/hooks/swr/use-inventory";
+import { useDebounce } from "@/hooks/use-debounce";
 import { useProducts, useDeleteVariant } from "@/hooks/swr/use-products";
 import { Fab } from "@/components/ui/fab";
 import { Product, ProductVariant } from "@/types";
 
-import { CreateProductDialog }        from "@/components/products/create-product-dialog";
+import { CreateProductDialog } from "@/components/products/create-product-dialog";
 import { CreateProductVariantDialog } from "@/components/products/create-product-variant-dialog";
-import { EditProductDialog }          from "@/components/products/edit-product-dialog";
-import { EditProductVariantDialog }   from "@/components/products/edit-product-variant-dialog";
-import { DeleteProductDialog }        from "@/components/products/delete-product-dialog";
-import { AddInventoryDialog }         from "@/components/products/add-inventory-dialog";
-import { AdjustInventoryDialog }      from "@/components/products/adjust-inventory-dialog";
-import { useCurrency }                from "@/hooks/swr/use-currency";
-import { CreateTransactionModal }     from "@/components/transactions/create-transaction-modal";
-import { useAccounts }                from "@/hooks/swr/use-accounts";
-import { useCreditCards }             from "@/hooks/swr/use-credit-cards";
-import { usePurchases }               from "@/hooks/swr/use-purchases";
-import { BatchExportDialog }          from "@/components/inventory/BatchExportDialog";
-import { BatchImportDialog }          from "@/components/inventory/BatchImportDialog";
+import { EditProductDialog } from "@/components/products/edit-product-dialog";
+import { EditProductVariantDialog } from "@/components/products/edit-product-variant-dialog";
+import { DeleteProductDialog } from "@/components/products/delete-product-dialog";
+import { AddInventoryDialog } from "@/components/products/add-inventory-dialog";
+import { AdjustInventoryDialog } from "@/components/products/adjust-inventory-dialog";
+import { useCurrency } from "@/hooks/swr/use-currency";
+import { CreateTransactionModal } from "@/components/transactions/create-transaction-modal";
+import { useAccounts } from "@/hooks/swr/use-accounts";
+import { useCreditCards } from "@/hooks/swr/use-credit-cards";
+import { usePurchases } from "@/hooks/swr/use-purchases";
+import { useMe } from "@/hooks/swr/use-me";
+import { useModulePermissions } from "@/hooks/use-module-permissions";
+import { BatchExportDialog } from "@/components/inventory/BatchExportDialog";
+import { BatchImportDialog } from "@/components/inventory/BatchImportDialog";
 
 // ── Helpers ────────────────────────────────────────────────────────────
 
 const getStockBadge = (stock: number, is_service?: boolean) => {
   if (is_service) return <Badge className="bg-blue-100 text-blue-700 border-blue-200">Servicio</Badge>;
   if (stock === 0) return <Badge variant="destructive">Agotado</Badge>;
-  if (stock < 5)   return <Badge variant="destructive">{stock} uds</Badge>;
-  if (stock < 10)  return <Badge className="bg-yellow-100 text-yellow-700 border-yellow-200">{stock} uds</Badge>;
+  if (stock < 5) return <Badge className="bg-orange-100 text-orange-700 border-orange-200">{stock} uds</Badge>;
+  if (stock < 10) return <Badge className="bg-yellow-100 text-yellow-700 border-yellow-200">{stock} uds</Badge>;
   return <Badge className="bg-green-100 text-green-700 border-green-200">{stock} uds</Badge>;
 };
+
+// ── Module-level action menu components ────────────────────────────────
+
+type InventoryItem = ReturnType<typeof useInventory>["inventory"][0];
+
+function ProductActionsMenu({
+  item,
+  findProduct,
+  setInventoryProduct,
+  setAdjustProduct,
+  setVariantProduct,
+  setEditProduct,
+  setDeleteProduct,
+  onViewDetail,
+  canEdit,
+  canDelete,
+}: {
+  item: InventoryItem;
+  findProduct: (id: number) => Product | null;
+  setInventoryProduct: (p: Product | null) => void;
+  setAdjustProduct: (p: Product | null) => void;
+  setVariantProduct: (p: Product | null) => void;
+  setEditProduct: (p: Product | null) => void;
+  setDeleteProduct: (p: Product | null) => void;
+  onViewDetail: (id: number) => void;
+  canEdit: boolean;
+  canDelete: boolean;
+}) {
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button variant="ghost" size="icon" className="size-8 shrink-0">
+          <MoreVertical className="size-4" />
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
+        <DropdownMenuItem onClick={() => onViewDetail(item.product_id)}>
+          <Eye className="size-4 mr-2 text-muted-foreground" />
+          Ver detalle
+        </DropdownMenuItem>
+        {canEdit && !item.is_service && (
+          <>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem onClick={() => { const p = findProduct(item.product_id); if (p) setInventoryProduct(p); }}>
+              <PackagePlus className="size-4 mr-2 text-primary" />
+              Agregar stock
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => { const p = findProduct(item.product_id); if (p) setAdjustProduct(p); }}>
+              <SlidersHorizontal className="size-4 mr-2 text-muted-foreground" />
+              Ajuste de inventario
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => { const p = findProduct(item.product_id); if (p) setVariantProduct(p); }}>
+              <Layers className="size-4 mr-2 text-muted-foreground" />
+              Agregar variante
+            </DropdownMenuItem>
+          </>
+        )}
+        {canEdit && (
+          <>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem onClick={() => { const p = findProduct(item.product_id); if (p) setEditProduct(p); }}>
+              <Pencil className="size-4 mr-2" />
+              {item.is_service ? "Editar servicio" : "Editar producto"}
+            </DropdownMenuItem>
+          </>
+        )}
+        {canDelete && (
+          <DropdownMenuItem
+            className="text-destructive focus:text-destructive"
+            onClick={() => { const p = findProduct(item.product_id); if (p) setDeleteProduct(p); }}
+          >
+            <Trash2 className="size-4 mr-2" />
+            Eliminar
+          </DropdownMenuItem>
+        )}
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
+
+function VariantActionsMenu({
+  product,
+  variant,
+  setAdjustVariant,
+  setEditVariant,
+  setDeleteVariantTarget,
+  canEdit,
+  canDelete,
+}: {
+  product: Product;
+  variant: ProductVariant;
+  setAdjustVariant: (v: { product: Product; variant: ProductVariant } | null) => void;
+  setEditVariant: (v: { product: Product; variant: ProductVariant } | null) => void;
+  setDeleteVariantTarget: (v: { product: Product; variant: ProductVariant } | null) => void;
+  canEdit: boolean;
+  canDelete: boolean;
+}) {
+  if (!canEdit && !canDelete) return null;
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button variant="ghost" size="icon" className="size-7 shrink-0">
+          <MoreVertical className="size-3.5" />
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end">
+        {canEdit && (
+          <>
+            <DropdownMenuItem onClick={() => setAdjustVariant({ product, variant })}>
+              <SlidersHorizontal className="size-4 mr-2 text-muted-foreground" />
+              Ajuste de inventario
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem onClick={() => setEditVariant({ product, variant })}>
+              <Pencil className="size-4 mr-2" />
+              Editar variante
+            </DropdownMenuItem>
+          </>
+        )}
+        {canDelete && (
+          <>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem
+              className="text-destructive focus:text-destructive"
+              onClick={() => setDeleteVariantTarget({ product, variant })}
+            >
+              <Trash2 className="size-4 mr-2" />
+              Eliminar variante
+            </DropdownMenuItem>
+          </>
+        )}
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
+
+function BaseTableRow({
+  item,
+  format,
+  showCosts,
+}: {
+  item: InventoryItem;
+  format: (v: number) => string;
+  showCosts: boolean;
+}) {
+  return (
+    <TableRow className="bg-muted/20 hover:bg-muted/30">
+      <TableCell>
+        <div className="flex items-center gap-3 pl-10">
+          <div className="relative size-8 rounded-md overflow-hidden bg-muted flex items-center justify-center shrink-0">
+            {item.image_url
+              ? <Image src={item.image_url} alt={item.product_name} fill className="object-cover" />
+              : <Box className="size-3.5 text-muted-foreground/40" />
+            }
+          </div>
+          <div>
+            <p className="text-sm font-medium">{item.product_name}</p>
+            <p className="text-xs text-muted-foreground">Producto base</p>
+          </div>
+        </div>
+      </TableCell>
+      <TableCell className="font-mono text-xs text-muted-foreground">
+        {item.sku ?? "—"}
+      </TableCell>
+      <TableCell>{getStockBadge(Number(item.base_stock))}</TableCell>
+      {showCosts && (
+        <TableCell className="text-sm">
+          {Number(item.base_stock) > 0 ? format(item.base_avg_unit_cost) : "—"}
+        </TableCell>
+      )}
+      <TableCell className="text-sm">{format(item.price)}</TableCell>
+      <TableCell className="text-right text-sm font-medium">
+        {Number(item.base_stock) > 0 ? format(item.base_total_value) : "—"}
+      </TableCell>
+      <TableCell />
+    </TableRow>
+  );
+}
+
+function VariantTableRow({
+  variantStock,
+  product,
+  format,
+  showCosts,
+  canEdit,
+  canDelete,
+  findVariant,
+  setAdjustVariant,
+  setEditVariant,
+  setDeleteVariantTarget,
+}: {
+  variantStock: VariantStock;
+  product: Product | null;
+  format: (v: number) => string;
+  showCosts: boolean;
+  canEdit: boolean;
+  canDelete: boolean;
+  findVariant: (product: Product, variantId: number) => ProductVariant | null;
+  setAdjustVariant: (v: { product: Product; variant: ProductVariant } | null) => void;
+  setEditVariant: (v: { product: Product; variant: ProductVariant } | null) => void;
+  setDeleteVariantTarget: (v: { product: Product; variant: ProductVariant } | null) => void;
+}) {
+  const pv = product ? findVariant(product, variantStock.variant_id) : null;
+
+  return (
+    <TableRow className="bg-muted/30 hover:bg-muted/50">
+      <TableCell>
+        <div className="flex items-center gap-3 pl-10">
+          <div className="relative size-8 rounded-md overflow-hidden bg-muted flex items-center justify-center shrink-0">
+            {(variantStock.image_url ?? product?.image_url)
+              ? <Image
+                src={(variantStock.image_url ?? product?.image_url)!}
+                alt={variantStock.variant_name}
+                fill
+                className="object-cover"
+              />
+              : <Layers className="size-3.5 text-muted-foreground/40" />
+            }
+          </div>
+          <div className="min-w-0">
+            <p className="text-sm font-medium truncate">{variantStock.variant_name}</p>
+            {variantStock.attributes && Object.keys(variantStock.attributes).length > 0 && (
+              <div className="flex flex-wrap gap-1 mt-0.5">
+                {Object.entries(variantStock.attributes).map(([k, v]) => (
+                  <span key={k} className="text-xs bg-muted text-muted-foreground px-1.5 py-0.5 rounded-md">
+                    {k}: {v}
+                  </span>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      </TableCell>
+      <TableCell className="font-mono text-xs text-muted-foreground">
+        {variantStock.sku || "—"}
+      </TableCell>
+      <TableCell>{getStockBadge(Number(variantStock.stock))}</TableCell>
+      {showCosts && (
+        <TableCell className="text-sm">
+          {Number(variantStock.stock) > 0 ? format(variantStock.avg_unit_cost) : "—"}
+        </TableCell>
+      )}
+      <TableCell className="text-sm">
+        {variantStock.price_override != null
+          ? format(variantStock.price_override)
+          : product
+            ? <span className="text-xs text-muted-foreground">Base: {format(product.price)}</span>
+            : "—"
+        }
+      </TableCell>
+      <TableCell className="text-right text-sm font-medium">
+        {Number(variantStock.stock) > 0 ? format(variantStock.total_value) : "—"}
+      </TableCell>
+      <TableCell>
+        {pv && product && (
+          <VariantActionsMenu
+            product={product}
+            variant={pv}
+            setAdjustVariant={setAdjustVariant}
+            setEditVariant={setEditVariant}
+            setDeleteVariantTarget={setDeleteVariantTarget}
+            canEdit={canEdit}
+            canDelete={canDelete}
+          />
+        )}
+      </TableCell>
+    </TableRow>
+  );
+}
+
+function BaseCard({
+  item,
+  format,
+  showCosts,
+}: {
+  item: InventoryItem;
+  format: (v: number) => string;
+  showCosts: boolean;
+}) {
+  return (
+    <div className="rounded-lg border bg-muted/20 overflow-hidden">
+      <div className="flex items-center gap-3 px-3 py-2.5">
+        <div className="relative size-9 rounded-md overflow-hidden bg-muted flex items-center justify-center shrink-0">
+          {item.image_url
+            ? <Image src={item.image_url} alt={item.product_name} fill className="object-cover" />
+            : <Box className="size-3.5 text-muted-foreground/40" />
+          }
+        </div>
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center justify-between gap-2">
+            <div>
+              <p className="text-sm font-medium">{item.product_name}</p>
+              <p className="text-xs text-muted-foreground">Producto base</p>
+            </div>
+            {getStockBadge(Number(item.base_stock))}
+          </div>
+        </div>
+      </div>
+      <div className={`grid gap-2 px-3 pb-2.5 text-center border-t ${showCosts ? "grid-cols-3" : "grid-cols-2"}`}>
+        {showCosts && (
+          <div className="pt-2">
+            <p className="text-xs text-muted-foreground">Costo prom.</p>
+            <p className="text-sm font-medium">
+              {Number(item.base_stock) > 0 ? format(item.base_avg_unit_cost) : "—"}
+            </p>
+          </div>
+        )}
+        <div className="pt-2">
+          <p className="text-xs text-muted-foreground">Precio venta</p>
+          <p className="text-sm font-medium">{format(item.price)}</p>
+        </div>
+        <div className="pt-2">
+          <p className="text-xs text-muted-foreground">Valor total</p>
+          <p className="text-sm font-bold text-primary">
+            {Number(item.base_stock) > 0 ? format(item.base_total_value) : "—"}
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function VariantCard({
+  variantStock,
+  product,
+  format,
+  showCosts,
+  canEdit,
+  canDelete,
+  findVariant,
+  setAdjustVariant,
+  setEditVariant,
+  setDeleteVariantTarget,
+}: {
+  variantStock: VariantStock;
+  product: Product | null;
+  format: (v: number) => string;
+  showCosts: boolean;
+  canEdit: boolean;
+  canDelete: boolean;
+  findVariant: (product: Product, variantId: number) => ProductVariant | null;
+  setAdjustVariant: (v: { product: Product; variant: ProductVariant } | null) => void;
+  setEditVariant: (v: { product: Product; variant: ProductVariant } | null) => void;
+  setDeleteVariantTarget: (v: { product: Product; variant: ProductVariant } | null) => void;
+}) {
+  const pv = product ? findVariant(product, variantStock.variant_id) : null;
+  const salePrice = variantStock.price_override != null
+    ? variantStock.price_override
+    : product?.price ?? 0;
+
+  return (
+    <div className="rounded-lg border bg-muted/30 overflow-hidden">
+      <div className="flex items-center gap-3 px-3 py-2.5">
+        <div className="relative size-9 rounded-md overflow-hidden bg-muted flex items-center justify-center shrink-0">
+          {(variantStock.image_url ?? product?.image_url)
+            ? <Image
+              src={(variantStock.image_url ?? product?.image_url)!}
+              alt={variantStock.variant_name}
+              fill
+              className="object-cover"
+            />
+            : <Layers className="size-3.5 text-muted-foreground/40" />
+          }
+        </div>
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center justify-between gap-2">
+            <div className="min-w-0">
+              <p className="text-sm font-medium truncate">{variantStock.variant_name}</p>
+              {variantStock.sku && (
+                <p className="text-xs text-muted-foreground font-mono">{variantStock.sku}</p>
+              )}
+              {variantStock.attributes && (
+                <div className="flex flex-wrap gap-1 mt-0.5">
+                  {Object.entries(variantStock.attributes).map(([k, v]) => (
+                    <span key={k} className="text-xs bg-background text-muted-foreground px-1.5 py-0.5 rounded border">
+                      {k}: {v}
+                    </span>
+                  ))}
+                </div>
+              )}
+            </div>
+            <div className="flex items-center gap-1 shrink-0">
+              {getStockBadge(Number(variantStock.stock))}
+              {pv && product && (
+                <VariantActionsMenu
+                  product={product}
+                  variant={pv}
+                  setAdjustVariant={setAdjustVariant}
+                  setEditVariant={setEditVariant}
+                  setDeleteVariantTarget={setDeleteVariantTarget}
+                  canEdit={canEdit}
+                  canDelete={canDelete}
+                />
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+      <div className={`grid gap-2 px-3 pb-2.5 text-center border-t ${showCosts ? "grid-cols-3" : "grid-cols-2"}`}>
+        {showCosts && (
+          <div className="pt-2">
+            <p className="text-xs text-muted-foreground">Costo prom.</p>
+            <p className="text-sm font-medium">
+              {Number(variantStock.stock) > 0 ? format(variantStock.avg_unit_cost) : "—"}
+            </p>
+          </div>
+        )}
+        <div className="pt-2">
+          <p className="text-xs text-muted-foreground">Precio venta</p>
+          <p className="text-sm font-medium">{format(salePrice)}</p>
+        </div>
+        <div className="pt-2">
+          <p className="text-xs text-muted-foreground">Valor total</p>
+          <p className="text-sm font-bold text-primary">
+            {Number(variantStock.stock) > 0 ? format(variantStock.total_value) : "—"}
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 // ── Page ───────────────────────────────────────────────────────────────
 
 export default function InventoryPage() {
-  const router = useRouter();
-  const { inventory, stats, isLoading: loadingInventory, mutate: mutateInventory } = useInventory();
+  const { push } = useRouter();
+
+  const [search, setSearch] = useState("");
+  const [stockFilter, setStockFilter] = useState("in_stock");
+  const [page, setPage] = useState(1);
+  const pageLimit = 15;
+
+  const debouncedSearch = useDebounce(search, 300);
+
+  useEffect(() => { setPage(1); }, [debouncedSearch, stockFilter]);
+
+  const { inventory, stats, total, totalPages, isLoading: loadingInventory, mutate: mutateInventory } = useInventory({
+    search: debouncedSearch || undefined,
+    stock: stockFilter !== "all" ? stockFilter : undefined,  // "all" omits the param so API returns everything
+    page,
+    limit: pageLimit,
+  });
   const { products, mutate: mutateProducts } = useProducts();
   const { deleteVariant, isDeleting: isDeletingVariant } = useDeleteVariant();
 
-  const [search,      setSearch]      = useState("");
-  const [stockFilter, setStockFilter] = useState("all");
-  const [expanded,    setExpanded]    = useState<Set<number>>(new Set());
+  const [expanded, setExpanded] = useState<Set<number>>(new Set());
 
   // Diálogos de producto
-  const [createOpen,       setCreateOpen]       = useState(false);
-  const [transactionOpen,  setTransactionOpen]  = useState(false);
-  const [editProduct,      setEditProduct]      = useState<Product | null>(null);
-  const [deleteProduct,    setDeleteProduct]    = useState<Product | null>(null);
+  const [createOpen, setCreateOpen] = useState(false);
+  const [transactionOpen, setTransactionOpen] = useState(false);
+  const [editProduct, setEditProduct] = useState<Product | null>(null);
+  const [deleteProduct, setDeleteProduct] = useState<Product | null>(null);
   const [inventoryProduct, setInventoryProduct] = useState<Product | null>(null);
-  const [adjustProduct,    setAdjustProduct]    = useState<Product | null>(null);
+  const [adjustProduct, setAdjustProduct] = useState<Product | null>(null);
 
   // Diálogos de carga masiva
   const [batchExportOpen, setBatchExportOpen] = useState(false);
   const [batchImportOpen, setBatchImportOpen] = useState(false);
 
   // Diálogos de variante
-  const [variantProduct,      setVariantProduct]      = useState<Product | null>(null);
-  const [editVariant,         setEditVariant]         = useState<{ product: Product; variant: ProductVariant } | null>(null);
+  const [variantProduct, setVariantProduct] = useState<Product | null>(null);
+  const [editVariant, setEditVariant] = useState<{ product: Product; variant: ProductVariant } | null>(null);
   const [deleteVariantTarget, setDeleteVariantTarget] = useState<{ product: Product; variant: ProductVariant } | null>(null);
-  const [adjustVariant,       setAdjustVariant]       = useState<{ product: Product; variant: ProductVariant } | null>(null);
+  const [adjustVariant, setAdjustVariant] = useState<{ product: Product; variant: ProductVariant } | null>(null);
 
   const { accounts, mutate: mutateAccounts } = useAccounts();
   const { creditCards } = useCreditCards();
-  const { format }     = useCurrency();
+  const { format } = useCurrency();
   const { purchases, mutate: mutatePurchases } = usePurchases();
+  const { features, subscription } = useMe();
+  const { show_costs: showCosts, can_edit: canEdit, can_delete: canDelete } = useModulePermissions("INVENTORY");
+
+  const isAdmin = (features?.ADMIN ?? []).length > 0 || subscription?.plan?.slug === "admin";
 
   const pendingPurchases = purchases.filter((p) => p.status === "PENDING");
-
 
   const findProduct = (productId: number): Product | null =>
     products.find((p) => p.id === productId) ?? null;
@@ -115,10 +559,7 @@ export default function InventoryPage() {
     });
   };
 
-  const filtered = inventory.filter((item) => {
-    const matchesSearch =
-      item.product_name.toLowerCase().includes(search.toLowerCase()) ||
-      (item.sku?.toLowerCase().includes(search.toLowerCase()) ?? false);
+  const hasFilters = search || stockFilter !== "in_stock";
 
     const stock = Number(item.stock);
     const matchesStock =
@@ -131,8 +572,6 @@ export default function InventoryPage() {
       true;
 
     return matchesSearch && matchesStock;
-  });
-
   const handleSuccess = () => {
     mutateProducts();
     mutateInventory();
@@ -152,287 +591,6 @@ export default function InventoryPage() {
     }
   };
 
-  // ── Actions menus ────────────────────────────────────────────────
-
-  const ProductActionsMenu = ({ item }: { item: typeof inventory[0] }) => (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0">
-          <MoreVertical className="h-4 w-4" />
-        </Button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="end">
-        {!item.is_service && (
-          <>
-            <DropdownMenuItem onClick={() => { const p = findProduct(item.product_id); if (p) setInventoryProduct(p); }}>
-              <PackagePlus className="h-4 w-4 mr-2 text-primary" />
-              Agregar stock
-            </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => { const p = findProduct(item.product_id); if (p) setAdjustProduct(p); }}>
-              <SlidersHorizontal className="h-4 w-4 mr-2 text-muted-foreground" />
-              Ajuste de inventario
-            </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => { const p = findProduct(item.product_id); if (p) setVariantProduct(p); }}>
-              <Layers className="h-4 w-4 mr-2 text-muted-foreground" />
-              Agregar variante
-            </DropdownMenuItem>
-            <DropdownMenuSeparator />
-          </>
-        )}
-        <DropdownMenuItem onClick={() => { const p = findProduct(item.product_id); if (p) setEditProduct(p); }}>
-          <Pencil className="h-4 w-4 mr-2" />
-          {item.is_service ? "Editar servicio" : "Editar producto"}
-        </DropdownMenuItem>
-        <DropdownMenuItem
-          className="text-destructive focus:text-destructive"
-          onClick={() => { const p = findProduct(item.product_id); if (p) setDeleteProduct(p); }}
-        >
-          <Trash2 className="h-4 w-4 mr-2" />
-          Eliminar
-        </DropdownMenuItem>
-      </DropdownMenuContent>
-    </DropdownMenu>
-  );
-
-  const VariantActionsMenu = ({ product, variant }: { product: Product; variant: ProductVariant }) => (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <Button variant="ghost" size="icon" className="h-7 w-7 shrink-0">
-          <MoreVertical className="h-3.5 w-3.5" />
-        </Button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="end">
-        <DropdownMenuItem onClick={() => setAdjustVariant({ product, variant })}>
-          <SlidersHorizontal className="h-4 w-4 mr-2 text-muted-foreground" />
-          Ajuste de inventario
-        </DropdownMenuItem>
-        <DropdownMenuSeparator />
-        <DropdownMenuItem onClick={() => setEditVariant({ product, variant })}>
-          <Pencil className="h-4 w-4 mr-2" />
-          Editar variante
-        </DropdownMenuItem>
-        <DropdownMenuSeparator />
-        <DropdownMenuItem
-          className="text-destructive focus:text-destructive"
-          onClick={() => setDeleteVariantTarget({ product, variant })}
-        >
-          <Trash2 className="h-4 w-4 mr-2" />
-          Eliminar variante
-        </DropdownMenuItem>
-      </DropdownMenuContent>
-    </DropdownMenu>
-  );
-
-  // ── Fila base (tabla desktop) ────────────────────────────────────
-
-  const BaseTableRow = ({ item }: { item: typeof inventory[0] }) => (
-    <TableRow className="bg-muted/20 hover:bg-muted/30">
-      <TableCell>
-        <div className="flex items-center gap-3 pl-10">
-          <div className="relative h-8 w-8 rounded-md overflow-hidden bg-muted flex items-center justify-center shrink-0">
-            {item.image_url
-              ? <Image src={item.image_url} alt={item.product_name} fill className="object-cover" />
-              : <Box className="h-3.5 w-3.5 text-muted-foreground/40" />
-            }
-          </div>
-          <div>
-            <p className="text-sm font-medium">{item.product_name}</p>
-            <p className="text-xs text-muted-foreground">Producto base</p>
-          </div>
-        </div>
-      </TableCell>
-      <TableCell className="font-mono text-xs text-muted-foreground">
-        {item.sku ?? "—"}
-      </TableCell>
-      <TableCell>{getStockBadge(Number(item.base_stock))}</TableCell>
-      <TableCell className="text-sm">
-        {Number(item.base_stock) > 0 ? format(item.base_avg_unit_cost) : "—"}
-      </TableCell>
-      <TableCell className="text-sm">{format(item.price)}</TableCell>
-      <TableCell className="text-right text-sm font-medium">
-        {Number(item.base_stock) > 0 ? format(item.base_total_value) : "—"}
-      </TableCell>
-      <TableCell />
-    </TableRow>
-  );
-
-  // ── Fila variante (tabla desktop) ────────────────────────────────
-
-  const VariantTableRow = ({
-    variantStock, product,
-  }: {
-    variantStock: VariantStock;
-    product:      Product;
-  }) => {
-    const pv = findVariant(product, variantStock.variant_id);
-
-    return (
-      <TableRow className="bg-muted/30 hover:bg-muted/50">
-        <TableCell>
-          <div className="flex items-center gap-3 pl-10">
-            <div className="relative h-8 w-8 rounded-md overflow-hidden bg-muted flex items-center justify-center shrink-0">
-              {variantStock.image_url ?? product.image_url
-                ? <Image
-                    src={variantStock.image_url ?? product.image_url!}
-                    alt={variantStock.variant_name}
-                    fill
-                    className="object-cover"
-                  />
-                : <Layers className="h-3.5 w-3.5 text-muted-foreground/40" />
-              }
-            </div>
-            <div className="min-w-0">
-              <p className="text-sm font-medium truncate">{variantStock.variant_name}</p>
-              {variantStock.attributes && Object.keys(variantStock.attributes).length > 0 && (
-                <div className="flex flex-wrap gap-1 mt-0.5">
-                  {Object.entries(variantStock.attributes).map(([k, v]) => (
-                    <span key={k} className="text-xs bg-muted text-muted-foreground px-1.5 py-0.5 rounded-md">
-                      {k}: {v}
-                    </span>
-                  ))}
-                </div>
-              )}
-            </div>
-          </div>
-        </TableCell>
-        <TableCell className="font-mono text-xs text-muted-foreground">
-          {variantStock.sku || "—"}
-        </TableCell>
-        <TableCell>{getStockBadge(Number(variantStock.stock))}</TableCell>
-        <TableCell className="text-sm">
-          {Number(variantStock.stock) > 0 ? format(variantStock.avg_unit_cost) : "—"}
-        </TableCell>
-        <TableCell className="text-sm">
-          {variantStock.price_override != null
-            ? format(variantStock.price_override)
-            : <span className="text-xs text-muted-foreground">Base: {format(product.price)}</span>
-          }
-        </TableCell>
-        <TableCell className="text-right text-sm font-medium">
-          {Number(variantStock.stock) > 0 ? format(variantStock.total_value) : "—"}
-        </TableCell>
-        <TableCell>
-          {pv && <VariantActionsMenu product={product} variant={pv} />}
-        </TableCell>
-      </TableRow>
-    );
-  };
-
-  // ── Card base (móvil) ────────────────────────────────────────────
-
-  const BaseCard = ({ item }: { item: typeof inventory[0] }) => (
-    <div className="rounded-lg border bg-muted/20 overflow-hidden">
-      <div className="flex items-center gap-3 px-3 py-2.5">
-        <div className="relative h-9 w-9 rounded-md overflow-hidden bg-muted flex items-center justify-center shrink-0">
-          {item.image_url
-            ? <Image src={item.image_url} alt={item.product_name} fill className="object-cover" />
-            : <Box className="h-3.5 w-3.5 text-muted-foreground/40" />
-          }
-        </div>
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center justify-between gap-2">
-            <div>
-              <p className="text-sm font-medium">{item.product_name}</p>
-              <p className="text-xs text-muted-foreground">Producto base</p>
-            </div>
-            {getStockBadge(Number(item.base_stock))}
-          </div>
-        </div>
-      </div>
-      <div className="grid grid-cols-3 gap-2 px-3 pb-2.5 text-center border-t">
-        <div className="pt-2">
-          <p className="text-xs text-muted-foreground">Costo prom.</p>
-          <p className="text-sm font-medium">
-            {Number(item.base_stock) > 0 ? format(item.base_avg_unit_cost) : "—"}
-          </p>
-        </div>
-        <div className="pt-2">
-          <p className="text-xs text-muted-foreground">Precio venta</p>
-          <p className="text-sm font-medium">{format(item.price)}</p>
-        </div>
-        <div className="pt-2">
-          <p className="text-xs text-muted-foreground">Valor total</p>
-          <p className="text-sm font-bold text-primary">
-            {Number(item.base_stock) > 0 ? format(item.base_total_value) : "—"}
-          </p>
-        </div>
-      </div>
-    </div>
-  );
-
-  // ── Card variante (móvil) ────────────────────────────────────────
-
-  const VariantCard = ({
-    variantStock, product,
-  }: {
-    variantStock: VariantStock;
-    product:      Product;
-  }) => {
-    const pv = findVariant(product, variantStock.variant_id);
-    const salePrice = variantStock.price_override != null
-      ? variantStock.price_override
-      : product.price;
-
-    return (
-      <div className="rounded-lg border bg-muted/30 overflow-hidden">
-        <div className="flex items-center gap-3 px-3 py-2.5">
-          <div className="relative h-9 w-9 rounded-md overflow-hidden bg-muted flex items-center justify-center shrink-0">
-            {variantStock.image_url ?? product.image_url
-              ? <Image
-                  src={variantStock.image_url ?? product.image_url!}
-                  alt={variantStock.variant_name}
-                  fill
-                  className="object-cover"
-                />
-              : <Layers className="h-3.5 w-3.5 text-muted-foreground/40" />
-            }
-          </div>
-          <div className="flex-1 min-w-0">
-            <div className="flex items-center justify-between gap-2">
-              <div className="min-w-0">
-                <p className="text-sm font-medium truncate">{variantStock.variant_name}</p>
-                {variantStock.sku && (
-                  <p className="text-xs text-muted-foreground font-mono">{variantStock.sku}</p>
-                )}
-                {variantStock.attributes && (
-                  <div className="flex flex-wrap gap-1 mt-0.5">
-                    {Object.entries(variantStock.attributes).map(([k, v]) => (
-                      <span key={k} className="text-xs bg-background text-muted-foreground px-1.5 py-0.5 rounded border">
-                        {k}: {v}
-                      </span>
-                    ))}
-                  </div>
-                )}
-              </div>
-              <div className="flex items-center gap-1 shrink-0">
-                {getStockBadge(Number(variantStock.stock))}
-                {pv && <VariantActionsMenu product={product} variant={pv} />}
-              </div>
-            </div>
-          </div>
-        </div>
-        <div className="grid grid-cols-3 gap-2 px-3 pb-2.5 text-center border-t">
-          <div className="pt-2">
-            <p className="text-xs text-muted-foreground">Costo prom.</p>
-            <p className="text-sm font-medium">
-              {Number(variantStock.stock) > 0 ? format(variantStock.avg_unit_cost) : "—"}
-            </p>
-          </div>
-          <div className="pt-2">
-            <p className="text-xs text-muted-foreground">Precio venta</p>
-            <p className="text-sm font-medium">{format(salePrice)}</p>
-          </div>
-          <div className="pt-2">
-            <p className="text-xs text-muted-foreground">Valor total</p>
-            <p className="text-sm font-bold text-primary">
-              {Number(variantStock.stock) > 0 ? format(variantStock.total_value) : "—"}
-            </p>
-          </div>
-        </div>
-      </div>
-    );
-  };
-
   // ──────────────────────────────────────────────────────────────────
 
   return (
@@ -441,7 +599,7 @@ export default function InventoryPage() {
       {/* Header */}
       <div className="flex items-start justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">Inventario</h1>
+          <h1 className="text-2xl font-semibold tracking-tight">Inventario</h1>
           <p className="text-muted-foreground text-sm">
             {loadingInventory
               ? "Cargando..."
@@ -454,16 +612,16 @@ export default function InventoryPage() {
       {/* Stats */}
       <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
         {[
-          { title: "Unidades",   value: stats.total_stock,         sub: `${stats.total_products} productos`, icon: Warehouse },
-          { title: "Valor",      value: format(stats.total_value), sub: "costo adquisición",                 icon: DollarSign },
-          { title: "Stock bajo", value: stats.low_stock,           sub: "menos de 10 uds",                   icon: AlertTriangle, cls: "text-yellow-600" },
-          { title: "Agotados",   value: stats.out_of_stock,        sub: "sin stock",                         icon: Package,       cls: "text-destructive" },
-        ].map((stat) => (
+          { title: "Unidades", value: stats.total_stock, sub: `${stats.total_products} productos`, icon: Warehouse },
+          { title: "Valor", value: format(stats.total_value), sub: "costo adquisición", icon: DollarSign, hiddenWhenNoCosts: true },
+          { title: "Stock bajo", value: stats.low_stock, sub: "menos de 10 uds", icon: AlertTriangle, cls: "text-yellow-600" },
+          { title: "Agotados", value: stats.out_of_stock, sub: "sin stock", icon: Package, cls: "text-destructive" },
+        ].filter((s) => !(s as any).hiddenWhenNoCosts || showCosts).map((stat) => (
           <Card key={stat.title}>
             <CardContent className="pl-3">
               <div className="flex items-center justify-between mb-1.5">
                 <span className="text-xs font-medium text-muted-foreground">{stat.title}</span>
-                <stat.icon className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                <stat.icon className="size-3.5 text-muted-foreground shrink-0" />
               </div>
               {loadingInventory
                 ? <Skeleton className="h-5 w-16" />
@@ -476,14 +634,14 @@ export default function InventoryPage() {
       </div>
 
       {/* ── Banner compras pendientes ─────────────────────────────── */}
-      {pendingPurchases.length > 0 && (
+      {isAdmin && pendingPurchases.length > 0 && (
         <button
           type="button"
-          onClick={() => router.push("/purchases/pending")}
+          onClick={() => push("/purchases/pending")}
           className="w-full flex items-center justify-between gap-3 rounded-xl border border-amber-200 bg-amber-50/60 dark:bg-amber-950/20 dark:border-amber-800/40 px-4 py-3 text-left hover:bg-amber-100/60 dark:hover:bg-amber-950/40 transition-colors"
         >
           <div className="flex items-center gap-2.5 min-w-0">
-            <Clock className="h-4 w-4 text-amber-600 shrink-0" />
+            <Clock className="size-4 text-amber-600 shrink-0" />
             <p className="text-sm font-medium text-amber-800 dark:text-amber-300 truncate">
               {pendingPurchases.length} compra{pendingPurchases.length !== 1 ? "s" : ""} pendiente{pendingPurchases.length !== 1 ? "s" : ""} de llegada — inventario no acreditado
             </p>
@@ -504,13 +662,23 @@ export default function InventoryPage() {
             <SelectValue placeholder="Estado de stock" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">Todo el inventario</SelectItem>
+            <SelectItem value="all">Todo</SelectItem>
+            <SelectItem value="in_stock">Disponible</SelectItem>
+            <SelectItem value="ok">Suficiente</SelectItem>
+            <SelectItem value="low">Bajo</SelectItem>
+            <SelectItem value="out">Agotado</SelectItem>
             <SelectItem value="services">Servicios</SelectItem>
-            <SelectItem value="ok">Stock suficiente</SelectItem>
-            <SelectItem value="low">Stock bajo</SelectItem>
-            <SelectItem value="out">Agotados</SelectItem>
           </SelectContent>
         </Select>
+        {hasFilters && (
+          <Button
+            variant="ghost" size="sm"
+            className="gap-1.5 text-muted-foreground shrink-0"
+            onClick={() => { setSearch(""); setStockFilter("in_stock"); setPage(1); }}
+          >
+            <X className="size-3.5" /> Limpiar
+          </Button>
+        )}
       </div>
 
       {/* ── Tabla — desktop ──────────────────────────────────────── */}
@@ -522,7 +690,7 @@ export default function InventoryPage() {
                 <TableHead>Producto</TableHead>
                 <TableHead>SKU</TableHead>
                 <TableHead>Stock</TableHead>
-                <TableHead>Costo prom.</TableHead>
+                {showCosts && <TableHead>Costo prom.</TableHead>}
                 <TableHead>Precio venta</TableHead>
                 <TableHead className="text-right">Valor total</TableHead>
                 <TableHead className="w-10" />
@@ -530,24 +698,25 @@ export default function InventoryPage() {
             </TableHeader>
             <TableBody>
               {loadingInventory ? (
+                /* skeleton - index key ok */
                 Array.from({ length: 5 }).map((_, i) => (
                   <TableRow key={i}>
-                    {Array.from({ length: 7 }).map((_, j) => (
+                    {Array.from({ length: showCosts ? 7 : 6 }).map((_, j) => (
                       <TableCell key={j}><Skeleton className="h-4 w-full" /></TableCell>
                     ))}
                   </TableRow>
                 ))
-              ) : filtered.length === 0 ? (
+              ) : inventory.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={7} className="text-center py-12 text-muted-foreground">
-                    Agrega productos para visualizarlos aquí
+                  <TableCell colSpan={showCosts ? 7 : 6} className="text-center py-12 text-muted-foreground">
+                    {hasFilters ? "No se encontraron productos" : "Agrega productos para visualizarlos aquí"}
                   </TableCell>
                 </TableRow>
               ) : (
-                filtered.map((item) => {
-                  const product     = findProduct(item.product_id);
+                inventory.map((item) => {
+                  const product = findProduct(item.product_id);
                   const hasVariants = item.variants_stock.length > 0 && !item.is_service;
-                  const isExpanded  = expanded.has(item.product_id);
+                  const isExpanded = expanded.has(item.product_id);
 
                   return (
                     <>
@@ -555,25 +724,25 @@ export default function InventoryPage() {
                       <TableRow
                         key={item.product_id}
                         className={cn(
-                          hasVariants && "cursor-pointer select-none",
-                          isExpanded  && "bg-muted/20"
+                          "cursor-pointer select-none",
+                          isExpanded && "bg-muted/20"
                         )}
-                        onClick={() => hasVariants && toggleExpand(item.product_id)}
+                        onClick={() => hasVariants ? toggleExpand(item.product_id) : push(`/inventory/${item.product_id}`)}
                       >
                         <TableCell>
                           <div className="flex items-center gap-3">
                             {hasVariants ? (
                               <ChevronDown className={cn(
-                                "h-3.5 w-3.5 text-muted-foreground shrink-0 transition-transform duration-200",
+                                "size-3.5 text-muted-foreground shrink-0 transition-transform duration-200",
                                 isExpanded && "rotate-180"
                               )} />
                             ) : (
                               <div className="w-3.5 shrink-0" />
                             )}
-                            <div className="relative h-10 w-10 rounded-lg overflow-hidden bg-muted flex items-center justify-center shrink-0">
+                            <div className="relative size-10 rounded-lg overflow-hidden bg-muted flex items-center justify-center shrink-0">
                               {item.image_url
                                 ? <Image src={item.image_url} alt={item.product_name} fill className="object-cover" />
-                                : <Package className="h-5 w-5 text-muted-foreground/40" />
+                                : <Package className="size-5 text-muted-foreground/40" />
                               }
                             </div>
                             <div>
@@ -593,25 +762,44 @@ export default function InventoryPage() {
                         <TableCell onClick={(e) => e.stopPropagation()}>
                           {getStockBadge(Number(item.stock), item.is_service)}
                         </TableCell>
-                        <TableCell>{item.is_service ? "—" : format(item.avg_unit_cost)}</TableCell>
+                        {showCosts && <TableCell>{item.is_service ? "—" : format(item.avg_unit_cost)}</TableCell>}
                         <TableCell>{format(item.price)}</TableCell>
                         <TableCell className="text-right font-medium">
                           {item.is_service ? format(item.price) : format(item.total_value)}
                         </TableCell>
                         <TableCell onClick={(e) => e.stopPropagation()}>
-                          <ProductActionsMenu item={item} />
+                          <ProductActionsMenu
+                            item={item}
+                            findProduct={findProduct}
+                            setInventoryProduct={setInventoryProduct}
+                            setAdjustProduct={setAdjustProduct}
+                            setVariantProduct={setVariantProduct}
+                            setEditProduct={setEditProduct}
+                            setDeleteProduct={setDeleteProduct}
+                            onViewDetail={(id) => push(`/inventory/${id}`)}
+                            canEdit={canEdit}
+                            canDelete={canDelete}
+                          />
                         </TableCell>
                       </TableRow>
 
                       {/* Acordeón: base + variantes */}
-                      {hasVariants && isExpanded && product && (
+                      {hasVariants && isExpanded && (
                         <>
-                          <BaseTableRow item={item} />
+                          <BaseTableRow item={item} format={format} showCosts={showCosts} />
                           {item.variants_stock.map((vs) => (
                             <VariantTableRow
                               key={`vs-${vs.variant_id}`}
                               variantStock={vs}
                               product={product}
+                              format={format}
+                              showCosts={showCosts}
+                              canEdit={canEdit}
+                              canDelete={canDelete}
+                              findVariant={findVariant}
+                              setAdjustVariant={setAdjustVariant}
+                              setEditVariant={setEditVariant}
+                              setDeleteVariantTarget={setDeleteVariantTarget}
                             />
                           ))}
                         </>
@@ -628,31 +816,38 @@ export default function InventoryPage() {
       {/* ── Cards — móvil ────────────────────────────────────────── */}
       <div className="space-y-3 md:hidden">
         {loadingInventory ? (
+          /* skeleton - index key ok */
           Array.from({ length: 4 }).map((_, i) => (
             <Skeleton key={i} className="h-28 w-full rounded-xl" />
           ))
-        ) : filtered.length === 0 ? (
+        ) : inventory.length === 0 ? (
           <Card>
             <CardContent className="flex flex-col items-center justify-center py-12">
-              <Package className="h-10 w-10 text-muted-foreground/40" />
-              <p className="mt-3 text-sm text-muted-foreground">No se encontraron productos</p>
+              <Package className="size-10 text-muted-foreground/40" />
+              <p className="mt-3 text-sm text-muted-foreground">
+                {hasFilters ? "No se encontraron productos" : "Agrega productos para visualizarlos aquí"}
+              </p>
             </CardContent>
           </Card>
         ) : (
-          filtered.map((item) => {
-            const product     = findProduct(item.product_id);
+          inventory.map((item) => {
+            const product = findProduct(item.product_id);
             const hasVariants = item.variants_stock.length > 0 && !item.is_service;
-            const isExpanded  = expanded.has(item.product_id);
+            const isExpanded = expanded.has(item.product_id);
 
             return (
-              <Card key={item.product_id}>
+              <Card
+                key={item.product_id}
+                className={!hasVariants ? "cursor-pointer" : undefined}
+                onClick={!hasVariants ? () => push(`/inventory/${item.product_id}`) : undefined}
+              >
                 <CardContent className="pl-3 pr-2">
                   {/* Cabecera del producto */}
                   <div className="flex items-center gap-3">
-                    <div className="relative h-12 w-12 rounded-lg overflow-hidden bg-muted flex items-center justify-center shrink-0">
+                    <div className="relative size-12 rounded-lg overflow-hidden bg-muted flex items-center justify-center shrink-0">
                       {item.image_url
                         ? <Image src={item.image_url} alt={item.product_name} fill className="object-cover" />
-                        : <Package className="h-6 w-6 text-muted-foreground/40" />
+                        : <Package className="size-6 text-muted-foreground/40" />
                       }
                     </div>
                     <div className="flex-1 min-w-0">
@@ -668,7 +863,20 @@ export default function InventoryPage() {
                         </div>
                         <div className="flex items-center gap-1 shrink-0">
                           {getStockBadge(Number(item.stock), item.is_service)}
-                          <ProductActionsMenu item={item} />
+                          <div onClick={(e) => e.stopPropagation()}>
+                            <ProductActionsMenu
+                              item={item}
+                              findProduct={findProduct}
+                              setInventoryProduct={setInventoryProduct}
+                              setAdjustProduct={setAdjustProduct}
+                              setVariantProduct={setVariantProduct}
+                              setEditProduct={setEditProduct}
+                              setDeleteProduct={setDeleteProduct}
+                              onViewDetail={(id) => push(`/inventory/${id}`)}
+                              canEdit={canEdit}
+                              canDelete={canDelete}
+                            />
+                          </div>
                         </div>
                       </div>
                       {item.sku && (
@@ -678,11 +886,13 @@ export default function InventoryPage() {
                   </div>
 
                   {/* Resumen general del producto */}
-                  <div className="grid grid-cols-3 gap-2 mt-3 pt-3 border-t text-center">
-                    <div>
-                      <p className="text-xs text-muted-foreground">Costo prom.</p>
-                      <p className="text-sm font-medium">{item.is_service ? "—" : format(item.avg_unit_cost)}</p>
-                    </div>
+                  <div className={`grid gap-2 mt-3 pt-3 border-t text-center ${showCosts ? "grid-cols-3" : "grid-cols-2"}`}>
+                    {showCosts && (
+                      <div>
+                        <p className="text-xs text-muted-foreground">Costo prom.</p>
+                        <p className="text-sm font-medium">{item.is_service ? "—" : format(item.avg_unit_cost)}</p>
+                      </div>
+                    )}
                     <div>
                       <p className="text-xs text-muted-foreground">Precio venta</p>
                       <p className="text-sm font-medium">{format(item.price)}</p>
@@ -707,19 +917,27 @@ export default function InventoryPage() {
                           Ver desglose — base + {item.variants_stock.length} variante{item.variants_stock.length !== 1 ? "s" : ""}
                         </span>
                         <ChevronDown className={cn(
-                          "h-3.5 w-3.5 transition-transform duration-200",
+                          "size-3.5 transition-transform duration-200",
                           isExpanded && "rotate-180"
                         )} />
                       </button>
 
-                      {isExpanded && product && (
+                      {isExpanded && (
                         <div className="mt-2 space-y-2">
-                          <BaseCard item={item} />
+                          <BaseCard item={item} format={format} showCosts={showCosts} />
                           {item.variants_stock.map((vs) => (
                             <VariantCard
                               key={vs.variant_id}
                               variantStock={vs}
                               product={product}
+                              format={format}
+                              showCosts={showCosts}
+                              canEdit={canEdit}
+                              canDelete={canDelete}
+                              findVariant={findVariant}
+                              setAdjustVariant={setAdjustVariant}
+                              setEditVariant={setEditVariant}
+                              setDeleteVariantTarget={setDeleteVariantTarget}
                             />
                           ))}
                         </div>
@@ -733,14 +951,70 @@ export default function InventoryPage() {
         )}
       </div>
 
+      {/* Paginación */}
+      {totalPages > 1 && (
+        <div className="flex flex-col items-center gap-2 sm:flex-row sm:justify-between">
+          <p className="text-sm text-muted-foreground order-2 sm:order-1">
+            {total} producto{total !== 1 ? "s" : ""} · página {page} de {totalPages}
+          </p>
+          <Pagination className="order-1 sm:order-2 w-auto mx-0 justify-end">
+            <PaginationContent>
+              <PaginationItem>
+                <PaginationPrevious
+                  onClick={() => setPage((p) => Math.max(1, p - 1))}
+                  aria-disabled={page === 1}
+                  className={page === 1 ? "pointer-events-none opacity-50" : "cursor-pointer"}
+                />
+              </PaginationItem>
+
+              {Array.from({ length: totalPages }, (_, i) => i + 1)
+                .filter((p) =>
+                  p === 1 || p === totalPages ||
+                  (p >= page - 1 && p <= page + 1)
+                )
+                .reduce<(number | "…")[]>((acc, p, i, arr) => {
+                  if (i > 0 && (p as number) - (arr[i - 1] as number) > 1) acc.push("…");
+                  acc.push(p);
+                  return acc;
+                }, [])
+                .map((p, i) =>
+                  p === "…" ? (
+                    <PaginationItem key={`ellipsis-${i}`}>
+                      <PaginationEllipsis />
+                    </PaginationItem>
+                  ) : (
+                    <PaginationItem key={p}>
+                      <PaginationLink
+                        isActive={p === page}
+                        onClick={() => setPage(p as number)}
+                        className="cursor-pointer"
+                      >
+                        {p}
+                      </PaginationLink>
+                    </PaginationItem>
+                  )
+                )}
+
+              <PaginationItem>
+                <PaginationNext
+                  onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                  aria-disabled={page === totalPages}
+                  className={page === totalPages ? "pointer-events-none opacity-50" : "cursor-pointer"}
+                />
+              </PaginationItem>
+            </PaginationContent>
+          </Pagination>
+        </div>
+      )}
+
       {/* FAB */}
       <Fab
         actions={[
-          { label: "Nueva transacción",  icon: ArrowLeftRight, onClick: () => setTransactionOpen(true) },
-          { label: "Nueva venta",        icon: ShoppingCart,   onClick: () => router.push("/sales/new") },
-          { label: "Nuevo producto",     icon: Plus,           onClick: () => setCreateOpen(true) },
-          { label: "Exportar plantilla", icon: Download,       onClick: () => setBatchExportOpen(true) },
-          { label: "Cargar lote",        icon: Upload,         onClick: () => setBatchImportOpen(true) },
+          { label: "Nueva transacción", icon: ArrowLeftRight, onClick: () => setTransactionOpen(true) },
+          { label: "Nueva venta", icon: ShoppingCart, onClick: () => push("/sales/new") },
+          ...(canEdit ? [{ label: "Nuevo producto", icon: Plus, onClick: () => setCreateOpen(true) }] : []),
+          { label: "Exportar plantilla", icon: Download, onClick: () => setBatchExportOpen(true) },
+          { label: "Cargar lote", icon: Upload, onClick: () => setBatchImportOpen(true) },
         ]}
       />
 

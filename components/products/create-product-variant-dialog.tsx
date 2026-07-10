@@ -1,13 +1,11 @@
-// components/products/create-product-variant-dialog.tsx
+﻿// components/products/create-product-variant-dialog.tsx
 "use client";
 
 import { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
-import {
-  Dialog, DialogContent, DialogHeader, DialogTitle,
-} from "@/components/ui/dialog";
+import { ResponsiveModal } from "@/components/shared/responsive-modal";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -25,6 +23,7 @@ import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { ProductImageUpload } from "./product-image-upload";
 import { ExistingForm, ExistingFormValue, defaultExistingForm } from "./inventory-section/existing-form";
 import { Boxes, ChevronDown, ChevronUp } from "lucide-react";
+import { localDateToISO } from "@/lib/date-utils";
 
 // ── Schema ─────────────────────────────────────────────────────────────
 
@@ -166,7 +165,7 @@ export function CreateProductVariantDialog({
               quantity:     Number(inventoryData.quantity),
               unit_cost:    inventoryData.unit_cost || 0,
               purchased_at: inventoryData.purchased_at
-                ? new Date(inventoryData.purchased_at + "T00:00:00-06:00").toISOString()
+                ? localDateToISO(inventoryData.purchased_at)
                 : undefined,
               notes: inventoryData.notes?.trim() || "Inventario inicial de variante",
             }),
@@ -208,56 +207,57 @@ export function CreateProductVariantDialog({
                     : "Crear variante";
 
   return (
-    <Dialog open={open} onOpenChange={(v) => !v && handleClose()}>
-      <DialogContent
-        className={cn(
-          "fixed bottom-0 left-0 right-0 top-auto translate-x-0 translate-y-0",
-          "w-full max-w-full rounded-t-2xl rounded-b-none border-t border-x-0 border-b-0",
-          "max-h-[92dvh] flex flex-col p-0",
-          "sm:bottom-auto sm:left-1/2 sm:right-auto sm:top-1/2",
-          "sm:-translate-x-1/2 sm:-translate-y-1/2",
-          "sm:w-full sm:max-w-md lg:max-w-xl xl:max-w-xl",
-          "sm:rounded-2xl sm:border sm:max-h-[88vh]",
-          "data-[state=open]:animate-in data-[state=closed]:animate-out",
-          "data-[state=open]:slide-in-from-bottom sm:data-[state=open]:slide-in-from-bottom-[48%]",
-          "data-[state=closed]:slide-out-to-bottom sm:data-[state=closed]:slide-out-to-bottom-[48%]",
-          "duration-300",
-        )}
-        onInteractOutside={(e) => e.preventDefault()}
-        onEscapeKeyDown={handleClose}
-      >
-        {/* Handle móvil */}
-        <div className="sm:hidden flex justify-center pt-3 pb-1 shrink-0">
-          <div className="w-10 h-1 rounded-full bg-muted-foreground/30" />
-        </div>
-
-        {/* Header */}
-        <DialogHeader className="shrink-0 px-5 pt-2 pb-3 sm:pt-5 border-b">
-          <DialogTitle className="flex items-center gap-2 text-lg font-bold">
-            <Layers className="h-4 w-4 text-primary" />
-            Nueva variante
-          </DialogTitle>
-          <p className="text-xs text-muted-foreground mt-0.5 truncate">
-            {productName} · precio base {format(basePrice)}
-          </p>
-        </DialogHeader>
-
-        {/* Scroll */}
-        <div
-          className="flex-1 overflow-y-auto px-5 py-4"
-          style={{ scrollbarWidth: "none" } as React.CSSProperties}
-        >
-          <form id="create-variant-form" onSubmit={handleSubmit(onSubmit)} className="space-y-5">
-
+    <ResponsiveModal
+      open={open}
+      onOpenChange={(v) => !v && handleClose()}
+      title="Nueva variante"
+      icon={Layers}
+      subtitle={`${productName} · precio base ${format(basePrice)}`}
+      width="wide"
+      as="form"
+      formProps={{ id: "create-variant-form", onSubmit: handleSubmit(onSubmit) }}
+      bodyClassName="space-y-5"
+      footer={
+        <>
+          <Button
+            type="button"
+            variant="outline"
+            onClick={handleClose}
+            disabled={isLoading}
+            className="flex-1 h-11"
+          >
+            Cancelar
+          </Button>
+          <Button
+            type="submit"
+            form="create-variant-form"
+            disabled={isLoading}
+            className="flex-1 h-11 gap-2"
+          >
+            {isLoading ? (
+              <>
+                <Loader2 className="size-4 animate-spin" />
+                {submitLabel}
+              </>
+            ) : (
+              <>
+                <Plus className="size-4" />
+                {submitLabel}
+              </>
+            )}
+          </Button>
+        </>
+      }
+    >
             {/* Imagen */}
             <div className="space-y-2">
-              <FieldLabel icon={<ImageIcon className="h-3.5 w-3.5" />} label="Imagen" optional />
+              <FieldLabel icon={<ImageIcon className="size-3.5" />} label="Imagen" optional />
               <ProductImageUpload disabled={isLoading} onChange={setImageFile} />
             </div>
 
             {/* Nombre de variante */}
             <div className="space-y-2">
-              <FieldLabel icon={<Tag className="h-3.5 w-3.5" />} label="Nombre" required />
+              <FieldLabel icon={<Tag className="size-3.5" />} label="Nombre" required />
               <Input
                 {...register("variant_name")}
                 placeholder="Ej: Talla M / Color Rojo / 500g"
@@ -271,7 +271,7 @@ export function CreateProductVariantDialog({
 
             {/* SKU */}
             <div className="space-y-2">
-              <FieldLabel icon={<Hash className="h-3.5 w-3.5" />} label="SKU" required />
+              <FieldLabel icon={<Hash className="size-3.5" />} label="SKU" required />
               <Input
                 {...register("sku")}
                 placeholder="Ej: CAM-NEG-M"
@@ -286,7 +286,7 @@ export function CreateProductVariantDialog({
             {/* Precio override */}
             <div className="space-y-2">
               <FieldLabel
-                icon={<DollarSign className="h-3.5 w-3.5" />}
+                icon={<DollarSign className="size-3.5" />}
                 label="Precio especial"
                 optional
               />
@@ -322,7 +322,7 @@ export function CreateProductVariantDialog({
             <div className="space-y-3">
               <div className="flex items-center justify-between">
                 <FieldLabel
-                  icon={<Tag className="h-3.5 w-3.5" />}
+                  icon={<Tag className="size-3.5" />}
                   label="Atributos"
                   optional
                 />
@@ -334,14 +334,14 @@ export function CreateProductVariantDialog({
                   disabled={isLoading || attributes.length >= 8}
                   className="h-7 text-xs gap-1 text-primary hover:text-primary"
                 >
-                  <Plus className="h-3 w-3" />
+                  <Plus className="size-3" />
                   Agregar
                 </Button>
               </div>
 
               <div className="space-y-2">
                 {attributes.map((attr, index) => (
-                  <div key={index} className="flex items-center gap-2">
+                  <div key={`${attr.key}-${index}`} className="flex items-center gap-2">
                     <Input
                       value={attr.key}
                       onChange={(e) => updateAttribute(index, "key", e.target.value)}
@@ -362,9 +362,9 @@ export function CreateProductVariantDialog({
                       size="icon"
                       onClick={() => removeAttribute(index)}
                       disabled={isLoading || attributes.length === 1}
-                      className="h-10 w-10 shrink-0 text-muted-foreground hover:text-destructive"
+                      className="size-10 shrink-0 text-muted-foreground hover:text-destructive"
                     >
-                      <Trash2 className="h-3.5 w-3.5" />
+                      <Trash2 className="size-3.5" />
                     </Button>
                   </div>
                 ))}
@@ -385,10 +385,10 @@ export function CreateProductVariantDialog({
               >
                 <div className="flex items-center gap-2.5 text-sm font-medium">
                   <div className={cn(
-                    "h-7 w-7 rounded-lg flex items-center justify-center transition-colors",
+                    "size-7 rounded-lg flex items-center justify-center transition-colors",
                     inventoryOpen ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground",
                   )}>
-                    <Boxes className="h-4 w-4" />
+                    <Boxes className="size-4" />
                   </div>
                   <span>Agregar inventario inicial</span>
                   {!inventoryOpen && (
@@ -396,8 +396,8 @@ export function CreateProductVariantDialog({
                   )}
                 </div>
                 {inventoryOpen
-                  ? <ChevronUp   className="h-4 w-4 text-muted-foreground shrink-0" />
-                  : <ChevronDown className="h-4 w-4 text-muted-foreground shrink-0" />
+                  ? <ChevronUp   className="size-4 text-muted-foreground shrink-0" />
+                  : <ChevronDown className="size-4 text-muted-foreground shrink-0" />
                 }
               </button>
 
@@ -412,41 +412,7 @@ export function CreateProductVariantDialog({
               )}
             </div>
 
-          </form>
-        </div>
-
-        {/* Footer */}
-        <div className="shrink-0 px-5 py-4 border-t bg-transparent xl:bg-transparent md:bg-transparent sm:bg-background flex gap-3">
-          <Button
-            type="button"
-            variant="outline"
-            onClick={handleClose}
-            disabled={isLoading}
-            className="flex-1 h-11"
-          >
-            Cancelar
-          </Button>
-          <Button
-            type="submit"
-            form="create-variant-form"
-            disabled={isLoading}
-            className="flex-1 h-11 gap-2"
-          >
-            {isLoading ? (
-              <>
-                <Loader2 className="h-4 w-4 animate-spin" />
-                {submitLabel}
-              </>
-            ) : (
-              <>
-                <Plus className="h-4 w-4" />
-                {submitLabel}
-              </>
-            )}
-          </Button>
-        </div>
-      </DialogContent>
-    </Dialog>
+    </ResponsiveModal>
   );
 }
 

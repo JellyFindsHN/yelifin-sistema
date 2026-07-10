@@ -2,7 +2,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import useSWR from "swr";
 import { useAuth } from "@/hooks/use-auth";
+import { usePrivacyMode } from "@/context/privacy-mode-context";
 
 const CACHE_KEY = "_currency";
 const DEFAULT   = "HNL";
@@ -18,8 +20,9 @@ const CURRENCY_SYMBOLS: Record<string, string> = {
 };
 
 export function useCurrency() {
-  const { firebaseUser } = useAuth();
-  const [currency, setCurrencyState] = useState<string>(() => {
+  const { firebaseUser }    = useAuth();
+  const { isPrivate }       = usePrivacyMode();
+  const [cached, setCached] = useState<string>(() => {
     // Leer de localStorage inmediatamente (sin esperar al API)
     if (typeof window !== "undefined") {
       return localStorage.getItem(CACHE_KEY) ?? DEFAULT;
@@ -27,42 +30,46 @@ export function useCurrency() {
     return DEFAULT;
   });
 
-  // Al montar, sincronizar con el API si hay usuario
+  // SWR dedupa la petición entre todos los componentes que usan el hook
+  const { data } = useSWR(
+    firebaseUser ? "/api/onboarding" : null,
+    async (url: string) => {
+      const token = await firebaseUser!.getIdToken();
+      const res = await fetch(url, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) throw new Error("Error al obtener configuración");
+      return res.json();
+    },
+    {
+      revalidateOnFocus: false,
+      revalidateOnReconnect: false,
+      dedupingInterval: 5 * 60_000, // 5 minutos sin re-fetch
+    }
+  );
+
+  const serverCurrency: string | undefined = data?.data?.currency;
+
   useEffect(() => {
-    if (!firebaseUser) return;
+    if (serverCurrency && serverCurrency !== cached) {
+      localStorage.setItem(CACHE_KEY, serverCurrency);
+      setCached(serverCurrency);
+    }
+  }, [serverCurrency, cached]);
 
-    const sync = async () => {
-      try {
-        const token = await firebaseUser.getIdToken();
-        const res   = await fetch("/api/onboarding", {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        if (!res.ok) return;
-        const data = await res.json();
-        const serverCurrency = data?.data?.currency;
-        if (serverCurrency) {
-          localStorage.setItem(CACHE_KEY, serverCurrency);
-          setCurrencyState(serverCurrency);
-        }
-      } catch {
-        // Falla silenciosa — usar el cache local
-      }
-    };
+  const currency = serverCurrency ?? cached;
+  const symbol   = CURRENCY_SYMBOLS[currency] ?? currency;
 
-    sync();
-  }, [firebaseUser]);
-
-  const symbol = CURRENCY_SYMBOLS[currency] ?? currency;
-
-  // Formateador listo para usar
-  const format = (value: number, opts?: Intl.NumberFormatOptions) =>
-    new Intl.NumberFormat("es-HN", {
+  const format = (value: number, opts?: Intl.NumberFormatOptions) => {
+    if (isPrivate) return "•••••";
+    return new Intl.NumberFormat("es-HN", {
       style:                 "currency",
       currency,
       minimumFractionDigits: 0,
       maximumFractionDigits: 2,
       ...opts,
     }).format(value);
+  };
 
   return { currency, symbol, format };
 }

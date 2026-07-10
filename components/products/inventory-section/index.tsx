@@ -1,4 +1,4 @@
-// components/products/inventory-section/index.tsx
+﻿// components/products/inventory-section/index.tsx
 "use client";
 
 import { useState } from "react";
@@ -76,10 +76,10 @@ export function InventorySection({ value, onChange, disabled }: Props) {
       >
         <div className="flex items-center gap-2.5 text-sm font-medium">
           <div className={cn(
-            "h-7 w-7 rounded-lg flex items-center justify-center transition-colors",
+            "size-7 rounded-lg flex items-center justify-center transition-colors",
             isOpen ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground",
           )}>
-            <Boxes className="h-4 w-4" />
+            <Boxes className="size-4" />
           </div>
           <span>Agregar inventario inicial</span>
           {!isOpen && (
@@ -87,8 +87,8 @@ export function InventorySection({ value, onChange, disabled }: Props) {
           )}
         </div>
         {isOpen
-          ? <ChevronUp   className="h-4 w-4 text-muted-foreground shrink-0" />
-          : <ChevronDown className="h-4 w-4 text-muted-foreground shrink-0" />
+          ? <ChevronUp   className="size-4 text-muted-foreground shrink-0" />
+          : <ChevronDown className="size-4 text-muted-foreground shrink-0" />
         }
       </button>
 

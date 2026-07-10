@@ -1,4 +1,4 @@
-// components/products/product-grid.tsx
+﻿// components/products/product-grid.tsx
 "use client";
 
 import { Product } from "@/types";
@@ -18,7 +18,7 @@ export function ProductGrid({ products, onEdit, onDelete, onAddInventory }: Prop
     return (
       <Card>
         <CardContent className="flex flex-col items-center justify-center py-16">
-          <Package className="h-12 w-12 text-muted-foreground/30" />
+          <Package className="size-12 text-muted-foreground/30" />
           <p className="mt-4 text-sm font-medium">No se encontraron productos</p>
           <p className="text-xs text-muted-foreground mt-1">
             Intenta con otros filtros o crea un nuevo producto

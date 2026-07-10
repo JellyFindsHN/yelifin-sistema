@@ -1,16 +1,18 @@
 // app/api/finances/summary/route.ts
 import { NextRequest } from "next/server";
 import { neon } from "@neondatabase/serverless";
-import { verifyAuth, createErrorResponse, isAuthSuccess } from "@/lib/auth";
+import { verifyAuth, createErrorResponse, isAuthSuccess, requireModule } from "@/lib/auth";
 
 const sql = neon(process.env.DATABASE_URL!);
 
 export async function GET(request: NextRequest) {
   const auth = await verifyAuth(request);
   if (!isAuthSuccess(auth)) return createErrorResponse(auth.error, auth.status);
+  const deny = await requireModule(auth.data, 'FINANCES', 'canView');
+  if (deny) return deny;
 
   try {
-    const { userId } = auth.data;
+    const { orgId } = auth.data;
     const { searchParams } = new URL(request.url);
 
     const month = searchParams.get("month");
@@ -55,14 +57,14 @@ export async function GET(request: NextRequest) {
                 ELSE 0
               END)
             FROM transactions t
-            WHERE t.user_id = ${userId}
+            WHERE t.org_id = ${orgId}
               AND t.occurred_at >= ${endISO}::timestamptz
               AND (t.account_id = a.id OR t.to_account_id = a.id)
           ), 
           0
         ) AS balance
       FROM accounts a
-      WHERE a.user_id = ${userId} AND a.is_active = TRUE
+      WHERE a.org_id = ${orgId} AND a.is_active = TRUE
       ORDER BY a.created_at ASC
     `;
 
@@ -72,7 +74,7 @@ export async function GET(request: NextRequest) {
         COALESCE(SUM(CASE WHEN type = 'INCOME'  THEN amount ELSE 0 END), 0) AS income,
         COALESCE(SUM(CASE WHEN type = 'EXPENSE' THEN amount ELSE 0 END), 0) AS expense
       FROM transactions
-      WHERE user_id = ${userId}
+      WHERE org_id = ${orgId}
         AND occurred_at >= ${startISO}::timestamptz
         AND occurred_at <  ${endISO}::timestamptz
     `;
@@ -84,7 +86,7 @@ export async function GET(request: NextRequest) {
         COALESCE(SUM(CASE WHEN type = 'EXPENSE' THEN amount ELSE 0 END), 0) AS expense,
         COUNT(*)::int AS count
       FROM transactions
-      WHERE user_id = ${userId}
+      WHERE org_id = ${orgId}
         AND occurred_at >= ${todayStart}::timestamptz
         AND occurred_at <  ${todayEnd}::timestamptz
     `;
@@ -96,7 +98,7 @@ export async function GET(request: NextRequest) {
         COALESCE(SUM(CASE WHEN type = 'INCOME'  THEN amount ELSE 0 END), 0) AS income,
         COALESCE(SUM(CASE WHEN type = 'EXPENSE' THEN amount ELSE 0 END), 0) AS expense
       FROM transactions
-      WHERE user_id = ${userId}
+      WHERE org_id = ${orgId}
         AND occurred_at >= ${startISO}::timestamptz
         AND occurred_at <  ${endISO}::timestamptz
       GROUP BY DATE(occurred_at)
@@ -113,7 +115,7 @@ export async function GET(request: NextRequest) {
       FROM transactions t
       JOIN accounts a ON a.id = t.account_id
       LEFT JOIN accounts ta ON ta.id = t.to_account_id
-      WHERE t.user_id = ${userId}
+      WHERE t.org_id = ${orgId}
         AND t.occurred_at >= ${todayStart}::timestamptz
         AND t.occurred_at <  ${todayEnd}::timestamptz
       ORDER BY t.occurred_at DESC

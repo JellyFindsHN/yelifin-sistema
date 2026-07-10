@@ -1,4 +1,4 @@
-// components/sales/pos/edit/edit-sale-options-panel.tsx
+﻿// components/sales/pos/edit/edit-sale-options-panel.tsx
 "use client";
 
 import { Card, CardContent } from "@/components/ui/card";
@@ -91,7 +91,7 @@ export function EditSaleOptionsPanel({
                 {/* Cliente: siempre 100% ancho */}
                 <div className="space-y-1.5">
                     <Label className="text-xs flex items-center gap-1">
-                        <User className="h-3.5 w-3.5 text-muted-foreground" />
+                        <User className="size-3.5 text-muted-foreground" />
                         <span>Cliente</span>
                         <span className="text-[11px] text-muted-foreground">
                             (opcional)
@@ -122,7 +122,7 @@ export function EditSaleOptionsPanel({
                     {/* Cuenta de destino: 50% en desktop, 100% en móvil */}
                     <div className="flex-1 space-y-1.5">
                         <Label className="text-xs flex items-center gap-1">
-                            <CreditCard className="h-3.5 w-3.5 text-muted-foreground" />
+                            <CreditCard className="size-3.5 text-muted-foreground" />
                             <span>Cuenta de destino</span>
                             <span className="text-destructive">*</span>
                         </Label>
@@ -148,7 +148,7 @@ export function EditSaleOptionsPanel({
                     {/* Costo de envío */}
                     <div className="flex-1 space-y-1.5">
                         <Label className="text-xs flex items-center gap-1">
-                            <Truck className="h-3.5 w-3.5 text-muted-foreground" />
+                            <Truck className="size-3.5 text-muted-foreground" />
                             <span>Costo de envío</span>
                             <span className="text-[11px] text-muted-foreground">
                                 (opcional)
@@ -181,7 +181,7 @@ export function EditSaleOptionsPanel({
                 {/* Notas */}
                 <div className="space-y-1.5">
                     <Label className="text-xs flex items-center gap-1">
-                        <MessageSquare className="h-3.5 w-3.5 text-muted-foreground" />
+                        <MessageSquare className="size-3.5 text-muted-foreground" />
                         <span>Notas</span>
                         <span className="text-[11px] text-muted-foreground">
                             (opcional)
@@ -211,7 +211,7 @@ export function EditSaleOptionsPanel({
                 <div className="mt-1 rounded-xl border bg-muted/50 px-3 py-2.5 flex items-center justify-between gap-3">
                     <div className="flex items-start gap-2">
                         <div className="mt-0.5">
-                            <Clock className="h-4 w-4 text-muted-foreground" />
+                            <Clock className="size-4 text-muted-foreground" />
                         </div>
                         <div>
                             <p className="text-xs font-medium">

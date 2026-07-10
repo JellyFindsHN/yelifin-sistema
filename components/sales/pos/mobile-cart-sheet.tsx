@@ -1,4 +1,4 @@
-// components/sales/pos/mobile-cart-sheet.tsx
+﻿// components/sales/pos/mobile-cart-sheet.tsx
 "use client";
 
 import { useEffect, useRef } from "react";
@@ -98,9 +98,9 @@ export function MobileCartSheet({
           <div className="w-full flex items-center justify-between px-4 pb-3 border-b">
             <div className="flex items-center gap-2.5">
               <div className="relative">
-                <ShoppingCart className="h-5 w-5 text-muted-foreground" />
+                <ShoppingCart className="size-5 text-muted-foreground" />
                 {itemCount > 0 && (
-                  <span className="absolute -top-1.5 -right-1.5 bg-primary text-primary-foreground text-[10px] font-bold rounded-full h-4 w-4 flex items-center justify-center">
+                  <span className="absolute -top-1.5 -right-1.5 bg-primary text-primary-foreground text-[10px] font-bold rounded-full size-4 flex items-center justify-center">
                     {itemCount > 9 ? "9+" : itemCount}
                   </span>
                 )}
@@ -119,7 +119,7 @@ export function MobileCartSheet({
                 </span>
               )}
               <ChevronDown
-                className={`h-4 w-4 text-muted-foreground transition-transform duration-300 ${
+                className={`size-4 text-muted-foreground transition-transform duration-300 ${
                   open ? "rotate-180" : "rotate-0"
                 }`}
               />

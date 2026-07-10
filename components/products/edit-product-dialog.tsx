@@ -1,13 +1,11 @@
-// components/products/edit-product-dialog.tsx
+﻿// components/products/edit-product-dialog.tsx
 "use client";
 
 import { useState, useRef, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
-import {
-  Dialog, DialogContent, DialogHeader, DialogTitle,
-} from "@/components/ui/dialog";
+import { ResponsiveModal } from "@/components/shared/responsive-modal";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -105,6 +103,7 @@ export function EditProductDialog({
   const [imageFile,        setImageFile]        = useState<File | null>(null);
   const [imagePreview,     setImagePreview]      = useState<string | null>(null);
   const [isUploadingImage, setIsUploadingImage]  = useState(false);
+  const [isDragging,       setIsDragging]        = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const {
@@ -131,6 +130,29 @@ export function EditProductDialog({
 
   const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
+    if (!file) return;
+    if (!file.type.startsWith("image/")) { toast.error("Solo se permiten imágenes"); return; }
+    if (file.size > 5 * 1024 * 1024)    { toast.error("La imagen no puede superar 5MB"); return; }
+    setImageFile(file);
+    setImagePreview(URL.createObjectURL(file));
+  };
+
+  const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    if (isLoading) return;
+    setIsDragging(true);
+  };
+
+  const handleDragLeave = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    setIsDragging(false);
+  };
+
+  const handleDrop = async (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    if (isLoading) return;
+    setIsDragging(false);
+    const file = e.dataTransfer.files?.[0];
     if (!file) return;
     if (!file.type.startsWith("image/")) { toast.error("Solo se permiten imágenes"); return; }
     if (file.size > 5 * 1024 * 1024)    { toast.error("La imagen no puede superar 5MB"); return; }
@@ -192,55 +214,63 @@ export function EditProductDialog({
   if (!product) return null;
 
   return (
-    <Dialog open={open} onOpenChange={(v) => !v && handleClose()}>
-      <DialogContent
-        className={cn(
-          "fixed bottom-0 left-0 right-0 top-auto translate-x-0 translate-y-0",
-          "w-full max-w-full rounded-t-2xl rounded-b-none border-t border-x-0 border-b-0",
-          "max-h-[92dvh] flex flex-col p-0",
-          "sm:bottom-auto sm:left-1/2 sm:right-auto sm:top-1/2",
-          "sm:-translate-x-1/2 sm:-translate-y-1/2",
-          "sm:w-full sm:max-w-md lg:max-w-xl xl:max-w-xl",
-          "sm:rounded-2xl sm:border sm:max-h-[88vh]",
-          "data-[state=open]:animate-in data-[state=closed]:animate-out",
-          "data-[state=open]:slide-in-from-bottom sm:data-[state=open]:slide-in-from-bottom-[48%]",
-          "data-[state=closed]:slide-out-to-bottom sm:data-[state=closed]:slide-out-to-bottom-[48%]",
-          "duration-300",
-        )}
-        onInteractOutside={(e) => e.preventDefault()}
-        onEscapeKeyDown={handleClose}
-      >
-        {/* Handle móvil */}
-        <div className="sm:hidden flex justify-center pt-3 pb-1 shrink-0">
-          <div className="w-10 h-1 rounded-full bg-muted-foreground/30" />
-        </div>
-
-        {/* Header */}
-        <DialogHeader className="shrink-0 px-5 pt-2 pb-3 sm:pt-5 border-b">
-          <DialogTitle className="flex items-center gap-2 text-lg font-bold">
-            <Pencil className="h-4 w-4 text-primary" />
-            Editar {is_service ? "servicio" : "producto"}
-          </DialogTitle>
-        </DialogHeader>
-
-        {/* Scroll */}
-        <div
-          className="flex-1 overflow-y-auto px-5 py-4"
-          style={{ scrollbarWidth: "none" } as React.CSSProperties}
-        >
-          <form id="edit-product-form" onSubmit={handleSubmit(onSubmit)} className="space-y-5">
-
+    <ResponsiveModal
+      open={open}
+      onOpenChange={(v) => !v && handleClose()}
+      title={`Editar ${is_service ? "servicio" : "producto"}`}
+      icon={Pencil}
+      width="wide"
+      as="form"
+      formProps={{ id: "edit-product-form", onSubmit: handleSubmit(onSubmit) }}
+      bodyClassName="space-y-5"
+      footer={
+        <>
+          <Button
+            type="button"
+            variant="outline"
+            onClick={handleClose}
+            disabled={isLoading}
+            className="flex-1 h-11"
+          >
+            Cancelar
+          </Button>
+          <Button
+            type="submit"
+            form="edit-product-form"
+            disabled={isLoading}
+            className="flex-1 h-11 gap-2"
+          >
+            {isLoading ? (
+              <>
+                <Loader2 className="size-4 animate-spin" />
+                {isUploadingImage ? "Subiendo imagen..." : "Guardando..."}
+              </>
+            ) : (
+              <>
+                <Pencil className="size-4" />
+                Guardar cambios
+              </>
+            )}
+          </Button>
+        </>
+      }
+    >
             {/* Imagen */}
             <div className="space-y-2">
-              <FieldLabel icon={<ImageIcon className="h-3.5 w-3.5" />} label="Imagen" optional />
+              <FieldLabel icon={<ImageIcon className="size-3.5" />} label="Imagen" optional />
               <div
                 className={cn(
-                  "relative w-full aspect-video rounded-xl border-2 border-dashed transition-colors overflow-hidden cursor-pointer",
+                  "relative w-full aspect-video rounded-xl border-2 border-dashed transition-colors overflow-hidden",
+                  isLoading ? "opacity-50 cursor-not-allowed" : "cursor-pointer",
                   imagePreview
                     ? "border-transparent"
                     : "border-muted-foreground/20 hover:border-primary/40 bg-muted/20",
+                  isDragging && !isLoading && "border-primary bg-primary/5",
                 )}
                 onClick={() => !isLoading && fileInputRef.current?.click()}
+                onDragOver={handleDragOver}
+                onDragLeave={handleDragLeave}
+                onDrop={handleDrop}
               >
                 {imagePreview ? (
                   <>
@@ -250,7 +280,7 @@ export function EditProductDialog({
                       onClick={(e) => { e.stopPropagation(); handleRemoveImage(); }}
                       className="absolute top-2 right-2 bg-background/80 backdrop-blur-sm rounded-full p-1.5 shadow hover:bg-background transition-colors"
                     >
-                      <X className="h-3.5 w-3.5" />
+                      <X className="size-3.5" />
                     </button>
                     <span className="absolute bottom-2 right-2 text-xs bg-black/60 text-white px-2 py-0.5 rounded-full">
                       WebP
@@ -258,10 +288,12 @@ export function EditProductDialog({
                   </>
                 ) : (
                   <div className="flex flex-col items-center justify-center h-full gap-2 text-muted-foreground p-4">
-                    <div className="h-10 w-10 rounded-xl bg-muted flex items-center justify-center">
-                      <Upload className="h-5 w-5" />
+                    <div className="size-10 rounded-xl bg-muted flex items-center justify-center">
+                      <Upload className="size-5" />
                     </div>
-                    <p className="text-sm font-medium">Toca para subir imagen</p>
+                    <p className="text-sm font-medium">
+                      {isDragging ? "Suelta la imagen aquí" : "Toca o arrastra una imagen"}
+                    </p>
                     <p className="text-xs text-center opacity-70">
                       PNG, JPG, WebP · máx 5MB · se convierte a WebP
                     </p>
@@ -280,7 +312,7 @@ export function EditProductDialog({
 
             {/* Nombre */}
             <div className="space-y-2">
-              <FieldLabel icon={<FileText className="h-3.5 w-3.5" />} label="Nombre" required />
+              <FieldLabel icon={<FileText className="size-3.5" />} label="Nombre" required />
               <Input
                 {...register("name")}
                 disabled={isLoading}
@@ -294,7 +326,7 @@ export function EditProductDialog({
             {/* SKU */}
             <div className="space-y-2">
               <FieldLabel
-                icon={<Hash className="h-3.5 w-3.5" />}
+                icon={<Hash className="size-3.5" />}
                 label="SKU"
                 required={!is_service}
                 optional={is_service}
@@ -313,7 +345,7 @@ export function EditProductDialog({
             {/* Precio */}
             <div className="space-y-2">
               <FieldLabel
-                icon={<DollarSign className="h-3.5 w-3.5" />}
+                icon={<DollarSign className="size-3.5" />}
                 label="Precio de venta"
                 required
               />
@@ -338,7 +370,7 @@ export function EditProductDialog({
 
             {/* Descripción */}
             <div className="space-y-2">
-              <FieldLabel icon={<FileText className="h-3.5 w-3.5" />} label="Descripción" optional />
+              <FieldLabel icon={<FileText className="size-3.5" />} label="Descripción" optional />
               <Textarea
                 placeholder={
                   is_service
@@ -352,41 +384,7 @@ export function EditProductDialog({
               />
             </div>
 
-          </form>
-        </div>
-
-        {/* Footer */}
-        <div className="shrink-0 px-5 py-4 border-t bg-transparent xl:bg-transparent md:bg-transparent sm:bg-background flex gap-3">
-          <Button
-            type="button"
-            variant="outline"
-            onClick={handleClose}
-            disabled={isLoading}
-            className="flex-1 h-11"
-          >
-            Cancelar
-          </Button>
-          <Button
-            type="submit"
-            form="edit-product-form"
-            disabled={isLoading}
-            className="flex-1 h-11 gap-2"
-          >
-            {isLoading ? (
-              <>
-                <Loader2 className="h-4 w-4 animate-spin" />
-                {isUploadingImage ? "Subiendo imagen..." : "Guardando..."}
-              </>
-            ) : (
-              <>
-                <Pencil className="h-4 w-4" />
-                Guardar cambios
-              </>
-            )}
-          </Button>
-        </div>
-      </DialogContent>
-    </Dialog>
+    </ResponsiveModal>
   );
 }
 

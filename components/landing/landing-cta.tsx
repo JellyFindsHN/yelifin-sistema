@@ -1,4 +1,4 @@
-// components/landing/landing-cta.tsx
+﻿// components/landing/landing-cta.tsx
 "use client";
 
 import Link from "next/link";
@@ -17,7 +17,7 @@ export function LandingCta() {
       <Link href="/dashboard" className="w-full sm:w-auto">
         <Button size="lg" className="w-full sm:w-auto text-base sm:text-lg px-6 sm:px-8 h-12 sm:h-14 gap-2 shadow-lg shadow-primary/30 cursor-pointer">
           Ir al panel
-          <LayoutDashboard className="w-4 h-4 sm:w-5 sm:h-5" />
+          <LayoutDashboard className="size-4 sm:w-5 sm:h-5" />
         </Button>
       </Link>
     );
@@ -28,7 +28,7 @@ export function LandingCta() {
       <Link href="/register" className="w-full sm:w-auto">
         <Button size="lg" className="w-full sm:w-auto text-base sm:text-lg px-6 sm:px-8 h-12 sm:h-14 gap-2 shadow-lg shadow-primary/30 cursor-pointer">
           Comenzar Ahora
-          <ArrowRight className="w-4 h-4 sm:w-5 sm:h-5" />
+          <ArrowRight className="size-4 sm:w-5 sm:h-5" />
         </Button>
       </Link>
       <Link href="#pricing" className="w-full sm:w-auto">

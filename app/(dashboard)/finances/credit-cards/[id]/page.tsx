@@ -1,4 +1,4 @@
-// app/(dashboard)/finances/credit-cards/[id]/page.tsx
+﻿// app/(dashboard)/finances/credit-cards/[id]/page.tsx
 "use client";
 
 import { useState } from "react";
@@ -23,21 +23,23 @@ import {
 import {
   CreditCard, ArrowLeft, Banknote, ShoppingBag,
   CalendarDays, TrendingUp, DollarSign, Tag,
-  MoreVertical, Pencil, Trash2,
+  MoreVertical, Pencil, Trash2, ArrowLeftRight,
 } from "lucide-react";
 import {
   useCreditCard,
   useCreditCardTransactions,
-  useUpdateCCTransactionCategory,
+  useCreditCardPeriods,
   useDeleteCCTransaction,
+  useCreditCards,
   CreditCardTransaction,
 } from "@/hooks/swr/use-credit-cards";
 import { useAccounts } from "@/hooks/swr/use-accounts";
 import { useCurrency } from "@/hooks/swr/use-currency";
-import { useTransactionCategories, TransactionCategory } from "@/hooks/swr/use-transaction-categories";
+import { useTransactionCategories } from "@/hooks/swr/use-transaction-categories";
 import { toast } from "sonner";
 import { PayCreditCardDialog } from "@/components/credit-cards/pay-credit-card-dialog";
 import { EditCCTransactionDialog } from "@/components/credit-cards/edit-cc-transaction-dialog";
+import { CreateTransactionModal } from "@/components/transactions/create-transaction-modal";
 import { Fab } from "@/components/ui/fab";
 
 const MONTH_NAMES = [
@@ -52,23 +54,26 @@ export default function CreditCardDetailPage({
 }) {
   const { id } = use(params);
   const cardId = Number(id);
-  const router = useRouter();
+  const { back } = useRouter();
 
   const now = new Date();
   const [selectedMonth, setSelectedMonth] = useState<number>(now.getMonth() + 1);
   const [selectedYear, setSelectedYear] = useState<number>(now.getFullYear());
   const [payOpen, setPayOpen] = useState(false);
+  const [transactionOpen, setTransactionOpen] = useState(false);
   const [editingTxn, setEditingTxn] = useState<CreditCardTransaction | null>(null);
   const [deletingTxn, setDeletingTxn] = useState<CreditCardTransaction | null>(null);
 
   const { creditCard, isLoading: loadingCard, mutate: mutateCard } = useCreditCard(cardId);
   const { transactions, totals, isLoading: loadingTxns, mutate: mutateTxns } = useCreditCardTransactions(cardId, {
-    month: selectedMonth,
-    year: selectedYear,
+    month:     selectedMonth,
+    year:      selectedYear,
+    tz_offset: new Date().getTimezoneOffset(),
   });
+  const { periods } = useCreditCardPeriods(cardId);
   const { accounts } = useAccounts();
+  const { creditCards } = useCreditCards();
   const { format, currency } = useCurrency();
-  const { updateCategory } = useUpdateCCTransactionCategory();
   const { deleteTransaction, isDeleting } = useDeleteCCTransaction();
   const { categories: expenseCategories } = useTransactionCategories("EXPENSE");
 
@@ -76,16 +81,6 @@ export default function CreditCardDetailPage({
     mutateCard();
     mutateTxns();
     setPayOpen(false);
-  };
-
-  const handleCategoryChange = async (txId: number, category: string | null) => {
-    try {
-      await updateCategory(txId, category);
-      mutateTxns();
-      toast.success("Categoria actualizada");
-    } catch {
-      toast.error("Error al actualizar categoria");
-    }
   };
 
   const handleDelete = async () => {
@@ -101,21 +96,38 @@ export default function CreditCardDetailPage({
     }
   };
 
-  const years = [now.getFullYear(), now.getFullYear() - 1];
+  const currentMonth = now.getMonth() + 1;
+  const currentYear  = now.getFullYear();
+
+  const availableYears = [...new Set([
+    ...periods.map((p) => p.year),
+    currentYear,
+  ])].sort((a, b) => b - a);
+
+  const monthsForYear = (y: number) => {
+    const fromPeriods = periods.filter((p) => p.year === y).map((p) => p.month);
+    const withCurrent = y === currentYear && !fromPeriods.includes(currentMonth)
+      ? [...fromPeriods, currentMonth]
+      : fromPeriods;
+    return [...new Set(withCurrent)].sort((a, b) => b - a);
+  };
+
+  const yearOptions  = availableYears;
+  const monthOptions = monthsForYear(selectedYear);
 
   return (
     <div className="space-y-4 pb-24">
       {/* Header */}
       <div className="flex items-center gap-3">
-        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => router.back()}>
-          <ArrowLeft className="h-4 w-4" />
+        <Button variant="ghost" size="icon" className="size-8" onClick={() => back()}>
+          <ArrowLeft className="size-4" />
         </Button>
         <div className="flex-1 min-w-0">
           {loadingCard ? (
             <Skeleton className="h-6 w-40" />
           ) : (
             <div className="flex items-center gap-2 flex-wrap">
-              <h1 className="text-xl font-bold tracking-tight">{creditCard?.name ?? "Tarjeta"}</h1>
+              <h1 className="text-xl font-semibold tracking-tight">{creditCard?.name ?? "Tarjeta"}</h1>
               {creditCard?.last_four && (
                 <Badge variant="outline" className="font-mono text-xs">.... {creditCard.last_four}</Badge>
               )}
@@ -127,50 +139,88 @@ export default function CreditCardDetailPage({
 
       {/* Card info */}
       {loadingCard ? (
-        <Skeleton className="h-32 w-full rounded-xl" />
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <Skeleton className="h-32 w-full rounded-xl" />
+          <Skeleton className="h-32 w-full rounded-xl" />
+        </div>
       ) : creditCard && (
-        <Card className="bg-primary text-primary-foreground">
-          <CardContent className="p-4 pt-0 pb-0">
-            <div className="flex items-center justify-between mb-3">
-              <p className="text-sm font-medium opacity-80">Saldo pendiente</p>
-              <CreditCard className="h-5 w-5 opacity-60" />
-            </div>
-            <div className="flex flex-wrap gap-4">
-              <div>
-                <p className="text-xs opacity-60">{currency}</p>
-                <p className="text-2xl font-bold">{format(Number(creditCard.balance))}</p>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          {/* Saldo pendiente */}
+          <Card className="bg-primary text-primary-foreground">
+            <CardContent className="p-4 pt-0 pb-0">
+              <div className="flex items-center justify-between mb-3">
+                <p className="text-sm font-medium opacity-80">Saldo pendiente</p>
+                <CreditCard className="size-5 opacity-60" />
               </div>
-              {Number(creditCard.balance_usd) > 0 && (
+              <div className="flex flex-wrap gap-4">
                 <div>
-                  <p className="text-xs opacity-60">USD</p>
-                  <p className="text-2xl font-bold flex items-center gap-0.5">
-                    <DollarSign className="h-4 w-4" />
-                    {Number(creditCard.balance_usd).toFixed(2)}
+                  <p className="text-xs opacity-60">{currency}</p>
+                  <p className="text-2xl font-bold">{format(Number(creditCard.balance))}</p>
+                </div>
+                {Number(creditCard.balance_usd) > 0 && (
+                  <div>
+                    <p className="text-xs opacity-60">USD</p>
+                    <p className="text-2xl font-bold flex items-center gap-0.5">
+                      <DollarSign className="size-4" />
+                      {Number(creditCard.balance_usd).toFixed(2)}
+                    </p>
+                  </div>
+                )}
+              </div>
+              <div className="flex items-center gap-4 mt-3 flex-wrap">
+                {creditCard.credit_limit && (
+                  <p className="text-xs opacity-60">
+                    Límite: {format(Number(creditCard.credit_limit))}
+                  </p>
+                )}
+                {creditCard.payment_due_day && (
+                  <p className="text-xs opacity-60 flex items-center gap-1">
+                    <CalendarDays className="size-3" />
+                    Pago: día {creditCard.payment_due_day}
+                  </p>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Saldo al corte */}
+          <Card className="border-amber-200 bg-amber-50/60 dark:bg-amber-950/20 dark:border-amber-800">
+            <CardContent className="p-4 pt-0 pb-0">
+              <div className="flex items-center justify-between mb-3">
+                <p className="text-sm font-medium text-amber-700 dark:text-amber-400">Saldo al corte</p>
+                <CalendarDays className="size-5 text-amber-500" />
+              </div>
+              <div className="flex flex-wrap gap-4">
+                <div>
+                  <p className="text-xs text-muted-foreground">{currency}</p>
+                  <p className="text-2xl font-bold text-amber-700 dark:text-amber-400">
+                    {format(creditCard.statement_balance_local ?? 0)}
                   </p>
                 </div>
-              )}
-            </div>
-            <div className="flex items-center gap-4 mt-3 flex-wrap">
-              {creditCard.credit_limit && (
-                <p className="text-xs opacity-60">
-                  Limite: {format(Number(creditCard.credit_limit))}
-                </p>
-              )}
-              {creditCard.statement_closing_day && (
-                <p className="text-xs opacity-60 flex items-center gap-1">
-                  <CalendarDays className="h-3 w-3" />
-                  Corte: dia {creditCard.statement_closing_day}
-                </p>
-              )}
-              {creditCard.payment_due_day && (
-                <p className="text-xs opacity-60 flex items-center gap-1">
-                  <CalendarDays className="h-3 w-3" />
-                  Pago: dia {creditCard.payment_due_day}
-                </p>
-              )}
-            </div>
-          </CardContent>
-        </Card>
+                <div>
+                  <p className="text-xs text-muted-foreground">USD</p>
+                  <p className="text-2xl font-bold text-amber-700 dark:text-amber-400 flex items-center gap-0.5">
+                    <DollarSign className="size-4" />
+                    {(creditCard.statement_balance_usd ?? 0).toFixed(2)}
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center gap-4 mt-3 flex-wrap">
+                {creditCard.statement_closing_day && (
+                  <p className="text-xs text-muted-foreground flex items-center gap-1">
+                    <CalendarDays className="size-3" />
+                    Corte: día {creditCard.statement_closing_day}
+                  </p>
+                )}
+                {creditCard.cycle_start && (
+                  <p className="text-xs text-muted-foreground">
+                    Desde {new Date(creditCard.cycle_start).toLocaleDateString("es-HN", { day: "numeric", month: "short" })}
+                  </p>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        </div>
       )}
 
       {/* Filtro de periodo */}
@@ -178,15 +228,25 @@ export default function CreditCardDetailPage({
         <Select value={String(selectedMonth)} onValueChange={(v) => setSelectedMonth(Number(v))}>
           <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
           <SelectContent>
-            {MONTH_NAMES.slice(1).map((name, i) => (
-              <SelectItem key={i + 1} value={String(i + 1)}>{name}</SelectItem>
+            {monthOptions.map((m) => (
+              <SelectItem key={m} value={String(m)}>{MONTH_NAMES[m]}</SelectItem>
             ))}
           </SelectContent>
         </Select>
-        <Select value={String(selectedYear)} onValueChange={(v) => setSelectedYear(Number(v))}>
+        <Select
+          value={String(selectedYear)}
+          onValueChange={(v) => {
+            const y = Number(v);
+            setSelectedYear(y);
+            const months = monthsForYear(y);
+            if (months.length && !months.includes(selectedMonth)) {
+              setSelectedMonth(months[0]);
+            }
+          }}
+        >
           <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
           <SelectContent>
-            {years.map((y) => <SelectItem key={y} value={String(y)}>{y}</SelectItem>)}
+            {yearOptions.map((y) => <SelectItem key={y} value={String(y)}>{y}</SelectItem>)}
           </SelectContent>
         </Select>
       </div>
@@ -198,7 +258,7 @@ export default function CreditCardDetailPage({
             <CardContent className="p-3">
               <div className="flex items-center justify-between mb-1">
                 <p className="text-[11px] font-medium text-muted-foreground">Compras ({currency})</p>
-                <TrendingUp className="h-3 w-3 text-destructive" />
+                <TrendingUp className="size-3 text-destructive" />
               </div>
               <p className="text-base font-bold text-destructive">{format(totals.charges_local)}</p>
             </CardContent>
@@ -207,7 +267,7 @@ export default function CreditCardDetailPage({
             <CardContent className="p-3">
               <div className="flex items-center justify-between mb-1">
                 <p className="text-[11px] font-medium text-muted-foreground">Compras (USD)</p>
-                <DollarSign className="h-3 w-3 text-destructive" />
+                <DollarSign className="size-3 text-destructive" />
               </div>
               <p className="text-base font-bold text-destructive">${totals.charges_usd.toFixed(2)}</p>
             </CardContent>
@@ -226,7 +286,7 @@ export default function CreditCardDetailPage({
               <div className="divide-y">
                 {Array.from({ length: 5 }).map((_, i) => (
                   <div key={i} className="flex items-center gap-3 p-3.5">
-                    <Skeleton className="h-8 w-8 rounded-full shrink-0" />
+                    <Skeleton className="size-8 rounded-full shrink-0" />
                     <div className="flex-1 space-y-1.5">
                       <Skeleton className="h-3.5 w-32" />
                       <Skeleton className="h-3 w-24" />
@@ -237,7 +297,7 @@ export default function CreditCardDetailPage({
               </div>
             ) : transactions.length === 0 ? (
               <div className="py-10 flex flex-col items-center justify-center gap-1">
-                <CreditCard className="h-8 w-8 text-muted-foreground/30" />
+                <CreditCard className="size-8 text-muted-foreground/30" />
                 <p className="text-sm text-muted-foreground">Sin movimientos en este periodo</p>
               </div>
             ) : (
@@ -248,8 +308,6 @@ export default function CreditCardDetailPage({
                     txn={txn}
                     format={format}
                     currency={currency}
-                    expenseCategories={expenseCategories}
-                    onCategoryChange={handleCategoryChange}
                     onEdit={() => setEditingTxn(txn)}
                     onDelete={() => setDeletingTxn(txn)}
                   />
@@ -260,15 +318,20 @@ export default function CreditCardDetailPage({
         </Card>
       </div>
 
-      {(Number(creditCard?.balance ?? 0) > 0 || Number(creditCard?.balance_usd ?? 0) > 0) && (
-        <Fab
-          actions={[{
+      <Fab
+        actions={[
+          {
+            label: "Nueva transacción",
+            icon: ArrowLeftRight,
+            onClick: () => setTransactionOpen(true),
+          },
+          ...((Number(creditCard?.balance ?? 0) > 0 || Number(creditCard?.balance_usd ?? 0) > 0) ? [{
             label: "Pagar tarjeta",
             icon: Banknote,
             onClick: () => setPayOpen(true),
-          }]}
-        />
-      )}
+          }] : []),
+        ]}
+      />
 
       <PayCreditCardDialog
         open={payOpen}
@@ -276,6 +339,14 @@ export default function CreditCardDetailPage({
         card={creditCard ?? null}
         accounts={accounts}
         onSuccess={handlePaySuccess}
+      />
+
+      <CreateTransactionModal
+        open={transactionOpen}
+        onOpenChange={setTransactionOpen}
+        accounts={accounts}
+        creditCards={creditCards}
+        onSuccess={() => { mutateCard(); mutateTxns(); }}
       />
 
       <EditCCTransactionDialog
@@ -315,16 +386,12 @@ function CreditCardTxnRow({
   txn,
   format,
   currency,
-  expenseCategories,
-  onCategoryChange,
   onEdit,
   onDelete,
 }: {
   txn: CreditCardTransaction;
   format: (v: number) => string;
   currency: string;
-  expenseCategories: TransactionCategory[];
-  onCategoryChange: (id: number, category: string | null) => Promise<void>;
   onEdit: () => void;
   onDelete: () => void;
 }) {
@@ -334,12 +401,12 @@ function CreditCardTxnRow({
 
   return (
     <div className="flex items-start gap-3 p-3.5">
-      <div className={`h-8 w-8 rounded-full flex items-center justify-center shrink-0 mt-0.5 ${
+      <div className={`size-8 rounded-full flex items-center justify-center shrink-0 mt-0.5 ${
         isCharge ? "bg-destructive/10" : "bg-green-100"
       }`}>
         {isCharge
-          ? <ShoppingBag className="h-4 w-4 text-destructive" />
-          : <Banknote className="h-4 w-4 text-green-600" />
+          ? <ShoppingBag className="size-4 text-destructive" />
+          : <Banknote className="size-4 text-green-600" />
         }
       </div>
 
@@ -348,7 +415,7 @@ function CreditCardTxnRow({
           {txn.description || (isCharge ? "Compra" : "Pago de tarjeta")}
         </p>
         <div className="flex items-center gap-2 flex-wrap">
-          <p className="text-xs text-muted-foreground">
+          <p className="text-xs text-muted-foreground" suppressHydrationWarning>
             {new Date(txn.occurred_at).toLocaleDateString("es-HN", {
               day: "numeric", month: "short", year: "numeric",
             })}
@@ -367,25 +434,12 @@ function CreditCardTxnRow({
             </span>
           )}
         </div>
-        {isCharge && (
+        {isCharge && txn.category && (
           <div className="mt-1">
-            <Select
-              value={txn.category ?? "__none__"}
-              onValueChange={async (val) => {
-                await onCategoryChange(txn.id, val === "__none__" ? null : val);
-              }}
-            >
-              <SelectTrigger className="h-6 text-[10px] w-36 border-dashed px-2">
-                <Tag className="h-2.5 w-2.5 mr-1 shrink-0" />
-                <SelectValue placeholder="Sin categoria" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="__none__">Sin categoria</SelectItem>
-                {expenseCategories.map((c) => (
-                  <SelectItem key={c.id} value={c.name}>{c.name}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <Badge variant="secondary" className="text-[10px] px-1.5 py-0 gap-1">
+              <Tag className="size-2.5 shrink-0" />
+              {txn.category}
+            </Badge>
           </div>
         )}
       </div>
@@ -407,13 +461,13 @@ function CreditCardTxnRow({
         {isEditable && (
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="icon" className="h-7 w-7 shrink-0">
-                <MoreVertical className="h-4 w-4" />
+              <Button variant="ghost" size="icon" className="size-7 shrink-0">
+                <MoreVertical className="size-4" />
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
               <DropdownMenuItem onClick={onEdit}>
-                <Pencil className="h-4 w-4 mr-2" />
+                <Pencil className="size-4 mr-2" />
                 Editar
               </DropdownMenuItem>
               <DropdownMenuSeparator />
@@ -421,7 +475,7 @@ function CreditCardTxnRow({
                 className="text-destructive focus:text-destructive"
                 onClick={onDelete}
               >
-                <Trash2 className="h-4 w-4 mr-2" />
+                <Trash2 className="size-4 mr-2" />
                 Eliminar
               </DropdownMenuItem>
             </DropdownMenuContent>

@@ -1,7 +1,7 @@
-// app/(dashboard)/inventory/movements/page.tsx
+﻿// app/(dashboard)/inventory/movements/page.tsx
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -23,9 +23,15 @@ import { useMovements, Movement } from "@/hooks/swr/use-movements";
 import { useProducts } from "@/hooks/swr/use-products";
 import { useMovementPeriods } from "@/hooks/swr/use-movements";
 import { useCurrency } from "@/hooks/swr/use-currency";
+import { useModulePermissions } from "@/hooks/use-module-permissions";
 import { Fab } from "@/components/ui/fab";
+import {
+  Pagination, PaginationContent, PaginationItem,
+  PaginationLink, PaginationNext, PaginationPrevious, PaginationEllipsis,
+} from "@/components/ui/pagination";
 import { SearchBar } from "@/components/shared/search-bar";
 import { SearchableSelect } from "@/components/shared/SearchableSelect";
+import { useDebounce } from "@/hooks/use-debounce";
 
 // ── Helpers ────────────────────────────────────────────────────────────
 
@@ -57,49 +63,49 @@ function TypeBadge({ m }: { m: Movement }) {
   if (m.reference_type === "ADJUSTMENT") {
     return m.movement_type === "IN" ? (
       <Badge className="bg-green-100 text-green-700 border-green-200 gap-1" variant="outline">
-        <TrendingUp className="h-3 w-3" /> Ajuste +
+        <TrendingUp className="size-3" /> Ajuste +
       </Badge>
     ) : (
       <Badge className="bg-red-100 text-red-700 border-red-200 gap-1" variant="outline">
-        <TrendingDown className="h-3 w-3" /> Ajuste −
+        <TrendingDown className="size-3" /> Ajuste −
       </Badge>
     );
   }
   if (m.reference_type === "INITIAL") {
     return (
       <Badge className="bg-purple-100 text-purple-700 border-purple-200 gap-1" variant="outline">
-        <BoxIcon className="h-3 w-3" /> Inicial
+        <BoxIcon className="size-3" /> Inicial
       </Badge>
     );
   }
   if (m.reference_type === "SALE_CANCELLED") {
     return (
       <Badge className="bg-gray-100 text-gray-600 border-gray-200 gap-1" variant="outline">
-        <RotateCcw className="h-3 w-3" /> Cancelación
+        <RotateCcw className="size-3" /> Cancelación
       </Badge>
     );
   }
   if (m.reference_type === "SALE_EDITED") {
     return m.movement_type === "OUT" ? (
       <Badge className="bg-yellow-100 text-yellow-700 border-yellow-200 gap-1" variant="outline">
-        <FilePen className="h-3 w-3" /> Edición +
+        <FilePen className="size-3" /> Edición +
       </Badge>
     ) : (
       <Badge className="bg-orange-100 text-orange-700 border-orange-200 gap-1" variant="outline">
-        <FilePen className="h-3 w-3" /> Edición −
+        <FilePen className="size-3" /> Edición −
       </Badge>
     );
   }
   if (m.movement_type === "IN") {
     return (
       <Badge className="bg-blue-100 text-blue-700 border-blue-200 gap-1" variant="outline">
-        <ArrowDownCircle className="h-3 w-3" /> Entrada
+        <ArrowDownCircle className="size-3" /> Entrada
       </Badge>
     );
   }
   return (
     <Badge className="bg-orange-100 text-orange-700 border-orange-200 gap-1" variant="outline">
-      <ArrowUpCircle className="h-3 w-3" /> Salida
+      <ArrowUpCircle className="size-3" /> Salida
     </Badge>
   );
 }
@@ -109,7 +115,7 @@ function TypeBadge({ m }: { m: Movement }) {
 function ProductCell({ m }: { m: Movement }) {
   return (
     <div className="flex items-center gap-2">
-      <div className="relative h-8 w-8 rounded-md overflow-hidden bg-muted shrink-0 flex items-center justify-center">
+      <div className="relative size-8 rounded-md overflow-hidden bg-muted shrink-0 flex items-center justify-center">
         {m.image_url ? (
           <img
             src={m.image_url}
@@ -118,7 +124,7 @@ function ProductCell({ m }: { m: Movement }) {
             onError={(e) => { e.currentTarget.style.display = "none"; }}
           />
         ) : (
-          <Package className="h-4 w-4 text-muted-foreground/40" />
+          <Package className="size-4 text-muted-foreground/40" />
         )}
       </div>
       <div className="min-w-0">
@@ -126,7 +132,7 @@ function ProductCell({ m }: { m: Movement }) {
         {/* Variante */}
         {m.variant_name && (
           <div className="flex items-center gap-1 mt-0.5">
-            <Layers className="h-2.5 w-2.5 text-muted-foreground shrink-0" />
+            <Layers className="size-2.5 text-muted-foreground shrink-0" />
             <span className="text-xs text-muted-foreground truncate">{m.variant_name}</span>
           </div>
         )}
@@ -143,7 +149,7 @@ function ProductCell({ m }: { m: Movement }) {
 
 // ── MovementDetail (tabla desktop) ────────────────────────────────────
 
-function MovementDetail({ m, format }: { m: Movement; format: FormatFn }) {
+function MovementDetail({ m, format, showCosts }: { m: Movement; format: FormatFn; showCosts: boolean }) {
   if (m.reference_type === "ADJUSTMENT" || m.reference_type === "INITIAL") {
     return (
       <p className="text-xs text-muted-foreground italic">
@@ -159,6 +165,7 @@ function MovementDetail({ m, format }: { m: Movement; format: FormatFn }) {
     );
   }
   if (m.movement_type === "IN") {
+    if (!showCosts) return <span className="text-muted-foreground text-xs">—</span>;
     const isUSD = m.purchase_currency === "USD";
     return (
       <div className="text-xs space-y-0.5">
@@ -191,9 +198,11 @@ function MovementDetail({ m, format }: { m: Movement; format: FormatFn }) {
       <p className="text-muted-foreground">
         Precio: <span className="text-foreground font-medium">{format(m.unit_price)}</span>
       </p>
-      <p className="text-muted-foreground">
-        Costo: <span className="text-foreground font-medium">{format(m.unit_cost)}</span>
-      </p>
+      {showCosts && (
+        <p className="text-muted-foreground">
+          Costo: <span className="text-foreground font-medium">{format(m.unit_cost)}</span>
+        </p>
+      )}
       {m.customer_name && (
         <p className="text-muted-foreground">
           Cliente: <span className="text-foreground font-medium">{m.customer_name}</span>
@@ -235,7 +244,7 @@ function MovementProfit({ m, format }: { m: Movement; format: FormatFn }) {
 
 // ── MobileDetail ───────────────────────────────────────────────────────
 
-function MobileDetail({ m, format }: { m: Movement; format: FormatFn }) {
+function MobileDetail({ m, format, showCosts, showProfit }: { m: Movement; format: FormatFn; showCosts: boolean; showProfit: boolean }) {
   if (m.reference_type === "ADJUSTMENT" || m.reference_type === "INITIAL") {
     return (
       <div className="pt-3 border-t">
@@ -252,6 +261,11 @@ function MobileDetail({ m, format }: { m: Movement; format: FormatFn }) {
   }
   if (m.movement_type === "IN") {
     const isUSD = m.purchase_currency === "USD";
+    if (!showCosts) {
+      return (
+        <div className="pt-3 border-t text-center text-xs text-muted-foreground">—</div>
+      );
+    }
     return (
       <div className="pt-3 border-t">
         <div className="grid grid-cols-3 gap-2 text-center text-xs">
@@ -287,23 +301,28 @@ function MobileDetail({ m, format }: { m: Movement; format: FormatFn }) {
     );
   }
   // OUT — venta
+  const colCount = showCosts && showProfit ? 3 : showCosts || showProfit ? 2 : 1;
   return (
     <div className="pt-3 border-t space-y-2">
-      <div className="grid grid-cols-3 gap-2 text-center text-xs">
+      <div className={`grid grid-cols-${colCount} gap-2 text-center text-xs`}>
         <div>
           <p className="text-muted-foreground">Precio</p>
           <p className="font-medium">{format(m.unit_price)}</p>
         </div>
-        <div>
-          <p className="text-muted-foreground">Total</p>
-          <p className="font-bold">{format(m.line_total)}</p>
-        </div>
-        <div>
-          <p className="text-muted-foreground">Ganancia</p>
-          <p className={`font-bold ${Number(m.profit) >= 0 ? "text-green-600" : "text-destructive"}`}>
-            {format(m.profit)}
-          </p>
-        </div>
+        {showCosts && (
+          <div>
+            <p className="text-muted-foreground">Costo</p>
+            <p className="font-medium">{format(m.unit_cost)}</p>
+          </div>
+        )}
+        {showProfit && (
+          <div>
+            <p className="text-muted-foreground">Ganancia</p>
+            <p className={`font-bold ${Number(m.profit) >= 0 ? "text-green-600" : "text-destructive"}`}>
+              {format(m.profit)}
+            </p>
+          </div>
+        )}
       </div>
       {(m.customer_name || m.sale_number) && (
         <div className="flex justify-between text-xs pt-1.5 border-t text-muted-foreground">
@@ -321,7 +340,7 @@ function MobileDetail({ m, format }: { m: Movement; format: FormatFn }) {
 
 export default function MovementsPage() {
   const now    = new Date();
-  const router = useRouter();
+  const { push } = useRouter();
 
   const [search,        setSearch]        = useState("");
   const [filterMode,    setFilterMode]    = useState<"month" | "date">("month");
@@ -330,44 +349,36 @@ export default function MovementsPage() {
   const [specificDate,  setSpecificDate]  = useState("");
   const [productId,     setProductId]     = useState<number | undefined>();
   const [typeFilter,    setTypeFilter]    = useState("all");
+  const [page,          setPage]          = useState(1);
+  const pageLimit       = 10;
 
-  const { movements, isLoading } = useMovements({
+  const debouncedSearch = useDebounce(search, 300);
+
+  useEffect(() => { setPage(1); }, [
+    debouncedSearch, typeFilter, productId,
+    filterMode, selectedMonth, selectedYear, specificDate,
+  ]);
+
+  const { movements, isLoading, total, totalPages } = useMovements({
     date:       filterMode === "date"  ? specificDate || undefined : undefined,
     month:      filterMode === "month" ? selectedMonth             : undefined,
     year:       filterMode === "month" ? selectedYear              : undefined,
     product_id: productId,
+    search:     debouncedSearch || undefined,
+    type:       typeFilter !== "all" ? typeFilter : undefined,
+    page,
+    limit:      pageLimit,
   });
 
   const { products }              = useProducts();
   const { periods }               = useMovementPeriods();
   const { format: formatCurrency } = useCurrency();
+  const { show_costs: showCosts, show_profit: showProfit } = useModulePermissions("INVENTORY");
 
   const format = (v: number | null | undefined): string => {
     if (v == null) return "—";
     return formatCurrency(Number(v));
   };
-
-  const filtered = movements.filter((m) => {
-    const matchesSearch = !search ||
-      m.product_name.toLowerCase().includes(search.toLowerCase()) ||
-      (m.sku?.toLowerCase().includes(search.toLowerCase())           ?? false) ||
-      (m.variant_name?.toLowerCase().includes(search.toLowerCase())  ?? false) ||
-      (m.variant_sku?.toLowerCase().includes(search.toLowerCase())   ?? false) ||
-      (m.customer_name?.toLowerCase().includes(search.toLowerCase()) ?? false) ||
-      (m.sale_number?.toLowerCase().includes(search.toLowerCase())   ?? false) ||
-      (m.notes?.toLowerCase().includes(search.toLowerCase())         ?? false);
-
-    const matchesType =
-      typeFilter === "all"        ? true :
-      typeFilter === "IN"         ? m.movement_type === "IN" && m.reference_type === "PURCHASE" :
-      typeFilter === "OUT"        ? m.movement_type === "OUT" && m.reference_type === "SALE" :
-      typeFilter === "ADJUSTMENT" ? m.reference_type === "ADJUSTMENT" :
-      typeFilter === "INITIAL"    ? m.reference_type === "INITIAL" :
-      typeFilter === "CANCELLED"  ? m.reference_type === "SALE_CANCELLED" :
-      true;
-
-    return matchesSearch && matchesType;
-  });
 
   const availableYears     = [...new Set(periods.map((p) => p.year))].sort((a, b) => b - a);
   const monthsForYear      = (year: number) =>
@@ -388,6 +399,7 @@ export default function MovementsPage() {
     setSpecificDate("");
     setProductId(undefined);
     setTypeFilter("all");
+    setPage(1);
   };
 
   const periodLabel =
@@ -399,7 +411,7 @@ export default function MovementsPage() {
     <div className="space-y-4 pb-24">
       {/* Header */}
       <div>
-        <h1 className="text-2xl font-bold tracking-tight">Movimientos</h1>
+        <h1 className="text-2xl font-semibold tracking-tight">Movimientos</h1>
         <p className="text-muted-foreground text-sm">Entradas y salidas · {periodLabel}</p>
       </div>
 
@@ -482,7 +494,7 @@ export default function MovementsPage() {
             onValueChange={(v) => setProductId(v === "all" ? undefined : Number(v))}
             items={products.map((p) => ({ value: p.id.toString(), label: p.name }))}
             defaultOption={{ value: "all", label: "Todos los productos" }}
-            className="w-full sm:w-48"
+            className="w-full sm:w-64"
           />
 
           <Select value={typeFilter} onValueChange={setTypeFilter}>
@@ -503,7 +515,7 @@ export default function MovementsPage() {
               className="gap-1.5 text-muted-foreground shrink-0"
               onClick={clearAll}
             >
-              <X className="h-3.5 w-3.5" /> Limpiar
+              <X className="size-3.5" /> Limpiar
             </Button>
           )}
         </div>
@@ -519,35 +531,36 @@ export default function MovementsPage() {
                 <TableHead>Tipo</TableHead>
                 <TableHead>Cant.</TableHead>
                 <TableHead>Detalle</TableHead>
-                <TableHead className="text-right">Total</TableHead>
-                <TableHead className="text-right">Ganancia</TableHead>
+                {showCosts  && <TableHead className="text-right">Total</TableHead>}
+                {showProfit && <TableHead className="text-right">Ganancia</TableHead>}
                 <TableHead>Fecha</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {isLoading ? (
+                /* skeleton - index key ok */
                 Array.from({ length: 6 }).map((_, i) => (
                   <TableRow key={i}>
-                    {Array.from({ length: 7 }).map((_, j) => (
+                    {Array.from({ length: 5 + (showCosts ? 1 : 0) + (showProfit ? 1 : 0) }).map((_, j) => (
                       <TableCell key={j}><Skeleton className="h-4 w-full" /></TableCell>
                     ))}
                   </TableRow>
                 ))
-              ) : filtered.length === 0 ? (
+              ) : movements.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={7} className="text-center py-12 text-muted-foreground">
+                  <TableCell colSpan={5 + (showCosts ? 1 : 0) + (showProfit ? 1 : 0)} className="text-center py-12 text-muted-foreground">
                     No hay movimientos en este período
                   </TableCell>
                 </TableRow>
               ) : (
-                filtered.map((m) => (
+                movements.map((m) => (
                   <TableRow key={m.id}>
                     <TableCell><ProductCell m={m} /></TableCell>
                     <TableCell><TypeBadge m={m} /></TableCell>
                     <TableCell className="font-medium">{m.quantity}</TableCell>
-                    <TableCell><MovementDetail m={m} format={format} /></TableCell>
-                    <TableCell className="text-right"><MovementTotal m={m} format={format} /></TableCell>
-                    <TableCell className="text-right"><MovementProfit m={m} format={format} /></TableCell>
+                    <TableCell><MovementDetail m={m} format={format} showCosts={showCosts} /></TableCell>
+                    {showCosts  && <TableCell className="text-right"><MovementTotal m={m} format={format} /></TableCell>}
+                    {showProfit && <TableCell className="text-right"><MovementProfit m={m} format={format} /></TableCell>}
                     <TableCell className="text-muted-foreground text-sm whitespace-nowrap">
                       {formatDateOnly(m.created_at)}
                     </TableCell>
@@ -562,22 +575,23 @@ export default function MovementsPage() {
       {/* ── Cards — móvil ────────────────────────────────────────── */}
       <div className="space-y-3 md:hidden">
         {isLoading ? (
+          /* skeleton - index key ok */
           Array.from({ length: 4 }).map((_, i) => (
             <Skeleton key={i} className="h-32 w-full rounded-xl" />
           ))
-        ) : filtered.length === 0 ? (
+        ) : movements.length === 0 ? (
           <Card>
             <CardContent className="flex flex-col items-center justify-center py-12">
-              <SlidersHorizontal className="h-10 w-10 text-muted-foreground/40" />
+              <SlidersHorizontal className="size-10 text-muted-foreground/40" />
               <p className="mt-3 text-sm text-muted-foreground">No hay movimientos</p>
             </CardContent>
           </Card>
         ) : (
-          filtered.map((m) => (
+          movements.map((m) => (
             <Card key={m.id}>
               <CardContent className="pl-3.5">
                 <div className="flex items-center gap-3 mb-3">
-                  <div className="relative h-10 w-10 rounded-lg overflow-hidden bg-muted shrink-0 flex items-center justify-center">
+                  <div className="relative size-10 rounded-lg overflow-hidden bg-muted shrink-0 flex items-center justify-center">
                     {m.image_url ? (
                       <img
                         src={m.image_url}
@@ -586,14 +600,14 @@ export default function MovementsPage() {
                         onError={(e) => { e.currentTarget.style.display = "none"; }}
                       />
                     ) : (
-                      <Package className="h-5 w-5 text-muted-foreground/40" />
+                      <Package className="size-5 text-muted-foreground/40" />
                     )}
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className="font-medium truncate">{m.product_name}</p>
                     {m.variant_name && (
                       <div className="flex items-center gap-1">
-                        <Layers className="h-2.5 w-2.5 text-muted-foreground shrink-0" />
+                        <Layers className="size-2.5 text-muted-foreground shrink-0" />
                         <span className="text-xs text-muted-foreground truncate">{m.variant_name}</span>
                       </div>
                     )}
@@ -604,19 +618,75 @@ export default function MovementsPage() {
                     <span className="text-xs text-muted-foreground">{m.quantity} uds</span>
                   </div>
                 </div>
-                <MobileDetail m={m} format={format} />
+                <MobileDetail m={m} format={format} showCosts={showCosts} showProfit={showProfit} />
               </CardContent>
             </Card>
           ))
         )}
       </div>
 
+      {/* Paginación */}
+      {totalPages > 1 && (
+        <div className="flex flex-col items-center gap-2 sm:flex-row sm:justify-between">
+          <p className="text-sm text-muted-foreground order-2 sm:order-1">
+            {total} movimiento{total !== 1 ? "s" : ""} · página {page} de {totalPages}
+          </p>
+          <Pagination className="order-1 sm:order-2 w-auto mx-0 justify-end">
+            <PaginationContent>
+              <PaginationItem>
+                <PaginationPrevious
+                  onClick={() => setPage((p) => Math.max(1, p - 1))}
+                  aria-disabled={page === 1}
+                  className={page === 1 ? "pointer-events-none opacity-50" : "cursor-pointer"}
+                />
+              </PaginationItem>
+
+              {Array.from({ length: totalPages }, (_, i) => i + 1)
+                .filter((p) =>
+                  p === 1 || p === totalPages ||
+                  (p >= page - 1 && p <= page + 1)
+                )
+                .reduce<(number | "…")[]>((acc, p, i, arr) => {
+                  if (i > 0 && (p as number) - (arr[i - 1] as number) > 1) acc.push("…");
+                  acc.push(p);
+                  return acc;
+                }, [])
+                .map((p, i) =>
+                  p === "…" ? (
+                    <PaginationItem key={`ellipsis-${i}`}>
+                      <PaginationEllipsis />
+                    </PaginationItem>
+                  ) : (
+                    <PaginationItem key={p}>
+                      <PaginationLink
+                        isActive={p === page}
+                        onClick={() => setPage(p as number)}
+                        className="cursor-pointer"
+                      >
+                        {p}
+                      </PaginationLink>
+                    </PaginationItem>
+                  )
+                )}
+
+              <PaginationItem>
+                <PaginationNext
+                  onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                  aria-disabled={page === totalPages}
+                  className={page === totalPages ? "pointer-events-none opacity-50" : "cursor-pointer"}
+                />
+              </PaginationItem>
+            </PaginationContent>
+          </Pagination>
+        </div>
+      )}
+
       {/* FAB */}
       <Fab
         actions={[
-          { label: "Nuevo producto",  icon: Plus,        onClick: () => router.push("/inventory") },
-          { label: "Registrar venta", icon: ShoppingCart, onClick: () => router.push("/sales/new") },
-          { label: "Agregar stock",   icon: PackagePlus,  onClick: () => router.push("/inventory") },
+          { label: "Nuevo producto",  icon: Plus,        onClick: () => push("/inventory") },
+          { label: "Registrar venta", icon: ShoppingCart, onClick: () => push("/sales/new") },
+          { label: "Agregar stock",   icon: PackagePlus,  onClick: () => push("/inventory") },
         ]}
       />
     </div>

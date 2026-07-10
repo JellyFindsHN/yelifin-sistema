@@ -1,4 +1,4 @@
-// app/(dashboard)/settings/profile/page.tsx
+﻿// app/(dashboard)/settings/profile/page.tsx
 "use client";
 
 import { useMemo } from "react";
@@ -18,7 +18,7 @@ import { Separator } from "@/components/ui/separator";
 import { Building2, ImageIcon } from "lucide-react";
 
 export default function ProfilePage() {
-  const router = useRouter();
+  const { push } = useRouter();
   const {
     data,
     user,
@@ -72,9 +72,9 @@ export default function ProfilePage() {
     return (
       <div className="space-y-4 pb-24 md:space-y-6">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">Mi perfil</h1>
+          <h1 className="text-2xl font-semibold tracking-tight">Mi perfil</h1>
           <p className="text-muted-foreground text-sm">
-            Cargando información de tu cuenta...
+            Cargando información de tu cuenta…
           </p>
         </div>
         <Card className="animate-pulse">
@@ -88,7 +88,7 @@ export default function ProfilePage() {
     return (
       <div className="space-y-4 pb-24 md:space-y-6">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">Mi perfil</h1>
+          <h1 className="text-2xl font-semibold tracking-tight">Mi perfil</h1>
           <p className="text-muted-foreground text-sm">
             No se pudo cargar la información de tu usuario.
           </p>
@@ -118,7 +118,7 @@ export default function ProfilePage() {
       {/* Header */}
       <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
         <div className="space-y-1">
-          <h1 className="text-2xl font-bold tracking-tight">Mi perfil</h1>
+          <h1 className="text-2xl font-semibold tracking-tight">Mi perfil</h1>
           <p className="text-muted-foreground text-sm">
             Configura los datos de tu cuenta y de tu negocio.
           </p>
@@ -148,7 +148,7 @@ export default function ProfilePage() {
             <div className="flex flex-wrap gap-2 pt-1">
               <Button
                 size="sm"
-                onClick={() => router.push("/onboarding")}
+                onClick={() => push("/onboarding")}
               >
                 Ir al onboarding
               </Button>
@@ -225,7 +225,7 @@ export default function ProfilePage() {
               </div>
 
               <div className="pt-1">
-                <span className="text-xs text-muted-foreground">
+                <span className="text-xs text-muted-foreground" suppressHydrationWarning>
                   Cuenta creada el{" "}
                   {new Date(user.created_at).toLocaleDateString("es-HN", {
                     year: "numeric",
@@ -241,14 +241,14 @@ export default function ProfilePage() {
           <Card>
             <CardHeader className="pb-3">
               <CardTitle className="text-base md:text-lg flex items-center gap-2">
-                <Building2 className="h-4 w-4 text-muted-foreground" />
+                <Building2 className="size-4 text-muted-foreground" />
                 Datos de tu negocio
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4 text-sm">
               {/* Logo + nombre */}
               <div className="flex items-center gap-4">
-                <div className="h-14 w-14 rounded-xl border bg-muted/40 flex items-center justify-center shrink-0 overflow-hidden">
+                <div className="size-14 rounded-xl border bg-muted/40 flex items-center justify-center shrink-0 overflow-hidden">
                   {profile.business_logo_url ? (
                     <Image
                       src={profile.business_logo_url}
@@ -259,7 +259,7 @@ export default function ProfilePage() {
                       unoptimized
                     />
                   ) : (
-                    <ImageIcon className="h-6 w-6 text-muted-foreground/40" />
+                    <ImageIcon className="size-6 text-muted-foreground/40" />
                   )}
                 </div>
                 <div>
@@ -288,7 +288,7 @@ export default function ProfilePage() {
               <div className="flex flex-wrap gap-2">
                 <Button
                   size="sm"
-                  onClick={() => router.push("/settings/organization")}
+                  onClick={() => push("/settings/organization")}
                 >
                   Editar datos del negocio
                 </Button>
@@ -352,7 +352,7 @@ export default function ProfilePage() {
                       <span className="text-xs text-muted-foreground">
                         Período actual
                       </span>
-                      <p className="text-xs">
+                      <p className="text-xs" suppressHydrationWarning>
                         Del{" "}
                         {new Date(
                           subscription.current_period_start
@@ -387,7 +387,7 @@ export default function ProfilePage() {
                 <Button
                   size="sm"
                   variant="outline"
-                  onClick={() => router.push("/settings/billing")}
+                  onClick={() => push("/settings/billing")}
                 >
                   Administrar suscripción
                 </Button>

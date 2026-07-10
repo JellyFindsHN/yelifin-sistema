@@ -33,7 +33,7 @@ export type CreateSaleInput = {
   status?:         SaleStatus;
 };
 
-export type ConfirmSaleInput = { action: 'confirm' };
+export type ConfirmSaleInput = { action: 'confirm'; confirmed_at: string };
 export type CancelSaleInput  = { action: 'cancel' };
 
 export type EditSaleInput = {
@@ -75,6 +75,8 @@ export type Sale = {
 };
 
 export type SaleDetail = Sale & {
+  next_id: number | null;
+  prev_id: number | null;
   items: {
     id:           number;
     product_id:   number;
@@ -99,10 +101,22 @@ export type SaleDetail = Sale & {
 export type SalesPreset = 'today' | '7d' | 'this_month' | 'last_month' | 'all';
 
 export type SalesFilters = {
-  preset?:  SalesPreset;
-  from?:    string;
-  to?:      string;
-  payment?: 'all' | 'CASH' | 'CARD' | 'TRANSFER' | 'MIXED' | 'OTHER';
+  preset?:     SalesPreset;
+  from?:       string;
+  to?:         string;
+  payment?:    'all' | 'CASH' | 'CARD' | 'TRANSFER' | 'MIXED' | 'OTHER';
+  search?:     string;
+  status?:     'all' | 'COMPLETED' | 'PENDING';
+  account_id?: string;
+  page?:       number;
+  limit?:      number;
+};
+
+export type SalesStats = {
+  total_revenue:   number;
+  total_profit:    number;
+  pending_count:   number;
+  completed_count: number;
 };
 
 function buildQuery(filters?: SalesFilters) {
@@ -116,6 +130,11 @@ function buildQuery(filters?: SalesFilters) {
   } else {
     sp.set('payment', 'all');
   }
+  if (filters?.search)                              sp.set('search',     filters.search);
+  if (filters?.status && filters.status !== 'all') sp.set('status',     filters.status);
+  if (filters?.account_id && filters.account_id !== 'all') sp.set('account_id', filters.account_id);
+  if (filters?.page)                                sp.set('page',       String(filters.page));
+  if (filters?.limit)                               sp.set('limit',      String(filters.limit));
   const q = sp.toString();
   return q ? `${KEY}?${q}` : KEY;
 }
@@ -157,10 +176,19 @@ export function useSales(filters?: SalesFilters) {
   );
 
   return {
-    sales:    (data?.data ?? []) as Sale[],
-    total:    data?.total ?? 0,
+    sales:      (data?.data ?? []) as Sale[],
+    total:      (data?.total      ?? 0)  as number,
+    page:       (data?.page       ?? 1)  as number,
+    totalPages: (data?.totalPages ?? 1)  as number,
+    limit:      (data?.limit      ?? 25) as number,
+    stats:      (data?.stats ?? {
+      total_revenue:   0,
+      total_profit:    0,
+      pending_count:   0,
+      completed_count: 0,
+    }) as SalesStats,
     isLoading,
-    error:    error?.message ?? null,
+    error:      error?.message ?? null,
     mutate,
   };
 }
@@ -253,7 +281,7 @@ export function usePatchSale(id: number | null) {
     }
   };
 
-  const confirmSale = () => patchSale({ action: 'confirm' });
+  const confirmSale = () => patchSale({ action: 'confirm', confirmed_at: new Date().toISOString() });
   const cancelSale  = () => patchSale({ action: 'cancel' });
   const editSale    = (data: Omit<EditSaleInput, 'action'>) =>
     patchSale({ action: 'edit', ...data });

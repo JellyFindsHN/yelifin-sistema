@@ -65,12 +65,14 @@ function useAuthFetch() {
   };
 }
 
-export function useSupplies(params?: { search?: string }) {
+export function useSupplies(params?: { search?: string; page?: number; limit?: number }) {
   const { firebaseUser } = useAuth();
   const authFetch = useAuthFetch();
 
   const qs = new URLSearchParams();
   if (params?.search) qs.set("search", params.search);
+  if (params?.page)   qs.set("page",   String(params.page));
+  if (params?.limit)  qs.set("limit",  String(params.limit));
 
   const swrKey = firebaseUser ? `${KEY}?${qs.toString()}` : null;
 
@@ -84,8 +86,9 @@ export function useSupplies(params?: { search?: string }) {
   );
 
   return {
-    supplies: (data?.data ?? []) as Supply[],
-    total: data?.total ?? 0,
+    supplies:   (data?.data ?? []) as Supply[],
+    total:      (data?.total      ?? 0) as number,
+    totalPages: (data?.totalPages ?? 1) as number,
     isLoading,
     error: error?.message ?? null,
     mutate,

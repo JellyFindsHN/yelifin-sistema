@@ -1,10 +1,8 @@
-// components/transactions/edit-transaction-modal.tsx
+﻿// components/transactions/edit-transaction-modal.tsx
 "use client";
 
-import { useState, useEffect } from "react";
-import {
-  Dialog, DialogContent, DialogHeader, DialogTitle,
-} from "@/components/ui/dialog";
+import { useReducer, useEffect } from "react";
+import { ResponsiveModal } from "@/components/shared/responsive-modal";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -14,8 +12,8 @@ import {
 } from "@/components/ui/select";
 import { Loader2, ArrowDownCircle, ArrowUpCircle, ArrowLeftRight } from "lucide-react";
 import { toast } from "sonner";
-import { cn } from "@/lib/utils";
 import { useUpdateTransaction, Transaction } from "@/hooks/swr/use-transactions";
+import { localDateToISO, toLocalDateInput } from "@/lib/date-utils";
 import { useCurrency } from "@/hooks/swr/use-currency";
 import { useTransactionCategories } from "@/hooks/swr/use-transaction-categories";
 
@@ -26,6 +24,30 @@ const TYPE_CONFIG: Record<TxType, { label: string; icon: React.ElementType }> = 
   EXPENSE:  { label: "Egreso",         icon: ArrowUpCircle   },
   TRANSFER: { label: "Transferencia",  icon: ArrowLeftRight  },
 };
+
+type FormState = {
+  accountId:   string;
+  toAccountId: string;
+  amount:      string;
+  category:    string;
+  description: string;
+  occurredAt:  string;
+};
+
+function txFromTransaction(t: Transaction): FormState {
+  return {
+    accountId:   String(t.account_id),
+    toAccountId: String(t.to_account_id ?? ""),
+    amount:      String(t.amount),
+    category:    t.category ?? "",
+    description: t.description ?? "",
+    occurredAt:  toLocalDateInput(t.occurred_at),
+  };
+}
+
+function formReducer(state: FormState, patch: Partial<FormState>): FormState {
+  return { ...state, ...patch };
+}
 
 type Props = {
   open:          boolean;
@@ -44,23 +66,12 @@ export function EditTransactionModal({
   // El tipo no es editable — solo se muestran los campos relevantes
   const type = transaction.type as TxType;
 
-  const [accountId,   setAccountId]   = useState(String(transaction.account_id));
-  const [toAccountId, setToAccountId] = useState(String(transaction.to_account_id ?? ""));
-  const [amount,      setAmount]      = useState(String(transaction.amount));
-  const [category,    setCategory]    = useState(transaction.category ?? "");
-  const [description, setDescription] = useState(transaction.description ?? "");
-  const [occurredAt,  setOccurredAt]  = useState(
-    new Date(transaction.occurred_at).toISOString().split("T")[0]
-  );
+  const [form, dispatch] = useReducer(formReducer, txFromTransaction(transaction));
+  const { accountId, toAccountId, amount, category, description, occurredAt } = form;
 
   // Sincronizar si cambia la transacción (ej: se abre con otra tx)
   useEffect(() => {
-    setAccountId(String(transaction.account_id));
-    setToAccountId(String(transaction.to_account_id ?? ""));
-    setAmount(String(transaction.amount));
-    setCategory(transaction.category ?? "");
-    setDescription(transaction.description ?? "");
-    setOccurredAt(new Date(transaction.occurred_at).toISOString().split("T")[0]);
+    dispatch(txFromTransaction(transaction));
   }, [transaction]);
 
   const { categories } = useTransactionCategories(type);
@@ -82,7 +93,7 @@ export function EditTransactionModal({
         to_account_id: type === "TRANSFER" ? Number(toAccountId) : undefined,
         category:      category    || undefined,
         description:   description || undefined,
-        occurred_at:   new Date(occurredAt + "T00:00:00-06:00").toISOString(),
+        occurred_at:   localDateToISO(occurredAt),
       });
 
       toast.success("Transacción actualizada");
@@ -96,53 +107,49 @@ export function EditTransactionModal({
   const { icon: Icon, label: typeLabel } = TYPE_CONFIG[type];
 
   return (
-    <Dialog open={open} onOpenChange={(v) => !v && handleClose()}>
-      <DialogContent
-        className={cn(
-          "fixed bottom-0 left-0 right-0 top-auto translate-x-0 translate-y-0",
-          "w-full max-w-full rounded-t-2xl rounded-b-none border-t border-x-0 border-b-0",
-          "max-h-[92dvh] flex flex-col p-0",
-          "sm:bottom-auto sm:left-1/2 sm:right-auto sm:top-1/2",
-          "sm:-translate-x-1/2 sm:-translate-y-1/2",
-          "sm:w-full sm:max-w-md",
-          "lg:max-w-xl",
-          "xl:max-w-xl",
-          "sm:rounded-2xl sm:border",
-          "sm:max-h-[88vh]",
-          "data-[state=open]:animate-in data-[state=closed]:animate-out",
-          "data-[state=open]:slide-in-from-bottom sm:data-[state=open]:slide-in-from-bottom-[48%]",
-          "data-[state=closed]:slide-out-to-bottom sm:data-[state=closed]:slide-out-to-bottom-[48%]",
-          "duration-300",
-        )}
-        onInteractOutside={(e) => e.preventDefault()}
-        onEscapeKeyDown={handleClose}
-      >
-         <div className="sm:hidden flex justify-center pt-3 pb-1 shrink-0">
-          <div className="w-10 h-1 rounded-full bg-muted-foreground/30" />
-        </div>
-
-        <DialogHeader className="shrink-0 px-5 pt-2 pb-3 sm:pt-5 border-b">
-          <DialogTitle className="text-lg font-bold">
-                Editar transacción
-            </DialogTitle>
-            
-          <div className="flex items-center gap-1.5 mt-1">
-            <Icon className="h-3.5 w-3.5 text-muted-foreground" />
-            <span className="text-xs text-muted-foreground">{typeLabel} · No se puede cambiar el tipo</span>
-          </div>
-        </DialogHeader>
-
-        <div
-          className="flex-1 overflow-y-auto px-5 py-4 space-y-4"
-          style={{ scrollbarWidth: "none" } as React.CSSProperties}
-        >
+    <ResponsiveModal
+      open={open}
+      onOpenChange={(v) => !v && handleClose()}
+      title="Editar transacción"
+      width="wide"
+      subtitle={
+        <span className="flex items-center gap-1.5 mt-1">
+          <Icon className="size-3.5 text-muted-foreground" />
+          <span className="text-xs text-muted-foreground">{typeLabel} · No se puede cambiar el tipo</span>
+        </span>
+      }
+      footer={
+        <>
+          <Button
+            type="button"
+            variant="outline"
+            onClick={handleClose}
+            disabled={isUpdating}
+            className="flex-1 h-11"
+          >
+            Cancelar
+          </Button>
+          <Button
+            type="button"
+            onClick={onSubmit}
+            disabled={isUpdating}
+            className="flex-1 h-11 gap-2"
+          >
+            {isUpdating
+              ? <><Loader2 className="size-4 animate-spin" />Guardando…</>
+              : "Guardar cambios"
+            }
+          </Button>
+        </>
+      }
+    >
           {/* Cuenta origen */}
           <div className="space-y-1.5">
             <Label className="text-sm font-medium">
               {type === "TRANSFER" ? "Cuenta origen" : "Cuenta"}{" "}
               <span className="text-destructive text-xs">*</span>
             </Label>
-            <Select value={accountId} onValueChange={setAccountId}>
+            <Select value={accountId} onValueChange={(v) => dispatch({ accountId: v })}>
               <SelectTrigger className="w-full h-11">
                 <SelectValue placeholder="Selecciona una cuenta" />
               </SelectTrigger>
@@ -167,7 +174,7 @@ export function EditTransactionModal({
               <Label className="text-sm font-medium">
                 Cuenta destino <span className="text-destructive text-xs">*</span>
               </Label>
-              <Select value={toAccountId} onValueChange={setToAccountId}>
+              <Select value={toAccountId} onValueChange={(v) => dispatch({ toAccountId: v })}>
                 <SelectTrigger className="w-full h-11">
                   <SelectValue placeholder="Selecciona cuenta destino" />
                 </SelectTrigger>
@@ -199,7 +206,7 @@ export function EditTransactionModal({
                 min="0"
                 placeholder="0.00"
                 value={amount}
-                onChange={(e) => setAmount(e.target.value)}
+                onChange={(e) => dispatch({ amount: e.target.value })}
                 className="h-11 pl-8 text-base"
               />
             </div>
@@ -213,7 +220,7 @@ export function EditTransactionModal({
             <Input
               type="date"
               value={occurredAt}
-              onChange={(e) => setOccurredAt(e.target.value)}
+              onChange={(e) => dispatch({ occurredAt: e.target.value })}
               className="h-11 text-base"
             />
           </div>
@@ -224,7 +231,7 @@ export function EditTransactionModal({
               Categoría{" "}
               <span className="text-xs text-muted-foreground font-normal">opcional</span>
             </Label>
-            <Select value={category} onValueChange={setCategory}>
+            <Select value={category} onValueChange={(v) => dispatch({ category: v })}>
               <SelectTrigger className="h-11 w-full">
                 <SelectValue placeholder="Sin categoría" />
               </SelectTrigger>
@@ -249,36 +256,10 @@ export function EditTransactionModal({
               placeholder="Detalle de la transacción..."
               rows={2}
               value={description}
-              onChange={(e) => setDescription(e.target.value)}
+              onChange={(e) => dispatch({ description: e.target.value })}
               className="resize-none text-base"
             />
           </div>
-        </div>
-
-        {/* Footer */}
-       <div className="shrink-0 px-5 py-4 border-t bg-transparent xl:bg-transparent md:bg-transparent sm:bg-background flex gap-3">
-          <Button
-            type="button"
-            variant="outline"
-            onClick={handleClose}
-            disabled={isUpdating}
-            className="flex-1 h-11"
-          >
-            Cancelar
-          </Button>
-          <Button
-            type="button"
-            onClick={onSubmit}
-            disabled={isUpdating}
-            className="flex-1 h-11 gap-2"
-          >
-            {isUpdating
-              ? <><Loader2 className="h-4 w-4 animate-spin" />Guardando...</>
-              : "Guardar cambios"
-            }
-          </Button>
-        </div>
-      </DialogContent>
-    </Dialog>
+    </ResponsiveModal>
   );
 }

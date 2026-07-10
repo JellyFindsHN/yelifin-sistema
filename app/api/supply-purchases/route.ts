@@ -1,7 +1,7 @@
 // app/api/supply-purchases/route.ts
 import { NextRequest } from "next/server";
 import { neon } from "@neondatabase/serverless";
-import { verifyAuth, createErrorResponse, isAuthSuccess } from "@/lib/auth";
+import { verifyAuth, createErrorResponse, isAuthSuccess, requireModule } from "@/lib/auth";
 
 const sql = neon(process.env.DATABASE_URL!);
 
@@ -16,9 +16,11 @@ function toISOOrNull(value: any) {
 export async function GET(request: NextRequest) {
   const auth = await verifyAuth(request);
   if (!isAuthSuccess(auth)) return createErrorResponse(auth.error, auth.status);
+  const deny = await requireModule(auth.data, 'INVENTORY', 'canView');
+  if (deny) return deny;
 
   try {
-    const { userId } = auth.data;
+    const { userId, orgId } = auth.data;
     const { searchParams } = new URL(request.url);
     const from = searchParams.get("from");
     const to   = searchParams.get("to");
@@ -29,7 +31,7 @@ export async function GET(request: NextRequest) {
     const purchases = await sql`
       SELECT
         sp.id,
-        sp.user_id,
+        sp.org_id,
         sp.supplier_id,
         sp.account_id,
         a.name AS account_name,
@@ -40,7 +42,7 @@ export async function GET(request: NextRequest) {
       FROM supply_purchases sp
       LEFT JOIN supply_purchase_items spi ON spi.supply_purchase_id = sp.id
       LEFT JOIN accounts a ON a.id = sp.account_id
-      WHERE sp.user_id = ${userId}
+      WHERE sp.org_id = ${orgId}
         AND (${fromISO}::timestamptz IS NULL OR sp.purchased_at >= ${fromISO}::timestamptz)
         AND (${toISO}::timestamptz   IS NULL OR sp.purchased_at <= ${toISO}::timestamptz)
       GROUP BY sp.id, a.name
@@ -57,9 +59,11 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   const auth = await verifyAuth(request);
   if (!isAuthSuccess(auth)) return createErrorResponse(auth.error, auth.status);
+  const deny = await requireModule(auth.data, 'INVENTORY', 'canEdit');
+  if (deny) return deny;
 
   try {
-    const { userId } = auth.data;
+    const { userId, orgId } = auth.data;
     const body = await request.json().catch(() => ({}));
 
     // Cuenta requerida
@@ -70,7 +74,7 @@ export async function POST(request: NextRequest) {
     // Verificar cuenta
     const [account] = await sql`
       SELECT id, balance FROM accounts
-      WHERE id = ${account_id} AND user_id = ${userId} AND is_active = TRUE
+      WHERE id = ${account_id} AND org_id = ${orgId} AND is_active = TRUE
     `;
     if (!account) return createErrorResponse("Cuenta no encontrada", 404);
 
@@ -116,8 +120,8 @@ export async function POST(request: NextRequest) {
     try {
       // 1. Crear supply_purchase con account_id
       const [purchase] = await sql`
-        INSERT INTO supply_purchases (user_id, supplier_id, account_id, purchased_at)
-        VALUES (${userId}, ${supplier_id}, ${account_id}, ${purchased_at}::timestamptz)
+        INSERT INTO supply_purchases (org_id, created_by, supplier_id, account_id, purchased_at)
+        VALUES (${orgId}, ${userId}, ${supplier_id}, ${account_id}, ${purchased_at}::timestamptz)
         RETURNING id
       `;
       const purchaseId = purchase.id as number;
@@ -125,7 +129,7 @@ export async function POST(request: NextRequest) {
       // 2. Items + actualizar stock
       for (const it of normalizedItems) {
         const [exists] = await sql`
-          SELECT id FROM supplies WHERE id = ${it.supply_id} AND user_id = ${userId}
+          SELECT id FROM supplies WHERE id = ${it.supply_id} AND org_id = ${orgId}
         `;
         if (!exists) {
           await sql`ROLLBACK`;
@@ -134,10 +138,10 @@ export async function POST(request: NextRequest) {
 
         await sql`
           INSERT INTO supply_purchase_items (
-            user_id, supply_purchase_id, supply_id,
+            org_id, created_by, supply_purchase_id, supply_id,
             quantity, unit_cost, line_total
           ) VALUES (
-            ${userId}, ${purchaseId}, ${it.supply_id},
+            ${orgId}, ${userId}, ${purchaseId}, ${it.supply_id},
             ${it.quantity}, ${it.unit_cost}, ${it.line_total}
           )
         `;
@@ -145,17 +149,17 @@ export async function POST(request: NextRequest) {
         await sql`
           UPDATE supplies
           SET stock = stock + ${it.quantity}, unit_cost = ${it.unit_cost}
-          WHERE id = ${it.supply_id} AND user_id = ${userId}
+          WHERE id = ${it.supply_id} AND org_id = ${orgId}
         `;
       }
 
       // 3. Registrar transacción de egreso
       await sql`
         INSERT INTO transactions (
-          user_id, account_id, type, amount,
+          org_id, created_by, account_id, type, amount,
           description, reference_type, reference_id, occurred_at
         ) VALUES (
-          ${userId}, ${account_id}, 'EXPENSE', ${total},
+          ${orgId}, ${userId}, ${account_id}, 'EXPENSE', ${total},
           ${'Compra de suministros #' + purchaseId}, 'SUPPLY_PURCHASE', ${purchaseId},
           ${purchased_at}::timestamptz
         )
@@ -165,7 +169,7 @@ export async function POST(request: NextRequest) {
       await sql`
         UPDATE accounts
         SET balance = balance - ${total}
-        WHERE id = ${account_id} AND user_id = ${userId}
+        WHERE id = ${account_id} AND org_id = ${orgId}
       `;
 
       await sql`COMMIT`;

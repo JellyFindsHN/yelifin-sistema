@@ -1,8 +1,9 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { User as FirebaseUser, onAuthStateChanged } from 'firebase/auth';
+import { User as FirebaseUser, onIdTokenChanged } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
+import { setTokenCookie, clearTokenCookie } from '@/lib/token-cookie';
 import { UserProfileResponse } from '@/types';
 import useSWR from 'swr';
 
@@ -14,13 +15,17 @@ export function useAuth() {
   const [firebaseLoading, setFirebaseLoading] = useState(true);
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (fbUser) => {
+    // onIdTokenChanged se dispara al iniciar/cerrar sesión Y cada vez que
+    // Firebase refresca el ID token (~1h), así la cookie que lee el proxy
+    // nunca queda vencida mientras haya sesión activa.
+    const unsubscribe = onIdTokenChanged(auth, async (fbUser) => {
       setFirebaseUser(fbUser);
       if (fbUser) {
         const idToken = await fbUser.getIdToken();
-        document.cookie = `token=${idToken}; path=/; max-age=3600; SameSite=Strict`
+        setTokenCookie(idToken);
         setToken(idToken);
       } else {
+        clearTokenCookie();
         setToken(null);
       }
       setFirebaseLoading(false);
@@ -49,6 +54,7 @@ export function useAuth() {
   const refreshProfile = async () => {
     if (firebaseUser) {
       const idToken = await firebaseUser.getIdToken(true);
+      setTokenCookie(idToken);
       setToken(idToken);
       await mutateProfile();
     }

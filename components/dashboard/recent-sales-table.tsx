@@ -1,4 +1,4 @@
-// components/dashboard/recent-sales-table.tsx
+﻿// components/dashboard/recent-sales-table.tsx
 "use client";
 
 import { useRouter } from "next/navigation";
@@ -11,17 +11,18 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Banknote, CreditCard, ArrowLeftRight, HelpCircle } from "lucide-react";
 
 const paymentLabel: Record<string, { label: string; icon: any }> = {
-  CASH:     { label: "Efectivo",      icon: Banknote },
-  CARD:     { label: "Tarjeta",       icon: CreditCard },
-  TRANSFER: { label: "Transferencia", icon: ArrowLeftRight },
-  MIXED:    { label: "Mixto",         icon: HelpCircle },
-  OTHER:    { label: "Otro",          icon: HelpCircle },
+  CASH:        { label: "Efectivo",       icon: Banknote },
+  CARD:        { label: "Tarjeta débito", icon: CreditCard },
+  CREDIT_CARD: { label: "Tarjeta créd.",  icon: CreditCard },
+  TRANSFER:    { label: "Transferencia",  icon: ArrowLeftRight },
+  MIXED:       { label: "Mixto",          icon: HelpCircle },
+  OTHER:       { label: "Otro",           icon: HelpCircle },
 };
 
-type Props = { recentSales: any[]; isLoading: boolean };
+type Props = { recentSales: any[]; isLoading: boolean; showProfit?: boolean };
 
-export function RecentSalesTable({ recentSales, isLoading }: Props) {
-  const router = useRouter();
+export function RecentSalesTable({ recentSales, isLoading, showProfit = true }: Props) {
+  const { push } = useRouter();
   const { format: formatCurrency } = useCurrency();
   const tz = useTimezone();
   const formatDateFull = (d: string) =>
@@ -42,21 +43,21 @@ export function RecentSalesTable({ recentSales, isLoading }: Props) {
               <TableHead>Método</TableHead>
               <TableHead>Fecha</TableHead>
               <TableHead className="text-right">Total</TableHead>
-              <TableHead className="text-right">Ganancia</TableHead>
+              {showProfit && <TableHead className="text-right">Ganancia</TableHead>}
             </TableRow>
           </TableHeader>
           <TableBody>
             {isLoading ? (
               Array.from({ length: 5 }).map((_, i) => (
                 <TableRow key={i}>
-                  {Array.from({ length: 6 }).map((_, j) => (
+                  {Array.from({ length: showProfit ? 6 : 5 }).map((_, j) => (
                     <TableCell key={j}><Skeleton className="h-4 w-full" /></TableCell>
                   ))}
                 </TableRow>
               ))
             ) : !recentSales.length ? (
               <TableRow>
-                <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
+                <TableCell colSpan={showProfit ? 6 : 5} className="text-center py-8 text-muted-foreground">
                   Sin ventas en este período
                 </TableCell>
               </TableRow>
@@ -65,17 +66,19 @@ export function RecentSalesTable({ recentSales, isLoading }: Props) {
                 const pay     = paymentLabel[sale.payment_method] ?? paymentLabel.OTHER;
                 const PayIcon = pay.icon;
                 return (
-                  <TableRow key={sale.id} className="cursor-pointer hover:bg-muted/50" onClick={() => router.push(`/sales/${sale.id}`)}>
+                  <TableRow key={sale.id} className="cursor-pointer hover:bg-muted/50" onClick={() => push(`/sales/${sale.id}`)}>
                     <TableCell className="font-mono font-medium">{sale.sale_number}</TableCell>
                     <TableCell>{sale.customer_name ?? <span className="text-muted-foreground">Anónimo</span>}</TableCell>
                     <TableCell>
                       <Badge variant="outline" className="gap-1">
-                        <PayIcon className="h-3 w-3" />{pay.label}
+                        <PayIcon className="size-3" />{pay.label}
                       </Badge>
                     </TableCell>
                     <TableCell className="text-muted-foreground text-sm">{formatDateFull(sale.sold_at)}</TableCell>
                     <TableCell className="text-right font-medium">{formatCurrency(Number(sale.total))}</TableCell>
-                    <TableCell className="text-right text-green-600 font-medium">{formatCurrency(Number(sale.profit))}</TableCell>
+                    {showProfit && (
+                      <TableCell className="text-right text-green-600 font-medium">{formatCurrency(Number(sale.profit))}</TableCell>
+                    )}
                   </TableRow>
                 );
               })

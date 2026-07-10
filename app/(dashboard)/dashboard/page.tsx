@@ -1,4 +1,4 @@
-// app/(dashboard)/dashboard/page.tsx
+﻿// app/(dashboard)/dashboard/page.tsx
 "use client";
 
 import { useState } from "react";
@@ -22,6 +22,7 @@ import {
 import { useDashboard, useDashboardPeriods } from "@/hooks/swr/use-dashboard";
 import { useAccounts } from "@/hooks/swr/use-accounts";
 import { useCreditCards } from "@/hooks/swr/use-credit-cards";
+import { useModulePermissions } from "@/hooks/use-module-permissions";
 import { Fab } from "@/components/ui/fab";
 import { CreateTransactionModal } from "@/components/transactions/create-transaction-modal";
 
@@ -50,7 +51,7 @@ const MONTH_NAMES = [
 ];
 
 export default function DashboardPage() {
-  const router = useRouter();
+  const { push } = useRouter();
 
   const [selectedMonth, setSelectedMonth] = useState<number | undefined>();
   const [selectedYear, setSelectedYear] = useState<number | undefined>();
@@ -63,6 +64,7 @@ export default function DashboardPage() {
   const { periods } = useDashboardPeriods();
   const { accounts } = useAccounts();
   const { creditCards } = useCreditCards();
+  const { show_profit: showProfit, show_costs: showCosts } = useModulePermissions("DASHBOARD");
 
   const availableYears = [...new Set(periods.map((p) => p.year))].sort(
     (a, b) => b - a
@@ -98,9 +100,18 @@ export default function DashboardPage() {
     units_sold: Number(p.units_sold ?? 0),
   }));
 
+  const PAYMENT_LABELS: Record<string, string> = {
+    CASH:        "Efectivo",
+    CARD:        "Tarjeta débito",
+    CREDIT_CARD: "Tarjeta créd.",
+    TRANSFER:    "Transferencia",
+    MIXED:       "Mixto",
+    OTHER:       "Otro",
+  };
+
   const paymentMethods = (data?.payment_methods ?? []).map(
     (p: any, i: number) => ({
-      name: p.method ?? "Otro",
+      name: PAYMENT_LABELS[p.method] ?? p.method ?? "Otro",
       value: Number(p.amount ?? 0),
       fill: ["#3B82F6", "#10B981", "#F59E0B", "#EF4444", "#8B5CF6"][i % 5],
     })
@@ -111,16 +122,16 @@ export default function DashboardPage() {
       {/* Header */}
       <div className="flex items-center justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">Dashboard</h1>
+          <h1 className="text-2xl font-semibold tracking-tight">Dashboard</h1>
           <p className="text-muted-foreground text-sm">Resumen de tu negocio</p>
         </div>
 
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button variant="outline" size="sm" className="gap-1.5 shrink-0">
-              <CalendarDays className="h-3.5 w-3.5" />
+              <CalendarDays className="size-3.5" />
               <span className="text-sm">{periodLabel()}</span>
-              <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
+              <ChevronDown className="size-3.5 text-muted-foreground" />
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-52">
@@ -194,7 +205,7 @@ export default function DashboardPage() {
         </DropdownMenu>
       </div>
 
-      <MetricsGrid metrics={m} isLoading={isLoading} />
+      <MetricsGrid metrics={m} isLoading={isLoading} showProfit={showProfit} />
       <CreditCardDebtWidget
         debtLocal={m?.credit_card_debt?.local ?? 0}
         debtUsd={m?.credit_card_debt?.usd ?? 0}
@@ -204,15 +215,17 @@ export default function DashboardPage() {
         lowStock={data?.low_stock ?? []}
         recentSales={data?.recent_sales ?? []}
         isLoading={isLoading}
+        showProfit={showProfit}
       />
-      <SecondaryStats metrics={m} isLoading={isLoading} />
+      <SecondaryStats metrics={m} isLoading={isLoading} showCosts={showCosts} />
       <SalesCharts
         salesChart={salesChart}
         paymentMethods={paymentMethods}
         periodLabel={periodLabel()}
         isLoading={isLoading}
+        showProfit={showProfit}
       />
-      <TopProductsStock 
+      <TopProductsStock
         topProducts={topProducts}
         lowStock={data?.low_stock ?? []}
         isLoading={isLoading}
@@ -220,6 +233,7 @@ export default function DashboardPage() {
       <RecentSalesTable
         recentSales={data?.recent_sales ?? []}
         isLoading={isLoading}
+        showProfit={showProfit}
       />
 
       {/* FAB */}
@@ -228,7 +242,7 @@ export default function DashboardPage() {
           {
             label: "Nueva venta",
             icon: ShoppingCart,
-            onClick: () => router.push("/sales/new"),
+            onClick: () => push("/sales/new"),
           },
           {
             label: "Nueva transacción",

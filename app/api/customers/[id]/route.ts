@@ -1,7 +1,7 @@
 // app/api/customers/[id]/route.ts
 import { NextRequest } from "next/server";
 import { neon } from "@neondatabase/serverless";
-import { verifyAuth, createErrorResponse, isAuthSuccess } from "@/lib/auth";
+import { verifyAuth, createErrorResponse, isAuthSuccess, requireModule, requireFeature } from "@/lib/auth";
 
 const sql = neon(process.env.DATABASE_URL!);
 
@@ -10,9 +10,13 @@ type Params = { params: Promise<{ id: string }> };
 export async function PATCH(request: NextRequest, { params }: Params) {
   const auth = await verifyAuth(request);
   if (!isAuthSuccess(auth)) return createErrorResponse(auth.error, auth.status);
+  const deny = await requireModule(auth.data, 'CUSTOMERS', 'canEdit');
+  if (deny) return deny;
+  const denyFeature = await requireFeature(auth.data.orgId, 'customers.manage');
+  if (denyFeature) return denyFeature;
 
   try {
-    const { userId } = auth.data;
+    const { userId, orgId } = auth.data;
     const { id } = await params;
     const customerId = Number(id);
 
@@ -22,12 +26,13 @@ export async function PATCH(request: NextRequest, { params }: Params) {
 
     const [updated] = await sql`
       UPDATE customers SET
-        name  = COALESCE(${name ?? null}, name),
-        phone = COALESCE(${phone ?? null}, phone),
-        email = COALESCE(${email ?? null}, email),
-        notes = COALESCE(${notes ?? null}, notes),
-        updated_at = CURRENT_TIMESTAMP
-      WHERE id = ${customerId} AND user_id = ${userId}
+        name       = COALESCE(${name ?? null}, name),
+        phone      = COALESCE(${phone ?? null}, phone),
+        email      = COALESCE(${email ?? null}, email),
+        notes      = COALESCE(${notes ?? null}, notes),
+        updated_at = CURRENT_TIMESTAMP,
+        updated_by = ${userId}
+      WHERE id = ${customerId} AND org_id = ${orgId}
       RETURNING *
     `;
 
@@ -44,9 +49,13 @@ export async function PATCH(request: NextRequest, { params }: Params) {
 export async function DELETE(request: NextRequest, { params }: Params) {
   const auth = await verifyAuth(request);
   if (!isAuthSuccess(auth)) return createErrorResponse(auth.error, auth.status);
+  const deny = await requireModule(auth.data, 'CUSTOMERS', 'canDelete');
+  if (deny) return deny;
+  const denyFeature = await requireFeature(auth.data.orgId, 'customers.manage');
+  if (denyFeature) return denyFeature;
 
   try {
-    const { userId } = auth.data;
+    const { userId, orgId } = auth.data;
     const { id } = await params;
     const customerId = Number(id);
 
@@ -54,7 +63,7 @@ export async function DELETE(request: NextRequest, { params }: Params) {
 
     await sql`
       DELETE FROM customers
-      WHERE id = ${customerId} AND user_id = ${userId}
+      WHERE id = ${customerId} AND org_id = ${orgId}
     `;
 
     return Response.json({ message: "Cliente eliminado correctamente" });
