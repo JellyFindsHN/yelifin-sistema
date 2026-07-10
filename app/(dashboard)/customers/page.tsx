@@ -36,9 +36,18 @@ import { CustomerSummarySheet }    from "@/components/customers/customer-summary
 import { LoyaltyPoliciesDialog }   from "@/components/customers/loyalty-policies-dialog";
 import { Fab }                     from "@/components/ui/fab";
 import { SearchBar }               from "@/components/shared/search-bar";
+import { FeatureGate }             from "@/components/shared/feature-gate";
 import { cn }                      from "@/lib/utils";
 
 export default function CustomersPage() {
+  return (
+    <FeatureGate feature="customers.manage">
+      <CustomersPageInner />
+    </FeatureGate>
+  );
+}
+
+function CustomersPageInner() {
   const [search,          setSearch]          = useState("");
   const [page,            setPage]            = useState(1);
   const pageLimit = 15;

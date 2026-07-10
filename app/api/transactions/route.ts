@@ -1,7 +1,7 @@
 // app/api/transactions/route.ts
 import { NextRequest } from "next/server";
 import { neon } from "@neondatabase/serverless";
-import { verifyAuth, createErrorResponse, isAuthSuccess, requireModule } from "@/lib/auth";
+import { verifyAuth, createErrorResponse, isAuthSuccess, requireModule, verifyResourceLimit } from "@/lib/auth";
 import { getUtcBounds } from "@/lib/date-bounds";
 
 const sql = neon(process.env.DATABASE_URL!);
@@ -84,6 +84,11 @@ export async function POST(request: NextRequest) {
   if (!isAuthSuccess(auth)) return createErrorResponse(auth.error, auth.status);
   const deny = await requireModule(auth.data, 'FINANCES', 'canEdit');
   if (deny) return deny;
+
+  const limit = await verifyResourceLimit(auth.data.orgId, "transactions");
+  if (!limit.withinLimit) {
+    return createErrorResponse(limit.error ?? "Límite alcanzado", limit.status, "needsUpgrade" in limit ? !!limit.needsUpgrade : false);
+  }
 
   try {
     const { userId, orgId } = auth.data;

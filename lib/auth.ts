@@ -169,17 +169,25 @@ export async function verifySubscription(
 
 export async function verifyFeatureAccess(orgId: number, featureKey: string) {
   try {
-    const [result] = await sql`
-      SELECT pf.is_enabled
+    const [row] = await sql`
+      SELECT
+        sp.slug,
+        EXISTS (
+          SELECT 1
+          FROM plan_features   pf
+          JOIN system_features sf ON sf.id = pf.feature_id
+          WHERE pf.plan_id     = os.plan_id
+            AND sf.feature_key = ${featureKey}
+            AND pf.is_enabled  = TRUE
+            AND sf.is_active   = TRUE
+        ) AS enabled
       FROM org_subscriptions os
-      JOIN plan_features    pf ON pf.plan_id = os.plan_id
-      JOIN system_features  sf ON sf.id      = pf.feature_id
-      WHERE os.org_id      = ${orgId}
-        AND sf.feature_key = ${featureKey}
-        AND pf.is_enabled  = TRUE
+      JOIN subscription_plans sp ON sp.id = os.plan_id
+      WHERE os.org_id = ${orgId}
     `;
 
-    if (!result?.is_enabled) {
+    // El plan admin siempre tiene acceso total
+    if (row?.slug !== "admin" && !row?.enabled) {
       return {
         error: "Esta funcionalidad requiere un plan superior",
         status: 403,
@@ -193,6 +201,24 @@ export async function verifyFeatureAccess(orgId: number, featureKey: string) {
     console.error("Error en verifyFeatureAccess:", error);
     return { error: "Error al verificar permisos", status: 500, hasAccess: false };
   }
+}
+
+// ── requireFeature ─────────────────────────────────────────────────────
+// Devuelve Response 403 (con needs_upgrade) si el plan no tiene la feature,
+// null si está OK. Uso: const deny = await requireFeature(orgId, 'reports.sales');
+export async function requireFeature(
+  orgId: number,
+  featureKey: string
+): Promise<Response | null> {
+  const res = await verifyFeatureAccess(orgId, featureKey);
+  if (!res.hasAccess) {
+    return createErrorResponse(
+      res.error ?? "Esta funcionalidad no está disponible en tu plan",
+      res.status,
+      "needsUpgrade" in res ? !!res.needsUpgrade : false
+    );
+  }
+  return null;
 }
 
 // ── verifyModuleAccess ─────────────────────────────────────────────────
@@ -270,7 +296,7 @@ export async function getModulePermissions(
 
 export async function verifyResourceLimit(
   orgId: number,
-  resourceType: "products" | "sales"
+  resourceType: "products" | "sales" | "transactions" | "accounts" | "supplies"
 ) {
   try {
     const limits: Record<string, { column: string; countQuery: () => Promise<number> }> = {
@@ -295,10 +321,42 @@ export async function verifyResourceLimit(
           return Number(r.count);
         },
       },
+      transactions: {
+        column: "max_transactions_per_month",
+        countQuery: async () => {
+          const [r] = await sql`
+            SELECT COUNT(*) AS count FROM transactions
+            WHERE org_id = ${orgId}
+              AND DATE_TRUNC('month', occurred_at) = DATE_TRUNC('month', NOW())
+          `;
+          return Number(r.count);
+        },
+      },
+      accounts: {
+        column: "max_accounts",
+        countQuery: async () => {
+          const [r] = await sql`
+            SELECT COUNT(*) AS count FROM accounts
+            WHERE org_id = ${orgId} AND is_active = TRUE
+          `;
+          return Number(r.count);
+        },
+      },
+      supplies: {
+        column: "max_supplies",
+        countQuery: async () => {
+          const [r] = await sql`
+            SELECT COUNT(*) AS count FROM supplies
+            WHERE org_id = ${orgId}
+          `;
+          return Number(r.count);
+        },
+      },
     };
 
     const [plan] = await sql`
-      SELECT sp.max_products, sp.max_sales_per_month
+      SELECT sp.max_products, sp.max_sales_per_month, sp.max_transactions_per_month,
+             sp.max_accounts, sp.max_supplies
       FROM org_subscriptions os
       JOIN subscription_plans sp ON sp.id = os.plan_id
       WHERE os.org_id = ${orgId}
@@ -320,6 +378,9 @@ export async function verifyResourceLimit(
       const messages = {
         products: "Has alcanzado el límite de productos para tu plan",
         sales: "Has alcanzado el límite de ventas mensuales para tu plan",
+        transactions: "Has alcanzado el límite de transacciones mensuales para tu plan",
+        accounts: "Has alcanzado el límite de cuentas para tu plan",
+        supplies: "Has alcanzado el límite de suministros para tu plan",
       };
 
       return {

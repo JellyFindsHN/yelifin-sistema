@@ -8,6 +8,7 @@ import { useAuth }        from "@/hooks/use-auth";
 import { fmtN }           from "@/lib/export";
 import { useModulePermissions } from "@/hooks/use-module-permissions";
 import { ReportShell, StatCard, useDateRange } from "@/components/reports/report-shell";
+import { FeatureGate } from "@/components/shared/feature-gate";
 import { PaginationControls } from "@/components/shared/pagination-controls";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge }    from "@/components/ui/badge";
@@ -18,6 +19,14 @@ import {
 const PRODUCT_PAGE_SIZE = 10;
 
 export default function SalesReportPage() {
+  return (
+    <FeatureGate feature="reports.sales">
+      <SalesReportPageInner />
+    </FeatureGate>
+  );
+}
+
+function SalesReportPageInner() {
   const { from, to, setFrom, setTo } = useDateRange("month");
   const { format, symbol }           = useCurrency();
   const { firebaseUser }             = useAuth();

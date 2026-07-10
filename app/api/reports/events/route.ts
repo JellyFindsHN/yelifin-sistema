@@ -1,7 +1,7 @@
 // app/api/reports/events/route.ts
 import { NextRequest } from "next/server";
 import { neon } from "@neondatabase/serverless";
-import { verifyAuth, createErrorResponse, isAuthSuccess, requireModule } from "@/lib/auth";
+import { verifyAuth, createErrorResponse, isAuthSuccess, requireModule, requireFeature } from "@/lib/auth";
 
 const sql = neon(process.env.DATABASE_URL!);
 
@@ -17,6 +17,8 @@ export async function GET(request: NextRequest) {
   if (!isAuthSuccess(auth)) return createErrorResponse(auth.error, auth.status);
   const deny = await requireModule(auth.data, 'REPORTS', 'canView');
   if (deny) return deny;
+  const denyFeature = await requireFeature(auth.data.orgId, 'reports.events');
+  if (denyFeature) return denyFeature;
 
   try {
     const { userId, orgId } = auth.data;

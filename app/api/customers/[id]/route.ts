@@ -1,7 +1,7 @@
 // app/api/customers/[id]/route.ts
 import { NextRequest } from "next/server";
 import { neon } from "@neondatabase/serverless";
-import { verifyAuth, createErrorResponse, isAuthSuccess, requireModule } from "@/lib/auth";
+import { verifyAuth, createErrorResponse, isAuthSuccess, requireModule, requireFeature } from "@/lib/auth";
 
 const sql = neon(process.env.DATABASE_URL!);
 
@@ -12,6 +12,8 @@ export async function PATCH(request: NextRequest, { params }: Params) {
   if (!isAuthSuccess(auth)) return createErrorResponse(auth.error, auth.status);
   const deny = await requireModule(auth.data, 'CUSTOMERS', 'canEdit');
   if (deny) return deny;
+  const denyFeature = await requireFeature(auth.data.orgId, 'customers.manage');
+  if (denyFeature) return denyFeature;
 
   try {
     const { userId, orgId } = auth.data;
@@ -49,6 +51,8 @@ export async function DELETE(request: NextRequest, { params }: Params) {
   if (!isAuthSuccess(auth)) return createErrorResponse(auth.error, auth.status);
   const deny = await requireModule(auth.data, 'CUSTOMERS', 'canDelete');
   if (deny) return deny;
+  const denyFeature = await requireFeature(auth.data.orgId, 'customers.manage');
+  if (denyFeature) return denyFeature;
 
   try {
     const { userId, orgId } = auth.data;

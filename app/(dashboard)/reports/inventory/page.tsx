@@ -8,6 +8,7 @@ import { useAuth }            from "@/hooks/use-auth";
 import { fmtN } from "@/lib/export";
 import { useModulePermissions } from "@/hooks/use-module-permissions";
 import { ReportShell, StatCard } from "@/components/reports/report-shell";
+import { FeatureGate } from "@/components/shared/feature-gate";
 import { PaginationControls } from "@/components/shared/pagination-controls";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge }    from "@/components/ui/badge";
@@ -25,6 +26,14 @@ const PRODUCT_PAGE_SIZE  = 10;
 const MOVEMENT_PAGE_SIZE = 10;
 
 export default function InventoryReportPage() {
+  return (
+    <FeatureGate feature="reports.inventory">
+      <InventoryReportPageInner />
+    </FeatureGate>
+  );
+}
+
+function InventoryReportPageInner() {
   const { format, symbol }                          = useCurrency();
   const { firebaseUser }                            = useAuth();
   const { summary, products, movements, isLoading } = useInventoryReport();
