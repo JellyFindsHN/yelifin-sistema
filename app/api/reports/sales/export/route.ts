@@ -1,6 +1,6 @@
 import { NextRequest } from "next/server";
 import { neon } from "@neondatabase/serverless";
-import { verifyAuth, createErrorResponse, isAuthSuccess, requireModule, requireFeature } from "@/lib/auth";
+import { verifyAuth, createErrorResponse, isAuthSuccess, requireModule, requireFeature, getModulePermissions } from "@/lib/auth";
 
 const sql = neon(process.env.DATABASE_URL!);
 
@@ -1131,6 +1131,12 @@ export async function POST(request: NextRequest) {
   if (deny) return deny;
   const denyFeature = await requireFeature(auth.data.orgId, 'reports.sales');
   if (denyFeature) return denyFeature;
+
+  // El documento exportado incluye costos y utilidades — requiere ambos permisos
+  const perms = await getModulePermissions(auth.data, 'REPORTS');
+  if (!perms.showCosts || !perms.showProfit) {
+    return createErrorResponse("Tu rol no tiene permiso para exportar este reporte (incluye costos y ganancias)", 403);
+  }
 
   try {
     const { userId, orgId } = auth.data;
