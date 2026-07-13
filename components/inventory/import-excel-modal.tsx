@@ -26,6 +26,7 @@ import type { Product } from "@/types";
 import type { Account } from "@/hooks/swr/use-accounts";
 import type { CreditCard } from "@/hooks/swr/use-credit-cards";
 import { downloadImportTemplate, type TemplateProductRow } from "@/lib/export-template";
+import { MAX_IMPORT_ROWS, IMPORT_EXECUTE_CHUNK_SIZE } from "@/lib/import-labels";
 
 // ── Tipos de la respuesta del endpoint ─────────────────────────────────
 
@@ -172,12 +173,20 @@ export function ImportExcelModal({
   };
 
   // ── Subida + dry run ──────────────────────────────────────────────────
-  const postImport = async (selectedFile: File, dryRun: boolean) => {
+  const postImport = async (
+    selectedFile: File,
+    opts: { dryRun?: boolean; offset?: number; limit?: number } = {}
+  ) => {
     const token = await firebaseUser?.getIdToken();
     if (!token) throw new Error("No autenticado");
     const formData = new FormData();
     formData.append("file", selectedFile);
-    const res = await fetch(`/api/inventory/import${dryRun ? "?dry_run=true" : ""}`, {
+    const params = new URLSearchParams();
+    if (opts.dryRun) params.set("dry_run", "true");
+    if (opts.offset !== undefined) params.set("offset", String(opts.offset));
+    if (opts.limit !== undefined) params.set("limit", String(opts.limit));
+    const qs = params.toString();
+    const res = await fetch(`/api/inventory/import${qs ? `?${qs}` : ""}`, {
       method: "POST",
       headers: { Authorization: `Bearer ${token}` },
       body: formData,
@@ -190,7 +199,7 @@ export function ImportExcelModal({
   const handleFile = async (selectedFile: File) => {
     setIsWorking(true);
     try {
-      const json = await postImport(selectedFile, true);
+      const json = await postImport(selectedFile, { dryRun: true });
       setFile(selectedFile);
       setPreviewRows(json.data.rows);
       setSummary(json.data.summary);
@@ -203,16 +212,31 @@ export function ImportExcelModal({
     }
   };
 
+  // Ejecuta en lotes secuenciales para que cada request al servidor se
+  // mantenga muy por debajo del timeout de la función serverless — necesario
+  // para archivos grandes (hasta MAX_IMPORT_ROWS filas).
   const handleImport = async () => {
     if (!file) return;
     setIsWorking(true);
+    const total = previewRows.length;
+    const showProgress = total > IMPORT_EXECUTE_CHUNK_SIZE;
+    const toastId = showProgress ? toast.loading(`Importando 0/${total} filas...`) : undefined;
     try {
-      const json = await postImport(file, false);
-      setResults(json.data.results);
+      const allResults: RowResult[] = [];
+      let offset = 0;
+      while (offset < total) {
+        const json = await postImport(file, { offset, limit: IMPORT_EXECUTE_CHUNK_SIZE });
+        allResults.push(...json.data.results);
+        offset += IMPORT_EXECUTE_CHUNK_SIZE;
+        if (toastId) toast.loading(`Importando ${Math.min(offset, total)}/${total} filas...`, { id: toastId });
+      }
+      if (toastId) toast.dismiss(toastId);
+      setResults(allResults);
       setConfirmOpen(false);
       setStep("report");
       onSuccess();
     } catch (error: any) {
+      if (toastId) toast.dismiss(toastId);
       toast.error(error.message);
       setConfirmOpen(false);
     } finally {
@@ -371,7 +395,7 @@ export function ImportExcelModal({
                 <p className="text-sm font-medium">
                   {isWorking ? "Analizando archivo..." : "Tocá para elegir tu archivo .xlsx"}
                 </p>
-                <p className="text-xs text-muted-foreground">Máximo 500 filas · 5 MB</p>
+                <p className="text-xs text-muted-foreground">Máximo {MAX_IMPORT_ROWS} filas · 5 MB</p>
               </button>
               <input
                 ref={fileInputRef}

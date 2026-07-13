@@ -44,7 +44,8 @@ export async function POST(request: NextRequest) {
 
   try {
     const { userId, orgId } = auth.data;
-    const dryRun = new URL(request.url).searchParams.get("dry_run") === "true";
+    const url = new URL(request.url);
+    const dryRun = url.searchParams.get("dry_run") === "true";
 
     const formData = await request.formData();
     const file = formData.get("file") as File | null;
@@ -58,64 +59,13 @@ export async function POST(request: NextRequest) {
 
     validateRows(rows);
     const resolved = await resolveRows(rows, orgId, sql);
-    const summary = summarizeRows(resolved);
 
-    // ── Límites del plan ──────────────────────────────────────────────
-    if (summary.newProducts > 0) {
-      const limit = await verifyResourceLimit(orgId, "products");
-      if (!limit.withinLimit) {
-        return createErrorResponse(
-          limit.error ?? "Límite de productos alcanzado",
-          limit.status,
-          "needsUpgrade" in limit ? !!limit.needsUpgrade : false
-        );
-      }
-      const [plan] = await sql`
-        SELECT sp.max_products,
-          (SELECT COUNT(*) FROM products p WHERE p.org_id = ${orgId} AND p.is_active = TRUE)::int AS current_count
-        FROM org_subscriptions os
-        JOIN subscription_plans sp ON sp.id = os.plan_id
-        WHERE os.org_id = ${orgId}
-      `;
-      if (
-        plan &&
-        plan.max_products !== null &&
-        Number(plan.current_count ?? 0) + summary.newProducts > Number(plan.max_products)
-      ) {
-        return createErrorResponse(
-          `El archivo crea ${summary.newProducts} productos y tu plan solo permite ${Number(plan.max_products) - Number(plan.current_count)} más`,
-          403,
-          true
-        );
-      }
-    }
-
-    if (summary.purchasesWithPayment > 0) {
-      const [plan] = await sql`
-        SELECT sp.max_transactions_per_month,
-          (SELECT COUNT(*) FROM transactions t
-           WHERE t.org_id = ${orgId}
-             AND DATE_TRUNC('month', t.occurred_at) = DATE_TRUNC('month', NOW()))::int AS current_count
-        FROM org_subscriptions os
-        JOIN subscription_plans sp ON sp.id = os.plan_id
-        WHERE os.org_id = ${orgId}
-      `;
-      if (
-        plan &&
-        plan.max_transactions_per_month !== null &&
-        Number(plan.current_count ?? 0) + summary.purchasesWithPayment >
-          Number(plan.max_transactions_per_month)
-      ) {
-        return createErrorResponse(
-          "El archivo crearía más transacciones de las que permite tu plan este mes",
-          403,
-          true
-        );
-      }
-    }
-
-    // ── Dry run: preview sin escribir ─────────────────────────────────
+    // ── Dry run: preview del archivo completo, sin escribir ───────────
     if (dryRun) {
+      const summary = summarizeRows(resolved);
+      const limitError = await checkPlanLimits(orgId, summary);
+      if (limitError) return limitError;
+
       return Response.json({
         data: {
           rows: resolved.map((r) => ({
@@ -137,9 +87,24 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    // ── Ejecución secuencial, fila por fila ───────────────────────────
+    // ── Ejecución por lotes: el cliente pide un rango [offset, offset+limit)
+    // de filas ya resueltas para mantener cada request muy por debajo del
+    // timeout de la función serverless (la escritura es secuencial, fila por
+    // fila, con varios round-trips SQL cada una — no es paralelizable con el
+    // driver HTTP de Neon, que no soporta transacciones reales entre queries).
+    const offset = Math.max(0, Number(url.searchParams.get("offset") ?? 0) || 0);
+    const limitParam = url.searchParams.get("limit");
+    const limit = limitParam ? Number(limitParam) || resolved.length : resolved.length;
+    const chunk = resolved.slice(offset, offset + limit);
+    if (chunk.length === 0)
+      return createErrorResponse("No hay filas para procesar en ese rango", 400);
+
+    const chunkSummary = summarizeRows(chunk);
+    const limitError = await checkPlanLimits(orgId, chunkSummary);
+    if (limitError) return limitError;
+
     const results: RowResult[] = [];
-    for (const row of resolved) {
+    for (const row of chunk) {
       if (row.action === "error") {
         results.push(rowResult(row, "failed", row.errors.join("; ")));
         continue;
@@ -158,13 +123,14 @@ export async function POST(request: NextRequest) {
     }
 
     const failed = results.filter((r) => r.status === "failed").length;
+    const nextOffset = offset + chunk.length < resolved.length ? offset + chunk.length : null;
     return Response.json(
       {
         message:
           failed === 0
             ? "Importación completada"
             : `Importación completada con ${failed} fila(s) fallida(s)`,
-        data: { results, summary },
+        data: { results, summary: chunkSummary, nextOffset, totalRows: resolved.length },
       },
       { status: 201 }
     );
@@ -172,6 +138,65 @@ export async function POST(request: NextRequest) {
     console.error("POST /api/inventory/import:", error);
     return createErrorResponse("Error al procesar la importación", 500);
   }
+}
+
+// Valida límites del plan (productos, transacciones) contra un resumen —
+// se usa tanto para el preview completo como para cada lote de ejecución.
+async function checkPlanLimits(orgId: number, summary: ReturnType<typeof summarizeRows>): Promise<Response | null> {
+  if (summary.newProducts > 0) {
+    const limit = await verifyResourceLimit(orgId, "products");
+    if (!limit.withinLimit) {
+      return createErrorResponse(
+        limit.error ?? "Límite de productos alcanzado",
+        limit.status,
+        "needsUpgrade" in limit ? !!limit.needsUpgrade : false
+      );
+    }
+    const [plan] = await sql`
+      SELECT sp.max_products,
+        (SELECT COUNT(*) FROM products p WHERE p.org_id = ${orgId} AND p.is_active = TRUE)::int AS current_count
+      FROM org_subscriptions os
+      JOIN subscription_plans sp ON sp.id = os.plan_id
+      WHERE os.org_id = ${orgId}
+    `;
+    if (
+      plan &&
+      plan.max_products !== null &&
+      Number(plan.current_count ?? 0) + summary.newProducts > Number(plan.max_products)
+    ) {
+      return createErrorResponse(
+        `El archivo crea ${summary.newProducts} productos y tu plan solo permite ${Number(plan.max_products) - Number(plan.current_count)} más`,
+        403,
+        true
+      );
+    }
+  }
+
+  if (summary.purchasesWithPayment > 0) {
+    const [plan] = await sql`
+      SELECT sp.max_transactions_per_month,
+        (SELECT COUNT(*) FROM transactions t
+         WHERE t.org_id = ${orgId}
+           AND DATE_TRUNC('month', t.occurred_at) = DATE_TRUNC('month', NOW()))::int AS current_count
+      FROM org_subscriptions os
+      JOIN subscription_plans sp ON sp.id = os.plan_id
+      WHERE os.org_id = ${orgId}
+    `;
+    if (
+      plan &&
+      plan.max_transactions_per_month !== null &&
+      Number(plan.current_count ?? 0) + summary.purchasesWithPayment >
+        Number(plan.max_transactions_per_month)
+    ) {
+      return createErrorResponse(
+        "El archivo crearía más transacciones de las que permite tu plan este mes",
+        403,
+        true
+      );
+    }
+  }
+
+  return null;
 }
 
 function rowResult(row: ResolvedRow, status: "ok" | "failed", error?: string): RowResult {

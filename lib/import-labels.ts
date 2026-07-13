@@ -4,7 +4,12 @@
 
 export type AccountKind = "account" | "credit_card";
 
-export const MAX_IMPORT_ROWS = 500;
+export const MAX_IMPORT_ROWS = 1800;
+
+// La escritura en DB es secuencial fila por fila (varios round-trips SQL
+// cada una) — se ejecuta en lotes de este tamaño para que cada request al
+// servidor quede muy por debajo del timeout de la función serverless.
+export const IMPORT_EXECUTE_CHUNK_SIZE = 100;
 
 export const TEMPLATE_COLUMNS = [
   "sku",
