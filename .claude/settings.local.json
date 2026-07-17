@@ -63,7 +63,11 @@
       "PowerShell(npx tsc --noEmit 2>&1 | Select-Object -First 60)",
       "PowerShell(npx tsc --noEmit; Write-Output \"EXIT: $LASTEXITCODE\")",
       "PowerShell(npx eslint lib/import-inventory.ts lib/import-labels.ts lib/export-template.ts \"app/api/inventory/import/route.ts\" \"app/api/purchases/[id]/route.ts\" components/inventory/import-excel-modal.tsx \"app/\\(dashboard\\)/inventory/page.tsx\")",
-      "PowerShell(Get-ChildItem -Name | Where-Object { $_ -match 'eslint' }; Test-Path .eslintrc.json; Test-Path eslint.config.mjs)"
+      "PowerShell(Get-ChildItem -Name | Where-Object { $_ -match 'eslint' }; Test-Path .eslintrc.json; Test-Path eslint.config.mjs)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\\\\n\" http://localhost:3000/dashboard)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\\\\n\" http://localhost:3000/inventory)",
+      "Bash(curl -s http://localhost:3000/inventory)",
+      "Bash(pnpm --version)"
     ]
   }
 }

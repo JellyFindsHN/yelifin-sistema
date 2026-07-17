@@ -19,6 +19,8 @@ import { Separator } from "@/components/ui/separator";
 import {
   Breadcrumb, BreadcrumbItem, BreadcrumbList, BreadcrumbPage,
 } from "@/components/ui/breadcrumb";
+import { ThemeToggle } from "@/components/theme-toggle";
+import { NavUserMenu } from "@/components/nav-user-menu";
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const { firebaseUser, loading } = useRequireAuth();
@@ -48,6 +50,11 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                 </BreadcrumbItem>
               </BreadcrumbList>
             </Breadcrumb>
+
+            <div className="ml-auto flex items-center gap-2">
+              <ThemeToggle isCollapsed />
+              <NavUserMenu />
+            </div>
           </header>
 
           <main className="flex-1 overflow-auto pb-0 p-4 lg:p-6 h-full">
