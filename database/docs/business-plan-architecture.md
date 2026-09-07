@@ -195,3 +195,38 @@ ofrece. Deja espacio de precio hacia arriba para un futuro tier "Enterprise" ($5
 agrega contabilidad, multi-sucursal o e-commerce más adelante — mismo patrón que ya usa el
 mercado local. No bajar de $24.99: por debajo de eso empieza a canibalizar el plan Pro actual
 ($12.99).
+
+## Candidatas adicionales de alcance — por decidir
+
+Además de lo ya cubierto en "Fases sugeridas" (caja, barcode, pago mixto, devoluciones,
+crédito a clientes, CAI), esto se evaluó como posible alcance extra de Business. Nada de esto
+está aprobado todavía — es lista de candidatas, no compromiso.
+
+**Con buen respaldo (gap real confirmado en el código + lo que ofrece la competencia):**
+
+- **Cajón de dinero + impresora térmica real (ESC/POS).** Hoy el ticket es `window.print()`
+  del navegador (`app/(print)/sales/[id]/receipt/page.tsx`) — un comercio de mostrador necesita
+  que la venta abra el cajón físico e imprima en una térmica de 80mm sin diálogo de impresión.
+- **Reporte X y Z de caja.** Estándar en cualquier POS de mostrador: "X" es un corte parcial
+  sin cerrar turno, "Z" es el cierre real con totales por método de pago. Complementa
+  `cash_register_sessions` ya planeada.
+- **Cuentas por pagar a proveedores.** Confirmado en el schema: no existe nada de esto hoy
+  (`app/api/purchases/*` no tiene términos de crédito ni vencimientos). Es el espejo de
+  "crédito a clientes" ya planeado, del lado de compras.
+- **Apartados (layaway).** Cliente reserva un producto y paga a plazos antes de llevárselo —
+  común en Honduras (ropa, electrodomésticos, celulares). QuickERP lo tiene en su plan
+  intermedio ($50). No existe nada parecido hoy.
+- **Descuentos avanzados: cupones y combos.** Hoy solo hay % global o por línea
+  (`cart-panel.tsx`). Falta cupón por código y combos ("2x1", "compra 3 paga 2").
+- **Alertas de stock bajo / punto de reorden.** Con FIFO y multi-bodega ya construidos, falta
+  la pieza proactiva: avisar antes de quedarse sin stock, no solo mostrarlo.
+
+**Dejar para un futuro tier "Enterprise" (no meter en Business — mismo criterio que el precio:
+no inflar alcance ni presionar el precio de vuelta hacia arriba).** Es justo lo que Ventix
+reserva para su plan de $60, arriba de donde se posicionó Business:
+
+- Contabilidad completa (libro diario, balance general).
+- Multi-sucursal real (varias tiendas con equipos y cajas independientes, no solo bodegas).
+- Integración e-commerce / catálogo online.
+- Acceso a API / integraciones externas.
+- Comisiones por vendedor y metas de venta.
